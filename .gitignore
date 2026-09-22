@@ -1,0 +1,32 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Laravel
+backend/storage/*.key
+backend/storage/logs/*
+backend/bootstrap/cache/*
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Build
+dist/
+build/
