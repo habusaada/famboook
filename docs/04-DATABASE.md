@@ -2,7 +2,7 @@
 ## Database Architecture
 
 **Document:** `04-DATABASE.md`  
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System  
@@ -19,6 +19,7 @@ It translates the approved:
 - `01-PRODUCT.md`
 - `02-DATA-DICTIONARY.md`
 - `03-BUSINESS-RULES.md`
+- `05-WORKFLOWS.md`
 
 into a PostgreSQL-oriented relational model.
 
@@ -32,6 +33,7 @@ This document defines:
 - Nullability.
 - Historical-data strategy.
 - Reference tables.
+- Workflow history.
 - Delete behavior.
 - Sensitive-data considerations.
 - Laravel implementation conventions.
@@ -159,9 +161,10 @@ SOCIOECONOMIC
 ├── person_education
 └── person_employment
 
-ASSESSMENT
+ASSESSMENT & WORKFLOW
 ├── assessments
-└── form_submissions
+├── form_submissions
+└── workflow_events
 
 CASE MANAGEMENT
 ├── family_needs
@@ -494,7 +497,7 @@ relationship_type_id → relationship_types.id
 CHECK (person_id <> related_person_id)
 ```
 
-### Recommended Index
+### Recommended Indexes
 
 ```text
 INDEX person_id
@@ -934,7 +937,7 @@ EMERGENCY_UPDATE
 
 Purpose:
 
-Represents the original source form.
+Represents the original source form and its data-entry/review lifecycle.
 
 ```text
 form_submissions
@@ -967,9 +970,286 @@ INDEX status
 INDEX paper_form_no
 ```
 
+### Approved V1 Workflow States
+
+```text
+DRAFT
+DATA_ENTRY_COMPLETED
+UNDER_REVIEW
+RETURNED_FOR_CORRECTION
+CORRECTED
+VERIFIED
+APPROVED
+ARCHIVED
+```
+
+`status` represents the current workflow state.
+
+Historical transitions are stored separately in:
+
+```text
+workflow_events
+```
+
 ---
 
-# 29. form_types
+# 29. workflow_events
+
+Purpose:
+
+Stores the immutable history of workflow state transitions for workflow-controlled entities.
+
+```text
+workflow_events
+```
+
+| Column | Type | Null | Constraint |
+|---|---|---:|---|
+| id | BIGINT | No | PK |
+| workflowable_type | VARCHAR(100) | No | Polymorphic type |
+| workflowable_id | BIGINT | No | Polymorphic ID |
+| from_status | VARCHAR(30) | Yes | |
+| to_status | VARCHAR(30) | No | |
+| action | VARCHAR(50) | No | |
+| reason | TEXT | Yes | |
+| metadata | JSONB | Yes | |
+| performed_by | BIGINT | Yes | FK users |
+| created_at | TIMESTAMP | No | |
+
+### Purpose
+
+Examples of workflow events:
+
+```text
+DRAFT → DATA_ENTRY_COMPLETED
+DATA_ENTRY_COMPLETED → UNDER_REVIEW
+UNDER_REVIEW → RETURNED_FOR_CORRECTION
+RETURNED_FOR_CORRECTION → CORRECTED
+CORRECTED → UNDER_REVIEW
+UNDER_REVIEW → VERIFIED
+VERIFIED → APPROVED
+```
+
+Need workflow events may include:
+
+```text
+IDENTIFIED → VERIFIED
+VERIFIED → ACTIVE
+ACTIVE → PARTIALLY_MET
+PARTIALLY_MET → MET
+MET → CLOSED
+```
+
+### Polymorphic Relationship
+
+`workflow_events` may track different workflow-controlled entities.
+
+```text
+workflow_events
+      │
+      ├── FormSubmission
+      ├── Assessment
+      └── FamilyNeed
+```
+
+Laravel conceptual relationship:
+
+```php
+public function workflowable()
+{
+    return $this->morphTo();
+}
+```
+
+Workflow-controlled models may expose:
+
+```php
+public function workflowEvents()
+{
+    return $this->morphMany(
+        WorkflowEvent::class,
+        'workflowable'
+    );
+}
+```
+
+### Foreign Key
+
+```text
+performed_by → users.id
+```
+
+`performed_by` may be nullable for system-generated events where no direct user actor exists.
+
+### Indexes
+
+Recommended:
+
+```text
+INDEX (workflowable_type, workflowable_id)
+INDEX performed_by
+INDEX created_at
+INDEX to_status
+INDEX action
+```
+
+The primary retrieval pattern is:
+
+```text
+workflowable_type
++
+workflowable_id
++
+created_at
+```
+
+to construct the chronological workflow timeline of a record.
+
+### Immutability
+
+Workflow events are historical records.
+
+Normal application users MUST NOT:
+
+```text
+UPDATE workflow_events
+DELETE workflow_events
+```
+
+A new workflow transition creates a new event.
+
+Existing workflow history must not be overwritten.
+
+### Example
+
+```text
+workflowable_type: FormSubmission
+workflowable_id: 510
+
+from_status: UNDER_REVIEW
+to_status: VERIFIED
+
+action: VERIFY
+
+performed_by: 25
+created_at: 2026-09-22 14:00:00
+```
+
+### Relationship to Current Status
+
+`workflow_events` does not replace the current status stored on the business entity.
+
+For example:
+
+```text
+form_submissions.status
+```
+
+may contain:
+
+```text
+APPROVED
+```
+
+while:
+
+```text
+workflow_events
+```
+
+stores the history that led to that state:
+
+```text
+DRAFT
+→ DATA_ENTRY_COMPLETED
+→ UNDER_REVIEW
+→ RETURNED_FOR_CORRECTION
+→ CORRECTED
+→ UNDER_REVIEW
+→ VERIFIED
+→ APPROVED
+```
+
+This provides efficient access to the current state while preserving lifecycle history.
+
+### Relationship to Audit Logs
+
+`workflow_events` and `audit_logs` serve different purposes.
+
+```text
+workflow_events
+= lifecycle / state transition history
+
+audit_logs
+= data modification and system activity history
+```
+
+Example workflow event:
+
+```text
+UNDER_REVIEW
+→
+VERIFIED
+```
+
+Example audit event:
+
+```text
+national_id
+
+804000001
+→
+804000011
+```
+
+One business operation may create both:
+
+```text
+workflow_event
++
+audit_log
+```
+
+### Delete Strategy
+
+Workflow events are historical records.
+
+Use:
+
+```text
+RESTRICT / NO ACTION
+```
+
+where appropriate.
+
+Do not cascade-delete workflow history through normal application operations.
+
+### Soft Delete
+
+`workflow_events` SHOULD NOT use soft deletes.
+
+The table is append-only for normal application operations.
+
+### Security
+
+Workflow history may reveal:
+
+```text
+User actions
+Correction reasons
+Review decisions
+Operational metadata
+```
+
+Access must therefore follow the authorization rules defined in:
+
+```text
+06-PERMISSIONS.md
+```
+
+---
+
+# 30. form_types
 
 Reference table:
 
@@ -981,7 +1261,7 @@ Allows future forms to be added without changing the core database.
 
 ---
 
-# 30. documents
+# 31. documents
 
 Purpose:
 
@@ -1030,7 +1310,7 @@ CHECK (
 
 ---
 
-# 31. document_types
+# 32. document_types
 
 Reference table:
 
@@ -1052,7 +1332,7 @@ OTHER
 
 ---
 
-# 32. family_needs
+# 33. family_needs
 
 Purpose:
 
@@ -1089,9 +1369,31 @@ INDEX status
 INDEX priority
 ```
 
+### Approved Lifecycle
+
+```text
+IDENTIFIED
+    ↓
+VERIFIED
+    ↓
+ACTIVE
+    ↓
+PARTIALLY_MET
+    ↓
+MET
+    ↓
+CLOSED
+```
+
+The lifecycle may branch according to the workflow rules defined in:
+
+```text
+05-WORKFLOWS.md
+```
+
 ---
 
-# 33. need_types
+# 34. need_types
 
 Reference table:
 
@@ -1118,7 +1420,7 @@ OTHER
 
 ---
 
-# 34. assistance_records
+# 35. assistance_records
 
 Purpose:
 
@@ -1153,11 +1455,15 @@ The optional:
 need_id
 ```
 
-allows assistance to satisfy or partially satisfy a documented Need.
+allows assistance to be associated with a documented Need.
+
+Recording Assistance MUST NOT automatically close a Need.
+
+Need status changes must follow the approved Need workflow.
 
 ---
 
-# 35. assistance_types
+# 36. assistance_types
 
 Reference table:
 
@@ -1175,7 +1481,7 @@ because Need and Assistance are different business concepts.
 
 ---
 
-# 36. person_notes
+# 37. person_notes
 
 ```text
 person_notes
@@ -1192,9 +1498,11 @@ person_notes
 | created_at | TIMESTAMP | No |
 | updated_at | TIMESTAMP | No |
 
+Person notes are append-oriented.
+
 ---
 
-# 37. case_notes
+# 38. case_notes
 
 ```text
 case_notes
@@ -1219,7 +1527,7 @@ Hard deletion should not be available to normal users.
 
 ---
 
-# 38. note_types
+# 39. note_types
 
 Reference table:
 
@@ -1241,7 +1549,7 @@ OTHER
 
 ---
 
-# 39. users
+# 40. users
 
 Laravel authentication table.
 
@@ -1270,7 +1578,7 @@ Final authentication policy is defined during implementation.
 
 ---
 
-# 40. Roles and Permissions
+# 41. Roles and Permissions
 
 Recommended Laravel package:
 
@@ -1296,7 +1604,7 @@ Detailed authorization design belongs in:
 
 ---
 
-# 41. audit_logs
+# 42. audit_logs
 
 Recommended package:
 
@@ -1333,7 +1641,7 @@ Audit records should be append-only for normal application users.
 
 ---
 
-# 42. Reference Table Standard
+# 43. Reference Table Standard
 
 Most lookup tables should follow:
 
@@ -1375,7 +1683,7 @@ form_types
 
 ---
 
-# 43. Foreign Key Delete Strategy
+# 44. Foreign Key Delete Strategy
 
 Deletion behavior must be deliberate.
 
@@ -1396,8 +1704,6 @@ for historical dependent records.
 
 Do NOT cascade-delete an entire person's history.
 
----
-
 ## Reference Tables
 
 Use:
@@ -1410,14 +1716,14 @@ when values are already referenced.
 
 Deactivate reference values instead of deleting them.
 
----
-
 ## Historical Records
 
 For:
 
 ```text
 assessments
+form_submissions
+workflow_events
 assistance_records
 case_notes
 documents
@@ -1428,7 +1734,7 @@ avoid destructive cascade behavior.
 
 ---
 
-# 44. Soft Deletes
+# 45. Soft Deletes
 
 Recommended for:
 
@@ -1445,13 +1751,20 @@ documents
 
 depending on retention requirements.
 
-Not recommended for immutable historical/audit events where explicit lifecycle states are more appropriate.
+Not recommended for:
+
+```text
+workflow_events
+audit_logs
+```
+
+because these represent append-only historical records.
 
 Soft deletion must not replace proper business statuses.
 
 ---
 
-# 45. Timestamps
+# 46. Timestamps
 
 Application timestamps should use timezone-aware handling.
 
@@ -1461,7 +1774,7 @@ Display conversion belongs to the application layer.
 
 ---
 
-# 46. Monetary Fields
+# 47. Monetary Fields
 
 Use:
 
@@ -1481,7 +1794,7 @@ Currency must be explicit when monetary values can use different currencies.
 
 ---
 
-# 47. Phone Numbers
+# 48. Phone Numbers
 
 Phone numbers must be stored as text.
 
@@ -1508,7 +1821,7 @@ Canonical normalization rules will be implemented at application level.
 
 ---
 
-# 48. National ID Storage
+# 49. National ID Storage
 
 National IDs must use:
 
@@ -1528,7 +1841,7 @@ A final uniqueness strategy will be approved after confirming identity rules and
 
 ---
 
-# 49. Sensitive Field Encryption
+# 50. Sensitive Field Encryption
 
 Candidate fields for application-level encryption include:
 
@@ -1561,7 +1874,7 @@ This decision must be finalized during the security implementation phase before 
 
 ---
 
-# 50. Search Strategy
+# 51. Search Strategy
 
 Initial indexed search fields:
 
@@ -1581,7 +1894,7 @@ pg_trgm
 
 for fuzzy name search.
 
-Example future index:
+Example future extension:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -1599,7 +1912,7 @@ This optimization should be introduced only when required.
 
 ---
 
-# 51. Duplicate Detection Data
+# 52. Duplicate Detection Data
 
 Duplicate detection logic primarily belongs in the application layer.
 
@@ -1617,7 +1930,7 @@ The system MUST NOT enforce automatic Person merging at database level.
 
 ---
 
-# 52. Derived Data
+# 53. Derived Data
 
 Do NOT create canonical columns such as:
 
@@ -1637,9 +1950,9 @@ If performance later requires cached aggregates, they must remain derived data.
 
 ---
 
-# 53. Assessment Snapshot Consideration
+# 54. Assessment Snapshot Consideration
 
-Some Person attributes are time-sensitive.
+Some Person and Family attributes are time-sensitive.
 
 Examples:
 
@@ -1649,17 +1962,18 @@ breastfeeding
 employment
 residence
 needs
+displacement
 ```
 
 V1 maintains current domain records plus assessment history.
 
-Where historical reporting requires exact "state at assessment time", snapshot tables or assessment-linked observations may be introduced.
+Where historical reporting requires the exact state at assessment time, snapshot tables or assessment-linked observations may be introduced.
 
 This must be considered before building advanced longitudinal reporting.
 
 ---
 
-# 54. Database Indexing Strategy
+# 55. Database Indexing Strategy
 
 Indexes should support actual query patterns.
 
@@ -1681,6 +1995,11 @@ assessments.family_id
 assessments.status
 assessments.assessment_date
 
+form_submissions.family_id
+form_submissions.status
+
+workflow_events.workflowable_type + workflowable_id
+
 family_needs.family_id
 family_needs.status
 
@@ -1692,7 +2011,7 @@ Avoid indexing every column without demonstrated need.
 
 ---
 
-# 55. Composite Indexes
+# 56. Composite Indexes
 
 Potential composite indexes include:
 
@@ -1702,6 +2021,12 @@ family_memberships
 
 assessments
 (family_id, assessment_date)
+
+form_submissions
+(family_id, status)
+
+workflow_events
+(workflowable_type, workflowable_id)
 
 family_needs
 (family_id, status)
@@ -1714,7 +2039,7 @@ Final indexes should be verified using production query patterns.
 
 ---
 
-# 56. Unique Constraints
+# 57. Unique Constraints
 
 V1 requires at minimum:
 
@@ -1739,44 +2064,50 @@ One current residence per family
 
 ---
 
-# 57. Check Constraints
+# 58. Check Constraints
 
 Recommended PostgreSQL checks include:
 
-### Person relationship
+### Person Relationship
 
 ```sql
-person_id <> related_person_id
+CHECK (person_id <> related_person_id)
 ```
 
-### Membership dates
+### Membership Dates
 
 ```sql
-ended_at IS NULL
-OR started_at IS NULL
-OR ended_at >= started_at
+CHECK (
+    ended_at IS NULL
+    OR started_at IS NULL
+    OR ended_at >= started_at
+)
 ```
 
-### Residence dates
+### Residence Dates
 
 ```sql
-to_date IS NULL
-OR from_date IS NULL
-OR to_date >= from_date
+CHECK (
+    to_date IS NULL
+    OR from_date IS NULL
+    OR to_date >= from_date
+)
 ```
 
-### Document owner
+### Document Owner
 
 ```sql
-family_id IS NOT NULL
-OR person_id IS NOT NULL
+CHECK (
+    family_id IS NOT NULL
+    OR person_id IS NOT NULL
+)
 ```
 
 Additional constraints should be introduced where they improve integrity without preventing valid operational exceptions.
 
 ---
 
-# 58. Null vs Unknown
+# 59. Null vs Unknown
 
 Database `NULL` generally means:
 
@@ -1818,7 +2149,7 @@ This distinction must be preserved where operationally important.
 
 ---
 
-# 59. ERD — Core
+# 60. ERD — Core
 
 ```text
 ┌─────────────────┐
@@ -1861,18 +2192,25 @@ families
    ├────────────── assessments
    │                    │
    │                    └──── form_submissions
+   │                              │
+   │                              └──── workflow_events
    │
    ├────────────── family_needs
    │                    │
+   │                    ├──── workflow_events
    │                    └──── assistance_records
    │
    ├────────────── case_notes
    └────────────── documents
 ```
 
+Note:
+
+`workflow_events` uses a polymorphic relationship and may therefore reference multiple workflow-controlled entities rather than having a direct foreign key to only one table.
+
 ---
 
-# 60. ERD — Identity Model
+# 61. ERD — Identity Model
 
 ```text
                 ┌───────────────┐
@@ -1902,7 +2240,7 @@ This model allows Person identity to survive household changes.
 
 ---
 
-# 61. Example — Person Moves Household
+# 62. Example — Person Moves Household
 
 Initial state:
 
@@ -1939,11 +2277,11 @@ The Person remains:
 PER-000100
 ```
 
-No duplicate person is created.
+No duplicate Person is created.
 
 ---
 
-# 62. Example — Household Head Change
+# 63. Example — Household Head Change
 
 Before:
 
@@ -1969,9 +2307,11 @@ is_household_head = true
 
 Membership history and audit logs preserve the change.
 
+The operation should execute transactionally to prevent a Family from temporarily ending in an inconsistent household-head state.
+
 ---
 
-# 63. Laravel Migration Order
+# 64. Laravel Migration Order
 
 Recommended migration sequence:
 
@@ -1997,26 +2337,27 @@ Recommended migration sequence:
 
 13 assessments
 14 form_submissions
+15 workflow_events
 
-15 documents
+16 documents
 
-16 family_needs
-17 assistance_records
+17 family_needs
+18 assistance_records
 
-18 person_notes
-19 case_notes
+19 person_notes
+20 case_notes
 
-20 roles / permissions
-21 audit infrastructure
+21 roles / permissions
+22 audit infrastructure
 
-22 indexes / specialized constraints
+23 indexes / specialized constraints
 ```
 
 Exact Laravel timestamps will determine actual execution order.
 
 ---
 
-# 64. Laravel Model Relationships
+# 65. Laravel Model Relationships
 
 Expected conceptual relationships:
 
@@ -2051,11 +2392,35 @@ Assessment
   belongsTo Collector
   belongsTo Reviewer
   hasMany FormSubmissions
+  morphMany WorkflowEvents
+```
+
+```text
+FormSubmission
+  belongsTo Family
+  belongsTo Assessment
+  belongsTo FormType
+  morphMany WorkflowEvents
+```
+
+```text
+FamilyNeed
+  belongsTo Family
+  belongsTo Person optionally
+  belongsTo Assessment optionally
+  hasMany AssistanceRecords
+  morphMany WorkflowEvents
+```
+
+```text
+WorkflowEvent
+  morphTo Workflowable
+  belongsTo User through performed_by
 ```
 
 ---
 
-# 65. Transaction Boundaries
+# 66. Transaction Boundaries
 
 Operations involving multiple dependent records should use database transactions.
 
@@ -2087,9 +2452,21 @@ Move Person Between Families
 
 should be atomic.
 
+Workflow transitions that update the entity state and create a corresponding `workflow_events` record should also execute transactionally.
+
+Example:
+
+```text
+Update form_submissions.status
++
+Insert workflow_events
+```
+
+must either both succeed or both fail.
+
 ---
 
-# 66. Concurrency
+# 67. Concurrency
 
 Critical updates should guard against race conditions.
 
@@ -2105,11 +2482,31 @@ or:
 Two users moving the same Person between families.
 ```
 
+or:
+
+```text
+Two reviewers attempting to verify/return the same submission.
+```
+
 Database constraints plus application transactions should protect these operations.
+
+Optimistic concurrency using:
+
+```text
+updated_at
+```
+
+or an explicit:
+
+```text
+version
+```
+
+field may be introduced for critical records.
 
 ---
 
-# 67. Data Seeding
+# 68. Data Seeding
 
 Seeders should initially provide:
 
@@ -2139,7 +2536,7 @@ Only approved lookup values should be treated as production seed data.
 
 ---
 
-# 68. Development Data
+# 69. Development Data
 
 Development environments may use factories and seeders containing fictional data.
 
@@ -2150,6 +2547,7 @@ Example:
 ```text
 FAM-000001
 Test Family
+
 PER-000001
 Test Person
 ```
@@ -2158,7 +2556,7 @@ or generated fictional records.
 
 ---
 
-# 69. Backup Requirements
+# 70. Backup Requirements
 
 Production architecture must support:
 
@@ -2174,7 +2572,7 @@ Backups containing personal data are sensitive and require protection equivalent
 
 ---
 
-# 70. Database Access
+# 71. Database Access
 
 Production database credentials:
 
@@ -2192,7 +2590,7 @@ must remain ignored by Git.
 
 ---
 
-# 71. Laravel Environment
+# 72. Laravel Environment
 
 Example development configuration:
 
@@ -2217,7 +2615,7 @@ for non-secret configuration examples.
 
 ---
 
-# 72. Database Naming
+# 73. Database Naming
 
 Use:
 
@@ -2231,6 +2629,7 @@ Tables:
 family_memberships
 person_health_conditions
 assistance_records
+workflow_events
 ```
 
 Columns:
@@ -2268,9 +2667,16 @@ Timestamps:
 *_at
 ```
 
+Polymorphic fields:
+
+```text
+workflowable_type
+workflowable_id
+```
+
 ---
 
-# 73. Database Anti-Patterns
+# 74. Database Anti-Patterns
 
 The following designs are prohibited unless a later architecture decision explicitly changes them.
 
@@ -2322,107 +2728,245 @@ store manually maintained family-member counts.
 
 store sensitive uploaded documents in public web directories.
 
+## Do Not
+
+store only the latest workflow status without preserving important transition history.
+
+## Do Not
+
+allow users to manually overwrite workflow history.
+
 ---
 
-# 74. Pending Database Decisions
+# 75. Pending Database Decisions
 
 The following must be finalized before production deployment.
 
-### PDD-001
+### PDD-001 — National ID Strategy
 
-Final National ID uniqueness/encryption strategy.
+Finalize:
 
-### PDD-002
-
-Final approved lookup values from the source form.
-
-### PDD-003
-
-Whether pregnancy/breastfeeding should move from the current health profile to assessment-linked observations for complete longitudinal history.
-
-### PDD-004
-
-Exact retention and archival policy.
-
-### PDD-005
-
-Whether confidential notes require additional field-level encryption.
-
-### PDD-006
-
-Final production backup policy.
-
-### PDD-007
-
-Whether full-text/trigram search is needed in V1.
-
-### PDD-008
-
-Whether household membership requires an explicit membership type in addition to relationship type.
+```text
+Uniqueness
+Normalization
+Encryption
+Search hash
+Exceptional duplicate handling
+```
 
 ---
 
-# 75. Approved Database Decisions V1
+### PDD-002 — Approved Lookup Values
+
+Finalize lookup values from the approved operational source/form.
+
+---
+
+### PDD-003 — Time-Sensitive Health Data
+
+Determine whether:
+
+```text
+pregnancy
+breastfeeding
+```
+
+remain in the current health profile only or also require assessment-linked historical observations.
+
+---
+
+### PDD-004 — Retention Policy
+
+Define retention and archival rules for:
+
+```text
+Forms
+Documents
+Workflow events
+Audit logs
+Exports
+Archived records
+Backups
+```
+
+---
+
+### PDD-005 — Confidential Note Encryption
+
+Determine whether confidential notes require field-level encryption in addition to authorization controls.
+
+---
+
+### PDD-006 — Backup Policy
+
+Finalize:
+
+```text
+Frequency
+Retention
+Encryption
+Storage
+Restore testing
+Access
+```
+
+---
+
+### PDD-007 — Advanced Search
+
+Determine whether V1 requires:
+
+```text
+pg_trgm
+GIN indexes
+Fuzzy Arabic name matching
+```
+
+or whether indexed standard search is sufficient initially.
+
+---
+
+### PDD-008 — Membership Type
+
+Determine whether `family_memberships` requires an explicit:
+
+```text
+membership_type
+```
+
+in addition to:
+
+```text
+relationship_type_id
+```
+
+for future household models.
+
+---
+
+### PDD-009 — Workflow Polymorphic Type Storage
+
+Before implementation, define a stable morph map for workflow-controlled entities.
+
+Recommended conceptual aliases:
+
+```text
+form_submission
+assessment
+family_need
+```
+
+rather than storing full PHP class names in `workflowable_type`.
+
+This avoids coupling persistent database data to PHP namespaces.
+
+---
+
+### PDD-010 — Duplicate Merge Tool
+
+Determine whether V1 requires a full database-backed Person merge process or only duplicate review and administrator resolution.
+
+---
+
+# 76. Approved Database Decisions V1
 
 The following architecture decisions are approved:
 
 ### DB-ADR-001
+
 PostgreSQL is the primary relational database.
 
 ### DB-ADR-002
+
 Internal BIGINT primary keys are used for core tables.
 
 ### DB-ADR-003
+
 `family_code` and `person_code` are unique business identifiers.
 
 ### DB-ADR-004
+
 Person identity is independent of Family identity.
 
 ### DB-ADR-005
+
 `family_memberships` is the canonical relationship between Persons and Families.
 
 ### DB-ADR-006
+
 Historical membership is preserved.
 
 ### DB-ADR-007
+
 One Person normally has one active primary family membership.
 
 ### DB-ADR-008
+
 One Family normally has one active household head.
 
 ### DB-ADR-009
+
 Residence history is represented using multiple records.
 
 ### DB-ADR-010
+
 Health conditions and disabilities are repeatable relational records.
 
 ### DB-ADR-011
+
 Needs and Assistance use separate tables.
 
 ### DB-ADR-012
+
 Assessments and Form Submissions are separate from permanent Family records.
 
 ### DB-ADR-013
+
 Core identity/history records are protected against destructive cascading deletes.
 
 ### DB-ADR-014
+
 Reference data uses stable codes.
 
 ### DB-ADR-015
+
 Derived statistics are not canonical database columns.
 
 ### DB-ADR-016
+
 Critical multi-record operations use transactions.
 
 ### DB-ADR-017
+
 Sensitive documents use private storage.
 
 ### DB-ADR-018
+
 Audit history is append-oriented and protected from normal modification.
+
+### DB-ADR-019
+
+`workflow_events` preserves workflow state-transition history.
+
+### DB-ADR-020
+
+Current workflow state remains on the workflow-controlled business entity for efficient access.
+
+### DB-ADR-021
+
+Workflow history is append-only for normal application users.
+
+### DB-ADR-022
+
+Workflow state changes and their corresponding workflow events should be written atomically.
+
+### DB-ADR-023
+
+Polymorphic workflow relationships should use stable morph aliases rather than PHP class names.
 
 ---
 
-# 76. Documentation Synchronization
+# 77. Documentation Synchronization
 
 The database implementation MUST remain consistent with:
 
@@ -2431,18 +2975,61 @@ The database implementation MUST remain consistent with:
 02-DATA-DICTIONARY.md
 03-BUSINESS-RULES.md
 04-DATABASE.md
+05-WORKFLOWS.md
 ```
 
 If implementation requires a structural change, documentation must be updated intentionally rather than allowing code and documentation to diverge.
 
+The precedence for implementation-specific database structure is:
+
+```text
+Product Intent
+      ↓
+Data Definitions
+      ↓
+Business Rules
+      ↓
+Database Architecture
+      ↓
+Workflow Requirements
+      ↓
+Permissions
+      ↓
+Implementation
+```
+
+Where a later approved architecture decision intentionally refines an earlier document, the affected earlier document should be updated or clearly marked as superseded for that specific decision.
+
 ---
 
-# 77. Document Status
+# 78. Implementation Readiness Checklist
+
+Before generating production Laravel migrations, confirm:
+
+```text
+[ ] Product V1 approved
+[ ] Data Dictionary approved
+[ ] Business Rules approved
+[ ] Database Architecture approved
+[ ] Workflows approved
+[ ] Permissions approved
+[ ] Lookup vocabularies reviewed
+[ ] National ID strategy confirmed
+[ ] Sensitive-data strategy confirmed
+[ ] Workflow morph aliases confirmed
+[ ] Backup/security baseline defined
+```
+
+Migrations may be prototyped before every production decision is finalized, but production data MUST NOT be loaded until critical identity, security, and retention decisions are resolved.
+
+---
+
+# 79. Document Status
 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.0
+Version: 1.1
 Status: APPROVED
 Database: PostgreSQL
 Date: 2026-09-22
@@ -2450,15 +3037,16 @@ Date: 2026-09-22
 
 ---
 
-# 78. Change Log
+# 80. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Approved | Initial PostgreSQL database architecture |
+| 1.1 | 2026-09-22 | Approved | Added workflow_events architecture, workflow indexes, migration ordering, workflow relationships, transaction rules, and synchronization with 05-WORKFLOWS.md |
 
 ---
 
-# 79. Next Step
+# 81. Next Step
 
 Current documentation status:
 
@@ -2466,10 +3054,24 @@ Current documentation status:
 01-PRODUCT.md                 APPROVED
 02-DATA-DICTIONARY.md         APPROVED
 03-BUSINESS-RULES.md          APPROVED
-04-DATABASE.md                APPROVED
-05-WORKFLOWS.md               NEXT
-06-PERMISSIONS.md
+04-DATABASE.md                APPROVED — v1.1
+05-WORKFLOWS.md               APPROVED
+06-PERMISSIONS.md             NEXT
 07-ROADMAP.md
 ```
 
-Do not generate production migrations until the remaining workflow and permission requirements that affect database behavior have been reviewed.
+The next document must define:
+
+```text
+WHO
+   ↓
+CAN PERFORM WHICH ACTION
+   ↓
+ON WHICH ENTITY
+   ↓
+AT WHICH WORKFLOW STATE
+   ↓
+WITH ACCESS TO WHICH FIELDS
+```
+
+before production implementation begins.
