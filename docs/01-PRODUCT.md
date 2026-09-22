@@ -2,7 +2,7 @@
 ## Product Definition
 
 **Document:** `01-PRODUCT.md`  
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System
@@ -11,324 +11,352 @@
 
 # 1. Product Overview
 
-Famboook is a Family Registry & Case Management System designed to create and maintain a structured, verified, historical, and secure digital registry of families and their members.
+Famboook is a secure Family Registry and Case Management platform designed to create, maintain, verify, and use structured Family and Person information.
 
-The system transforms fragmented family information, paper forms, assessments, updates, documents, needs, assistance records, and follow-up activities into a unified digital platform.
+The system transforms paper-based and fragmented Family information into a controlled digital registry while preserving:
 
-Famboook is not merely a paper-form data-entry system.
+- Person identity
+- Family membership history
+- Household structure
+- Residence history
+- Assessments
+- Needs
+- Assistance
+- Supporting documents
+- Verification history
+- Change history
+- Workflow history
 
-It is designed as a long-term family information platform supporting:
+Famboook is not merely a digital copy of a paper form.
 
-```text
-Registration
-+
-Verification
-+
-Family Registry
-+
-Person Registry
-+
-Family Self-Service
-+
-Assessments
-+
-Needs
-+
-Assistance
-+
-Case Management
-+
-Reporting
-+
-Historical Tracking
-```
+The paper form is considered a data source.
+
+The digital platform represents the real-world domain independently from the structure and limitations of paper forms.
 
 ---
 
 # 2. Product Vision
 
-The vision of Famboook is to establish a reliable digital source of truth for family information.
+Famboook should become a trusted digital Family Registry platform capable of supporting:
 
-The platform should allow authorized users to answer questions such as:
+- Family registration
+- Person registration
+- Household structure
+- Data verification
+- Family data maintenance
+- Social assessments
+- Needs identification
+- Assistance tracking
+- Case management
+- Family self-service
+- Controlled data correction
+- Reporting
+- Decision support
 
-```text
-Who are the registered families?
-
-Who are the registered persons?
-
-Which Person belongs to which Family?
-
-Who is the current household head?
-
-Where is the Family currently residing?
-
-What is the Family's residence/displacement history?
-
-What health or disability conditions exist?
-
-What are the education and employment conditions?
-
-What needs have been identified?
-
-What assistance has been received?
-
-What assessments have been performed?
-
-What documents are available?
-
-What changes were requested by the Family?
-
-Who verified or approved a change?
-
-How has the Family record changed over time?
-```
+The product should be designed as a modern, extensible, secure digital platform rather than a traditional administrative CRUD panel.
 
 ---
 
-# 3. Product Goals
+# 3. Product Positioning
 
-Famboook V1 aims to:
-
-1. Establish a structured Family Registry.
-2. Establish an independent Person Registry.
-3. Digitize existing paper-based family records.
-4. Support unlimited Family members.
-5. Preserve historical changes.
-6. Prevent unnecessary duplicate Person records.
-7. Support controlled data verification.
-8. Support household membership history.
-9. Track residence and displacement.
-10. Track health and disability information.
-11. Track education and employment information.
-12. Track assessments.
-13. Track needs and assistance.
-14. Store supporting documents securely.
-15. Support case-management notes.
-16. Provide controlled reporting.
-17. Provide role-based access control.
-18. Maintain complete auditability.
-19. Allow authenticated Families to review permitted information.
-20. Allow Families to submit controlled update requests.
-21. Prevent Family-submitted changes from silently modifying the official registry.
-22. Create a foundation that can scale beyond the initial Family dataset.
-
----
-
-# 4. Product Philosophy
-
-The system follows several fundamental principles.
-
-## 4.1 Person Is an Independent Entity
-
-A Person is not simply:
+Famboook is designed as a:
 
 ```text
-Family Member Row #4
-```
-
-A Person has a persistent identity in the system.
-
-Example:
-
-```text
-PER-001825
-```
-
-The same Person may change:
-
-```text
-Family
-Residence
-Marital Status
-Household Role
-Employment
-Education
-Health Information
-```
-
-without becoming a new Person.
-
----
-
-## 4.2 Family Is an Independent Entity
-
-A Family has its own persistent identity.
-
-Example:
-
-```text
-FAM-000510
-```
-
-The Family remains identifiable even when:
-
-```text
-Household Head changes
-Members leave
-Members join
-Residence changes
-Displacement occurs
-```
-
----
-
-## 4.3 Paper Forms Are Sources, Not the Database Model
-
-Paper forms are treated as:
-
-```text
-Source Documents
-```
-
-They do not define the permanent structure of the database.
-
-Example:
-
-If a paper form contains space for:
-
-```text
-10 children
-```
-
-the digital system must not be limited to 10 children.
-
----
-
-## 4.4 Registry Data Is Different From Assessment Data
-
-Permanent registry information and point-in-time observations must remain conceptually separate.
-
-Example:
-
-```text
-Person Name
-National ID
-Birth Date
-```
-
-are identity/registry data.
-
-While:
-
-```text
-Current Need
-Current Employment Situation
-Current Displacement Situation
-Pregnancy
-Breastfeeding
-```
-
-may change over time and may be associated with an assessment or update.
-
----
-
-## 4.5 Family-Submitted Data Is Not Automatically Official Data
-
-Information submitted through the Family Portal must not automatically overwrite the verified Family Registry.
-
-Instead:
-
-```text
-Family Submission
-      ↓
-Change Request
-      ↓
-Validation
-      ↓
-Review
-      ↓
-Approval / Rejection
-      ↓
-Apply to Official Registry
-```
-
-This distinction is fundamental to Famboook.
-
----
-
-# 5. Product Actors
-
-Famboook serves two major actor groups:
-
-```text
-Internal Operational Users
+Family Registry
 +
-Authenticated Family Users
+Case Management System
++
+Family Self-Service Platform
++
+Operational Data Platform
 ```
+
+The system must support both operational staff and authorized Family users without compromising registry integrity.
 
 ---
 
-# 6. Internal Operational Users
+# 4. Product Design Philosophy
 
-Internal users operate the Staff Portal.
+Famboook should feel like a modern SaaS / Enterprise product.
 
-Approved V1 roles include:
+The product experience should prioritize:
 
 ```text
-SUPER_ADMIN
+Clarity
+
+Professional Design
+
+Modern UX
+
+Arabic-first Experience
+
+RTL Excellence
+
+Responsive Design
+
+Mobile Usability
+
+Fast Navigation
+
+Data Density without Clutter
+
+Accessibility
+
+Consistency
+
+Security
+
+Trust
+```
+
+Visual design is considered part of the product architecture, not a final cosmetic phase.
+
+---
+
+# 5. Product Experience Principle
+
+Famboook must not expose the database structure directly as the user experience.
+
+Users should interact with meaningful domain concepts such as:
+
+```text
+Family Profile
+
+Person Profile
+
+Household Members
+
+Residence
+
+Assessment
+
+Need
+
+Assistance
+
+Change Request
+
+Verification
+
+Review Queue
+
+Family Timeline
+```
+
+rather than raw database tables.
+
+---
+
+# 6. Primary Product Experiences
+
+Famboook contains four primary experiences:
+
+```text
+1. Staff Application
+
+2. Executive Dashboard
+
+3. Family Portal
+
+4. System Administration
+```
+
+These experiences may use different interfaces while sharing the same backend, domain rules, authorization model, and canonical database.
+
+---
+
+# 7. Staff Application
+
+The Staff Application is the main operational interface.
+
+It is a custom modern web application.
+
+Primary users include:
+
+```text
 ADMINISTRATOR
+
 DATA_ENTRY
+
 REVIEWER
+
 SOCIAL_WORKER
+
 REPORTS_VIEWER
 ```
 
-Detailed permissions are defined in:
+The Staff Application is not implemented as a generic administration panel.
 
-```text
-06-PERMISSIONS.md
-```
+It is designed specifically around Famboook operational workflows.
 
 ---
 
-# 7. Family User
+# 8. Staff Application Capabilities
 
-Famboook introduces an authenticated external user type:
+The Staff Application may include:
+
+```text
+Dashboard
+
+Families
+
+Persons
+
+Data Entry
+
+Membership Management
+
+Relationship Management
+
+Residence Management
+
+Review Center
+
+Verification
+
+Assessments
+
+Health Information
+
+Disability Information
+
+Education
+
+Employment
+
+Needs
+
+Assistance
+
+Documents
+
+Case Notes
+
+Change Requests
+
+Duplicate Review
+
+Reports
+
+Notifications
+```
+
+Exact capabilities depend on role and permission.
+
+---
+
+# 9. Executive Dashboard
+
+Management and decision-makers should use a dedicated product experience rather than the technical administration interface.
+
+The Executive Dashboard may provide:
+
+```text
+Registry KPIs
+
+Family Statistics
+
+Population Statistics
+
+Residence Statistics
+
+Displacement Statistics
+
+Needs Analysis
+
+Assistance Analysis
+
+Operational Workload
+
+Verification Progress
+
+Change Request Metrics
+
+Data Quality Indicators
+
+Trends
+
+Management Reports
+```
+
+The Executive Dashboard is part of the primary Famboook web application.
+
+---
+
+# 10. Family Portal
+
+Famboook includes an authenticated Family Portal.
+
+The Family Portal provides controlled self-service access to authorized Family users.
+
+It is not public self-registration.
+
+It is not unrestricted registry editing.
+
+---
+
+# 11. Family User
+
+The external authorization role is:
 
 ```text
 FAMILY_USER
 ```
 
-A Family User represents a verified Person authorized to access permitted information related to a Family.
+`FAMILY_USER` is preferred over using `HOUSEHOLD_HEAD` as an authorization role.
 
-In the initial V1 implementation, the Family User will normally be:
+Household Head is a domain relationship/state.
 
-```text
-The Household Head
-```
+FAMILY_USER is an application authorization concept.
 
-However, the architecture must not permanently assume:
+This separation allows future support for:
 
 ```text
-Family User = Household Head
-```
-
-because future requirements may allow:
-
-```text
-Authorized Family Representative
 Guardian
-Authorized Adult Member
+
+Authorized Representative
+
+Approved Adult Family Member
 ```
 
-Therefore:
-
-```text
-FAMILY_USER
-```
-
-is preferred as the authorization concept.
+without redesigning the role model.
 
 ---
 
-# 8. Family User Identity
+# 12. Recommended V1 Family User
 
-A Family User account must be linked to a known Person.
+The recommended V1 policy is:
+
+```text
+Verified Current Household Head
+```
+
+A user must not receive Family Portal access merely because they know:
+
+```text
+Family Code
+
+Person Code
+
+National ID
+
+Phone Number
+```
+
+Identity and relationship verification are required.
+
+---
+
+# 13. User Identity vs Person Identity
+
+A system User and a registry Person are separate entities.
 
 Conceptually:
 
 ```text
 User
+ ↓
+User-Person Link
  ↓
 Person
  ↓
@@ -337,341 +365,189 @@ Active Family Membership
 Family
 ```
 
-A Family User must not gain access to a Family merely by knowing:
+A User represents authentication identity.
 
-```text
-Family Code
-National ID
-Phone Number
-```
+A Person represents real-world registry identity.
 
-Account linking must follow an approved identity-verification and activation process.
+These concepts must not be merged.
 
 ---
 
-# 9. Two Product Experiences
+# 14. Family Portal Scope
 
-Famboook V1 consists conceptually of two application experiences.
+An authenticated Family User may access only the Family scope authorized through their verified identity relationship.
 
-```text
-FAMBOOOK
-│
-├── Staff Portal
-│
-│   ├── Administration
-│   ├── Data Entry
-│   ├── Verification
-│   ├── Family Registry
-│   ├── Person Registry
-│   ├── Assessments
-│   ├── Needs & Assistance
-│   ├── Case Management
-│   ├── Reports
-│   └── Audit
-│
-└── Family Portal
-    │
-    ├── My Family
-    ├── Family Members
-    ├── My Profile
-    ├── Update Requests
-    ├── Documents
-    ├── Needs / Assistance Summary
-    └── Notifications
-```
-
-The portals may initially share the same Laravel backend.
-
-The exact frontend implementation may evolve independently.
-
----
-
-# 10. Staff Portal
-
-The Staff Portal is the operational administration environment.
-
-It supports:
+Authorization must consider:
 
 ```text
-Family Registration
-Person Registration
-Data Entry
-Verification
-Approval
-Assessments
-Needs
-Assistance
-Documents
-Case Management
-Reporting
-Administration
-Audit
-```
+User Status
 
-Filament is the recommended V1 implementation platform for the Staff Portal.
+User Role
 
----
+User-Person Link
 
-# 11. Family Portal
+Person Status
 
-The Family Portal provides controlled self-service access for authenticated Family Users.
+Current Family Membership
 
-Its purpose is not to provide unrestricted editing.
+Household Head Status where required
 
-It provides:
+Resource Policy
 
-```text
-Read
-Review
-Request
-Upload
-Track
-```
+Field Visibility
 
-rather than unrestricted:
-
-```text
-Edit Official Registry
+Workflow State
 ```
 
 ---
 
-# 12. Family Portal V1 Capabilities
+# 15. Family Portal Capabilities
 
-Subject to permissions and verification, a Family User may be able to:
+V1 Family Portal may provide:
 
 ```text
-View permitted Family information
+Family Overview
 
-View permitted Family members
+Permitted Family Information
 
-View their own profile
+Permitted Family Members
 
-Review selected household information
+Current Residence
 
-Submit an update request
+Own Change Requests
 
-Request addition of a Family member
+Submit Update Requests
 
-Request correction of Person information
+Respond to Clarification
 
-Report a death
+Upload Supporting Documents
 
-Report marriage-related changes
+Track Request Status
 
-Report household membership changes
+Notifications
 
-Request residence/address update
-
-Update contact information through an approved process
-
-Upload supporting documents
-
-View submitted requests
-
-Track request status
-
-View selected Needs information
-
-View selected Assistance information
-
-Receive system notifications
+Account Information
 ```
 
-Not every capability must allow direct registry modification.
+Selected Needs and Assistance information may be exposed only after explicit policy approval.
 
 ---
 
-# 13. Family Portal Restrictions
+# 16. Family Portal Restrictions
 
-A Family User must not automatically be able to:
+Family Users must not directly:
 
 ```text
-Directly modify verified National ID
+Delete Persons
 
-Directly delete a Person
+Change National ID without controlled review
 
-Directly change Household Head
+Change Household Head
 
-Directly transfer a Person between Families
+Transfer Persons between Families
 
-Directly mark a Person as deceased in the official registry
+Mark a Person officially deceased
 
-Directly change verified relationships
+Modify official Family relationships
 
-Directly approve a submitted change
+Approve Change Requests
 
-Directly verify documents
+Verify Documents
 
-Directly close a Need
+Create Assistance Records
 
-Directly create an Assistance record
+Close Needs
 
-View confidential Case Notes
+View confidential Staff Notes
 
-View internal audit logs
+View Audit Logs
 
-View staff comments
+View Internal Workflow Notes
 
-View other Families
+Access other Families
 
-Export unrestricted Family Registry data
+Perform unrestricted exports
 ```
-
-These actions remain controlled by internal workflows.
 
 ---
 
-# 14. Family Self-Service Is Not Public Self-Registration
+# 17. Canonical Registry
 
-Famboook distinguishes:
+Famboook maintains a canonical registry.
 
-```text
-Public Self-Registration
-```
+Canonical data represents the system's currently accepted official state.
 
-from:
+Examples:
 
 ```text
-Authenticated Family Self-Service
+Family
+
+Person
+
+Family Membership
+
+Household Head
+
+Person Relationship
+
+Current Residence
+
+Life Status
+
+Verified Documents
 ```
 
-Public Self-Registration means:
-
-```text
-Unknown person
-      ↓
-Creates a new Family/Person registry record
-```
-
-This remains outside V1.
-
-Family Self-Service means:
-
-```text
-Known verified Person
-      ↓
-Authenticated account
-      ↓
-Linked Family
-      ↓
-Views permitted data
-      ↓
-Submits controlled change requests
-```
-
-Family Self-Service is part of V1.
+Canonical registry data must not be silently overwritten by unverified submissions.
 
 ---
 
-# 15. Official Registry vs Submitted Changes
+# 18. Proposed Data
 
-Famboook must maintain a strict distinction between:
+Data submitted by Family Users is considered proposed data until reviewed and applied.
 
-```text
-Official Registry
-```
-
-and:
+Conceptually:
 
 ```text
-Requested Changes
-```
-
-Example:
-
-Official registry:
-
-```text
-Residence:
-Khan Younis
-```
-
-Family User submits:
-
-```text
-New Residence:
-Al-Mawasi
-```
-
-The system must not immediately replace:
-
-```text
-Khan Younis
-```
-
-with:
-
-```text
-Al-Mawasi
-```
-
-Instead:
-
-```text
-Official Value
-Khan Younis
-
-Pending Request
-Al-Mawasi
-```
-
-until the request is reviewed and applied.
-
----
-
-# 16. Change Request Concept
-
-A Family-submitted modification is represented as:
-
-```text
+Family User Submission
+        ↓
+Proposed Data
+        ↓
 Change Request
-```
-
-A Change Request describes:
-
-```text
-Who submitted the request?
-
-Which Family does it concern?
-
-Which Person does it concern, if applicable?
-
-What type of change is requested?
-
-What data was submitted?
-
-What supporting documents were provided?
-
-Why was the change requested?
-
-What is its current status?
-
-Who reviewed it?
-
-What was the review decision?
-
-Was the approved change applied?
+        ↓
+Review
+        ↓
+Approval
+        ↓
+Controlled Application
+        ↓
+Canonical Registry
 ```
 
 ---
 
-# 17. Change Request Types
+# 19. Change Requests
 
-Initial V1 types may include:
+Substantive Family User changes are represented as Change Requests.
+
+Initial Change Request types include:
 
 ```text
 CONTACT_UPDATE
+
 RESIDENCE_UPDATE
 
 PERSON_CORRECTION
+
 ADD_FAMILY_MEMBER
+
 MEMBERSHIP_CHANGE
 
 HOUSEHOLD_HEAD_CHANGE
 
 BIRTH_REPORT
+
 DEATH_REPORT
+
 MARRIAGE_UPDATE
 
 DOCUMENT_UPDATE
@@ -679,13 +555,13 @@ DOCUMENT_UPDATE
 OTHER
 ```
 
-Final codes must be standardized in the Data Dictionary and Database Architecture.
+Not every type must be enabled for Family Users in the initial release.
 
 ---
 
-# 18. Change Request Workflow
+# 20. Change Request Lifecycle
 
-Recommended V1 workflow:
+The baseline lifecycle is:
 
 ```text
 DRAFT
@@ -708,1975 +584,2608 @@ UNDER_REVIEW
 
 ---
 
-# 19. APPROVED vs APPLIED
+# 21. Approved vs Applied
 
-These statuses are intentionally separate.
-
-```text
-APPROVED
-```
-
-means:
-
-```text
-The requested change has been accepted.
-```
-
-While:
-
-```text
-APPLIED
-```
-
-means:
-
-```text
-The approved change has been successfully written to the official registry.
-```
-
-This distinction allows safe transactional application of complex changes.
-
----
-
-# 20. Example — Contact Update
-
-Family User submits:
-
-```text
-Old Mobile:
-0590000000
-
-Requested Mobile:
-0560000000
-```
-
-The request becomes:
-
-```text
-SUBMITTED
-```
-
-After the approved review process:
+The system must distinguish:
 
 ```text
 APPROVED
-↓
-Update Person/Family Contact
-↓
+```
+
+from:
+
+```text
 APPLIED
 ```
 
-The action is audited.
+APPROVED means the proposed change has been authorized.
+
+APPLIED means the canonical registry transaction has successfully completed.
+
+An approved request must not be presented as applied before the domain operation succeeds.
 
 ---
 
-# 21. Example — Add Newborn
+# 22. Change Request Application
 
-Family User selects:
+Approved Change Requests must be applied through the same controlled Domain Actions used by authorized Staff operations.
 
-```text
-Add Family Member
-```
-
-and provides:
+Example:
 
 ```text
-Name
-Gender
-Birth Date
-Relationship
-National ID if available
-Birth Certificate if available
+RESIDENCE_UPDATE
+      ↓
+Approved Change Request
+      ↓
+ChangeFamilyResidenceAction
+      ↓
+Canonical Registry
 ```
 
-The system creates:
-
-```text
-Change Request
-```
-
-not an official Person immediately.
-
-Staff review:
-
-```text
-Validate
-↓
-Duplicate Check
-↓
-Review Document
-↓
-Approve
-↓
-Create Person
-+
-Create Family Membership
-↓
-APPLIED
-```
-
-The resulting Person receives a permanent:
-
-```text
-PER-XXXXXX
-```
-
-identifier.
+This prevents duplicate business logic.
 
 ---
 
-# 22. Example — Death Report
+# 23. Supporting Documents
 
-A Family User may report:
+Family Users may upload supporting documents with Change Requests.
 
-```text
-Person X has died
-```
-
-but the Family Portal must not immediately perform:
-
-```text
-persons.life_status = DECEASED
-```
-
-Instead:
-
-```text
-DEATH_REPORT
-      ↓
-Supporting Information
-      ↓
-Review
-      ↓
-Approval
-      ↓
-Update life_status
-      ↓
-Review Household Head if required
-      ↓
-APPLIED
-```
-
-The Person remains in the registry.
-
----
-
-# 23. Example — Household Head Change
-
-A Family User may request a Household Head change.
-
-They cannot directly perform it.
-
-Flow:
-
-```text
-Request Household Head Change
-      ↓
-Select Proposed Member
-      ↓
-Provide Reason
-      ↓
-Submit
-      ↓
-Review
-      ↓
-Approve
-      ↓
-Execute Controlled Head Change
-      ↓
-Audit
-      ↓
-APPLIED
-```
-
----
-
-# 24. Example — Person Leaves Household
-
-A Family User may report:
-
-```text
-Member married / moved / formed another household
-```
-
-This does not delete the Person.
-
-After approval:
-
-```text
-Existing Person
-      ↓
-Close old Family Membership
-      ↓
-Create/associate new Family Membership where applicable
-```
-
-The same:
-
-```text
-PER-XXXXXX
-```
-
-is preserved.
-
----
-
-# 25. Low-Risk vs High-Risk Changes
-
-Not all update requests have the same sensitivity.
-
-Conceptually:
-
-```text
-LOW RISK
-MEDIUM RISK
-HIGH RISK
-```
-
-Examples of potentially lower-risk changes:
-
-```text
-Alternate Mobile
-Basic Contact Information
-```
-
-Examples of higher-risk changes:
-
-```text
-National ID
-Person Identity
-Birth Date
-Household Head
-Family Membership
-Death
-Marriage
-Relationship
-```
-
-V1 may still require review for all Family-submitted changes.
-
-Future versions may allow approved low-risk changes to use simplified workflows.
-
-No automatic application should be introduced without an explicit approved rule.
-
----
-
-# 26. Family User Documents
-
-A Family User may upload supporting evidence for a Change Request.
-
-Examples:
-
-```text
-Birth Certificate
-Identity Document
-Death Certificate
-Marriage Document
-Medical Report
-Other Supporting Document
-```
-
-Uploaded documents remain:
+Uploaded documents are initially:
 
 ```text
 UNVERIFIED
 ```
 
-until reviewed by an authorized staff user.
+Upload does not imply authenticity or verification.
 
-Upload does not imply document verification.
+Verification is a separate authorized Staff operation.
 
 ---
 
-# 27. Family User Notifications
+# 24. Notifications
 
-The Family Portal should support notification of important request events.
+Famboook should notify users about meaningful workflow events.
 
 Examples:
 
 ```text
 Request Submitted
 
-Request Returned for Clarification
+Request Under Review
 
-Request Resubmitted
+Clarification Requested
 
 Request Approved
 
 Request Rejected
 
 Request Applied
+
+Account Activated
+
+Account Suspended
 ```
 
-V1 may initially provide:
-
-```text
-In-App Notifications
-```
-
-External channels may be introduced later.
+Notifications must avoid unnecessary sensitive information.
 
 ---
 
-# 28. Core Product Flow
+# 25. Family
 
-The complete Famboook information flow becomes:
+A Family is a persistent domain entity.
+
+A Family is not defined only by:
 
 ```text
-SOURCE DATA
-│
-├── Paper Form
-├── Staff Entry
-├── Assessment
-└── Family Change Request
-        ↓
-VALIDATION
-        ↓
-REVIEW / VERIFICATION
-        ↓
-OFFICIAL REGISTRY
-        ↓
-ASSESSMENTS & UPDATES
-        ↓
-NEEDS & ASSISTANCE
-        ↓
-REPORTING
+Current Household Head
+
+Current Address
+
+Current Members
+
+Paper Form
 ```
+
+Those values may change while Family identity remains.
+
+Each Family receives a permanent internal identity and a stable business code.
 
 ---
 
-# 29. Staff Registration Flow
+# 26. Person
+
+A Person is an independent persistent entity.
+
+A Person must not be structurally owned by a Family.
+
+A Person may:
 
 ```text
-Paper / Approved Source
-      ↓
-Data Entry
-      ↓
-Draft
-      ↓
-Submit
-      ↓
-Review
-      ↓
-Correction if required
-      ↓
-Verification
-      ↓
-Approval
-      ↓
-Official Registry
+Join a Family
+
+Leave a Family
+
+Transfer to another Family
+
+Become Household Head
+
+Marry
+
+Become deceased
+
+Change residence context
 ```
+
+without losing their Person identity.
 
 ---
 
-# 30. Family Update Flow
+# 27. Family Membership
 
-```text
-Authenticated Family User
-      ↓
-View Permitted Registry Data
-      ↓
-Submit Change Request
-      ↓
-Attach Evidence if applicable
-      ↓
-Review
-      ↓
-Clarification if required
-      ↓
-Approve / Reject
-      ↓
-Apply Approved Change
-      ↓
-Official Registry Updated
-      ↓
-Audit + History
-```
-
----
-
-# 31. Core Modules
-
-Famboook V1 consists of the following core modules:
-
-```text
-01 Dashboard
-02 Family Registry
-03 Person Registry
-04 Data Entry
-05 Verification
-06 Assessments
-07 Residence & Displacement
-08 Health & Disability
-09 Education
-10 Employment
-11 Needs
-12 Assistance
-13 Documents
-14 Case Notes
-15 Search
-16 Duplicate Review
-17 Reports
-18 Users & Permissions
-19 Audit Log
-20 Family Portal
-21 Change Requests
-22 Notifications
-```
-
----
-
-# 32. Dashboard
-
-The internal Dashboard provides operational indicators.
-
-Potential indicators include:
-
-```text
-Total Families
-Total Persons
-Pending Data Entry
-Under Review
-Returned for Correction
-Verified
-Approved
-
-Pending Family Change Requests
-Requests Under Review
-Requests Returned
-Approved Requests Awaiting Application
-
-Displaced Families
-Families with Active Needs
-Persons with Disabilities
-Persons with Chronic Conditions
-Recent Assistance
-```
-
-Dashboard visibility must follow permissions and scope.
-
----
-
-# 33. Family Registry
-
-The Family Registry provides:
-
-```text
-Family Code
-Household Head
-Members
-Residence
-Assessments
-Needs
-Assistance
-Documents
-Notes
-History
-Change Requests
-```
-
-Family Code format:
-
-```text
-FAM-000001
-```
-
----
-
-# 34. Person Registry
-
-The Person Registry provides:
-
-```text
-Person Code
-Identity
-National ID
-Demographics
-Family Membership
-Relationships
-Health
-Disability
-Education
-Employment
-Documents
-Notes
-History
-```
-
-Person Code format:
-
-```text
-PER-000001
-```
-
----
-
-# 35. Family Membership
-
-Family membership is not permanently stored as a fixed attribute of Person identity.
+The canonical relationship between Family and Person is represented through Family Membership.
 
 Conceptually:
 
 ```text
-Person
-   ↓
-Family Membership
-   ↓
 Family
+  ↓
+Family Membership
+  ↓
+Person
 ```
 
-This supports historical movement between Families.
+The system must not use a canonical:
+
+```text
+persons.family_id
+```
+
+relationship.
 
 ---
 
-# 36. Household Head
+# 28. Membership History
 
-A Family should normally have one active Household Head.
+Family membership history must be preserved.
 
-The Household Head is:
+The system should know:
 
 ```text
-A Person
-+
-An Active Family Membership
-+
-is_household_head = true
+Which Family
+
+Which Person
+
+Relationship Type
+
+Whether Household Head
+
+Membership Start
+
+Membership End
+
+Membership Status
+
+End Reason
 ```
 
-Household-head changes must preserve history.
+Historical memberships must not be overwritten.
 
 ---
 
-# 37. Data Entry
+# 29. Household Head
 
-Data Entry converts approved sources into structured records.
+Household Head is a state of Family Membership.
 
-Recommended registration flow:
+It is not a permanent Person attribute.
 
-```text
-1. Family
-2. Household Head
-3. Members
-4. Residence
-5. Health & Disability
-6. Education & Employment
-7. Needs
-8. Documents & Notes
-9. Review
-10. Submit
-```
+A Family may change Household Head over time.
 
-Drafts may remain incomplete.
-
-Submission requires stronger validation.
-
----
-
-# 38. Verification
-
-Verification is a controlled workflow.
-
-Baseline:
+V1 allows at most:
 
 ```text
-DRAFT
-↓
-DATA_ENTRY_COMPLETED
-↓
-UNDER_REVIEW
-├── RETURNED_FOR_CORRECTION
-│       ↓
-│    CORRECTED
-│       ↓
-└── UNDER_REVIEW
-        ↓
-     VERIFIED
-        ↓
-     APPROVED
-```
-
-Detailed rules are defined in:
-
-```text
-05-WORKFLOWS.md
+One active Household Head per Family
 ```
 
 ---
 
-# 39. Assessments
+# 30. Person Relationships
 
-Assessments represent point-in-time information collection.
+Person-to-Person relationships are separate from Family membership.
 
 Examples:
 
 ```text
-Initial Registration
-Verification
-Follow-Up
-Needs Assessment
-Emergency Update
+Spouse
+
+Parent
+
+Child
+
+Guardian
+
+Sibling
 ```
 
-A Family may have multiple Assessments over time.
+These relationships must not be inferred solely from paper row position.
 
 ---
 
-# 40. Residence & Displacement
+# 31. Residence
 
-The system supports:
+Residence is historical.
+
+The system must preserve:
 
 ```text
+Previous Residence
+
 Current Residence
-Residence History
-Displacement Status
-Displacement Location
-Displacement Date
-Housing Type
-Tenure
-Housing Condition
+
+Residence Change
+
+Displacement Context
 ```
 
-Changing residence must not destroy previous residence history.
+rather than overwriting a single address indefinitely.
 
 ---
 
-# 41. Health
+# 32. Health and Disability
 
-Health information belongs to Persons.
+Health and disability data is sensitive.
 
-The system supports:
+It should be modeled as repeatable Person-level information.
+
+The system must not assume:
 
 ```text
-Health Profile
-Health Conditions
-Chronic Conditions
-Treatment Requirements
-Medication Requirements
-Follow-Up Requirements
+One condition per Person
+
+One disability per Person
 ```
 
-Health information is Restricted data.
+Sensitive access requires explicit authorization.
 
 ---
 
-# 42. Disability
+# 33. Education and Employment
 
-The system supports repeatable disability records.
+Education and employment are Person-level domains.
 
-Possible information includes:
+The architecture should permit historical or repeated records where operationally required.
+
+---
+
+# 34. Assessments
+
+Assessments represent point-in-time evaluations.
+
+They must be separate from permanent registry identity.
+
+A Family may have:
 
 ```text
-Disability Type
-Severity
-Assistance Requirement
-Assistive Device
-Notes
+Assessment A
+
+Assessment B
+
+Assessment C
 ```
 
-Disability information is Restricted data.
+over time.
+
+Assessment answers must not silently overwrite canonical registry data.
 
 ---
 
-# 43. Education
+# 35. Needs
 
-The system supports education information and history.
+Needs represent identified Family or Person requirements.
 
-Examples:
-
-```text
-Enrollment
-Education Level
-Grade
-Institution
-Specialization
-Education Status
-```
-
----
-
-# 44. Employment
-
-The system supports employment information and history.
-
-Examples:
-
-```text
-Employment Status
-Occupation
-Employer
-Sector
-Income Indicator
-Income where approved
-```
-
----
-
-# 45. Needs
-
-Needs are stored independently from Assistance.
-
-Examples:
+Examples may include:
 
 ```text
 Food
+
 Shelter
+
 Health
-Medication
+
 Education
-WASH
+
 Protection
-Assistive Device
-Clothing
-Cash
+
 Livelihood
-Other
-```
 
-Need lifecycle is defined in:
-
-```text
-05-WORKFLOWS.md
-```
-
----
-
-# 46. Assistance
-
-Assistance represents an actual assistance event.
-
-Examples:
-
-```text
-Food Package
 Cash Assistance
-Medical Assistance
-Medication
-Education Support
-Shelter Support
-Assistive Device
-Other
 ```
 
-Assistance may be linked to a Need.
-
-Assistance does not automatically close a Need.
+Needs have their own lifecycle.
 
 ---
 
-# 47. Documents
+# 36. Assistance
 
-Documents may belong to:
+Assistance represents support that was actually delivered or recorded.
+
+Need and Assistance are separate concepts.
+
+A Need does not automatically become resolved because an Assistance record exists.
+
+---
+
+# 37. Documents
+
+Documents may relate to:
 
 ```text
 Family
+
 Person
+
 Change Request
 ```
 
-depending on context.
+Documents require:
 
-Documents must use private storage.
+```text
+Private Storage
 
-Document availability does not imply verification.
+Authorization
+
+Verification Status
+
+Audit where appropriate
+```
+
+Document files must not be publicly exposed by default.
 
 ---
 
-# 48. Case Notes
+# 38. Notes
 
-Authorized operational users may add:
+Famboook may contain:
 
 ```text
 Person Notes
+
 Case Notes
+
+Operational Notes
+
 Confidential Notes
 ```
 
-Notes are append-oriented.
+Visibility depends on note type and authorization.
 
-Confidential notes require additional authorization.
-
-Family Users must not have access to internal confidential notes.
+Family Users must not automatically see Staff notes.
 
 ---
 
-# 49. Search
+# 39. Paper Forms
 
-Search should support:
+Paper forms remain traceable data sources.
 
-```text
-Family Code
-Person Code
-National ID
-Full Name
-Mobile
-```
-
-Search must respect:
+The system should preserve where appropriate:
 
 ```text
-Permissions
-Data Scope
-Sensitive Data Restrictions
+Paper Form Number
+
+Source Type
+
+Source Document
+
+Data Entry Actor
+
+Data Entry Date
+
+Verification Actor
+
+Verification Date
 ```
+
+The database must not replicate fixed paper rows or columns.
 
 ---
 
-# 50. Duplicate Detection
+# 40. Duplicate Management
 
-Duplicate detection is required before creating or applying identity-related changes.
+Famboook must support duplicate detection.
 
-Categories:
+Possible duplicate classes:
 
 ```text
 EXACT
+
 PROBABLE
+
 POSSIBLE
 ```
 
-No automatic Person merge is permitted.
+Possible signals include:
+
+```text
+National ID
+
+Name
+
+Birth Date
+
+Gender
+
+Mobile
+
+Family Context
+```
+
+No Person records are automatically merged.
 
 Human review is required.
 
 ---
 
-# 51. Duplicate Detection in Family Requests
+# 41. Search
 
-Family Change Requests may trigger duplicate detection.
-
-Example:
-
-```text
-ADD_FAMILY_MEMBER
-```
-
-must search the existing Person Registry before creating a new Person.
-
-Possible result:
-
-```text
-Existing Person Found
-      ↓
-Review
-      ↓
-Reuse Person
-      ↓
-Create Membership
-```
-
-instead of:
-
-```text
-Create Duplicate Person
-```
-
----
-
-# 52. Reports
-
-Reports should use canonical registry data.
-
-Potential reports include:
-
-```text
-Family Registry
-Demographics
-Residence
-Displacement
-Health
-Disability
-Education
-Employment
-Needs
-Assistance
-Registration Workflow
-Change Requests
-```
-
-Reports must respect authorization.
-
----
-
-# 53. Family Portal Data Visibility
-
-The Family Portal must not simply expose the Staff Portal Family Profile.
-
-A separate presentation model is required.
-
-The Family User sees only approved fields.
-
-Conceptually:
-
-```text
-Official Registry
-      ↓
-Family Portal Visibility Rules
-      ↓
-Family User
-```
-
----
-
-# 54. Family User Scope
-
-A Family User is limited to:
-
-```text
-Their linked Person
-+
-Their authorized Family
-+
-Permitted Family members
-```
-
-A Family User must never browse:
-
-```text
-Other Families
-Global Person Registry
-Staff Queues
-Internal Reports
-Audit Logs
-```
-
----
-
-# 55. Family Portal Privacy Between Members
-
-Membership in the same Family does not automatically mean every Family User may view every sensitive field of every Person.
-
-Future multi-user Family access may require additional privacy rules.
-
-V1 should therefore avoid assuming:
-
-```text
-Family membership
-=
-Unlimited access to all member data
-```
-
----
-
-# 56. User Account vs Person
-
-A system User and a Person are different concepts.
-
-```text
-users
-```
-
-represents authentication identity.
-
-```text
-persons
-```
-
-represents registry identity.
-
-A Family User account may be linked to a Person.
-
-An internal Staff User does not necessarily require a Person record.
-
----
-
-# 57. Account Activation
-
-Family User accounts must not be automatically created merely because a Person exists.
-
-Activation should require an approved process.
-
-Conceptually:
-
-```text
-Person Identified
-      ↓
-Identity Verification
-      ↓
-Account Activation
-      ↓
-User ↔ Person Link
-      ↓
-Family Portal Access
-```
-
-The exact activation mechanism is defined during security/workflow design.
-
----
-
-# 58. Account Access After Household Change
-
-Family Portal access must not depend solely on a cached Family ID.
-
-Because a Person may:
-
-```text
-Move
-Marry
-Change Household
-Become Household Head
-Stop Being Household Head
-```
-
-authorization must resolve the current approved relationship.
-
-Historical access must not remain accidentally available after membership changes.
-
----
-
-# 59. Family User Access After Household Head Change
-
-If V1 grants Family Portal access primarily to Household Heads, changing the Household Head must trigger an account-access review.
-
-Example:
-
-```text
-Old Head
-      ↓
-Head Role Ends
-      ↓
-Family Portal Authorization Review
-
-New Head
-      ↓
-Identity Verification
-      ↓
-Account Activation / Authorization
-```
-
-The system must not silently leave former Household Heads with unintended Family-wide access.
-
----
-
-# 60. Auditability
-
-Critical actions must be auditable.
-
-Examples:
-
-```text
-Family Created
-Person Created
-National ID Changed
-Household Head Changed
-Person Transferred
-Residence Changed
-Form Verified
-Form Approved
-Need Verified
-Document Verified
-
-Family User Activated
-Family User Access Changed
-Change Request Submitted
-Change Request Returned
-Change Request Approved
-Change Request Rejected
-Change Request Applied
-```
-
----
-
-# 61. Data Classification
-
-Famboook handles different data sensitivity levels.
-
-## Restricted
-
-Examples:
-
-```text
-National ID
-Health
-Disability
-Identity Documents
-Confidential Notes
-Sensitive Supporting Documents
-```
-
-## Internal
-
-Examples:
-
-```text
-Mobile
-Address
-Family Relationships
-Employment
-Needs
-Assistance
-```
-
-## Operational
-
-Examples:
+Authorized Staff search may include:
 
 ```text
 Family Code
+
 Person Code
-Workflow Status
-Dates
-System Timestamps
+
+Name
+
+National ID
+
+Mobile
+
+Paper Form Number
 ```
 
-Family Portal visibility is independently controlled and does not mean that all Internal data is automatically visible externally.
+Search must respect authorization and sensitive-field policies.
+
+Family Users do not receive global registry search.
 
 ---
 
-# 62. Security Requirements
+# 42. Reporting
 
-Famboook must implement:
+Famboook provides operational and management reporting.
 
-```text
-Authentication
-Authorization
-Least Privilege
-Deny by Default
-Private File Storage
-Audit Logging
-Workflow History
-Secure Sessions
-Input Validation
-Sensitive Data Controls
-Controlled Exports
-```
-
-Family Portal authentication requires particular attention because it exposes registry information outside the Staff Portal.
-
----
-
-# 63. Authorization Model
-
-Authorization uses:
-
-```text
-RBAC
-+
-Data Scope
-+
-Field-Level Access
-+
-Workflow State
-```
-
-Family User access additionally uses:
-
-```text
-User-to-Person Link
-+
-Authorized Family Relationship
-```
-
-Detailed rules belong in:
-
-```text
-06-PERMISSIONS.md
-```
-
----
-
-# 64. User Roles
-
-V1 roles:
-
-```text
-SUPER_ADMIN
-ADMINISTRATOR
-DATA_ENTRY
-REVIEWER
-SOCIAL_WORKER
-REPORTS_VIEWER
-FAMILY_USER
-```
-
-Roles are permission bundles.
-
-Business logic should check permissions and Policies rather than relying only on role names.
-
----
-
-# 65. Workflow History
-
-Workflow-controlled entities should preserve state-transition history.
+Reports must derive from canonical data.
 
 Examples:
 
 ```text
-Form Submission
-Assessment
-Family Need
-Change Request
-```
+Family Count
 
-Current status is stored on the entity.
+Population
 
-Historical transitions are stored as workflow events.
+Gender Distribution
 
----
+Age Distribution
 
-# 66. Change Request History
+Children
 
-A Change Request must preserve:
+Elderly
 
-```text
-Submission
-Return
-Clarification
-Resubmission
-Review
-Approval/Rejection
-Application
-```
+Disability
 
-The history must not be silently overwritten.
+Chronic Conditions
 
----
+Residence
 
-# 67. Applying Approved Changes
+Displacement
 
-Applying an approved Change Request must use the same domain rules as staff operations.
+Education
 
-Example:
+Employment
 
-An approved Household Head change must not bypass:
+Needs
 
-```text
-One Active Household Head Rule
-Membership Validation
-Audit
-Transaction Safety
-```
-
-Likewise, an approved Person addition must not bypass duplicate detection.
-
----
-
-# 68. Notifications
-
-V1 should support an internal notification model.
-
-Potential recipients:
-
-```text
-Data Entry
-Reviewer
-Administrator
-Social Worker
-Family User
-```
-
-Events may include:
-
-```text
-Form Returned
-Form Verified
-Request Submitted
-Request Returned
-Request Approved
-Request Rejected
-Request Applied
-```
-
-Initial delivery may be in-app.
-
-Future channels may include:
-
-```text
-Email
-SMS
-Other approved messaging channels
+Assistance
 ```
 
 ---
 
-# 69. RTL & Localization
+# 43. Derived Statistics
 
-Famboook must support Arabic operational use.
-
-Requirements include:
+Values such as:
 
 ```text
-RTL
-Arabic labels
-Arabic names
-Unicode
-Readable Arabic forms
+Family Size
+
+Child Count
+
+Adult Count
+
+Male Count
+
+Female Count
 ```
 
-Technical codes remain language-independent.
+should normally be derived from canonical records rather than manually maintained.
 
 ---
 
-# 70. Responsive Design
-
-The Staff Portal should support normal desktop operational use.
-
-The Family Portal should be particularly responsive and mobile-friendly because Family Users may primarily access it from phones.
-
----
-
-# 71. Non-Functional Requirements
-
-## Security
-
-Sensitive data must be protected.
-
-## Auditability
+# 44. Auditability
 
 Critical changes must be traceable.
 
-## Data Integrity
+Audit should answer:
 
-Critical rules must be enforced at database/backend level.
+```text
+Who?
 
-## Maintainability
+What?
 
-Domain logic should not be trapped inside UI components.
+When?
 
-## Performance
+From what?
 
-Registry searches and profiles should remain responsive at realistic scale.
+To what?
+```
 
-## Usability
+Examples include:
 
-Operational workflows should be understandable to non-technical users.
+```text
+National ID changes
 
-## RTL
+Membership changes
 
-Arabic interface must render correctly.
+Household Head changes
 
-## Responsive UI
+Residence changes
 
-Family Portal must work effectively on mobile devices.
+Life Status changes
 
-## Backup
+User-Person Link changes
 
-Production data and private documents require backups.
+Permission changes
 
-## Extensibility
-
-Architecture should support future portals and integrations.
+Change Request application
+```
 
 ---
 
-# 72. V1 Technical Direction
+# 45. Workflow History
 
-Recommended:
+Workflow history is separate from data audit history.
+
+Workflow events describe process transitions such as:
 
 ```text
-Backend:
-Laravel
+SUBMITTED
 
-Database:
-PostgreSQL
+UNDER_REVIEW
 
-Staff Portal:
-Filament
+RETURNED
 
-Authorization:
-Laravel Policies
+VERIFIED
+
+APPROVED
+
+REJECTED
+
+APPLIED
+```
+
+Audit and Workflow Events serve different purposes.
+
+---
+
+# 46. Product Authorization Model
+
+Authorization is not based on Role alone.
+
+Internal authorization is:
+
+```text
+Role
 +
-Spatie Laravel Permission
+Permission
++
+Data Scope
++
+Field Access
++
+Workflow State
++
+Domain Rules
+```
 
-Audit:
-Spatie Activity Log
-or equivalent
+Family Portal authorization additionally requires:
 
-File Storage:
-Private Laravel Storage
-or approved private object storage
+```text
+User-Person Link
++
+Current Family Relationship
++
+Family Access Policy
 ```
 
 ---
 
-# 73. Family Portal Technical Direction
+# 47. Product Roles
 
-The Family Portal should use the same Laravel domain and authorization layer.
-
-Possible implementation approaches include:
+Initial roles:
 
 ```text
-Laravel + Blade/Livewire
+SUPER_ADMIN
+
+ADMINISTRATOR
+
+DATA_ENTRY
+
+REVIEWER
+
+SOCIAL_WORKER
+
+REPORTS_VIEWER
+
+FAMILY_USER
 ```
 
-or later:
-
-```text
-Next.js / React
-```
-
-The architectural requirement is:
-
-```text
-Family Portal
-      ↓
-Same Authorization Rules
-      ↓
-Same Domain Actions
-      ↓
-Same Registry
-```
-
-The portal must not implement separate uncontrolled business logic.
-
-The final frontend technology can be selected during implementation planning.
+Roles do not replace record-level authorization.
 
 ---
 
-# 74. Domain Actions
+# 48. Technical Product Architecture
 
-Important business operations should be implemented through reusable Actions/Services.
+Famboook uses a separated frontend/backend architecture.
+
+Conceptually:
+
+```text
+                    Browser
+                       │
+                       ▼
+                    Next.js
+                       │
+                  HTTPS / JSON
+                       │
+                       ▼
+                   Laravel API
+                       │
+              Domain / Security
+                       │
+                       ▼
+                  PostgreSQL
+```
+
+---
+
+# 49. Primary Frontend
+
+The primary Famboook web application uses:
+
+```text
+Next.js
+
+React
+
+TypeScript
+
+Tailwind CSS
+
+shadcn/ui
+
+Radix UI
+
+Lucide Icons
+```
+
+The frontend must support:
+
+```text
+Arabic
+
+RTL
+
+Responsive Design
+
+Mobile
+
+Modern UX
+
+Accessibility
+
+Low-bandwidth considerations
+```
+
+---
+
+# 50. Famboook Design System
+
+Famboook must establish its own reusable Design System.
+
+The Design System should include:
+
+```text
+Design Tokens
+
+Typography
+
+Colors
+
+Spacing
+
+Radius
+
+Shadows
+
+Status Colors
+
+Interaction States
+
+Responsive Rules
+```
+
+and reusable UI components.
+
+---
+
+# 51. UI Foundation
+
+`shadcn/ui` and Radix UI provide foundational UI primitives.
+
+They do not define the final Famboook visual identity.
+
+Famboook owns and customizes the resulting component code.
+
+The product must not appear as a generic template with only logo and color replacement.
+
+---
+
+# 52. Domain UI Components
+
+Famboook should develop reusable domain-specific components such as:
+
+```text
+FamilyCard
+
+FamilyProfileHeader
+
+PersonCard
+
+PersonIdentityCard
+
+FamilyMemberRow
+
+HouseholdHeadBadge
+
+VerificationBadge
+
+StatusBadge
+
+ResidenceCard
+
+ResidenceHistory
+
+AssessmentSummary
+
+NeedCard
+
+AssistanceCard
+
+ChangeRequestCard
+
+RequestTimeline
+
+ReviewPanel
+
+DuplicateMatchCard
+
+ActivityTimeline
+
+StatCard
+```
+
+These components form part of the product identity.
+
+---
+
+# 53. Frontend Server State
+
+Frontend server state is managed using:
+
+```text
+TanStack Query
+```
+
+It may handle:
+
+```text
+Fetching
+
+Caching
+
+Pagination
+
+Refetching
+
+Mutations
+
+Invalidation
+
+Loading States
+
+Error States
+```
+
+The frontend cache is not a source of truth.
+
+---
+
+# 54. Frontend Forms
+
+Frontend forms use:
+
+```text
+React Hook Form
+
+Zod
+```
+
+for:
+
+```text
+Form State
+
+UX Validation
+
+Field Errors
+
+Conditional Forms
+```
+
+Frontend validation improves user experience.
+
+It is not authoritative business validation.
+
+---
+
+# 55. Backend Authority
+
+Laravel is the authoritative application backend.
+
+Laravel is responsible for:
+
+```text
+Authentication
+
+Authorization
+
+Validation
+
+Business Rules
+
+Domain Actions
+
+Transactions
+
+Workflow
+
+Audit
+
+Notifications
+
+Queues
+
+File Authorization
+
+Canonical Data Changes
+```
+
+Frontend logic must not replace backend authority.
+
+---
+
+# 56. API Architecture
+
+Famboook follows an API-first architecture for the primary web product.
+
+The API is versioned:
+
+```text
+/api/v1
+```
+
+Examples:
+
+```text
+GET    /api/v1/me
+
+GET    /api/v1/families
+
+POST   /api/v1/families
+
+GET    /api/v1/families/{family}
+
+GET    /api/v1/persons/{person}
+
+GET    /api/v1/change-requests
+
+POST   /api/v1/change-requests
+```
+
+Domain operations may use action-oriented endpoints where appropriate.
+
+---
+
+# 57. API Design Principle
+
+The API must not be treated as unrestricted CRUD over database tables.
+
+Important business operations should express domain intent.
+
+Examples:
+
+```text
+Change Household Head
+
+Transfer Family Member
+
+Record Person Death
+
+Change Family Residence
+
+Apply Change Request
+```
+
+These operations must invoke controlled backend Domain Actions.
+
+---
+
+# 58. Domain Actions
+
+Important business operations are implemented as reusable Domain Actions.
 
 Examples:
 
 ```text
 CreateFamilyAction
-CreatePersonAction
-ChangeHouseholdHeadAction
-TransferPersonAction
 
-SubmitFormAction
-VerifyFormAction
-ApproveFormAction
+CreatePersonAction
+
+AddFamilyMemberAction
+
+TransferFamilyMemberAction
+
+ChangeHouseholdHeadAction
+
+ChangeFamilyResidenceAction
+
+RecordPersonDeathAction
 
 SubmitChangeRequestAction
-ReturnChangeRequestAction
+
 ApproveChangeRequestAction
-RejectChangeRequestAction
+
 ApplyChangeRequestAction
 ```
 
-This allows the same rules to be used from Staff Portal, Family Portal, and future APIs.
+The same actions may be invoked by authorized entry points.
 
 ---
 
-# 75. Out of Scope — V1
+# 59. Shared Domain Layer
 
-The following remain outside V1 unless later explicitly approved:
+Conceptually:
 
 ```text
-Anonymous public self-registration
+Next.js
+    │
+    ├──────────────┐
+    │              │
+Laravel API        │
+    │              │
+    ▼              │
+Domain Actions ◄── Filament
+    │
+    ▼
+PostgreSQL
+```
 
-Unknown users directly creating official Families
+Filament must not implement an independent copy of business logic.
 
-Public Family profiles
+---
 
-Native mobile application
+# 60. Authentication
 
-Biometric identification
+The primary first-party web application uses:
 
-Automated eligibility decisions
+```text
+Laravel Sanctum
+```
 
-AI-controlled eligibility decisions
+with secure cookie/session-based authentication.
 
-Automatic Person merging
+Authentication secrets or bearer tokens must not be stored in browser `localStorage` for the primary web application.
 
-Accounting system
+---
 
-Payment processing
+# 61. Authentication Responsibilities
 
-Complex external-system integrations
+Laravel controls:
 
-Fully offline synchronization
+```text
+Login
+
+Logout
+
+Session
+
+User Status
+
+Authentication Failure
+
+Rate Limiting
+
+Password Recovery
+
+Account Suspension
+```
+
+Exact login identifier and activation mechanism remain implementation decisions until finalized.
+
+---
+
+# 62. Authorization Technologies
+
+Backend authorization uses:
+
+```text
+Laravel Policies
+
+Spatie Laravel Permission
+
+Query Scopes
+
+Domain Authorization
+
+Field-Level Exposure Rules
+```
+
+Frontend permission information may be used to improve UX, such as hiding unavailable actions.
+
+Frontend hiding is never considered security enforcement.
+
+---
+
+# 63. API Resources
+
+Laravel API Resources or equivalent controlled response objects must be used to control data exposure.
+
+The system must not automatically serialize unrestricted Models.
+
+Different contexts may require different representations.
+
+Examples:
+
+```text
+PersonSummaryResource
+
+PersonDetailResource
+
+FamilyMemberResource
+
+FamilyPortalPersonResource
 ```
 
 ---
 
-# 76. Explicitly In Scope — V1
+# 64. System Administration
 
-To avoid ambiguity, the following is now explicitly part of V1:
+Filament is retained as a restricted System / High Administration interface.
+
+Filament is not the primary Staff Application.
+
+Filament is not the Family Portal.
+
+Filament is not the Executive Dashboard.
+
+---
+
+# 65. Filament Scope
+
+Filament may be used for:
 
 ```text
-Authenticated Family Portal
+System Users
 
-Verified Family User accounts
+Roles
 
-User-to-Person linking
+Permissions
 
-Controlled Family data visibility
+Family User Accounts
 
-Family Change Requests
+User-Person Links
 
-Supporting document uploads
+Reference Data
 
-Change Request review
+System Settings
 
-Change Request approval/rejection
+Audit Administration
 
-Application of approved changes
+Failed Jobs
 
-Change Request workflow history
+Queue Administration
 
-Family User notifications
+Notification Administration
+
+Import Administration
+
+Technical Maintenance Tools
 ```
 
+Exact modules remain permission-controlled.
+
 ---
 
-# 77. Future Capabilities
+# 66. High Administration Principle
 
-Future versions may consider:
+Operational and executive users should not be forced into a generic technical administration panel when a purpose-built Famboook experience is appropriate.
+
+Management dashboards and operational workflows belong in the custom Next.js product.
+
+Filament acts as a restricted control room for authorized high-level/system administration.
+
+---
+
+# 67. Private Storage
+
+Sensitive files are stored privately.
+
+Conceptually:
 
 ```text
-Multiple authorized users per Family
-
-Delegated Family representatives
-
-Family User account recovery
-
-SMS verification
-
-2FA
-
-Electronic consent
-
-Digital signatures
-
-Public appointment booking
-
-Advanced notifications
-
-External assistance-provider integrations
-
-Offline field collection
-
-Native mobile application
-```
-
-These are not automatic V1 commitments.
-
----
-
-# 78. Product Invariants
-
-The following must remain true.
-
-```text
-PROD-INV-001
-A Person is not defined by a paper-form row.
-
-PROD-INV-002
-A Person may survive Family membership changes.
-
-PROD-INV-003
-A Family may survive Household Head changes.
-
-PROD-INV-004
-Historical membership must not be destroyed by transfer.
-
-PROD-INV-005
-Family-submitted changes do not automatically become official registry data.
-
-PROD-INV-006
-A Family User may access only authorized Family data.
-
-PROD-INV-007
-A Family User cannot approve their own registry changes.
-
-PROD-INV-008
-Adding a member through the Family Portal must not bypass duplicate detection.
-
-PROD-INV-009
-Reporting a death must not delete the Person.
-
-PROD-INV-010
-Household Head changes must preserve history.
-
-PROD-INV-011
-Documents uploaded by Family Users are not automatically verified.
-
-PROD-INV-012
-Workflow history is preserved.
-
-PROD-INV-013
-Sensitive internal data is not automatically exposed to Family Users.
-
-PROD-INV-014
-Staff Portal and Family Portal use the same core domain rules.
-
-PROD-INV-015
-Public self-registration is not equivalent to authenticated Family self-service.
-```
-
----
-
-# 79. Approved Product Decisions V1
-
-### PROD-ADR-001
-
-Famboook is a Family Registry & Case Management System, not merely a form-entry application.
-
-### PROD-ADR-002
-
-Family and Person are independent persistent entities.
-
-### PROD-ADR-003
-
-Paper forms are data sources rather than the database model.
-
-### PROD-ADR-004
-
-Family membership must support history.
-
-### PROD-ADR-005
-
-Assessments are separate from permanent registry identity.
-
-### PROD-ADR-006
-
-Needs and Assistance are separate concepts.
-
-### PROD-ADR-007
-
-Sensitive data requires controlled access.
-
-### PROD-ADR-008
-
-Duplicate Persons must not be automatically merged.
-
-### PROD-ADR-009
-
-Famboook V1 includes an authenticated Family Portal.
-
-### PROD-ADR-010
-
-The external portal actor is modeled as `FAMILY_USER`.
-
-### PROD-ADR-011
-
-A Family User account is linked to a known Person.
-
-### PROD-ADR-012
-
-Family-submitted modifications use Change Requests.
-
-### PROD-ADR-013
-
-Family-submitted changes do not directly overwrite verified registry records.
-
-### PROD-ADR-014
-
-Change Request `APPROVED` and `APPLIED` are separate lifecycle states.
-
-### PROD-ADR-015
-
-Family User document uploads remain unverified until staff verification.
-
-### PROD-ADR-016
-
-Family Portal access must be reevaluated when household membership or Household Head status changes.
-
-### PROD-ADR-017
-
-Family Portal uses the same core domain/business rules as Staff operations.
-
-### PROD-ADR-018
-
-Anonymous public self-registration remains outside V1.
-
----
-
-# 80. Pending Product Decisions
-
-### PPD-001 — Family Account Activation
-
-Define the exact Family User identity-verification and account-activation process.
-
-Potential mechanisms may include:
-
-```text
-Staff Activation
-National ID Verification
-Mobile Verification
-OTP
-Verification Questions
-Combination
-```
-
-Security review is required before selection.
-
----
-
-### PPD-002 — Family User Eligibility
-
-Confirm whether V1 Family Portal access is limited to:
-
-```text
-Current Household Head
-```
-
-or may also include:
-
-```text
-Authorized Family Representative
-```
-
-The architecture supports both.
-
----
-
-### PPD-003 — Multiple Family Users
-
-Determine whether V1 allows more than one Family User account per Family.
-
----
-
-### PPD-004 — Direct Low-Risk Updates
-
-Determine whether any low-risk fields may eventually be updated directly without staff approval.
-
-Default V1 position:
-
-```text
-All Family-submitted registry changes require controlled review.
-```
-
----
-
-### PPD-005 — Family Portal Health Visibility
-
-Determine exactly which health/disability information a Family User may view for:
-
-```text
-Self
-Children
-Other Adult Members
-```
-
----
-
-### PPD-006 — Needs Visibility
-
-Determine which Need details are appropriate for Family Portal display.
-
----
-
-### PPD-007 — Assistance Visibility
-
-Determine which Assistance details are appropriate for Family Portal display.
-
----
-
-### PPD-008 — Notifications
-
-Determine V1 delivery channels:
-
-```text
-In-App only
-SMS
-Email
-Combination
-```
-
----
-
-### PPD-009 — Family Portal Frontend
-
-Select initial Family Portal implementation:
-
-```text
-Laravel / Livewire
-```
-
-or:
-
-```text
-Separate React / Next.js frontend
-```
-
-without changing core domain architecture.
-
----
-
-### PPD-010 — Account Recovery
-
-Define a secure Family User account-recovery process.
-
----
-
-# 81. V1 Success Criteria
-
-Famboook V1 is successful when authorized staff can:
-
-```text
-Register Families
-Register Persons
-Verify Data
-Manage Membership
-Track Residence
-Perform Assessments
-Record Needs
-Record Assistance
-Manage Documents
-Manage Cases
-Search
-Report
-Audit
-```
-
-and authorized Family Users can:
-
-```text
+Browser
+ ↓
+Next.js
+ ↓
+Laravel
+ ↓
 Authenticate
-Access their permitted Family profile
-Review permitted information
-Submit update requests
-Upload supporting evidence
-Track request status
-Receive request outcomes
+ ↓
+Authorize
+ ↓
+Private Storage
+ ↓
+Authorized File Response
 ```
 
-without directly compromising the integrity of the official registry.
+Direct public file paths must not be used for sensitive documents.
 
 ---
 
-# 82. Product Completion Flow
+# 68. Background Processing
 
-The product architecture is now:
+Laravel Queue is used for suitable background operations.
+
+Examples:
 
 ```text
-Staff Sources ─────────────┐
-                           │
-Paper Forms ───────────────┤
-                           ▼
-                    Validation / Review
-                           │
-                           ▼
-                    OFFICIAL REGISTRY
-                           ▲
-                           │
-Family Portal             │
-     │                     │
-     ▼                     │
-Change Request             │
-     │                     │
-     ▼                     │
-Review / Approval ─────────┘
+Notifications
+
+Email
+
+SMS when enabled
+
+Large Imports
+
+Large Exports
+
+Document Processing
+
+Long-running Reports
+```
+
+Business-critical state changes must not depend on an unconfirmed asynchronous operation unless explicitly designed that way.
+
+---
+
+# 69. Notifications Architecture
+
+Notifications are generated by the Laravel backend.
+
+Delivery channels may include:
+
+```text
+Database Notifications
+
+Email
+
+SMS
+```
+
+depending on approved implementation.
+
+V1 begins with database notifications unless changed by an approved decision.
+
+---
+
+# 70. Database
+
+The primary database is:
+
+```text
+PostgreSQL 16+
+```
+
+PostgreSQL is the canonical persistent data store.
+
+The frontend never connects directly to PostgreSQL.
+
+---
+
+# 71. Database Integrity
+
+Critical invariants should be protected at multiple levels:
+
+```text
+Frontend UX Validation
+        ↓
+Laravel Validation
+        ↓
+Domain Rules
+        ↓
+Database Constraints
+```
+
+Database constraints should be used where they safely represent domain invariants.
+
+---
+
+# 72. PostgreSQL Capabilities
+
+Famboook may benefit from PostgreSQL features including:
+
+```text
+Partial Unique Indexes
+
+JSONB
+
+Strong Constraints
+
+Advanced Indexing
+
+Transactional Integrity
+
+Search Extensions when required
+```
+
+JSONB should not replace proper relational modeling for canonical registry entities.
+
+---
+
+# 73. Change Request Payloads
+
+Change Request proposed data may use structured JSONB where appropriate because payload shape varies by request type.
+
+Example:
+
+```text
+CONTACT_UPDATE
+```
+
+has different proposed fields from:
+
+```text
+DEATH_REPORT
+```
+
+Each request type must have explicit backend validation and application rules.
+
+---
+
+# 74. Deployment Topology
+
+The initial preferred deployment topology is:
+
+```text
+famboook.com
+    ↓
+Next.js
+Primary Web Product
+
+
+api.famboook.com
+    ↓
+Laravel API
+
+
+admin.famboook.com
+    ↓
+Filament / Laravel
+System Administration
+```
+
+PostgreSQL and private infrastructure are not directly exposed to browser applications.
+
+Final hostnames may change without changing this architectural separation.
+
+---
+
+# 75. First-Party Application Model
+
+The Next.js application and Laravel backend are both controlled parts of Famboook.
+
+They should be treated as a first-party application environment.
+
+Authentication, cookies, CORS, CSRF, and session configuration must reflect the final deployment topology.
+
+---
+
+# 76. Staff Experience
+
+The Staff Application should optimize for:
+
+```text
+Fast Data Entry
+
+Efficient Search
+
+Data-rich Views
+
+Keyboard-friendly Workflows
+
+Review Queues
+
+Bulk Operational Context
+
+Clear Statuses
+
+Minimal Repetition
+
+Fast Navigation
 ```
 
 ---
 
-# 83. Document Dependencies
+# 77. Family Experience
 
-This Product document must be reflected in:
+The Family Portal should optimize for:
 
 ```text
-02-DATA-DICTIONARY.md
+Simplicity
 
-03-BUSINESS-RULES.md
+Arabic-first UX
 
-04-DATABASE.md
+Mobile-first Layout
 
-05-WORKFLOWS.md
+Low Bandwidth
 
-06-PERMISSIONS.md
+Large Touch Targets
 
-07-ROADMAP.md
+Clear Instructions
+
+Simple Forms
+
+Request Status Clarity
+
+Minimal Technical Language
 ```
 
-In particular, the following new concepts require downstream definitions:
+---
+
+# 78. Executive Experience
+
+Executive and management interfaces should optimize for:
 
 ```text
-FAMILY_USER
+KPIs
 
-User ↔ Person Link
+Trends
 
-Family Portal
+Exceptions
+
+Operational Performance
+
+Data Quality
+
+Decision Support
+
+Drill-down where authorized
+```
+
+without exposing unnecessary sensitive person-level information.
+
+---
+
+# 79. Responsive Design
+
+The primary Famboook web application must be responsive.
+
+The system should support:
+
+```text
+Desktop
+
+Laptop
+
+Tablet
+
+Mobile
+```
+
+Staff workflows may be desktop-optimized where appropriate.
+
+Family Portal workflows must be mobile-friendly.
+
+---
+
+# 80. Arabic and RTL
+
+Arabic and RTL are first-class requirements.
+
+They must be considered in:
+
+```text
+Layout
+
+Navigation
+
+Tables
+
+Forms
+
+Icons
+
+Charts
+
+Typography
+
+Dialogs
+
+Drawers
+
+Validation
+
+Dates
+
+Numbers
+
+Search
+```
+
+RTL must not be treated as a final translation task.
+
+---
+
+# 81. Low-Bandwidth Design
+
+The Family Portal should avoid unnecessary:
+
+```text
+Large JavaScript Payloads
+
+Large Images
+
+Heavy Animation
+
+Repeated Requests
+
+Unnecessary Background Fetching
+```
+
+Performance is part of accessibility.
+
+---
+
+# 82. Product Security
+
+Famboook handles sensitive personal information.
+
+Security requirements include:
+
+```text
+Authentication
+
+Authorization
+
+Object-Level Access Control
+
+Field-Level Access Control
+
+Private Files
+
+Rate Limiting
+
+Session Security
+
+Audit
+
+Input Validation
+
+Secure Uploads
+
+Secure Exports
+
+Sensitive Logging Controls
+```
+
+---
+
+# 83. Sensitive Data
+
+Sensitive data includes, but is not limited to:
+
+```text
+National ID
+
+Health Data
+
+Disability Data
+
+Documents
+
+Mobile Numbers
+
+Residence
+
+Confidential Notes
+```
+
+Sensitive information should follow least-privilege access.
+
+---
+
+# 84. Product Data Classification
+
+Suggested classifications:
+
+```text
+OPERATIONAL
+
+INTERNAL
+
+RESTRICTED
+```
+
+Portal visibility may additionally use:
+
+```text
+FAMILY_VISIBLE
+
+SELF_ONLY
+
+STAFF_ONLY
+
+RESTRICTED
+```
+
+Classification does not replace authorization policies.
+
+---
+
+# 85. National ID
+
+National ID is stored as text rather than numeric data.
+
+It must not be used as:
+
+```text
+Primary Database Key
+
+Public Resource Identifier
+
+Authentication Secret
+```
+
+Visibility and search are permission-controlled.
+
+---
+
+# 86. Death Information
+
+A Person may have:
+
+```text
+life_status = DECEASED
+```
+
+with an optional canonical:
+
+```text
+death_date
+```
+
+If the exact death date is unknown, the system must not invent one.
+
+A reported death does not become canonical merely because a Family User submitted it.
+
+---
+
+# 87. Real-World Events vs Corrections
+
+The system must distinguish between:
+
+```text
+Correction
+```
+
+and:
+
+```text
+Real-world Change
+```
+
+Example:
+
+```text
+Wrong birth date entered
+= Correction
+
+Family moved to a new residence
+= Real-world Change
+```
+
+This distinction affects history and audit.
+
+---
+
+# 88. Imports
+
+Imports must not bypass domain rules.
+
+Import processing should support:
+
+```text
+Validation
+
+Preview
+
+Duplicate Detection
+
+Error Reporting
+
+Traceability
+
+Controlled Application
+```
+
+---
+
+# 89. Exports
+
+Exports require explicit permission.
+
+Sensitive exports may require:
+
+```text
+Additional Permission
+
+Reason
+
+Audit
+
+Masking
+
+Scope Restrictions
+```
+
+Family Users do not receive unrestricted registry export capabilities.
+
+---
+
+# 90. Product Performance
+
+Famboook should support the expected registry population without architectural redesign.
+
+The application should use appropriate:
+
+```text
+Indexes
+
+Pagination
+
+Query Optimization
+
+Caching when justified
+
+Background Jobs
+
+Efficient API Payloads
+```
+
+Performance optimizations must be based on actual needs and measurement.
+
+---
+
+# 91. Product Scalability
+
+The architecture should permit future expansion to:
+
+```text
+Larger Population
+
+Multiple Family Users
+
+Additional Case Programs
+
+Additional Assessments
+
+PWA
+
+Mobile Application
+
+External Integrations
+
+Regional Scope
+
+Additional Organizations
+```
+
+without compromising the core Person/Family model.
+
+---
+
+# 92. API Extensibility
+
+The API-first architecture should allow future authorized clients such as:
+
+```text
+Mobile Application
+
+PWA
+
+External Integration
+
+Partner System
+```
+
+without moving business rules out of Laravel.
+
+---
+
+# 93. Public Self-Registration
+
+Anonymous public self-registration is out of scope for V1.
+
+Family Portal access requires controlled account creation/activation and identity verification.
+
+---
+
+# 94. Native Mobile Application
+
+A native mobile application is not required for V1.
+
+The responsive Family Portal should satisfy initial mobile usage.
+
+Native applications may be considered later if justified.
+
+---
+
+# 95. PWA
+
+PWA capabilities may be considered later.
+
+Offline storage of sensitive Family data requires separate security design.
+
+PWA capability must not be enabled merely for technical novelty.
+
+---
+
+# 96. External Integrations
+
+Potential future integrations may include:
+
+```text
+SMS Providers
+
+Email Providers
+
+Identity Verification Services
+
+Humanitarian Platforms
+
+External Registries
+
+Data Exchange APIs
+```
+
+External systems must not bypass Famboook authorization and audit rules.
+
+---
+
+# 97. Product Modules
+
+Initial product modules include:
+
+```text
+Authentication
+
+User Administration
+
+Family Registry
+
+Person Registry
+
+Family Memberships
+
+Person Relationships
+
+Residence
+
+Health
+
+Disability
+
+Education
+
+Employment
+
+Assessments
+
+Needs
+
+Assistance
+
+Documents
+
+Notes
+
+Source Forms
+
+Workflow
+
+Verification
 
 Change Requests
 
-Change Request Types
+Family Portal
 
-Change Request Workflow
+Notifications
 
-Change Request Documents
+Duplicate Management
 
-Family User Notifications
+Search
 
-Family User Data Scope
+Reports
+
+Executive Dashboard
+
+Audit
+
+System Administration
 ```
 
 ---
 
-# 84. Implementation Warning
+# 98. Product Boundary
 
-Do not implement the Family Portal as:
+Famboook V1 is not intended to be:
 
 ```text
-Family User
-      ↓
-Direct CRUD
-      ↓
-families / persons tables
+Accounting Software
+
+Payment Gateway
+
+ERP
+
+Public Social Network
+
+Public Family Directory
+
+Medical Record System
+
+Biometric Identity Platform
+
+Automated Aid Eligibility Engine
 ```
 
-The intended architecture is:
+Future integrations may connect Famboook to specialized systems.
+
+---
+
+# 99. V1 Product Priorities
+
+Priority order:
 
 ```text
-Family User
-      ↓
-Authorized Family Portal
-      ↓
-Change Request
-      ↓
+1. Data Integrity
+
+2. Security
+
+3. Correct Domain Model
+
+4. Workflow Correctness
+
+5. Operational Usability
+
+6. Modern UX
+
+7. Family Self-Service
+
+8. Reporting
+
+9. Extensibility
+```
+
+Modern UX is a core requirement, but must not weaken registry integrity or security.
+
+---
+
+# 100. V1 Staff MVP
+
+The Staff Application should eventually support:
+
+```text
+Family Management
+
+Person Management
+
+Membership Management
+
+Relationship Management
+
+Residence
+
+Data Entry
+
 Review
-      ↓
-Approved Domain Action
-      ↓
-Official Registry
-```
 
-This separation is essential for registry integrity.
+Verification
+
+Assessments
+
+Needs
+
+Assistance
+
+Documents
+
+Case Notes
+
+Change Request Review
+
+Duplicate Review
+
+Reports
+```
 
 ---
 
-# 85. Document Status
+# 101. V1 Family Portal MVP
+
+The Family Portal should support:
+
+```text
+Authentication
+
+Verified User-Person Link
+
+Authorized Family Scope
+
+Family Overview
+
+Permitted Member Information
+
+Residence
+
+Change Request Creation
+
+Request Tracking
+
+Clarification Response
+
+Supporting Documents
+
+Notifications
+
+Account
+```
+
+---
+
+# 102. V1 System Administration
+
+Restricted Filament administration may support:
+
+```text
+Users
+
+Roles
+
+Permissions
+
+Family User Accounts
+
+User-Person Links
+
+Reference Data
+
+System Settings
+
+Audit Administration
+
+Technical Operations
+```
+
+---
+
+# 103. Product Invariants
+
+```text
+PROD-INV-001
+A Person is independent from Family membership.
+
+PROD-INV-002
+Family Membership is the canonical Family-Person association.
+
+PROD-INV-003
+Historical memberships are preserved.
+
+PROD-INV-004
+At most one active Household Head exists per Family in V1.
+
+PROD-INV-005
+Paper forms are sources, not the digital domain model.
+
+PROD-INV-006
+Duplicate Persons are never automatically merged.
+
+PROD-INV-007
+Family User submissions do not directly overwrite canonical registry data.
+
+PROD-INV-008
+APPROVED and APPLIED are distinct Change Request states.
+
+PROD-INV-009
+User identity and Person identity remain separate.
+
+PROD-INV-010
+Family Portal access requires verified authorization scope.
+
+PROD-INV-011
+Sensitive data is permission-controlled.
+
+PROD-INV-012
+Uploaded documents are not automatically verified.
+
+PROD-INV-013
+Critical history is preserved.
+
+PROD-INV-014
+Derived statistics should come from canonical data.
+
+PROD-INV-015
+Family Portal does not expose internal Staff audit or confidential notes.
+
+PROD-INV-016
+Laravel is the authoritative business and security layer.
+
+PROD-INV-017
+Next.js does not directly access PostgreSQL.
+
+PROD-INV-018
+Frontend permission visibility does not replace backend authorization.
+
+PROD-INV-019
+Filament does not own independent business logic.
+
+PROD-INV-020
+All authorized entry points reuse the same domain rules.
+
+PROD-INV-021
+The primary Staff experience is a purpose-built Famboook interface.
+
+PROD-INV-022
+Filament is restricted to System / High Administration.
+
+PROD-INV-023
+Sensitive documents are private by default.
+
+PROD-INV-024
+Frontend validation never replaces Laravel validation.
+
+PROD-INV-025
+The API does not expose unrestricted Models.
+
+PROD-INV-026
+Arabic and RTL are first-class product requirements.
+
+PROD-INV-027
+The Family Portal is mobile-friendly.
+
+PROD-INV-028
+Visual design must not compromise authorization or data integrity.
+
+PROD-INV-029
+The canonical database is PostgreSQL.
+
+PROD-INV-030
+The Famboook Design System remains independent from generic template identity.
+```
+
+---
+
+# 104. Approved Product Decisions
+
+### PROD-ADR-001
+
+Family and Person are separate persistent entities.
+
+### PROD-ADR-002
+
+Family Membership is the canonical Family-Person association.
+
+### PROD-ADR-003
+
+Paper forms do not define the database structure.
+
+### PROD-ADR-004
+
+Assessments are separated from permanent registry records.
+
+### PROD-ADR-005
+
+Repeatable information is modeled as repeatable records.
+
+### PROD-ADR-006
+
+Historical state is preserved where operationally meaningful.
+
+### PROD-ADR-007
+
+Duplicate Persons are never automatically merged.
+
+### PROD-ADR-008
+
+Sensitive data requires explicit authorization.
+
+### PROD-ADR-009
+
+Family self-service uses authenticated Family Users.
+
+### PROD-ADR-010
+
+FAMILY_USER is an authorization role independent from Household Head domain status.
+
+### PROD-ADR-011
+
+User and Person identities are separate.
+
+### PROD-ADR-012
+
+User-Person Links provide the identity bridge.
+
+### PROD-ADR-013
+
+Substantive Family User updates use Change Requests.
+
+### PROD-ADR-014
+
+Family User submissions do not directly mutate canonical registry data.
+
+### PROD-ADR-015
+
+APPROVED and APPLIED are distinct.
+
+### PROD-ADR-016
+
+Supporting documents uploaded by Family Users remain unverified until Staff verification.
+
+### PROD-ADR-017
+
+Anonymous public self-registration is out of V1 scope.
+
+### PROD-ADR-018
+
+Family Portal authorization depends on verified identity and current Family relationship.
+
+### PROD-ADR-019
+
+PostgreSQL 16+ is the primary database.
+
+### PROD-ADR-020
+
+Laravel 12 is the authoritative backend and domain layer.
+
+### PROD-ADR-021
+
+Famboook uses an API-first architecture for its primary web product.
+
+### PROD-ADR-022
+
+The primary web frontend uses Next.js, React, and TypeScript.
+
+### PROD-ADR-023
+
+Tailwind CSS is the primary styling foundation.
+
+### PROD-ADR-024
+
+shadcn/ui and Radix UI provide the initial component primitives.
+
+### PROD-ADR-025
+
+Famboook maintains its own Design System.
+
+### PROD-ADR-026
+
+The Staff Application is a custom Next.js experience.
+
+### PROD-ADR-027
+
+The Executive Dashboard is a custom Next.js experience.
+
+### PROD-ADR-028
+
+The Family Portal is a custom Next.js experience.
+
+### PROD-ADR-029
+
+Filament is restricted to System / High Administration.
+
+### PROD-ADR-030
+
+Filament does not replace the operational Staff Application.
+
+### PROD-ADR-031
+
+Laravel Sanctum is the initial first-party web authentication mechanism.
+
+### PROD-ADR-032
+
+Primary web authentication uses secure cookie/session-based authentication.
+
+### PROD-ADR-033
+
+Primary web authentication secrets are not stored in browser localStorage.
+
+### PROD-ADR-034
+
+Laravel Policies and Spatie Permission form the authorization foundation.
+
+### PROD-ADR-035
+
+Important business operations are implemented as reusable Domain Actions.
+
+### PROD-ADR-036
+
+Next.js and Filament reuse the same Laravel domain layer.
+
+### PROD-ADR-037
+
+Laravel API Resources control API data exposure.
+
+### PROD-ADR-038
+
+The initial API is versioned under `/api/v1`.
+
+### PROD-ADR-039
+
+TanStack Query is the preferred frontend server-state layer.
+
+### PROD-ADR-040
+
+React Hook Form and Zod are the preferred frontend form and UX-validation foundation.
+
+### PROD-ADR-041
+
+Laravel remains authoritative for validation and business rules.
+
+### PROD-ADR-042
+
+Sensitive documents use private storage.
+
+### PROD-ADR-043
+
+The preferred initial topology separates primary web, API, and system administration hosts.
+
+### PROD-ADR-044
+
+PostgreSQL is not directly exposed to frontend applications.
+
+### PROD-ADR-045
+
+Arabic and RTL are architectural product requirements.
+
+### PROD-ADR-046
+
+Modern custom UX is a core product requirement rather than post-development visual polish.
+
+---
+
+# 105. Preferred Technology Stack
+
+```text
+PRIMARY FRONTEND
+────────────────────────────
+Next.js
+React
+TypeScript
+Tailwind CSS
+shadcn/ui
+Radix UI
+Lucide Icons
+
+
+FRONTEND DATA / FORMS
+────────────────────────────
+TanStack Query
+React Hook Form
+Zod
+
+
+BACKEND
+────────────────────────────
+Laravel 12
+REST API
+Laravel Sanctum
+Laravel Policies
+Spatie Permission
+Domain Actions
+Laravel Queue
+Notifications
+Audit / Workflow
+
+
+DATABASE
+────────────────────────────
+PostgreSQL 16+
+
+
+STAFF EXPERIENCE
+────────────────────────────
+Custom Next.js Application
+
+
+EXECUTIVE EXPERIENCE
+────────────────────────────
+Custom Next.js Dashboard
+
+
+FAMILY EXPERIENCE
+────────────────────────────
+Custom Next.js Family Portal
+
+
+SYSTEM ADMINISTRATION
+────────────────────────────
+Filament
+
+
+FILES
+────────────────────────────
+Private Storage
+```
+
+---
+
+# 106. Preferred Deployment Model
+
+```text
+famboook.com
+│
+└── Next.js
+    ├── Staff Application
+    ├── Executive Dashboard
+    └── Family Portal
+
+
+api.famboook.com
+│
+└── Laravel 12
+    ├── REST API v1
+    ├── Authentication
+    ├── Authorization
+    ├── Domain Actions
+    ├── Workflows
+    ├── Audit
+    ├── Queue
+    └── Private Files
+
+
+admin.famboook.com
+│
+└── Laravel + Filament
+    └── System / High Administration
+
+
+Private Infrastructure
+│
+├── PostgreSQL
+├── Private File Storage
+└── Queue Infrastructure
+```
+
+Final hostnames remain deployment configuration rather than permanent domain-model decisions.
+
+---
+
+# 107. Pending Product Decisions
+
+The following remain intentionally open:
+
+```text
+PPD-001
+Exact Family User account activation mechanism.
+
+PPD-002
+Exact login identifier:
+email, mobile, username, or approved combination.
+
+PPD-003
+Exact identity verification mechanism.
+
+PPD-004
+Whether V1 Family Portal eligibility remains strictly Household Head-only.
+
+PPD-005
+Whether multiple Family Users may be active for one Family.
+
+PPD-006
+Future Guardian / Authorized Representative policy.
+
+PPD-007
+Whether any low-risk Family User updates may eventually bypass full Change Request review.
+
+PPD-008
+Exact Family Portal health-data visibility.
+
+PPD-009
+Exact Needs and Assistance visibility for Family Users.
+
+PPD-010
+Exact Family Portal document visibility.
+
+PPD-011
+Notification channels beyond database notifications.
+
+PPD-012
+2FA requirement for Staff and/or System Administrators.
+
+PPD-013
+Exact session lifetime and re-authentication requirements.
+
+PPD-014
+Final production hostnames and infrastructure topology.
+
+PPD-015
+Whether Staff and Family routes remain in one Next.js application or are separated later.
+
+PPD-016
+Final Famboook visual identity, typography, and design tokens.
+
+PPD-017
+Exact Executive Dashboard KPI set.
+
+PPD-018
+Whether Redis is required for initial production or introduced only when operationally justified.
+
+PPD-019
+PWA requirements after V1.
+
+PPD-020
+Future external API/integration authentication strategy.
+```
+
+---
+
+# 108. Product Definition of Done
+
+The product architecture is considered ready for implementation when:
+
+```text
+Family and Person model is stable
+
+Membership architecture is stable
+
+Canonical vs proposed data is clear
+
+Family User architecture is clear
+
+Change Request model is clear
+
+Authorization model is clear
+
+Primary frontend architecture is clear
+
+Backend authority is clear
+
+Database choice is clear
+
+Staff experience architecture is clear
+
+Family Portal architecture is clear
+
+System Administration boundary is clear
+
+API architecture is clear
+
+Authentication direction is clear
+
+Design System direction is clear
+
+Sensitive file strategy is clear
+
+Implementation-blocking pending decisions are resolved before their affected phase
+```
+
+---
+
+# 109. Document Status
 
 ```text
 Project: Famboook
 Document: Product Definition
-Version: 1.1
+Version: 1.2
 Status: APPROVED
 Date: 2026-09-22
 ```
 
 ---
 
-# 86. Change Log
+# 110. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Approved | Initial Famboook product definition |
-| 1.1 | 2026-09-22 | Approved | Added authenticated Family Portal, FAMILY_USER, controlled self-service, Change Requests, Family User access model, supporting documents, notifications, and distinction between self-service and public self-registration |
+| 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
+| 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
+| 1.2 | 2026-09-22 | Approved | Established PostgreSQL, Laravel API-first backend, custom Next.js Staff/Executive/Family experiences, Famboook Design System, Sanctum authentication, Domain Actions, controlled API Resources, and restricted Filament System Administration |
 
 ---
 
-# 87. Next Step
-
-After approving this update, synchronize:
+# 111. Product Architecture Summary
 
 ```text
-01-PRODUCT.md             UPDATED — v1.1
-        ↓
-02-DATA-DICTIONARY.md     NEXT
-        ↓
-03-BUSINESS-RULES.md
-        ↓
-04-DATABASE.md
-        ↓
-05-WORKFLOWS.md
-        ↓
-06-PERMISSIONS.md
-        ↓
-07-ROADMAP.md
+                           FAMBOOOK
+                              │
+            ┌─────────────────┼──────────────────┐
+            │                 │                  │
+      STAFF APPLICATION   EXECUTIVE          FAMILY PORTAL
+            │             DASHBOARD               │
+            │                 │                  │
+            └─────────── NEXT.JS ────────────────┘
+                              │
+                    Famboook Design System
+                              │
+                         REST API v1
+                              │
+                         Laravel 12
+                              │
+             ┌────────────────┼────────────────┐
+             │                │                │
+          Domain          Authorization      Workflow
+          Actions         Policies/RBAC       Audit
+             │                │                │
+             └────────────────┼────────────────┘
+                              │
+                         PostgreSQL
+                              │
+                       Canonical Registry
+
+
+                    SYSTEM ADMINISTRATION
+                              │
+                           Filament
+                              │
+                       Laravel Core
 ```
 
-The next document must formally define the new data entities and fields required for:
+---
+
+# 112. Final Product Principle
+
+Famboook is not:
 
 ```text
-Family User accounts
-User-to-Person linking
-Change Requests
-Change Request Types
-Supporting Documents
-Request Review
-Request Application
-Notifications
+A paper form converted into a database
+```
+
+and it is not:
+
+```text
+A generic administration template connected to Family records
+```
+
+Famboook is:
+
+```text
+A modern, secure, domain-driven Family Registry
+and Case Management digital product
+with controlled Family self-service.
 ```
