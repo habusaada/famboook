@@ -2,7 +2,7 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System
@@ -11,330 +11,31 @@
 
 # 1. Purpose
 
-This document defines the business meaning, structure, classification, and expected behavior of the core data elements used by Famboook.
+This document defines the logical data structure and terminology used by Famboook.
 
-It translates the approved Product Definition into a normalized data vocabulary before physical database implementation.
+It establishes the canonical meaning of the main entities, fields, relationships, statuses, and data classifications used throughout the platform.
 
-This document covers:
+This document is a logical Data Dictionary.
 
-```text
-Families
-Persons
-Family Memberships
-Person Relationships
-Residence & Displacement
-Health
-Disability
-Education
-Employment
-Assessments
-Source Forms
-Documents
-Needs
-Assistance
-Notes
-Users
-Family Users
-Change Requests
-Notifications
-Workflow History
-Audit
-Reference Data
-```
-
-The physical PostgreSQL implementation is defined separately in:
+Physical PostgreSQL implementation details are defined in:
 
 ```text
 04-DATABASE.md
 ```
 
----
-
-# 2. Data Modeling Principles
-
-Famboook follows these principles:
+Business constraints are defined in:
 
 ```text
-One real-world concept
-=
-One clear data entity
+03-BUSINESS-RULES.md
 ```
 
-Repeated information must be represented as repeated records rather than fixed columns.
-
-Historical information should be preserved.
-
-Derived values should not normally be stored as canonical fields.
-
-Sensitive information must be classified and permission-controlled.
-
-Family-submitted information must remain distinguishable from verified official registry data until approved and applied.
-
----
-
-# 3. Canonical Data vs Submitted Data
-
-Famboook distinguishes between:
+Workflow transitions are defined in:
 
 ```text
-CANONICAL REGISTRY DATA
+05-WORKFLOWS.md
 ```
 
-and:
-
-```text
-SUBMITTED / PROPOSED DATA
-```
-
-Canonical registry data represents the currently accepted official record.
-
-Examples:
-
-```text
-Person Name
-Birth Date
-National ID
-Family Membership
-Current Residence
-Life Status
-```
-
-Submitted data may originate from:
-
-```text
-Paper Forms
-Data Entry
-Assessments
-Family Change Requests
-Imports
-```
-
-Submitted data does not automatically become canonical data.
-
----
-
-# 4. Core Entity Map
-
-```text
-Family
- │
- ├── Family Memberships
- │       │
- │       └── Persons
- │
- ├── Residences
- ├── Assessments
- ├── Form Submissions
- ├── Needs
- ├── Assistance
- ├── Documents
- ├── Case Notes
- └── Change Requests
-
-Person
- │
- ├── Family Memberships
- ├── Person Relationships
- ├── Health Profile
- ├── Health Conditions
- ├── Disabilities
- ├── Education
- ├── Employment
- ├── Documents
- ├── Person Notes
- └── User Account Link
-
-User
- │
- ├── Staff Role(s)
- │
- └── Optional Person Link
-          │
-          └── Family Portal
-
-Change Request
- │
- ├── Family
- ├── Optional Person
- ├── Request Type
- ├── Proposed Data
- ├── Supporting Documents
- ├── Workflow History
- └── Review / Application Metadata
-```
-
----
-
-# 5. families
-
-## Purpose
-
-Represents one household/family registry entity.
-
-A Family is independent from its current Household Head.
-
-## Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| id | BIGINT | Yes | Internal primary identifier |
-| family_code | VARCHAR | Yes | Permanent business identifier |
-| status | VARCHAR | Yes | Current Family registry status |
-| registration_date | DATE | Yes | Date Family entered registry |
-| registration_source | VARCHAR | Yes | Source of initial registration |
-| paper_form_no | VARCHAR | No | Original paper form reference |
-| notes | TEXT | No | General operational notes |
-| created_by | User | No | User who created record |
-| updated_by | User | No | Last modifying user |
-| created_at | TIMESTAMP | Yes | Creation timestamp |
-| updated_at | TIMESTAMP | Yes | Last update timestamp |
-| deleted_at | TIMESTAMP | No | Soft-delete/archive support |
-
-## Example
-
-```text
-family_code:
-FAM-000510
-```
-
-## Rules
-
-```text
-Family Code is unique.
-Family Code is permanent.
-Family Code is not the database primary key.
-Family size is derived.
-Current Household Head is derived from active membership.
-```
-
----
-
-# 6. Family Status
-
-Initial conceptual values:
-
-```text
-ACTIVE
-INACTIVE
-ARCHIVED
-```
-
-Family workflow status must not be confused with:
-
-```text
-Form Submission Status
-Assessment Status
-Change Request Status
-Need Status
-```
-
-Each workflow-controlled entity has its own status.
-
----
-
-# 7. persons
-
-## Purpose
-
-Represents one human identity.
-
-A Person is independent from a Family.
-
-## Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| id | BIGINT | Yes | Internal identifier |
-| person_code | VARCHAR | Yes | Permanent Person business code |
-| full_name | VARCHAR | Yes | Person's full name |
-| national_id | VARCHAR | No | National/identity number |
-| gender | VARCHAR | Yes | Gender |
-| birth_date | DATE | No | Date of birth |
-| marital_status_id | Reference | No | Current marital status |
-| life_status | VARCHAR | Yes | Living/deceased/etc. |
-| mobile | VARCHAR | No | Primary mobile |
-| alternate_mobile | VARCHAR | No | Secondary mobile |
-| notes | TEXT | No | General notes |
-| is_active | BOOLEAN | Yes | Operational active state |
-| created_by | User | No | Creator |
-| updated_by | User | No | Last updater |
-| created_at | TIMESTAMP | Yes | Created timestamp |
-| updated_at | TIMESTAMP | Yes | Updated timestamp |
-| deleted_at | TIMESTAMP | No | Soft deletion |
-
-## Example
-
-```text
-person_code:
-PER-001825
-```
-
----
-
-# 8. Person Identity Rules
-
-A Person must not be recreated because they:
-
-```text
-Move to another Family
-Marry
-Become Household Head
-Stop being Household Head
-Change residence
-Change marital status
-Become deceased
-```
-
-The same Person identity should remain.
-
----
-
-# 9. National ID
-
-## Type
-
-```text
-VARCHAR
-```
-
-Never:
-
-```text
-INTEGER
-BIGINT
-```
-
-## Reason
-
-National IDs may:
-
-```text
-Contain leading zeros
-Require formatting
-Require masking
-Require encryption
-```
-
-## Rules
-
-```text
-Normalize before comparison.
-Do not insert fake placeholder IDs.
-Missing National ID may be allowed.
-Duplicate National ID triggers review.
-Duplicate National ID does not trigger automatic merge.
-Changes to National ID are sensitive and audited.
-```
-
-## Display
-
-Possible masked representation:
-
-```text
-804****32
-```
-
-Detailed authorization is defined in:
+Authorization rules are defined in:
 
 ```text
 06-PERMISSIONS.md
@@ -342,22 +43,373 @@ Detailed authorization is defined in:
 
 ---
 
-# 10. Gender
+# 2. Core Data Principle
 
-Initial conceptual values:
+Famboook models real-world entities rather than paper-form layout.
+
+The fundamental structure is:
+
+```text
+Family
+  ↓
+Family Membership
+  ↓
+Person
+```
+
+A Person exists independently from a Family.
+
+A Family exists independently from its current Household Head.
+
+Paper forms are data sources and must not define the permanent database structure.
+
+---
+
+# 3. Canonical vs Proposed Data
+
+Famboook distinguishes between:
+
+```text
+CANONICAL DATA
+```
+
+and:
+
+```text
+PROPOSED DATA
+```
+
+Canonical data represents the currently accepted registry state.
+
+Proposed data represents information submitted for review but not yet applied.
+
+Example:
+
+```text
+Current Canonical Residence
+        ↓
+Family User submits new residence
+        ↓
+Change Request
+        ↓
+Proposed Residence
+        ↓
+Review / Approval
+        ↓
+Apply Domain Action
+        ↓
+New Canonical Residence
+```
+
+Proposed data must never silently overwrite canonical data.
+
+---
+
+# 4. Main Entity Groups
+
+The logical data model contains the following groups:
+
+```text
+Registry
+├── Families
+├── Persons
+├── Family Memberships
+├── Person Relationships
+└── Residence
+
+Person Information
+├── Health
+├── Disability
+├── Education
+└── Employment
+
+Assessment
+├── Assessments
+├── Form Submissions
+└── Workflow Events
+
+Case Management
+├── Needs
+├── Assistance
+├── Person Notes
+└── Case Notes
+
+Documents
+└── Supporting Documents
+
+Identity & Access
+├── Users
+└── User-Person Links
+
+Family Self-Service
+├── Change Request Types
+├── Change Requests
+└── Notifications
+```
+
+---
+
+# 5. Family
+
+## Entity
+
+```text
+families
+```
+
+## Purpose
+
+Represents a persistent Family registry entity.
+
+A Family remains the same Family even when:
+
+```text
+Household Head changes
+
+Members change
+
+Residence changes
+
+Assessment changes
+```
+
+---
+
+# 6. Family Fields
+
+```text
+id
+family_code
+status
+registration_date
+registration_source
+paper_form_no
+notes
+created_by
+updated_by
+created_at
+updated_at
+deleted_at
+```
+
+---
+
+# 7. Family Field Definitions
+
+### id
+
+Internal database identifier.
+
+Not intended as the primary user-facing identifier.
+
+---
+
+### family_code
+
+Permanent business identifier.
+
+Example:
+
+```text
+FAM-000001
+```
+
+Must remain stable after creation.
+
+---
+
+### status
+
+Current Family lifecycle status.
+
+Initial values may include:
+
+```text
+ACTIVE
+INACTIVE
+ARCHIVED
+```
+
+Additional statuses require an approved business decision.
+
+---
+
+### registration_date
+
+Date the Family was formally registered in Famboook.
+
+---
+
+### registration_source
+
+Origin of the initial Family registration.
+
+Examples:
+
+```text
+PAPER_FORM
+MANUAL_ENTRY
+IMPORT
+VERIFIED_SOURCE
+```
+
+---
+
+### paper_form_no
+
+Optional original paper-form reference.
+
+Used for traceability.
+
+It is not the Family primary identity.
+
+---
+
+### notes
+
+General authorized Family-level notes.
+
+Sensitive case notes should use dedicated case-note structures.
+
+---
+
+# 8. Person
+
+## Entity
+
+```text
+persons
+```
+
+## Purpose
+
+Represents a persistent real-world Person.
+
+A Person is independent from Family membership.
+
+---
+
+# 9. Person Fields
+
+```text
+id
+person_code
+full_name
+national_id
+gender
+birth_date
+marital_status_id
+life_status
+death_date
+mobile
+alternate_mobile
+notes
+is_active
+created_by
+updated_by
+created_at
+updated_at
+deleted_at
+```
+
+---
+
+# 10. Person Field Definitions
+
+### id
+
+Internal database identifier.
+
+---
+
+### person_code
+
+Permanent business identifier.
+
+Example:
+
+```text
+PER-000001
+```
+
+Must remain stable.
+
+---
+
+### full_name
+
+Person's registered full name.
+
+Arabic names must be stored in Unicode without destructive normalization.
+
+Search normalization may use separate processing.
+
+---
+
+### national_id
+
+National identity number when available.
+
+Data type conceptually:
+
+```text
+VARCHAR
+```
+
+It must not be numeric because:
+
+```text
+Leading zeros may be meaningful.
+
+Arithmetic is irrelevant.
+
+Formatting rules may change.
+```
+
+National ID is sensitive information.
+
+It must not be used as the database primary key.
+
+---
+
+### gender
+
+Initial controlled values:
 
 ```text
 MALE
 FEMALE
 ```
 
-Final implementation must use approved reference values or controlled enumeration.
+Any expansion requires an approved data/business decision.
 
 ---
 
-# 11. Life Status
+### birth_date
 
-Initial conceptual values:
+Known date of birth.
+
+Must not be a future date.
+
+Age is derived from this field.
+
+Age must not be permanently stored as canonical data.
+
+---
+
+### marital_status_id
+
+Reference to:
+
+```text
+marital_statuses
+```
+
+---
+
+### life_status
+
+Initial values:
 
 ```text
 ALIVE
@@ -365,160 +417,98 @@ DECEASED
 UNKNOWN
 ```
 
-A deceased Person remains in the registry.
+---
 
-Death does not mean deletion.
+### death_date
+
+Optional canonical date of death.
+
+Rules:
+
+```text
+May be NULL.
+
+Must not be in the future.
+
+Must not precede birth_date.
+
+Normally requires life_status = DECEASED.
+
+If life_status = ALIVE, death_date should normally be NULL.
+```
+
+A Person may be:
+
+```text
+life_status = DECEASED
+death_date = NULL
+```
+
+when death has been verified but the exact date is unknown.
+
+The system must never invent a death date.
+
+A Family User death report does not directly populate this canonical field.
 
 ---
 
-# 12. family_memberships
+### mobile
 
-## Purpose
+Primary mobile number when available.
 
-Represents a Person's membership in a Family.
-
-This is the canonical Family ↔ Person relationship.
-
-`persons.family_id` must not be treated as canonical membership.
-
-## Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| id | BIGINT | Yes | Internal ID |
-| family_id | Family | Yes | Family |
-| person_id | Person | Yes | Person |
-| relationship_type_id | Reference | Yes | Relationship to household |
-| is_household_head | BOOLEAN | Yes | Current Household Head indicator |
-| paper_sequence_no | SMALLINT | No | Row/order on original paper form |
-| started_at | DATE | No | Membership start |
-| ended_at | DATE | No | Membership end |
-| is_active | BOOLEAN | Yes | Active membership |
-| end_reason | VARCHAR | No | Reason membership ended |
-| notes | TEXT | No | Membership notes |
-| created_by | User | No | Creator |
-| updated_by | User | No | Last updater |
-| created_at | TIMESTAMP | Yes | Created |
-| updated_at | TIMESTAMP | Yes | Updated |
+Sensitive personal data.
 
 ---
 
-# 13. Membership Rules
+### alternate_mobile
 
-V1 baseline:
-
-```text
-One Person
-→ maximum one active primary Family membership
-```
-
-A Family may have unlimited members.
-
-When a Person moves:
-
-```text
-Do not delete old membership.
-Close old membership.
-Create new membership.
-```
+Optional alternative contact number.
 
 ---
 
-# 14. Household Head
+### notes
 
-Household Head is represented through:
+General Person-level authorized notes.
 
-```text
-family_memberships.is_household_head
-```
-
-A Family should normally have:
-
-```text
-One active Household Head
-```
-
-Changing Household Head must preserve Person identity and membership history.
+Confidential operational or case notes must use dedicated note entities.
 
 ---
 
-# 15. relationship_types
+### is_active
 
-## Purpose
+Indicates whether the Person record remains operationally active in the registry.
 
-Defines relationship of a Person to the household structure.
-
-Initial conceptual values:
+It does not mean:
 
 ```text
-SELF / HEAD
-SPOUSE
-SON
-DAUGHTER
-FATHER
-MOTHER
-BROTHER
-SISTER
-GRANDCHILD
-OTHER_RELATIVE
-OTHER
+Person is alive.
 ```
 
-## Fields
+Life status is represented separately.
+
+---
+
+# 11. Marital Status
+
+## Entity
+
+```text
+marital_statuses
+```
+
+Fields:
 
 ```text
 id
 code
-name_ar
-name_en
+name
 is_active
 sort_order
+created_at
+updated_at
 ```
 
-Final vocabulary must be approved before production seeding.
-
----
-
-# 16. person_relationships
-
-## Purpose
-
-Represents direct Person-to-Person relationships independently from Family membership.
-
-Examples:
-
-```text
-Spouse
-Parent
-Child
-Sibling
-Guardian
-```
-
-## Fields
-
-| Field | Type | Required |
-|---|---|---:|
-| id | BIGINT | Yes |
-| person_id | Person | Yes |
-| related_person_id | Person | Yes |
-| relationship_type_id | Reference | Yes |
-| start_date | DATE | No |
-| end_date | DATE | No |
-| status | VARCHAR | Yes |
-| notes | TEXT | No |
-| created_at | TIMESTAMP | Yes |
-| updated_at | TIMESTAMP | Yes |
-
-A Person cannot be related to themselves.
-
----
-
-# 17. marital_statuses
-
-Reference entity.
-
-Potential values:
+Possible values may include:
 
 ```text
 SINGLE
@@ -529,991 +519,838 @@ SEPARATED
 UNKNOWN
 ```
 
-Final values require operational approval.
+Exact values are managed as reference data.
 
 ---
 
-# 18. family_residences
+# 12. Family Membership
+
+## Entity
+
+```text
+family_memberships
+```
 
 ## Purpose
 
-Stores current and historical Family residence information.
+Represents the canonical relationship between a Person and a Family.
 
-## Fields
+This is the authoritative Family-Person association.
 
-| Field | Type | Required |
-|---|---|---:|
-| id | BIGINT | Yes |
-| family_id | Family | Yes |
-| governorate_id | Reference | No |
-| locality_id | Reference | No |
-| neighborhood | VARCHAR | No |
-| address_details | TEXT | No |
-| housing_type_id | Reference | No |
-| tenure_type_id | Reference | No |
-| housing_condition_id | Reference | No |
-| is_displaced | BOOLEAN | Yes |
-| displacement_location | TEXT | No |
-| displacement_date | DATE | No |
-| displacement_reason | TEXT | No |
-| is_current | BOOLEAN | Yes |
-| from_date | DATE | No |
-| to_date | DATE | No |
-| notes | TEXT | No |
-| created_at | TIMESTAMP | Yes |
-| updated_at | TIMESTAMP | Yes |
+The system must not use:
+
+```text
+persons.family_id
+```
+
+as the canonical relationship.
 
 ---
 
-# 19. Residence Rules
-
-A Family should normally have:
-
-```text
-Maximum one current residence.
-```
-
-Changing residence must:
-
-```text
-Close previous current residence
-+
-Create new current residence
-```
-
-Historical displacement information must not be destroyed.
-
----
-
-# 20. Geographic Reference Data
-
-Reference entities:
-
-```text
-governorates
-localities
-```
-
-`localities` belongs to a Governorate.
-
-Free-text location information may still be used for detailed addresses where required.
-
----
-
-# 21. Housing Reference Data
-
-Reference entities:
-
-```text
-housing_types
-tenure_types
-housing_condition_types
-```
-
-Final values must be verified against the approved source forms and operational terminology.
-
----
-
-# 22. person_health_profiles
-
-## Purpose
-
-Stores current high-level health indicators for a Person.
-
-## Fields
+# 13. Family Membership Fields
 
 ```text
 id
+family_id
 person_id
-
-has_health_condition
-has_chronic_disease
-has_disability
-
-is_pregnant
-is_breastfeeding
-
-requires_follow_up
-
+relationship_type_id
+is_household_head
+paper_sequence_no
+started_at
+ended_at
+is_active
+end_reason
 notes
-
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-## Classification
+---
+
+# 14. Membership Field Definitions
+
+### family_id
+
+Family participating in the membership.
+
+---
+
+### person_id
+
+Person participating in the membership.
+
+---
+
+### relationship_type_id
+
+Relationship of the Person within the Family structure.
+
+References:
 
 ```text
-RESTRICTED
+relationship_types
 ```
 
 ---
 
-# 23. Health Time Sensitivity
+### is_household_head
 
-Some health fields are time-sensitive.
+Boolean indicating whether this active membership currently represents the Household Head.
+
+V1 allows at most one active Household Head per Family.
+
+---
+
+### paper_sequence_no
+
+Optional original row/order reference from a paper form.
+
+This is source metadata only.
+
+It does not determine Person identity or Family relationship.
+
+---
+
+### started_at
+
+Date/time or date from which the membership became effective.
+
+---
+
+### ended_at
+
+Date/time or date when the membership ended.
+
+NULL for active membership.
+
+---
+
+### is_active
+
+Indicates current membership.
+
+V1 supports at most one active primary Family membership per Person.
+
+---
+
+### end_reason
+
+Reason the membership ended.
+
+Examples may include:
+
+```text
+TRANSFER
+MARRIAGE
+HOUSEHOLD_RESTRUCTURE
+DATA_CORRECTION
+OTHER
+```
+
+Death does not require deleting membership history.
+
+---
+
+# 15. Relationship Type
+
+## Entity
+
+```text
+relationship_types
+```
+
+Fields:
+
+```text
+id
+code
+name
+description
+is_active
+sort_order
+created_at
+updated_at
+```
 
 Examples:
 
 ```text
-is_pregnant
-is_breastfeeding
+HEAD
+SPOUSE
+SON
+DAUGHTER
+FATHER
+MOTHER
+OTHER
 ```
 
-These should not be interpreted as permanent Person identity attributes.
-
-Assessment-linked historical representation may be required for longitudinal reporting.
+Reference values must be centrally managed.
 
 ---
 
-# 24. health_condition_types
+# 16. Person Relationship
 
-Reference entity.
-
-Examples may include approved medical categories.
-
-Fields:
+## Entity
 
 ```text
-id
-code
-name_ar
-name_en
-is_chronic
-is_active
-sort_order
+person_relationships
 ```
-
-Do not finalize medical vocabulary from assumptions.
-
----
-
-# 25. person_health_conditions
 
 ## Purpose
 
-Allows multiple health conditions per Person.
+Represents a direct relationship between two Persons.
 
-## Fields
+Examples:
+
+```text
+Spouse
+
+Parent
+
+Child
+
+Guardian
+```
+
+This is distinct from Family Membership.
+
+---
+
+# 17. Person Relationship Fields
 
 ```text
 id
 person_id
-health_condition_type_id
-details
-severity
-requires_treatment
-requires_medication
+related_person_id
+relationship_type_id
+started_at
+ended_at
+is_active
 notes
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-Classification:
-
-```text
-RESTRICTED
-```
+The same Person must not be related to themselves.
 
 ---
 
-# 26. disability_types
+# 18. Residence
 
-Reference entity.
-
-Fields:
+## Entity
 
 ```text
-id
-code
-name_ar
-name_en
-is_active
-sort_order
+family_residences
 ```
-
-Final values require source verification.
-
----
-
-# 27. person_disabilities
 
 ## Purpose
 
-Allows multiple disability records per Person.
+Stores Family residence history.
 
-## Fields
+Residence is historical rather than a single permanently overwritten address.
+
+---
+
+# 19. Residence Fields
+
+```text
+id
+family_id
+residence_type
+governorate
+city
+area
+neighborhood
+address_text
+latitude
+longitude
+displacement_status
+started_at
+ended_at
+is_current
+source
+notes
+created_by
+updated_by
+created_at
+updated_at
+```
+
+Exact geographic fields may evolve based on operational requirements.
+
+---
+
+# 20. Residence Rules
+
+A Family may have many historical residences.
+
+V1 should allow at most:
+
+```text
+One current residence per Family
+```
+
+Changing residence should normally:
+
+```text
+End current residence
+        ↓
+Create new residence
+```
+
+rather than overwrite historical information.
+
+---
+
+# 21. Health Profile
+
+## Entity
+
+```text
+person_health_profiles
+```
+
+## Purpose
+
+Stores Person-level health summary information where required.
+
+Health data is classified as restricted.
+
+---
+
+# 22. Health Condition
+
+## Entity
+
+```text
+person_health_conditions
+```
+
+Fields may include:
+
+```text
+id
+person_id
+condition_type_id
+condition_name
+diagnosis_status
+notes
+is_active
+started_at
+ended_at
+created_by
+updated_by
+created_at
+updated_at
+```
+
+A Person may have multiple conditions.
+
+---
+
+# 23. Disability
+
+## Entity
+
+```text
+person_disabilities
+```
+
+Fields may include:
 
 ```text
 id
 person_id
 disability_type_id
 severity
-requires_assistance
-uses_assistive_device
-assistive_device
 notes
+is_active
+started_at
+ended_at
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-Classification:
-
-```text
-RESTRICTED
-```
+A Person may have multiple disability records.
 
 ---
 
-# 28. person_education
+# 24. Education
 
-## Purpose
+## Entity
 
-Stores Person education information/history.
+```text
+person_education
+```
 
-## Fields
+Fields may include:
 
 ```text
 id
 person_id
-
-is_enrolled
 education_level_id
-current_grade
 institution_name
 specialization
-education_status_id
-
-from_date
-to_date
-is_current
-
+status
+started_at
+ended_at
 notes
-
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-Multiple historical records may exist.
-
 ---
 
-# 29. Education Reference Data
+# 25. Employment
+
+## Entity
 
 ```text
-education_levels
-education_statuses
+person_employment
 ```
 
-Final values must be approved.
-
----
-
-# 30. person_employment
-
-## Purpose
-
-Stores Person employment history.
-
-## Fields
+Fields may include:
 
 ```text
 id
 person_id
-
 employment_status_id
 occupation
 employer
-employment_sector_id
-
-has_income
-income_amount
-income_frequency
-
-from_date
-to_date
+started_at
+ended_at
 is_current
-
 notes
-
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-Income data should only be collected where operationally justified.
-
 ---
 
-# 31. Employment Reference Data
+# 26. Assessment
+
+## Entity
 
 ```text
-employment_statuses
-employment_sectors
+assessments
 ```
-
-Final values require approval.
-
----
-
-# 32. assessments
 
 ## Purpose
 
-Represents a point-in-time data collection, verification, or follow-up event.
+Represents a point-in-time Family or case assessment.
 
-## Fields
+Assessment data does not automatically become canonical registry data.
+
+---
+
+# 27. Assessment Fields
 
 ```text
 id
 assessment_code
-
 family_id
 assessment_type_id
+status
 assessment_date
-
-collector_id
-reviewer_id
-
-status
-location
-source
-notes
-
-submitted_at
-verified_at
-
+assigned_to
+created_by
+updated_by
 created_at
 updated_at
 ```
 
-A Family may have multiple Assessments.
-
 ---
 
-# 33. assessment_types
+# 28. Form Submission
 
-Potential types:
+## Entity
 
 ```text
-INITIAL_REGISTRATION
-VERIFICATION
-FOLLOW_UP
-NEEDS_ASSESSMENT
-EMERGENCY_UPDATE
+form_submissions
 ```
-
-Final codes are reference data.
-
----
-
-# 34. form_submissions
 
 ## Purpose
 
-Represents a paper/digital source form and its controlled data-entry lifecycle.
+Stores structured form responses related to an Assessment or controlled data-collection process.
 
-## Fields
+Fields may include:
 
 ```text
 id
-family_id
 assessment_id
-form_type_id
-
-paper_form_no
-page_count
-source_file
-
-entered_by
-entered_at
-
-reviewed_by
-reviewed_at
-
+form_type
+form_version
 status
-return_reason
-
+submitted_data
+submitted_by
+submitted_at
+verified_by
+verified_at
+approved_by
+approved_at
 created_at
 updated_at
 ```
 
----
-
-# 35. Form Submission Status
-
-Approved baseline:
-
-```text
-DRAFT
-DATA_ENTRY_COMPLETED
-UNDER_REVIEW
-RETURNED_FOR_CORRECTION
-CORRECTED
-VERIFIED
-APPROVED
-ARCHIVED
-```
-
-Current status is stored on the submission.
-
-State history is stored separately through workflow events.
+Exact response storage strategy is defined by the form architecture.
 
 ---
 
-# 36. form_types
+# 29. Workflow Event
 
-Reference entity.
-
-Purpose:
-
-Allows multiple source/form types without changing core architecture.
-
-Fields:
-
-```text
-id
-code
-name_ar
-name_en
-is_active
-sort_order
-```
-
----
-
-# 37. workflow_events
-
-## Purpose
-
-Stores immutable workflow state-transition history.
-
-Applicable entities include:
-
-```text
-Form Submission
-Assessment
-Family Need
-Change Request
-```
-
-## Fields
-
-```text
-id
-
-workflowable_type
-workflowable_id
-
-from_status
-to_status
-action
-reason
-metadata
-
-performed_by
-created_at
-```
-
-## Rule
-
-Workflow events are append-only for normal application users.
-
----
-
-# 38. Workflow Event vs Audit Log
+## Entity
 
 ```text
 workflow_events
 ```
 
-answers:
+## Purpose
 
-```text
-How did the workflow state change?
-```
+Stores workflow state-transition history.
 
-Example:
-
-```text
-UNDER_REVIEW
-→
-APPROVED
-```
-
-`audit_logs` answers:
-
-```text
-What data/system action changed?
-```
-
-Example:
-
-```text
-mobile:
-0590000000
-→
-0560000000
-```
-
-One business operation may generate both.
+Workflow events are distinct from audit logs.
 
 ---
 
-# 39. documents
-
-## Purpose
-
-Stores metadata for supporting documents.
-
-Documents may belong to:
-
-```text
-Family
-Person
-Change Request
-```
-
-depending on context.
-
-## Fields
+# 30. Workflow Event Fields
 
 ```text
 id
+workflowable_type
+workflowable_id
+from_status
+to_status
+event_type
+actor_id
+comment
+metadata
+created_at
+```
 
-family_id nullable
-person_id nullable
-change_request_id nullable
+Supported workflow targets may include:
 
+```text
+Form Submission
+
+Assessment
+
+Change Request
+
+Document
+
+Other approved workflow entities
+```
+
+Workflow events are append-only.
+
+---
+
+# 31. Document
+
+## Entity
+
+```text
+documents
+```
+
+## Purpose
+
+Represents supporting documentation.
+
+A document may belong to a:
+
+```text
+Family
+
+Person
+
+Change Request
+```
+
+---
+
+# 32. Document Fields
+
+```text
+id
+family_id
+person_id
+change_request_id
 document_type_id
-
 document_number
 is_available
 is_verified
-
 issue_date
 expiry_date
-
 file_path
-
 uploaded_by
 verified_by
 verified_at
-
 notes
-
 created_at
 updated_at
 ```
 
-At least one valid business context must exist.
+At least one valid ownership/context relationship must exist.
+
+Exact polymorphic expansion may be considered later if justified.
 
 ---
 
-# 40. Document Ownership
-
-Possible contexts:
-
-```text
-Family Document
-
-Person Document
-
-Change Request Supporting Document
-```
-
-A Change Request document may later become associated with a canonical Person/Family document after review if operationally appropriate.
-
-This must be an explicit action.
-
-It must not happen merely because a file was uploaded.
-
----
-
-# 41. document_types
-
-Potential types:
-
-```text
-NATIONAL_ID
-BIRTH_CERTIFICATE
-MARRIAGE_CERTIFICATE
-DEATH_CERTIFICATE
-MEDICAL_REPORT
-DISABILITY_REPORT
-RESIDENCE_EVIDENCE
-OTHER
-```
-
-Final values require approval.
-
----
-
-# 42. Document Verification
+# 33. Document Verification
 
 These concepts are different:
 
 ```text
-Uploaded
-Available
-Verified
+UPLOADED
 ```
 
-A Family User uploading a document means:
+and:
 
 ```text
-Uploaded
+VERIFIED
 ```
 
-not:
+A successfully uploaded file is not automatically verified.
 
-```text
-Verified
-```
-
-Verification requires authorized staff action.
+Verification requires an authorized operation.
 
 ---
 
-# 43. family_needs
+# 34. Family Need
 
-## Purpose
+## Entity
 
-Represents identified needs.
+```text
+family_needs
+```
 
-## Fields
+Fields may include:
 
 ```text
 id
-
 family_id
-person_id nullable
-assessment_id nullable
-
+person_id
 need_type_id
 priority
-description
 status
-
 identified_at
-
-is_verified
-verified_by
-verified_at
-
+identified_by
+closed_at
+closed_by
+source
+notes
 created_at
 updated_at
 ```
 
+`person_id` may be NULL for Family-level Needs.
+
 ---
 
-# 44. Need Status
+# 35. Need Status
 
-Conceptual lifecycle:
+Possible initial lifecycle:
 
 ```text
-IDENTIFIED
-VERIFIED
-ACTIVE
-PARTIALLY_MET
+OPEN
+IN_PROGRESS
 MET
 CLOSED
+CANCELLED
 ```
 
-Detailed transitions belong in:
-
-```text
-05-WORKFLOWS.md
-```
+Exact workflow is defined in `05-WORKFLOWS.md`.
 
 ---
 
-# 45. need_types
+# 36. Assistance Record
 
-Potential categories:
+## Entity
 
 ```text
-FOOD
-SHELTER
-HEALTH
-MEDICATION
-EDUCATION
-WASH
-PROTECTION
-ASSISTIVE_DEVICE
-CLOTHING
-CASH
-LIVELIHOOD
-OTHER
+assistance_records
 ```
 
-Final values must be approved.
-
----
-
-# 46. assistance_records
-
-## Purpose
-
-Represents an assistance event.
-
-## Fields
+Fields may include:
 
 ```text
 id
-
 family_id
-person_id nullable
-need_id nullable
-
+person_id
+need_id
 assistance_type_id
-
-provider_name
-description
-
+provider
 quantity
 unit
-
-estimated_value
+value
 currency
-
-received_at
-distribution_reference
-
+provided_at
+recorded_by
+reference_no
 notes
-
 created_at
 updated_at
 ```
 
-Assistance may optionally link to a Need.
+Assistance does not automatically imply that a Need has been resolved.
 
 ---
 
-# 47. Assistance Rules
+# 37. Person Note
+
+## Entity
 
 ```text
-Need
-≠
-Assistance
+person_notes
 ```
 
-Recording Assistance does not automatically mean:
-
-```text
-Need Verified
-Need Met
-Need Closed
-```
-
-These are separate controlled decisions.
-
----
-
-# 48. assistance_types
-
-Reference entity.
-
-Final categories require operational approval.
-
----
-
-# 49. person_notes
-
-## Purpose
-
-Stores Person-related notes.
-
-## Fields
+Fields:
 
 ```text
 id
 person_id
-note_type_id
-note
-is_confidential
+note_type
+visibility
+content
 created_by
 created_at
 updated_at
 ```
 
-Notes are append-oriented.
-
 ---
 
-# 50. case_notes
+# 38. Case Note
 
-## Purpose
+## Entity
 
-Stores Family/case-management notes.
+```text
+case_notes
+```
 
-## Fields
+Fields:
 
 ```text
 id
 family_id
-assessment_id nullable
-person_id nullable
-note_type_id
-note
-is_confidential
+person_id
+note_type
+visibility
+content
 created_by
 created_at
 updated_at
 ```
 
-Confidential notes require additional authorization.
-
-Family Users must not automatically see internal Case Notes.
+Case notes are not automatically Family Portal-visible.
 
 ---
 
-# 51. note_types
+# 39. User
 
-Potential categories:
+## Entity
 
 ```text
-GENERAL
-FOLLOW_UP
-VERIFICATION
-PROTECTION
-HEALTH
-CORRECTION
-OTHER
+users
 ```
-
-Final values require approval.
-
----
-
-# 52. users
 
 ## Purpose
 
-Represents an authentication identity.
+Represents application authentication identity.
 
-A User is not automatically a Person.
+A User is not the same as a Person.
 
-Internal staff may have:
+---
 
-```text
-User
-without
-Person
-```
+# 40. User Fields
 
-Family Portal users normally have:
-
-```text
-User
-linked to
-Person
-```
-
-## Fields
+Laravel authentication fields are implementation-dependent but logically include:
 
 ```text
 id
 name
-email nullable
-mobile nullable
+email
+mobile
 password
-is_active
+status
 last_login_at
 created_at
 updated_at
 ```
 
-Additional authentication fields may be introduced during implementation.
+Additional security fields may be added.
+
+Roles are managed separately through the authorization layer.
 
 ---
 
-# 53. User vs Person
+# 41. User-Person Link
 
-This distinction is mandatory.
-
-```text
-USER
-=
-Who can authenticate?
-
-PERSON
-=
-Who exists in the Family Registry?
-```
-
-Examples:
-
-```text
-Staff Administrator
-→ User
-→ No Person required
-```
-
-```text
-Household Head
-→ Person
-→ May have User account
-```
-
-A Person does not automatically receive a User account.
-
----
-
-# 54. user_person_links
-
-## Purpose
-
-Links an authenticated User to a registry Person.
-
-This is especially important for Family Portal access.
-
-Recommended entity:
+## Entity
 
 ```text
 user_person_links
 ```
 
-## Fields
+## Purpose
 
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| id | BIGINT | Yes | Internal identifier |
-| user_id | User | Yes | Authentication account |
-| person_id | Person | Yes | Registry Person |
-| link_type | VARCHAR | Yes | Nature of link |
-| status | VARCHAR | Yes | Link status |
-| verified_by | User | No | Staff verifier |
-| verified_at | TIMESTAMP | No | Verification time |
-| activated_at | TIMESTAMP | No | Access activation |
-| ended_at | TIMESTAMP | No | Access/link end |
-| end_reason | VARCHAR | No | Reason link ended |
-| created_at | TIMESTAMP | Yes | Created |
-| updated_at | TIMESTAMP | Yes | Updated |
+Explicitly connects an authenticated User to a registry Person.
+
+This link is required for Family Portal identity resolution.
 
 ---
 
-# 55. User-Person Link Type
+# 42. User-Person Link Fields
 
-Initial conceptual value:
+```text
+id
+user_id
+person_id
+link_type
+status
+verified_by
+verified_at
+activated_at
+ended_at
+end_reason
+created_at
+updated_at
+```
+
+---
+
+# 43. User-Person Link Type
+
+Initial:
 
 ```text
 SELF
 ```
 
-Future possibilities may include:
+Potential future types:
 
 ```text
 GUARDIAN
 AUTHORIZED_REPRESENTATIVE
 ```
 
-These should not be enabled until corresponding business rules are approved.
+Future types require explicit authorization rules.
 
 ---
 
-# 56. User-Person Link Status
+# 44. User-Person Link Status
 
-Recommended values:
+Initial values:
 
 ```text
 PENDING_VERIFICATION
@@ -1523,244 +1360,64 @@ SUSPENDED
 ENDED
 ```
 
-A link alone does not necessarily mean current portal access.
-
-Authorization must consider:
-
-```text
-User Active?
-+
-Link Active?
-+
-Person Relationship?
-+
-Family Authorization?
-```
+An ACTIVE link alone does not grant unrestricted Family access.
 
 ---
 
-# 57. Family User
+# 45. Family User Resolution
 
-`FAMILY_USER` is an authorization role for an authenticated external user.
-
-A Family User is normally represented by:
+Family Portal scope is dynamically resolved:
 
 ```text
-users
-      ↓
-user_person_links
-      ↓
-persons
-      ↓
-family_memberships
-      ↓
-families
+User
+ ↓
+Active User-Person Link
+ ↓
+Person
+ ↓
+Active Family Membership
+ ↓
+Family
 ```
 
-The initial V1 operational policy may limit Family User access to the active Household Head.
+Additional policy checks may include:
 
-The data architecture does not permanently hard-code that assumption.
+```text
+Household Head Status
+
+User Status
+
+Person Status
+
+Family Status
+
+Resource Policy
+```
+
+The system must not rely on:
+
+```text
+users.family_id
+```
+
+as the canonical authorization relationship.
 
 ---
 
-# 58. Family User Account Activation
+# 46. Change Request Type
 
-Account activation must be separate from Person creation.
-
-Conceptual process:
+## Entity
 
 ```text
-Person Exists
-      ↓
-Identity Verified
-      ↓
-User Created / Linked
-      ↓
-Portal Access Activated
+change_request_types
 ```
 
-The exact verification mechanism remains a pending security/workflow decision.
-
----
-
-# 59. change_requests
-
-## Purpose
-
-Represents a request to modify official registry information without directly overwriting the canonical record.
-
-This is the core Family Portal update mechanism.
-
-## Fields
-
-| Field | Type | Required | Description |
-|---|---|---:|---|
-| id | BIGINT | Yes | Internal ID |
-| request_code | VARCHAR | Yes | Permanent request business code |
-| family_id | Family | Yes | Family concerned |
-| person_id | Person | No | Existing Person concerned |
-| change_request_type_id | Reference | Yes | Request type |
-| status | VARCHAR | Yes | Current workflow state |
-| risk_level | VARCHAR | No | LOW/MEDIUM/HIGH if used |
-| submitted_data | JSON/JSONB concept | Yes | Proposed data payload |
-| reason | TEXT | No | Family-provided reason |
-| notes | TEXT | No | General request notes |
-| submitted_by | User | Yes | Family User or authorized submitter |
-| submitted_at | TIMESTAMP | No | Submission timestamp |
-| reviewed_by | User | No | Reviewer |
-| reviewed_at | TIMESTAMP | No | Review timestamp |
-| review_notes | TEXT | No | Staff review notes |
-| approved_by | User | No | Approver |
-| approved_at | TIMESTAMP | No | Approval timestamp |
-| rejected_by | User | No | Rejecting user |
-| rejected_at | TIMESTAMP | No | Rejection timestamp |
-| rejection_reason | TEXT | No | Rejection reason |
-| applied_by | User | No | User/system actor applying change |
-| applied_at | TIMESTAMP | No | Application timestamp |
-| created_at | TIMESTAMP | Yes | Created |
-| updated_at | TIMESTAMP | Yes | Updated |
-
----
-
-# 60. Change Request Code
-
-Recommended business identifier:
-
-```text
-CRQ-000001
-```
-
-Properties:
-
-```text
-Unique
-Permanent
-Human-readable
-Not database primary key
-```
-
----
-
-# 61. Change Request Target
-
-Every Change Request belongs to:
-
-```text
-One Family
-```
-
-It may optionally target:
-
-```text
-One existing Person
-```
-
-Examples:
-
-```text
-CONTACT_UPDATE
-→ person_id may identify the Person
-
-PERSON_CORRECTION
-→ person_id required
-
-DEATH_REPORT
-→ person_id required
-
-RESIDENCE_UPDATE
-→ person_id may be null because residence belongs to Family
-
-ADD_FAMILY_MEMBER
-→ person_id may initially be null because duplicate review must occur before creating/reusing a Person
-```
-
----
-
-# 62. submitted_data
-
-`submitted_data` stores the proposed values associated with the request.
-
-Conceptually:
-
-```json
-{
-  "mobile": "0560000000"
-}
-```
-
-or:
-
-```json
-{
-  "full_name": "Example Name",
-  "gender": "MALE",
-  "birth_date": "2026-09-01",
-  "relationship_type": "SON"
-}
-```
-
-This payload is:
-
-```text
-Proposed Data
-```
-
-not canonical registry data.
-
----
-
-# 63. submitted_data Rules
-
-`submitted_data` must not become an uncontrolled arbitrary storage mechanism.
-
-Each Change Request Type must define:
-
-```text
-Allowed Fields
-Required Fields
-Validation Rules
-Sensitivity
-Application Action
-```
-
-Example:
-
-```text
-CONTACT_UPDATE
-```
-
-may allow:
-
-```text
-mobile
-alternate_mobile
-```
-
-but must not allow:
-
-```text
-national_id
-birth_date
-life_status
-```
-
-unless explicitly part of that request type.
-
----
-
-# 64. change_request_types
-
-## Purpose
-
-Defines supported Change Request categories.
-
-## Fields
+Fields:
 
 ```text
 id
 code
-name_ar
-name_en
+name
 description
 risk_level
 requires_document
@@ -1772,9 +1429,7 @@ updated_at
 
 ---
 
-# 65. Initial Change Request Types
-
-Recommended V1 starting set:
+# 47. Initial Change Request Types
 
 ```text
 CONTACT_UPDATE
@@ -1800,13 +1455,13 @@ DOCUMENT_UPDATE
 OTHER
 ```
 
-Final codes must be synchronized with Business Rules and Workflows.
+Not every type must be enabled for Family Users immediately.
 
 ---
 
-# 66. Change Request Risk Level
+# 48. Change Request Risk
 
-Conceptual values:
+Possible values:
 
 ```text
 LOW
@@ -1814,41 +1469,155 @@ MEDIUM
 HIGH
 ```
 
-Example classification:
+Risk level may affect:
 
 ```text
-CONTACT_UPDATE
-→ potentially LOW
+Reviewer requirements
 
-RESIDENCE_UPDATE
-→ potentially MEDIUM
+Approval requirements
 
-NATIONAL ID CORRECTION
-→ HIGH
+Required documents
 
-DEATH_REPORT
-→ HIGH
+Additional verification
 
-HOUSEHOLD_HEAD_CHANGE
-→ HIGH
-
-MEMBERSHIP_CHANGE
-→ HIGH
+Application authorization
 ```
 
-Risk classification does not automatically authorize direct application.
+V1 defaults to Staff review for substantive Family User changes.
 
-Default V1:
+---
+
+# 49. Change Request
+
+## Entity
 
 ```text
-Family-submitted changes require review.
+change_requests
+```
+
+## Purpose
+
+Stores proposed changes submitted through controlled self-service or authorized workflow.
+
+It must not be treated as the canonical registry record.
+
+---
+
+# 50. Change Request Fields
+
+```text
+id
+request_code
+family_id
+person_id
+change_request_type_id
+status
+risk_level
+submitted_data
+reason
+notes
+submitted_by
+submitted_at
+reviewed_by
+reviewed_at
+review_notes
+approved_by
+approved_at
+rejected_by
+rejected_at
+rejection_reason
+applied_by
+applied_at
+created_at
+updated_at
 ```
 
 ---
 
-# 67. Change Request Status
+# 51. Change Request Code
 
-Approved conceptual lifecycle:
+Example:
+
+```text
+CRQ-000001
+```
+
+The code is a stable business identifier.
+
+---
+
+# 52. Change Request Family
+
+Every Change Request belongs to one Family.
+
+```text
+family_id
+```
+
+is mandatory.
+
+---
+
+# 53. Change Request Person
+
+```text
+person_id
+```
+
+is optional.
+
+It is used when a request targets a specific existing Person.
+
+Examples:
+
+```text
+PERSON_CORRECTION
+
+DEATH_REPORT
+
+DOCUMENT_UPDATE
+```
+
+Some requests are Family-level.
+
+---
+
+# 54. submitted_data
+
+`submitted_data` contains proposed values.
+
+Logical type:
+
+```text
+JSON / JSONB
+```
+
+PostgreSQL implementation uses:
+
+```text
+JSONB
+```
+
+where appropriate.
+
+Example:
+
+```json
+{
+  "mobile": "0590000000",
+  "alternate_mobile": "0560000000"
+}
+```
+
+This payload is not automatically trusted.
+
+Each Change Request type requires explicit validation.
+
+---
+
+# 55. Change Request Status
+
+Initial statuses:
 
 ```text
 DRAFT
@@ -1868,922 +1637,542 @@ REJECTED
 APPLIED
 ```
 
-Current status is stored on:
+---
 
-```text
-change_requests.status
-```
+# 56. Change Request Status Meaning
 
-Transition history is stored in:
+### DRAFT
 
-```text
-workflow_events
-```
+Requester has not submitted the request.
 
 ---
 
-# 68. APPROVED vs APPLIED
+### SUBMITTED
 
-These values must remain distinct.
-
-```text
-APPROVED
-```
-
-means:
-
-```text
-The proposed change was accepted.
-```
-
-`APPLIED` means:
-
-```text
-The approved domain change was successfully executed against the official registry.
-```
-
-Example:
-
-```text
-HOUSEHOLD_HEAD_CHANGE
-APPROVED
-```
-
-does not yet mean:
-
-```text
-family_memberships.is_household_head
-```
-
-has changed.
-
-Only after successful controlled application:
-
-```text
-APPLIED
-```
-
-is recorded.
+Request has been formally submitted.
 
 ---
 
-# 69. Change Request Application
+### UNDER_REVIEW
 
-Each approved request must map to an approved domain action.
+Authorized Staff are reviewing the request.
+
+---
+
+### RETURNED_FOR_CLARIFICATION
+
+Additional information is required from the requester.
+
+---
+
+### RESUBMITTED
+
+Requester responded and resubmitted the request.
+
+---
+
+### APPROVED
+
+Request has been approved but the canonical domain operation may not yet have completed.
+
+---
+
+### REJECTED
+
+Request was not approved.
+
+---
+
+### APPLIED
+
+The approved domain operation completed successfully and canonical data was updated.
+
+---
+
+# 57. Change Request Application
+
+Application must map the approved request to an authorized Domain Action.
 
 Examples:
 
 ```text
-CONTACT_UPDATE
-→ UpdatePersonContactAction
-
 RESIDENCE_UPDATE
-→ ChangeFamilyResidenceAction
-
-ADD_FAMILY_MEMBER
-→ CreateOrLinkFamilyMemberAction
-
-HOUSEHOLD_HEAD_CHANGE
-→ ChangeHouseholdHeadAction
-
-DEATH_REPORT
-→ RecordPersonDeathAction
+        ↓
+ChangeFamilyResidenceAction
 ```
 
-The request mechanism must not bypass existing domain rules.
+```text
+HOUSEHOLD_HEAD_CHANGE
+        ↓
+ChangeHouseholdHeadAction
+```
+
+```text
+DEATH_REPORT
+        ↓
+RecordPersonDeathAction
+```
+
+The Change Request itself must not contain arbitrary database mutation logic.
 
 ---
 
-# 70. Change Request Documents
+# 58. Change Request Supporting Documents
 
-Supporting documents should be represented through:
+Supporting files are connected through:
 
 ```text
 documents.change_request_id
 ```
 
-Examples:
-
-```text
-ADD_FAMILY_MEMBER
-→ Birth Certificate
-
-DEATH_REPORT
-→ Death Certificate
-
-MARRIAGE_UPDATE
-→ Marriage Document
-```
-
-Document upload does not imply verification.
+A document submitted with a Change Request remains unverified until explicitly verified.
 
 ---
 
-# 71. Change Request Review Data
+# 59. Notification
 
-Review information includes:
+## Logical Entity
 
-```text
-reviewed_by
-reviewed_at
-review_notes
-```
+Famboook requires notifications.
 
-Approval:
+V1 may use Laravel's standard database notification infrastructure rather than a custom domain table.
+
+Logical notification information includes:
 
 ```text
-approved_by
-approved_at
-```
-
-Rejection:
-
-```text
-rejected_by
-rejected_at
-rejection_reason
-```
-
-Application:
-
-```text
-applied_by
-applied_at
-```
-
-Detailed transition history remains in `workflow_events`.
-
----
-
-# 72. Change Request Clarification
-
-If additional information is required:
-
-```text
-UNDER_REVIEW
-      ↓
-RETURNED_FOR_CLARIFICATION
-```
-
-The Family User may provide clarification and/or additional supporting documents.
-
-Then:
-
-```text
-RESUBMITTED
-      ↓
-UNDER_REVIEW
-```
-
-Previous workflow history must remain available.
-
----
-
-# 73. Change Request Duplicate Detection
-
-Requests affecting Person identity or membership may trigger duplicate detection.
-
-Examples:
-
-```text
-ADD_FAMILY_MEMBER
-BIRTH_REPORT
-PERSON_CORRECTION
-MEMBERSHIP_CHANGE
-```
-
-Duplicate outcomes:
-
-```text
-EXACT
-PROBABLE
-POSSIBLE
-```
-
-No automatic merge is permitted.
-
----
-
-# 74. Example — Contact Update Request
-
-```text
-request_code:
-CRQ-000101
-
-family_id:
-510
-
-person_id:
-1825
-
-type:
-CONTACT_UPDATE
-
-submitted_data:
-{
-  "mobile": "0560000000"
-}
-
-status:
-SUBMITTED
-```
-
-The canonical Person record remains unchanged until the request is approved and applied.
-
----
-
-# 75. Example — Residence Update Request
-
-```text
-type:
-RESIDENCE_UPDATE
-
-family_id:
-510
-
-person_id:
-NULL
-
-submitted_data:
-{
-  "governorate_id": 1,
-  "locality_id": 15,
-  "neighborhood": "Example",
-  "is_displaced": true
-}
-```
-
-After approval:
-
-```text
-Close previous current residence
-+
-Create new current residence
-```
-
-then:
-
-```text
-Change Request
-→ APPLIED
-```
-
----
-
-# 76. Example — Add Family Member
-
-Before approval:
-
-```text
-No new canonical Person is created merely because the Family User submitted the request.
-```
-
-Submitted data may include:
-
-```text
-full_name
-gender
-birth_date
-national_id
-relationship_type
-```
-
-Staff review performs:
-
-```text
-Validation
-Duplicate Search
-Document Review
-```
-
-Then either:
-
-```text
-Reuse Existing Person
-```
-
-or:
-
-```text
-Create New Person
-```
-
-followed by:
-
-```text
-Create Family Membership
-```
-
----
-
-# 77. Example — Death Report
-
-Request:
-
-```text
-type:
-DEATH_REPORT
-
-person_id:
-1825
-```
-
-Submitted information may include:
-
-```text
-death_date
-supporting_document
-reason/notes
-```
-
-After approval, an authorized domain action updates:
-
-```text
-persons.life_status
-```
-
-and triggers any required:
-
-```text
-Household Head Review
-Membership Review
-```
-
-The Person is not deleted.
-
----
-
-# 78. family_user_notifications
-
-## Purpose
-
-Stores application notifications relevant to Family Portal users.
-
-Recommended logical entity:
-
-```text
-family_user_notifications
-```
-
-Alternatively, Laravel's notification infrastructure may provide the physical implementation.
-
-## Data Elements
-
-```text
-id
-user_id
+recipient
 type
 title
 message
-related_type
-related_id
+related_resource
 read_at
 created_at
 ```
 
+Sensitive information should be minimized in notification payloads.
+
 ---
 
-# 79. Notification Types
+# 60. Notification Events
 
-Potential V1 events:
+Examples:
 
 ```text
 CHANGE_REQUEST_SUBMITTED
+
 CHANGE_REQUEST_UNDER_REVIEW
-CHANGE_REQUEST_RETURNED
-CHANGE_REQUEST_RESUBMITTED
+
+CHANGE_REQUEST_CLARIFICATION_REQUIRED
+
 CHANGE_REQUEST_APPROVED
+
 CHANGE_REQUEST_REJECTED
+
 CHANGE_REQUEST_APPLIED
+
 ACCOUNT_ACTIVATED
+
 ACCOUNT_SUSPENDED
 ```
 
-External delivery channels are separate from notification business events.
+---
+
+# 61. Audit Data
+
+Audit records must be logically distinct from workflow events.
+
+Audit data should answer:
+
+```text
+Who changed data?
+
+What changed?
+
+When?
+
+Previous value?
+
+New value?
+```
+
+Audit implementation is defined in the database and technical architecture documents.
 
 ---
 
-# 80. Notification Privacy
+# 62. Data Classification
 
-Notifications must not expose sensitive information unnecessarily.
+Famboook uses data classification to support security decisions.
 
-For example, a notification may say:
-
-```text
-Your update request CRQ-000101 was approved.
-```
-
-rather than including sensitive identity/medical information in the notification body.
-
----
-
-# 81. Audit Logs
-
-## Purpose
-
-Stores system/data-change audit history.
-
-Logical fields:
+Initial classifications:
 
 ```text
-id
-actor_id
-event
-entity_type
-entity_id
-old_values
-new_values
-ip_address
-user_agent
-created_at
-```
-
-Audit records are append-only to normal users.
-
----
-
-# 82. Family Portal Audit Events
-
-Important events include:
-
-```text
-Family User Account Activated
-Family User Account Suspended
-
-User-Person Link Verified
-User-Person Link Ended
-
-Change Request Created
-Change Request Submitted
-Change Request Returned
-Change Request Resubmitted
-Change Request Approved
-Change Request Rejected
-Change Request Applied
-
-Supporting Document Uploaded
-
-Sensitive Family Portal Access where required
-```
-
----
-
-# 83. Derived Fields
-
-The following should not normally be stored as canonical values:
-
-```text
-age
-
-family_size
-
-children_count
-
-male_count
-
-female_count
-
-under_1_count
-under_2_count
-under_5_count
-
-elderly_count
-
-disabled_count
-
-chronic_disease_count
-
-pending_change_request_count
-```
-
-These should be calculated from canonical records.
-
----
-
-# 84. Age
-
-Age is derived from:
-
-```text
-birth_date
-+
-reference date
-```
-
-Do not store permanent:
-
-```text
-age
-```
-
-because it becomes stale.
-
----
-
-# 85. Family Size
-
-Family size is derived from active:
-
-```text
-family_memberships
-```
-
-not from a manually maintained:
-
-```text
-families.family_size
-```
-
-field.
-
----
-
-# 86. Paper Sequence Number
-
-`paper_sequence_no` exists only for source traceability.
-
-It does not represent Person identity.
-
-Example:
-
-```text
-Person appears on row 4
-```
-
-does not mean:
-
-```text
-Person ID = 4
-```
-
----
-
-# 87. Data Classification
-
-Famboook data is classified into:
-
-```text
-RESTRICTED
-INTERNAL
 OPERATIONAL
+
+INTERNAL
+
+RESTRICTED
 ```
 
 ---
 
-# 88. Restricted Data
+# 63. Restricted Data
 
-Examples:
+Examples include:
 
 ```text
 National ID
 
-Health Conditions
+Health Information
 
 Disability Information
 
-Identity Documents
-
-Medical Documents
+Sensitive Documents
 
 Confidential Notes
 
-Sensitive Supporting Documents
-
-Sensitive Change Request Payloads
+Authentication Information
 ```
 
-Access requires explicit authorization.
+Restricted data requires explicit authorization.
 
 ---
 
-# 89. Internal Data
+# 64. Portal Visibility
 
-Examples:
-
-```text
-Mobile
-
-Address
-
-Family Relationships
-
-Employment
-
-Needs
-
-Assistance
-
-Family Change Requests
-```
-
-Internal does not mean automatically visible to Family Portal users.
-
-Family Portal visibility is defined separately.
-
----
-
-# 90. Operational Data
-
-Examples:
-
-```text
-Family Code
-Person Code
-Request Code
-Workflow Status
-Registration Date
-Timestamps
-```
-
-Operational classification does not mean publicly accessible.
-
----
-
-# 91. Family Portal Visibility Classification
-
-A separate visibility concept is required for Family Portal presentation.
-
-Possible conceptual levels:
+Separate from data classification, portal visibility may use:
 
 ```text
 FAMILY_VISIBLE
+
 SELF_ONLY
+
 STAFF_ONLY
+
 RESTRICTED
 ```
 
-This is a presentation/authorization concept.
-
-It does not necessarily require a visibility column on every database table.
-
----
-
-# 92. FAMILY_VISIBLE
-
-Information approved for presentation to the authorized Family User.
-
-Examples may include:
+Example:
 
 ```text
-Family Code
-Member Names
-Basic Relationships
-Request Status
-Selected Assistance Summary
-```
+Person Name
+→ FAMILY_VISIBLE
 
-Final visibility rules belong in:
+Another adult's National ID
+→ RESTRICTED / HIDDEN
 
-```text
-06-PERMISSIONS.md
+Staff Review Notes
+→ STAFF_ONLY
 ```
 
 ---
 
-# 93. SELF_ONLY
+# 65. Field-Level Exposure
 
-Information visible only to the linked Person rather than every Family User.
+The API must not assume that all fields belonging to an authorized resource are automatically visible.
 
-This becomes particularly important if multiple Family User accounts are supported later.
+Conceptually:
+
+```text
+Can access Person
+        ≠
+Can view every Person field
+```
+
+Different API representations may expose different field sets.
 
 ---
 
-# 94. STAFF_ONLY
+# 66. API Representation vs Database Entity
+
+Database entities and API representations are intentionally separate concepts.
+
+For example:
+
+```text
+persons
+```
+
+may be represented as:
+
+```text
+PersonSummaryResource
+
+PersonDetailResource
+
+FamilyMemberResource
+
+FamilyPortalPersonResource
+```
+
+The Data Dictionary defines canonical data.
+
+It does not require exposing every canonical field through every API response.
+
+---
+
+# 67. Frontend Data
+
+The Next.js frontend may maintain temporary:
+
+```text
+Form State
+
+UI State
+
+Cached Server State
+
+Search Filters
+
+Pagination State
+```
+
+These are not canonical registry data.
+
+TanStack Query cache must never be treated as a source of truth.
+
+---
+
+# 68. Frontend Validation Data
+
+Zod schemas may represent frontend validation requirements.
+
+They do not replace Laravel validation or domain rules.
+
+Example:
+
+```text
+Zod
+→ Improve form UX
+
+Laravel
+→ Authoritative validation
+
+PostgreSQL
+→ Persistence integrity
+```
+
+---
+
+# 69. Reference Data
+
+Reference tables may include:
+
+```text
+marital_statuses
+
+relationship_types
+
+document_types
+
+condition_types
+
+disability_types
+
+education_levels
+
+employment_statuses
+
+assessment_types
+
+need_types
+
+assistance_types
+```
+
+Reference data should use stable codes where appropriate.
+
+---
+
+# 70. Reference Code Principle
+
+Reference codes should be machine-stable.
+
+Example:
+
+```text
+MARRIED
+```
+
+Display labels may be localized:
+
+```text
+Married
+
+متزوج
+```
+
+Application logic must not depend on translated display text.
+
+---
+
+# 71. Business Identifiers
+
+Primary user-facing entities should receive stable business identifiers.
 
 Examples:
 
 ```text
-Internal Case Notes
-Review Notes
-Audit Logs
-Duplicate Investigation Notes
-Internal Verification Comments
+Family
+FAM-000001
+
+Person
+PER-000001
+
+Change Request
+CRQ-000001
 ```
 
-These must not be exposed through Family Portal APIs or UI.
+Database IDs and business identifiers are separate concepts.
 
 ---
 
-# 95. Restricted Family Portal Data
+# 72. Source Metadata
 
-Examples requiring explicit policy decisions:
+Where data originates from paper or imported sources, source metadata should be preserved.
+
+Possible metadata:
 
 ```text
-Full National IDs
-Health Details
-Disability Details
-Adult Member Documents
-Confidential Information
+source_type
+
+paper_form_no
+
+paper_sequence_no
+
+import_batch
+
+created_by
+
+created_at
 ```
 
-Do not assume Household Head status automatically grants access to all such data.
+Source metadata must not determine canonical identity by itself.
 
 ---
 
-# 96. Null, Unknown and Not Applicable
+# 73. Null vs Unknown
 
-These concepts should remain distinguishable where important.
-
-Example:
+The system must distinguish when possible between:
 
 ```text
-is_pregnant = FALSE
+NULL
 ```
 
-means:
+meaning:
 
 ```text
-Known not pregnant
+Not known / not provided
 ```
 
-while:
-
-```text
-is_pregnant = NULL
-```
-
-may mean:
-
-```text
-Not assessed / unknown
-```
-
-Similarly:
+and explicit domain values such as:
 
 ```text
 UNKNOWN
-NOT_APPLICABLE
-NOT_RECORDED
 ```
 
-should not be collapsed where operational meaning differs.
+when the business meaning requires an explicit unknown state.
+
+The system must not invent placeholder values merely to satisfy required database fields.
 
 ---
 
-# 97. Dates
+# 74. No Fake Values
 
-Use:
-
-```text
-DATE
-```
-
-for calendar dates such as:
+Examples of prohibited fake values include:
 
 ```text
-birth_date
-assessment_date
-received_at
+000000000
+for unknown National ID
+
+1900-01-01
+for unknown birth date
+
+2026-01-01
+for unknown death date
 ```
 
-Use:
-
-```text
-TIMESTAMP
-```
-
-for events such as:
-
-```text
-submitted_at
-verified_at
-approved_at
-applied_at
-created_at
-```
+Unknown data should remain properly unknown.
 
 ---
 
-# 98. Money
+# 75. Derived Data
 
-Use decimal/numeric values.
+Derived values should not normally be stored redundantly.
 
-Never use floating point for monetary values.
+Examples:
+
+```text
+Age
+
+Family Size
+
+Number of Children
+
+Number of Adults
+
+Male Count
+
+Female Count
+```
+
+They should be calculated from canonical records unless a justified performance strategy requires otherwise.
+
+---
+
+# 76. Historical Data
+
+Historical records should be preserved where the real-world state changes over time.
+
+Examples:
+
+```text
+Family Membership
+
+Residence
+
+Employment
+
+Education where applicable
+
+Health Conditions where applicable
+
+Person Relationships
+
+Workflow Events
+```
+
+Historical records should not be overwritten simply to represent current state.
+
+---
+
+# 77. Soft Deletion
+
+Selected entities may use:
+
+```text
+deleted_at
+```
+
+Soft deletion is not equivalent to historical lifecycle state.
 
 Example:
 
 ```text
-estimated_value
-NUMERIC(12,2)
+Person transferred from Family
 ```
 
-Currency should be explicit where required.
+should be represented by ending a membership, not deleting it.
 
 ---
 
-# 99. Phone Numbers
+# 78. Duplicate Detection Data
 
-Store as text.
-
-Example:
+Duplicate detection may consider:
 
 ```text
-VARCHAR
-```
+National ID
 
-Do not store as numeric values.
-
-Phone normalization belongs in application validation.
-
----
-
-# 100. Reference Data Standard
-
-Reference entities should normally provide:
-
-```text
-id
-code
-name_ar
-name_en
-description
-is_active
-sort_order
-created_at
-updated_at
-```
-
-where appropriate.
-
-Codes should remain stable even if labels change.
-
----
-
-# 101. Reference Data List
-
-V1 reference data includes:
-
-```text
-relationship_types
-
-marital_statuses
-
-governorates
-localities
-
-housing_types
-tenure_types
-housing_condition_types
-
-health_condition_types
-disability_types
-
-education_levels
-education_statuses
-
-employment_statuses
-employment_sectors
-
-document_types
-
-need_types
-assistance_types
-
-note_types
-
-assessment_types
-form_types
-
-change_request_types
-```
-
----
-
-# 102. Searchable Fields
-
-Initial registry search:
-
-```text
-family_code
-person_code
-national_id
-full_name
-mobile
-```
-
-Change Request search:
-
-```text
-request_code
-family_code
-person_code
-status
-request_type
-submitted_at
-```
-
-Search results must respect authorization.
-
----
-
-# 103. Duplicate Detection Inputs
-
-Potential signals:
-
-```text
-Normalized National ID
-
-Normalized Full Name
+Normalized Name
 
 Birth Date
 
@@ -2791,815 +2180,716 @@ Gender
 
 Mobile
 
-Existing Relationships
-
-Existing Membership
+Family Context
 ```
 
-Duplicate detection is advisory/review-based except where exact conflicts must block creation.
-
----
-
-# 104. Duplicate Classification
+Potential duplicate classification:
 
 ```text
 EXACT
+
 PROBABLE
+
 POSSIBLE
 ```
 
-### EXACT
-
-Example:
-
-```text
-Same normalized National ID
-```
-
-### PROBABLE
-
-Example:
-
-```text
-Same full name
-+
-Same birth date
-+
-Same gender
-```
-
-### POSSIBLE
-
-Example:
-
-```text
-Similar name
-+
-Matching relationship/mobile/context
-```
-
-No classification automatically merges records.
+No automatic merge is allowed.
 
 ---
 
-# 105. Family Portal Duplicate Protection
+# 79. Search Data
 
-Family Portal requests that could create a Person must not create that Person before duplicate checking.
-
-Examples:
+Searchable data may include:
 
 ```text
-ADD_FAMILY_MEMBER
-BIRTH_REPORT
+family_code
+
+person_code
+
+full_name
+
+national_id
+
+mobile
+
+paper_form_no
 ```
 
-Flow:
+Search capability must respect sensitive-field permissions.
 
-```text
-Submitted Person Data
-      ↓
-Duplicate Detection
-      ↓
-Human Review
-      ↓
-Reuse Existing / Create New
-```
+Search normalization must not destructively alter canonical values.
 
 ---
 
-# 106. Historical Data
+# 80. Arabic Data
 
-Historical information must be preserved for:
+Arabic text must be stored as Unicode.
+
+Canonical Arabic values should not be destructively modified for search convenience.
+
+Search may maintain or calculate normalized forms separately.
+
+Possible search normalization may address:
 
 ```text
-Family Membership
-Residence
-Education
-Employment
-Assessments
-Needs
-Assistance
-Workflow
-Change Requests
-User-Person Access Links
+Diacritics
+
+Tatweel
+
+Alef variants
+
+Whitespace
 ```
 
-History should not be reconstructed only from audit logs where a proper domain-history record exists.
+Exact normalization rules require implementation testing.
 
 ---
 
-# 107. Source Traceability
+# 81. Date and Time
 
-Data may originate from:
+Business dates such as:
 
 ```text
-Paper Form
-Staff Entry
-Assessment
-Family Change Request
-Import
-Approved Correction
+birth_date
+
+death_date
+
+registration_date
 ```
 
-Where operationally important, source information should remain traceable.
+should use date semantics when time-of-day is irrelevant.
+
+System events such as:
+
+```text
+created_at
+
+updated_at
+
+submitted_at
+
+approved_at
+
+applied_at
+```
+
+use timestamp semantics.
+
+System timestamps should be stored consistently, preferably UTC.
 
 ---
 
-# 108. Change Source
+# 82. Money
 
-When an approved Change Request modifies the official registry, the resulting operation should retain traceability to:
-
-```text
-change_request_id
-```
-
-either through:
+Where financial values are recorded, such as Assistance value:
 
 ```text
-Audit metadata
-Workflow metadata
-Domain event metadata
+value
+currency
 ```
 
-or an explicit relationship where justified.
+must be separate.
 
-The exact physical strategy is defined in Database Architecture.
+Currency must not be inferred from the numeric amount.
 
 ---
 
-# 109. Data Validation Layers
+# 83. File Metadata
 
-Validation occurs at multiple levels:
+Document database records store metadata.
+
+The actual sensitive file is stored in private storage.
+
+Database records may contain:
 
 ```text
-UI Validation
-
-Request Validation
-
-Domain Validation
-
-Workflow Validation
-
-Database Constraints
+file_path
 ```
 
-Critical business invariants must not rely only on frontend validation.
+but the value must not imply public accessibility.
 
 ---
 
-# 110. Family User Input Validation
+# 84. Authentication Secrets
 
-Family-submitted input must be treated as untrusted input.
+Authentication secrets are not registry data.
 
-It requires:
+Passwords must never be stored in plaintext.
+
+Primary web authentication uses secure session/cookie mechanisms through Laravel Sanctum.
+
+Browser localStorage must not contain primary authentication secrets.
+
+---
+
+# 85. Data Ownership
+
+Famboook does not interpret Family User submission as ownership of canonical data.
+
+A Family User may be authorized to:
+
+```text
+View
+
+Request
+
+Submit
+
+Upload
+
+Track
+```
+
+without being authorized to directly mutate canonical records.
+
+---
+
+# 86. Data Trust Levels
+
+Conceptually, information may move through trust levels:
+
+```text
+Submitted
+   ↓
+Reviewed
+   ↓
+Verified / Approved
+   ↓
+Canonical
+```
+
+Exact workflows vary by entity.
+
+---
+
+# 87. Family User Input
+
+All Family User input is considered untrusted input.
+
+It must undergo:
 
 ```text
 Authentication
+
 Authorization
+
 Validation
-Normalization
-File Validation
-Rate Limiting where appropriate
-Workflow Review
+
+Workflow
+
+Review where required
 ```
 
-Family User status does not make submitted data automatically trusted.
+before affecting canonical data.
 
 ---
 
-# 111. Supporting File Validation
+# 88. Import Data
 
-Uploads should validate:
+Imported data is also untrusted until validated.
+
+Import processes must support:
 
 ```text
-Allowed file type
-Allowed size
-Malware/security strategy where available
-Private storage destination
-Authorization
-Ownership context
+Validation
+
+Duplicate Detection
+
+Error Reporting
+
+Source Traceability
 ```
 
-Original filenames should not be trusted as storage paths.
+Imports must not bypass domain constraints.
 
 ---
 
-# 112. Data Retention
+# 89. Export Data
 
-Retention rules must be finalized for:
+Exports are generated representations of authorized canonical data.
+
+Export files are not separate sources of truth.
+
+Sensitive export generation must respect:
 
 ```text
-Paper Source Files
-Documents
-Change Request Documents
-Rejected Requests
-Workflow Events
-Audit Logs
-Exports
-Backups
-```
+Role
 
-Until policy is finalized, historical business records should not be casually destroyed.
+Permission
+
+Data Scope
+
+Field Visibility
+
+Export Permission
+```
 
 ---
 
-# 113. Data Dictionary Invariants
+# 90. Data Dictionary Invariants
 
 ```text
 DD-INV-001
 Person identity is independent from Family membership.
 
 DD-INV-002
-Family membership is represented through family_memberships.
+Family Membership is the canonical Family-Person relationship.
 
 DD-INV-003
-Family size is derived from active memberships.
+Historical Family memberships are preserved.
 
 DD-INV-004
-Age is derived from birth date.
+Paper sequence does not define Person identity.
 
 DD-INV-005
 National ID is stored as text.
 
 DD-INV-006
-A paper row is not a Person identity.
+Unknown values are not replaced with fake placeholders.
 
 DD-INV-007
-Health conditions are repeatable records.
+Age is derived from birth_date.
 
 DD-INV-008
-Disabilities are repeatable records.
+Residence history is preserved.
 
 DD-INV-009
-Need and Assistance are separate concepts.
+Health conditions are repeatable records.
 
 DD-INV-010
-A User is not the same entity as a Person.
+Disabilities are repeatable records.
 
 DD-INV-011
-A Person does not automatically have a User account.
+Assessments do not automatically overwrite canonical registry data.
 
 DD-INV-012
-Family Portal access requires an authorized User-Person relationship.
+Uploaded documents are not automatically verified.
 
 DD-INV-013
-Family-submitted proposed data is not canonical registry data.
+Need and Assistance are separate concepts.
 
 DD-INV-014
-Change Request APPROVED is not the same as APPLIED.
+User and Person are separate entities.
 
 DD-INV-015
-Family User document upload does not imply document verification.
+Family User scope is resolved through User-Person Link and Family Membership.
 
 DD-INV-016
-Change Requests preserve their workflow history.
+Change Request submitted_data is proposed data, not canonical data.
 
 DD-INV-017
-Adding a Person through a Change Request requires duplicate review.
+APPROVED and APPLIED are distinct.
 
 DD-INV-018
-Death changes life status; it does not delete Person identity.
+Family User input never silently overwrites canonical data.
 
 DD-INV-019
-Internal notes are not automatically Family Portal visible.
+Workflow Events and Audit records are separate concepts.
 
 DD-INV-020
-Family Portal authorization must follow current approved relationships.
+Restricted fields require explicit authorization.
+
+DD-INV-021
+persons.death_date is the optional canonical exact death date.
+
+DD-INV-022
+Unknown death dates are never invented.
+
+DD-INV-023
+Database entities and API representations are separate concepts.
+
+DD-INV-024
+Frontend cached data is not canonical data.
+
+DD-INV-025
+Frontend validation is not authoritative business validation.
+
+DD-INV-026
+Reference-data codes are independent from translated labels.
+
+DD-INV-027
+Sensitive document files are private by default.
+
+DD-INV-028
+PostgreSQL is the canonical persistent data store.
+
+DD-INV-029
+Frontend applications never directly access PostgreSQL.
+
+DD-INV-030
+Canonical Arabic data is not destructively normalized for search.
 ```
 
 ---
 
-# 114. Approved Data Decisions V1
+# 91. Approved Data Decisions
 
 ### DD-ADR-001
 
-Families and Persons use independent persistent identifiers.
+Family is a persistent independent entity.
 
 ### DD-ADR-002
 
-`family_memberships` is the canonical Family ↔ Person relationship.
+Person is a persistent independent entity.
 
 ### DD-ADR-003
 
-Repeatable data uses child records rather than fixed columns.
+Family Membership is the canonical Family-Person association.
 
 ### DD-ADR-004
 
-National IDs use text representation.
+No canonical `persons.family_id` is used.
 
 ### DD-ADR-005
 
-Derived statistics are not canonical stored fields.
+Membership history is preserved.
 
 ### DD-ADR-006
 
-Residence history is preserved.
+Household Head is represented through Family Membership.
 
 ### DD-ADR-007
 
-Assessments are separate from permanent registry identity.
+Person Relationships are separate from Family Membership.
 
 ### DD-ADR-008
 
-Needs and Assistance are separate.
+Residence is historical.
 
 ### DD-ADR-009
 
-Workflow history is represented separately from current status.
+Health conditions are repeatable Person records.
 
 ### DD-ADR-010
 
-Users and Persons are separate entities.
+Disabilities are repeatable Person records.
 
 ### DD-ADR-011
 
-Family Portal authentication uses an explicit User ↔ Person link.
+Assessments are separate from permanent registry identity.
 
 ### DD-ADR-012
 
-`FAMILY_USER` represents an authenticated external registry user.
+Documents may belong to Family, Person, or Change Request contexts.
 
 ### DD-ADR-013
 
-Family-submitted updates are represented as `change_requests`.
+Need and Assistance are separate entities.
 
 ### DD-ADR-014
 
-Change Requests use a permanent `request_code`.
+Users are separate from Persons.
 
 ### DD-ADR-015
 
-Proposed Change Request values remain separate from canonical registry data until application.
+User-Person Links connect authentication identity to registry identity.
 
 ### DD-ADR-016
 
-Change Request types define allowed update contexts.
+FAMILY_USER authorization does not require `users.family_id`.
 
 ### DD-ADR-017
 
-Supporting documents may belong to Change Requests.
+Family User proposed changes use Change Requests.
 
 ### DD-ADR-018
 
-Change Requests participate in workflow history.
+Change Request variable payloads may use JSONB.
 
 ### DD-ADR-019
 
-Family User notifications are supported as an application concept.
+Change Request application invokes controlled Domain Actions.
 
 ### DD-ADR-020
 
-Family Portal visibility is distinct from internal data classification.
+Notifications may use Laravel notification infrastructure.
+
+### DD-ADR-021
+
+`persons.death_date` stores the optional canonical exact death date.
+
+### DD-ADR-022
+
+A deceased Person may have a NULL death date when the exact date is unknown.
+
+### DD-ADR-023
+
+API representations are separated from persistence Models.
+
+### DD-ADR-024
+
+Laravel API Resources control context-specific data exposure.
+
+### DD-ADR-025
+
+PostgreSQL 16+ is the canonical database platform.
+
+### DD-ADR-026
+
+Frontend state does not represent canonical persistence.
+
+### DD-ADR-027
+
+TanStack Query cache is treated only as frontend server-state cache.
+
+### DD-ADR-028
+
+Zod validation supplements but does not replace Laravel validation.
+
+### DD-ADR-029
+
+Sensitive document files use private storage.
+
+### DD-ADR-030
+
+Canonical reference values use stable codes independent from localization.
 
 ---
 
-# 115. Pending Data Decisions
+# 92. Pending Data Decisions
 
-### PDDICT-001 — National ID Format
-
-Confirm:
+The following remain open:
 
 ```text
-Length
-Validation rules
-Normalization
-Exceptional cases
-```
+PDD-001
+Exact National ID normalization policy.
 
----
+PDD-002
+Whether normalized National ID requires a separate searchable hash/index.
 
-### PDDICT-002 — National ID Encryption
+PDD-003
+Exact Arabic-name search normalization rules.
 
-Determine:
+PDD-004
+Whether marriage history requires a dedicated marriage entity.
 
-```text
-Plain indexed value
-Encrypted value
-Search hash
-Combination
-```
+PDD-005
+Final relationship-type reference values.
 
-before production identity data is loaded.
+PDD-006
+Final residence geographic hierarchy.
 
----
+PDD-007
+Exact health condition taxonomy.
 
-### PDDICT-003 — Lookup Vocabularies
+PDD-008
+Exact disability taxonomy.
 
-Finalize approved values for:
+PDD-009
+Exact education reference structure.
 
-```text
-Housing
-Tenure
-Housing Condition
-Health Conditions
-Disability
-Education
-Employment
-Needs
-Assistance
-Documents
-```
+PDD-010
+Exact employment reference structure.
 
----
+PDD-011
+Exact Need taxonomy.
 
-### PDDICT-004 — Pregnancy/Breastfeeding History
+PDD-012
+Exact Assistance taxonomy.
 
-Determine whether these require explicit assessment-linked observation records.
+PDD-013
+Exact Assessment types and schemas.
 
----
+PDD-014
+Exact document-type taxonomy.
 
-### PDDICT-005 — Family User Eligibility
+PDD-015
+Whether selected Person fields require application-level encryption.
 
-Confirm whether V1 account access is:
+PDD-016
+Whether sensitive exact-search fields require HMAC search hashes.
 
-```text
-Household Head only
-```
+PDD-017
+Exact retention rules for documents and sensitive data.
 
-or also:
+PDD-018
+Exact Family User visibility of health information.
 
-```text
-Authorized Representative
-```
+PDD-019
+Exact Family User visibility of Needs and Assistance.
 
----
+PDD-020
+Exact Guardian / Authorized Representative data requirements.
 
-### PDDICT-006 — Multiple Family Users
+PDD-021
+Whether multilingual reference labels are stored in DB or localization files.
 
-Determine whether one Family may have multiple active Family User accounts in V1.
+PDD-022
+Exact handling of partial/unknown birth dates if required.
 
----
+PDD-023
+Exact data model for multiple mobile/contact methods if required.
 
-### PDDICT-007 — User-Person Link Cardinality
-
-Baseline recommendation:
-
-```text
-One Family User account
-→ one Person
-```
-
-Confirm whether future requirements require multiple Person links per User.
-
----
-
-### PDDICT-008 — Change Request Payload Strategy
-
-Confirm physical representation of:
-
-```text
-submitted_data
-```
-
-Recommended starting direction:
-
-```text
-JSONB
-+
-type-specific validation
-```
-
-Do not use JSONB as a replacement for canonical relational registry tables.
-
----
-
-### PDDICT-009 — Change Request Type Configuration
-
-Determine whether type-specific allowed fields and validation rules are:
-
-```text
-Code-defined
-Database-configured
-Hybrid
-```
-
-Recommended V1:
-
-```text
-Code-defined validation
-+
-Reference table for type identity/display
+PDD-024
+Exact geographic coordinate usage and privacy rules.
 ```
 
 ---
 
-### PDDICT-010 — Low-Risk Direct Updates
-
-Default V1:
+# 93. Core Entity Relationship Summary
 
 ```text
-No direct Family User registry modification.
-```
-
-Confirm whether any field such as alternate mobile may later bypass full review.
-
----
-
-### PDDICT-011 — Family Portal Health Visibility
-
-Define visibility for:
-
-```text
-Self
-Minor children
-Adult members
-```
-
----
-
-### PDDICT-012 — Family Portal Documents
-
-Define which verified documents, if any, can be viewed/downloaded by Family Users.
-
----
-
-### PDDICT-013 — Notification Storage
-
-Determine whether physical implementation uses:
-
-```text
-Laravel notifications table
-```
-
-or a dedicated:
-
-```text
-family_user_notifications
-```
-
-table.
-
----
-
-### PDDICT-014 — Change Request Documents
-
-Determine whether supporting files remain permanently linked to the Change Request after application or may also be promoted/copied to canonical Family/Person document context.
-
----
-
-### PDDICT-015 — Death Date
-
-The current Person model contains:
-
-```text
-life_status
-```
-
-but does not yet explicitly define:
-
-```text
-death_date
-```
-
-Determine whether V1 requires a canonical death date field or a separate life-event model.
-
-This must be resolved before implementing `DEATH_REPORT`.
-
----
-
-### PDDICT-016 — Marriage History
-
-Determine whether V1 requires only:
-
-```text
-Current Marital Status
-+
-Person Relationships
-```
-
-or a dedicated marriage/event history model.
-
----
-
-### PDDICT-017 — Family User Access Revocation
-
-Define exact data needed to preserve:
-
-```text
-Why access ended
-Who ended it
-When it ended
-```
-
-for Family Portal access.
-
----
-
-# 116. Source Form Verification Notes
-
-Some original paper-form labels and value lists may remain unclear.
-
-Do not invent final reference values merely to complete development.
-
-Use:
-
-```text
-PENDING VERIFICATION
-```
-
-where the source does not clearly support a value.
-
-Production seeders should contain only approved vocabularies.
-
----
-
-# 117. Synchronization With Product V1.1
-
-This version incorporates the Product V1.1 concepts:
-
-```text
-Authenticated Family Portal
-
-FAMILY_USER
-
-User ↔ Person Link
-
-Controlled Self-Service
-
-Change Requests
-
-Change Request Types
-
-Change Request Workflow
-
-Supporting Documents
-
-Family User Notifications
-
-Family Portal Data Scope
-```
-
-These concepts must now be reflected in:
-
-```text
-03-BUSINESS-RULES.md
-04-DATABASE.md
-05-WORKFLOWS.md
-06-PERMISSIONS.md
-07-ROADMAP.md
+Family
+  │
+  ├── Family Membership ───── Person
+  │                              │
+  │                              ├── Health Conditions
+  │                              ├── Disabilities
+  │                              ├── Education
+  │                              ├── Employment
+  │                              ├── Person Notes
+  │                              └── User-Person Links ── User
+  │
+  ├── Residence History
+  ├── Assessments
+  │      └── Form Submissions
+  │
+  ├── Needs
+  │      └── Assistance
+  │
+  ├── Case Notes
+  │
+  ├── Documents
+  │
+  └── Change Requests
+          │
+          ├── Proposed Data
+          ├── Supporting Documents
+          └── Workflow Events
 ```
 
 ---
 
-# 118. Required Database Changes
-
-`04-DATABASE.md` must subsequently define physical structures for at least:
+# 94. Family Portal Data Flow
 
 ```text
-user_person_links
-
-change_requests
-
-change_request_types
+User
+  ↓
+User-Person Link
+  ↓
+Person
+  ↓
+Family Membership
+  ↓
+Authorized Family
+  ↓
+Permitted API Representation
+  ↓
+Next.js Family Portal
 ```
 
-and update:
+For updates:
 
 ```text
-documents
-workflow_events
-users
-indexes
-ERD
-migration order
-Laravel relationships
-transaction boundaries
-```
-
-Notification storage must also be finalized or documented as Laravel notification infrastructure.
-
----
-
-# 119. Required Workflow Changes
-
-`05-WORKFLOWS.md` must subsequently define:
-
-```text
-Family User Account Activation
-
-Change Request Creation
-
-Change Request Submission
-
-Change Request Review
-
-Clarification / Return
-
-Resubmission
-
+Family Portal
+      ↓
+Proposed Input
+      ↓
+Laravel Validation
+      ↓
+Change Request
+      ↓
+Staff Review
+      ↓
 Approval
-
-Rejection
-
-Application
-
-Failure During Application
-
-Family Portal Access Review
-
-Household Head Change Impact on Portal Access
+      ↓
+Domain Action
+      ↓
+Canonical PostgreSQL Data
 ```
 
 ---
 
-# 120. Required Permission Changes
+# 95. Canonical Data Boundary
 
-`06-PERMISSIONS.md` must subsequently define:
+Canonical registry entities include:
 
 ```text
-FAMILY_USER
+Family
 
-Family Portal scope
+Person
 
-Self / Family visibility
+Family Membership
 
-Change Request permissions
+Person Relationship
 
-Supporting document upload
+Residence
 
-Request tracking
+Verified Person Attributes
 
-Family User notifications
+Approved Health Information
 
-Internal review permissions
+Approved Documents
 
-Approval permissions
+Needs
 
-Apply permissions
-
-Restricted Family Portal fields
+Assistance
 ```
+
+Change Requests are workflow/proposal records.
+
+Frontend state is presentation state.
+
+Notifications are communication records.
+
+Audit records are evidence of system activity.
+
+These concepts must remain separate.
 
 ---
 
-# 121. Document Status
+# 96. Document Status
 
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.1
+Version: 1.2
 Status: APPROVED
 Date: 2026-09-22
 ```
 
 ---
 
-# 122. Change Log
+# 97. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Approved | Initial Famboook data dictionary |
-| 1.1 | 2026-09-22 | Approved | Added Family Portal data concepts, FAMILY_USER, User-Person linking, Change Requests, supporting documents, workflow integration, Family User notifications, and Family Portal visibility rules; aligned canonical Family membership with family_memberships |
+| 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
+| 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
+| 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
 
 ---
 
-# 123. Next Step
+# 98. Final Data Principle
 
-Documentation synchronization now proceeds as:
-
-```text
-01-PRODUCT.md                 UPDATED — v1.1
-02-DATA-DICTIONARY.md         UPDATED — v1.1
-        ↓
-03-BUSINESS-RULES.md          NEXT
-        ↓
-04-DATABASE.md
-        ↓
-05-WORKFLOWS.md
-        ↓
-06-PERMISSIONS.md
-        ↓
-07-ROADMAP.md
-```
-
-The next document must establish the business rules governing:
+Famboook data architecture follows:
 
 ```text
-Family User identity
-
-Family Portal authorization
-
-Account activation
-
-User-Person linking
-
-Change Request submission
-
-Change Request review
-
-Change Request approval/rejection
-
-Applying approved changes
-
-Supporting documents
-
-Duplicate checks
-
-Household Head changes
-
-Access revocation
-
-Sensitive Family Portal information
+Real-world Entity
+        ↓
+Canonical Domain Model
+        ↓
+Controlled Laravel Domain Rules
+        ↓
+PostgreSQL
+        ↓
+Authorized API Representation
+        ↓
+User Experience
 ```
 
-before physical database implementation is finalized.
+not:
+
+```text
+Paper Form
+   ↓
+Database Columns
+   ↓
+Generic CRUD Screen
+```
+
+The database models the domain.
+
+The API controls exposure.
+
+The frontend presents the product.
