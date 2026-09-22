@@ -2,7 +2,7 @@
 ## Workflows & State Transitions
 
 **Document:** `05-WORKFLOWS.md`  
-**Version:** 1.0  
+**Version:** 1.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System
@@ -11,822 +11,724 @@
 
 # 1. Purpose
 
-This document defines the operational workflows and state transitions of Famboook V1.
+This document defines the workflows, state transitions, review processes, and controlled business operations used by Famboook.
 
-It translates the approved:
+A workflow determines:
 
-- `01-PRODUCT.md`
-- `02-DATA-DICTIONARY.md`
-- `03-BUSINESS-RULES.md`
-- `04-DATABASE.md`
+- Current state
+- Allowed transitions
+- Authorized actors
+- Required validation
+- Review requirements
+- Approval requirements
+- Domain operations
+- Workflow history
+- Audit requirements
+- Failure behavior
 
-into controlled operational processes.
-
-This document defines:
-
-- Form submission workflow.
-- Family registration workflow.
-- Verification workflow.
-- Correction workflow.
-- Approval workflow.
-- Duplicate detection and resolution.
-- Household-head changes.
-- Person movement between families.
-- Residence updates.
-- Assessment workflow.
-- Needs workflow.
-- Assistance workflow.
-- Document verification.
-- Sensitive-data corrections.
-- Archival behavior.
-
-Permissions for performing each action are defined separately in:
-
-`06-PERMISSIONS.md`
+The workflow architecture applies consistently across all authorized interfaces.
 
 ---
 
-# 2. Workflow Principles
+# 2. Workflow Authority
 
-## WF-P01 — Explicit State
+Laravel is the authoritative workflow engine.
 
-Important operational records MUST have an explicit state where lifecycle management is required.
+Conceptually:
+
+```text
+Next.js / Filament
+        ↓
+Requested Action
+        ↓
+Laravel
+        ↓
+Authentication
+        ↓
+Authorization
+        ↓
+Current-State Validation
+        ↓
+Domain Action
+        ↓
+Transaction
+        ↓
+State Transition
+        ↓
+Workflow Event
+        ↓
+Audit
+        ↓
+PostgreSQL
+```
+
+The frontend must not independently transition canonical workflow state.
 
 ---
 
-## WF-P02 — Controlled Transitions
+# 3. Workflow Principles
 
-Users MUST NOT arbitrarily change workflow status values.
+All Famboook workflows follow these principles:
 
-Transitions must occur through approved actions.
+```text
+Explicit State
+
+Controlled Transition
+
+Server-Side Authorization
+
+Current-State Validation
+
+History Preservation
+
+Auditability
+
+Transactional Integrity
+
+Concurrency Protection
+
+Idempotency where required
+```
+
+---
+
+# 4. Current State vs History
+
+The current workflow state is stored on the relevant entity.
 
 Example:
 
 ```text
-DRAFT
+change_requests.status = UNDER_REVIEW
+```
+
+Historical transitions are stored separately:
+
+```text
+workflow_events
+```
+
+Example:
+
+```text
+DRAFT → SUBMITTED
+
+SUBMITTED → UNDER_REVIEW
+```
+
+---
+
+# 5. Workflow Events vs Audit
+
+Workflow history and audit history are separate.
+
+Workflow Event answers:
+
+```text
+What process transition happened?
+```
+
+Audit answers:
+
+```text
+What data changed?
+Who changed it?
+From what?
+To what?
+```
+
+A single business operation may create both.
+
+---
+
+# 6. Workflow Event Principle
+
+Workflow events are append-only.
+
+Historical workflow events must not normally be edited or deleted.
+
+Corrections should generate new events rather than rewriting workflow history.
+
+---
+
+# 7. Generic Workflow Transition
+
+A controlled workflow transition should follow:
+
+```text
+Receive Action
+    ↓
+Authenticate
+    ↓
+Authorize
+    ↓
+Load Current State
+    ↓
+Validate Transition
+    ↓
+Validate Domain Conditions
+    ↓
+Lock where required
+    ↓
+Execute Transaction
+    ↓
+Update State
+    ↓
+Write Workflow Event
+    ↓
+Write Audit
+    ↓
+Commit
+    ↓
+Notify after commit
+```
+
+---
+
+# 8. Invalid Transition
+
+If a requested transition is not valid from the current state:
+
+```text
+Reject
+```
+
+Example:
+
+```text
+REJECTED
    ↓
-SUBMIT
-   ↓
-DATA_ENTRY_COMPLETED
-```
-
-rather than directly editing:
-
-```text
-status = APPROVED
-```
-
----
-
-## WF-P03 — Server-Side Enforcement
-
-Critical workflow rules MUST be enforced by the backend.
-
-Frontend restrictions alone are insufficient.
-
----
-
-## WF-P04 — Auditability
-
-Important transitions MUST generate an audit event.
-
----
-
-## WF-P05 — Actor
-
-Every user-driven transition MUST identify the acting user.
-
----
-
-## WF-P06 — Timestamp
-
-Important transitions MUST record when the action occurred.
-
----
-
-## WF-P07 — Reason
-
-Transitions involving rejection, correction, exceptional modification, or archival SHOULD require a reason.
-
----
-
-## WF-P08 — Transaction Safety
-
-Transitions that modify multiple related records MUST execute atomically where appropriate.
-
----
-
-# 3. Primary Form Workflow
-
-The primary registration workflow is:
-
-```text
-                     ┌─────────────┐
-                     │    DRAFT    │
-                     └──────┬──────┘
-                            │
-                         Submit
-                            │
-                            ▼
-              ┌────────────────────────┐
-              │ DATA_ENTRY_COMPLETED   │
-              └────────────┬───────────┘
-                           │
-                      Send to Review
-                           │
-                           ▼
-                 ┌──────────────────┐
-                 │  UNDER_REVIEW    │
-                 └───────┬──────────┘
-                         │
-             ┌───────────┴─────────────┐
-             │                         │
-             │ Return                  │ Verify
-             ▼                         ▼
-┌──────────────────────────┐    ┌──────────────┐
-│ RETURNED_FOR_CORRECTION  │    │   VERIFIED   │
-└────────────┬─────────────┘    └──────┬───────┘
-             │                         │
-          Correct                    Approve
-             │                         │
-             ▼                         ▼
-      ┌─────────────┐          ┌──────────────┐
-      │  CORRECTED  │          │   APPROVED   │
-      └──────┬──────┘          └──────────────┘
-             │
-          Resubmit
-             │
-             ▼
-      ┌───────────────┐
-      │ UNDER_REVIEW  │
-      └───────────────┘
-```
-
----
-
-# 4. Form Statuses
-
-Approved V1 statuses:
-
-```text
-DRAFT
-DATA_ENTRY_COMPLETED
-UNDER_REVIEW
-RETURNED_FOR_CORRECTION
-CORRECTED
-VERIFIED
 APPROVED
+```
+
+must not occur unless an explicit reopening workflow is later designed.
+
+---
+
+# 9. Frontend Workflow Boundary
+
+Next.js may:
+
+```text
+Display current status
+
+Display available actions
+
+Hide unavailable actions
+
+Show confirmation dialogs
+
+Collect comments
+
+Collect supporting information
+
+Submit requested action
+```
+
+Next.js must not decide that the transition is valid.
+
+Laravel decides.
+
+---
+
+# 10. Filament Workflow Boundary
+
+Filament is subject to the same workflow rules.
+
+System Administration access does not permit arbitrary workflow transitions.
+
+Important operations must reuse the same Domain Actions used by the API.
+
+---
+
+# 11. Staff Form Workflow
+
+Baseline Staff form workflow:
+
+```text
+DRAFT
+  ↓
+DATA_ENTRY_COMPLETED
+  ↓
+UNDER_REVIEW
+  ├── RETURNED_FOR_CORRECTION
+  │            ↓
+  │        CORRECTED
+  │            ↓
+  └────── UNDER_REVIEW
+               ↓
+            VERIFIED
+               ↓
+            APPROVED
+```
+
+Optional terminal state:
+
+```text
 ARCHIVED
 ```
 
-These codes should remain stable.
-
-Arabic display labels may be localized independently.
-
 ---
 
-# 5. DRAFT
+# 12. Staff Form States
 
-## Entry
-
-A new form submission begins as:
+Initial form states:
 
 ```text
 DRAFT
-```
 
-## Allowed Behavior
-
-The Data Entry user may:
-
-- Enter partial information.
-- Save progress.
-- Add family members.
-- Edit information.
-- Resume later.
-
-Submission-level mandatory fields do not all need to be complete yet.
-
-## Exit
-
-Action:
-
-```text
-Submit
-```
-
-Target:
-
-```text
 DATA_ENTRY_COMPLETED
-```
 
-Submission validation MUST pass.
-
----
-
-# 6. DATA_ENTRY_COMPLETED
-
-This state means:
-
-> Data entry has been completed but the record has not yet been independently verified.
-
-The record should normally become read-only to the original data-entry operator except through an authorized correction process.
-
-Next action:
-
-```text
-Send to Review
-```
-
-Target:
-
-```text
 UNDER_REVIEW
-```
 
----
+RETURNED_FOR_CORRECTION
 
-# 7. UNDER_REVIEW
-
-The reviewer examines:
-
-- Family data.
-- Household head.
-- Members.
-- National IDs.
-- Relationships.
-- Residence.
-- Health information.
-- Disability information.
-- Education.
-- Employment.
-- Needs.
-- Documents.
-- Source form.
-- Duplicate warnings.
-
-Reviewer actions:
-
-```text
-Verify
-```
-
-or:
-
-```text
-Return for Correction
-```
-
----
-
-# 8. RETURNED_FOR_CORRECTION
-
-A reviewer MUST provide:
-
-```text
-return_reason
-```
-
-Preferably correction items should identify affected areas.
-
-Example:
-
-```text
-Member PER-000125:
-National ID differs from source form.
-
-Residence:
-Current displacement location is missing.
-```
-
-The record becomes editable according to correction permissions.
-
----
-
-# 9. CORRECTED
-
-After correcting the requested issues, the Data Entry user performs:
-
-```text
-Complete Correction
-```
-
-Status:
-
-```text
 CORRECTED
+
+VERIFIED
+
+APPROVED
+
+ARCHIVED
 ```
 
-Then:
+---
+
+# 13. DRAFT
+
+A DRAFT may be incomplete.
+
+Authorized Data Entry users may edit it.
+
+DRAFT information must not automatically be interpreted as verified canonical information.
+
+---
+
+# 14. DATA_ENTRY_COMPLETED
+
+Indicates the Data Entry actor considers required entry complete.
+
+Transition requires:
 
 ```text
-Resubmit
+Required fields present
+
+Basic validation passed
+
+Source reference captured where applicable
 ```
 
-returns it to:
+---
+
+# 15. UNDER_REVIEW
+
+The record is awaiting or undergoing review.
+
+The reviewer evaluates:
+
+```text
+Completeness
+
+Source consistency
+
+Possible duplicates
+
+Validation issues
+
+Required evidence
+```
+
+---
+
+# 16. RETURNED_FOR_CORRECTION
+
+Reviewer identified an issue requiring correction.
+
+A reason/comment should be recorded.
+
+The correction reason must be available to the authorized correction actor.
+
+---
+
+# 17. CORRECTED
+
+The correction actor has responded to the returned item.
+
+It can then return to:
 
 ```text
 UNDER_REVIEW
 ```
 
-Previous review and correction history MUST remain available.
+---
+
+# 18. VERIFIED
+
+An authorized reviewer has verified the record according to the applicable process.
+
+Verification does not necessarily equal final approval.
 
 ---
 
-# 10. VERIFIED
+# 19. APPROVED
 
-`VERIFIED` means an authorized reviewer has confirmed the record according to the verification process.
+The record has completed the required approval process.
 
-It does NOT necessarily mean final organizational approval.
-
-Transition:
-
-```text
-VERIFIED
-   ↓
-Approve
-   ↓
-APPROVED
-```
-
-Only an authorized approver may perform this transition.
+Approval actor and timestamp must be recorded.
 
 ---
 
-# 11. APPROVED
+# 20. ARCHIVED
 
-`APPROVED` represents the accepted operational record.
+ARCHIVED is a terminal/non-operational state unless a future restoration process is explicitly designed.
 
-Approved records MUST NOT behave like editable drafts.
-
-Important modifications require:
-
-```text
-Permission
-+
-Reason
-+
-Audit
-```
-
-where applicable.
-
-Approval does not make a record permanently immutable.
-
-Real-world family information may change and should be updated through controlled workflows.
+Archiving must not destroy history.
 
 ---
 
-# 12. ARCHIVED
+# 21. Maker-Checker
 
-Archiving removes a record from normal active operational workflows without destroying its history.
-
-Archive reasons may include:
+Where required:
 
 ```text
-DUPLICATE
-CREATED_IN_ERROR
-SUPERSEDED
-CLOSED
-OTHER
+Maker
+≠
+Checker
 ```
 
-Archiving MUST NOT be equivalent to physical deletion.
+The creator/submitter should not perform incompatible review/approval actions on the same item.
+
+Exact separation depends on workflow risk.
 
 ---
 
-# 13. Transition Matrix
+# 22. Family Registration Workflow
 
-| Current | Action | Next |
-|---|---|---|
-| DRAFT | Submit | DATA_ENTRY_COMPLETED |
-| DATA_ENTRY_COMPLETED | Send to Review | UNDER_REVIEW |
-| UNDER_REVIEW | Return | RETURNED_FOR_CORRECTION |
-| RETURNED_FOR_CORRECTION | Complete Correction | CORRECTED |
-| CORRECTED | Resubmit | UNDER_REVIEW |
-| UNDER_REVIEW | Verify | VERIFIED |
-| VERIFIED | Approve | APPROVED |
-| Eligible state | Archive | ARCHIVED |
-
-Invalid transitions MUST be rejected by the backend.
-
-Example:
+Baseline:
 
 ```text
-DRAFT → APPROVED
-```
-
-is prohibited.
-
----
-
-# 14. Family Registration Workflow
-
-Creating a family should be treated as one logical operation.
-
-```text
-Start Registration
-      ↓
-Create Draft Family Context
-      ↓
-Register Household Head
-      ↓
-Check Person Duplicate
-      ↓
-Create / Reuse Person
-      ↓
-Create Membership
-      ↓
-Add Family Members
-      ↓
-Check Duplicates
-      ↓
-Add Residence
-      ↓
-Add Assessment/Form Data
-      ↓
-Review
-      ↓
-Submit
-```
-
-A transaction should be used where creation requires several dependent records to succeed together.
-
----
-
-# 15. Existing Person During Registration
-
-Before creating a new Person:
-
-```text
-Search / Duplicate Check
-```
-
-If no match exists:
-
-```text
-Create Person
-```
-
-If a possible match exists:
-
-```text
-Flag for Review
-```
-
-If the reviewer confirms an existing Person:
-
-```text
-Reuse Existing Person
-```
-
-Do NOT create another Person merely because the person appears on a new family form.
-
----
-
-# 16. Duplicate Detection Workflow
-
-```text
-New / Edited Person
+Create Family Draft
+        ↓
+Validate Family Data
+        ↓
+Resolve/Create Household Head Person
         ↓
 Duplicate Check
         ↓
-┌───────────────────────────────┐
-│ Match found?                  │
-└──────────────┬────────────────┘
-               │
-       ┌───────┴───────┐
-       │               │
-      NO              YES
-       │               │
-       ▼               ▼
-   Continue       Create Alert
-                       ↓
-                Classify Match
-                       ↓
-             ┌─────────┼─────────┐
-             │         │         │
-           EXACT    PROBABLE   POSSIBLE
-             │         │         │
-             └─────────┼─────────┘
-                       ↓
-                 Human Review
+Create Membership
+        ↓
+Assign Household Head
+        ↓
+Add Residence
+        ↓
+Complete Entry
+        ↓
+Review
+        ↓
+Verify / Approve
+```
+
+Where these operations form one initial registration transaction, partial invalid registry state must not be committed.
+
+---
+
+# 23. Person Registration Workflow
+
+Baseline:
+
+```text
+Enter Person Information
+        ↓
+Normalize Search Inputs
+        ↓
+Duplicate Check
+        ↓
+No Match?
+   ├── Yes → Create Person
+   └── No  → Duplicate Review
+```
+
+No automatic duplicate merge is allowed.
+
+---
+
+# 24. Duplicate Detection Workflow
+
+```text
+Potential Person
+      ↓
+Duplicate Detection
+      ↓
+┌───────────────────────┐
+│ EXACT                 │
+│ PROBABLE              │
+│ POSSIBLE              │
+└───────────────────────┘
+      ↓
+Human Review
+      ↓
+┌───────────────────────┐
+│ NOT_DUPLICATE         │
+│ SAME_PERSON           │
+│ UNRESOLVED            │
+└───────────────────────┘
 ```
 
 ---
 
-# 17. Duplicate Review Outcomes
+# 25. Duplicate Resolution
 
-An authorized reviewer may decide:
+If:
 
 ```text
 NOT_DUPLICATE
 ```
 
-The records represent different people.
+creation may continue.
 
-Or:
+If:
 
 ```text
 SAME_PERSON
 ```
 
-The records represent the same human identity.
+the existing Person should normally be reused.
 
-Or:
+If:
 
 ```text
 UNRESOLVED
 ```
 
-Additional evidence is required.
+the operation may remain pending or require authorized escalation.
 
 ---
 
-# 18. Duplicate Resolution
+# 26. Duplicate Merge
 
-Famboook MUST NOT automatically merge Person records.
+Automatic merge is prohibited.
 
-When:
-
-```text
-SAME_PERSON
-```
-
-is confirmed, an authorized resolution process should determine:
-
-- Canonical Person.
-- Conflicting values.
-- Memberships.
-- Documents.
-- Assessments.
-- Notes.
-- Needs.
-- Assistance.
-- Historical references.
-
-The merge operation, if implemented in V1, MUST be:
+A future Person merge workflow must define:
 
 ```text
-Controlled
-Audited
-Transactional
-Recoverable where practical
+Surviving Person
+
+Field Conflict Resolution
+
+Membership Handling
+
+Document Handling
+
+Assessment Handling
+
+Audit
+
+Rollback Strategy
 ```
 
-The duplicate Person should normally be archived/superseded rather than silently deleted.
+before implementation.
 
 ---
 
-# 19. Exact National ID Conflict
+# 27. Add Family Member Workflow
 
-If a newly entered National ID matches an existing verified Person:
-
-```text
-National ID
-     ↓
-Exact Existing Match
-     ↓
-BLOCK / REVIEW
-```
-
-The system SHOULD prevent casual creation of a second verified Person using the same National ID.
-
-An authorized reviewer resolves the conflict.
-
----
-
-# 20. Household Head Workflow
-
-Initial household-head assignment:
+Staff flow:
 
 ```text
-Family
-   ↓
-Select / Create Person
-   ↓
-Create Active Membership
-   ↓
-is_household_head = true
-```
-
-The database must enforce that a family cannot normally have multiple active household heads.
-
----
-
-# 21. Change Household Head
-
-Workflow:
-
-```text
-Open Family
+Select Family
     ↓
-Change Household Head
+Enter / Search Person
     ↓
-Select Existing Active Member
+Duplicate Check
     ↓
-Confirm Reason
+Existing Person?
+  ├── Yes → Validate Membership Eligibility
+  └── No  → Create Person
     ↓
-Validate
+Create Family Membership
     ↓
-Transaction
-    ├── Old Head → false
-    └── New Head → true
+Create Relationships where required
     ↓
 Audit
 ```
 
-The Person records remain unchanged.
+---
+
+# 28. Family Membership Transfer
+
+```text
+Person
+   ↓
+Current Active Membership
+   ↓
+Request Transfer
+   ↓
+Validate Destination Family
+   ↓
+Validate Head / Relationship Impact
+   ↓
+Lock Memberships
+   ↓
+End Current Membership
+   ↓
+Create New Membership
+   ↓
+Reevaluate Portal Access
+   ↓
+Audit
+```
+
+The operation is transactional.
 
 ---
 
-# 22. Household Head Not Yet a Member
+# 29. Household Head Change Workflow
 
-If the selected new household head is not currently a member:
+```text
+Family
+  ↓
+Current Household Head
+  ↓
+Select Proposed Head
+  ↓
+Validate Active Membership
+  ↓
+Validate Eligibility
+  ↓
+Authorize
+  ↓
+Lock Family Memberships
+  ↓
+Remove Current Head Flag
+  ↓
+Assign New Head
+  ↓
+Reevaluate Family Portal Access
+  ↓
+Audit
+  ↓
+Commit
+```
+
+---
+
+# 30. Household Head Concurrency
+
+The system must protect against two simultaneous head changes.
+
+Protection includes:
+
+```text
+Transaction
+
+Row Locking
+
+Partial Unique Index
+```
+
+---
+
+# 31. Household Head Death
+
+When an official Person death operation affects the current Household Head:
+
+```text
+Record Death
+    ↓
+Detect Household Head
+    ↓
+Create / Flag Household Head Review
+    ↓
+Reevaluate Family User Access
+    ↓
+Authorized Staff selects replacement through Head Change Workflow
+```
+
+Famboook must not silently choose the next Household Head.
+
+---
+
+# 32. Person Death Workflow
+
+Staff-originated official operation:
 
 ```text
 Select Person
-     ↓
-Validate Person
-     ↓
-Resolve Existing Active Membership
-     ↓
-Create / Transfer Membership
-     ↓
-Assign Household Head
-```
-
-This operation may require elevated permissions.
-
----
-
-# 23. Household Head Death
-
-Workflow:
-
-```text
-Mark Person as Deceased
-        ↓
-Is Household Head?
-        │
-   ┌────┴────┐
-   │         │
-  NO        YES
-   │         │
-   ▼         ▼
-Continue   Flag Family
-              ↓
-       HEAD_REVIEW_REQUIRED
-              ↓
-        Select New Head
-              ↓
-          Audit Change
-```
-
-The deceased Person remains in historical records.
-
----
-
-# 24. Move Person Between Families
-
-A Person MUST NOT be recreated.
-
-Workflow:
-
-```text
-PER-001825
     ↓
-Move Household
+Validate Current Life Status
     ↓
-Select Destination Family
+Capture Verified Information
     ↓
-Validate
+Validate death_date if known
     ↓
-Close Current Membership
+Authorize
     ↓
-Create New Membership
+RecordPersonDeathAction
+    ↓
+Update life_status
+    ↓
+Set death_date if known
+    ↓
+Handle Head/Access Implications
     ↓
 Audit
 ```
 
-Example:
-
-```text
-Old membership:
-FAM-000100
-ended_at = 2026-09-22
-is_active = false
-
-New membership:
-FAM-000250
-started_at = 2026-09-22
-is_active = true
-```
+Unknown exact death date remains NULL.
 
 ---
 
-# 25. Person Move Transaction
+# 33. Marriage Workflow
 
-The following should execute atomically:
-
-```text
-1. Lock relevant active membership.
-2. Validate destination family.
-3. End old membership.
-4. Create new membership.
-5. Apply relationship classification.
-6. Audit the move.
-```
-
-If any critical operation fails:
+Marriage-related changes may affect:
 
 ```text
-ROLLBACK
+Marital Status
+
+Person Relationships
+
+Family Membership
 ```
+
+These effects must be explicitly selected/validated.
+
+Marriage must not automatically transfer a Person to another Family without an authorized membership operation.
 
 ---
 
-# 26. Marriage / New Family Workflow
-
-An existing Person may establish a new household.
-
-```text
-Existing Person
-      ↓
-Create New Family
-      ↓
-Close Old Primary Membership
-      ↓
-Create Membership in New Family
-      ↓
-Assign Role
-      ↓
-Add Spouse / Members
-      ↓
-Audit
-```
-
-Person identity remains unchanged.
-
----
-
-# 27. Residence Update Workflow
-
-Do NOT overwrite the historical current residence blindly.
-
-Workflow:
-
-```text
-Current Residence
-       ↓
-Update Residence
-       ↓
-Close Previous Record
-is_current = false
-to_date = change date
-       ↓
-Create New Residence
-is_current = true
-from_date = change date
-       ↓
-Audit
-```
-
----
-
-# 28. Displacement Workflow
-
-When displacement occurs:
+# 34. Residence Change Workflow
 
 ```text
 Family
   ↓
-Create / Update Residence Event
+Current Residence
   ↓
-is_displaced = true
+New Residence Data
   ↓
-Record Displacement Information
+Validate
+  ↓
+Authorize
+  ↓
+Lock Current Residence
+  ↓
+End Current Residence
+  ↓
+Create New Current Residence
+  ↓
+Audit
 ```
 
-Relevant information may include:
-
-```text
-displacement_date
-displacement_location
-displacement_reason
-housing information
-```
-
-Returning home does not delete displacement history.
+The operation is transactional.
 
 ---
 
-# 29. Assessment Workflow
+# 35. Assessment Workflow
 
-Assessment lifecycle:
+Baseline:
 
 ```text
+CREATE
+  ↓
 DRAFT
   ↓
 IN_PROGRESS
@@ -836,1243 +738,2132 @@ COMPLETED
 UNDER_REVIEW
   ↓
 VERIFIED
+  ↓
+APPROVED
 ```
 
-Depending on the assessment type, final approval may also be required.
-
-Assessment workflow should remain conceptually separate from permanent Family status.
+Exact Assessment workflow may vary by Assessment Type.
 
 ---
 
-# 30. Assessment Creation
+# 36. Assessment Independence
 
-Workflow:
+Assessment answers represent point-in-time information.
+
+Assessment completion must not automatically overwrite canonical Family/Person data.
+
+Any canonical update must use an explicit controlled operation.
+
+---
+
+# 37. Need Workflow
+
+Suggested baseline:
 
 ```text
-Select Family
-    ↓
-Select Assessment Type
-    ↓
-Create Assessment
-    ↓
-Record Assessment Data
-    ↓
-Complete
-    ↓
-Review / Verify
-```
-
-Examples:
-
-```text
-INITIAL_REGISTRATION
-VERIFICATION
-FOLLOW_UP
-NEEDS_ASSESSMENT
-EMERGENCY_UPDATE
-```
-
----
-
-# 31. Time-Sensitive Information
-
-Information such as:
-
-```text
-Pregnancy
-Breastfeeding
-Employment status
-Needs
-Displacement situation
-```
-
-may change over time.
-
-When collected through an assessment, historical assessment context SHOULD be preserved.
-
-The current profile may be updated without destroying previous assessment evidence.
-
----
-
-# 32. Need Workflow
-
-Recommended V1 lifecycle:
-
-```text
-IDENTIFIED
-    ↓
-VERIFIED
-    ↓
-ACTIVE
-    ↓
-┌─────────────────┐
-│                 │
-▼                 ▼
-PARTIALLY_MET     MET
-│                 │
-└────────┬────────┘
-         ↓
-       CLOSED
-```
-
----
-
-# 33. IDENTIFIED Need
-
-A need has been reported or observed.
-
-It has not necessarily been independently verified.
-
----
-
-# 34. VERIFIED Need
-
-An authorized user confirms that the need is valid according to operational rules.
-
----
-
-# 35. ACTIVE Need
-
-The need remains unresolved and operationally relevant.
-
----
-
-# 36. PARTIALLY_MET Need
-
-Some assistance has addressed the need, but it remains active.
-
----
-
-# 37. MET Need
-
-The identified need has been fulfilled according to the responsible user's assessment.
-
----
-
-# 38. CLOSED Need
-
-The need is no longer operationally active.
-
-Closing the need does not delete its history.
-
----
-
-# 39. Assistance Workflow
-
-Assistance represents an actual assistance event.
-
-Workflow:
-
-```text
-Select Family / Person
-       ↓
-Select Assistance Type
-       ↓
-Optional: Link Need
-       ↓
-Enter Provider / Date / Quantity
-       ↓
-Validate
-       ↓
-Record Assistance
-       ↓
-Optional: Update Need Status
-       ↓
-Audit
-```
-
-Creating Assistance MUST NOT automatically close a Need.
-
-The user must explicitly determine whether the Need becomes:
-
-```text
-PARTIALLY_MET
-```
-
-or:
-
-```text
+OPEN
+  ↓
+IN_PROGRESS
+  ↓
 MET
+  ↓
+CLOSED
 ```
 
-where applicable.
+Alternative terminal state:
+
+```text
+CANCELLED
+```
 
 ---
 
-# 40. Assistance Without Existing Need
+# 38. Need Creation
 
-The system MAY record Assistance without an existing Need.
-
-Example:
+A Need may originate from:
 
 ```text
-External distribution received before Famboook assessment.
+Assessment
+
+Social Worker
+
+Authorized Staff
+
+Approved Case Process
 ```
 
-Therefore:
+Creation requires appropriate authorization.
+
+---
+
+# 39. Need and Assistance
+
+Recording Assistance does not automatically close a Need.
+
+Need status requires explicit transition.
+
+---
+
+# 40. Assistance Workflow
+
+Baseline:
 
 ```text
-assistance_records.need_id
+Record Assistance
+      ↓
+Validate Family / Person
+      ↓
+Validate Need if linked
+      ↓
+Authorize
+      ↓
+Save Assistance
+      ↓
+Audit
+      ↓
+Optionally Review Need Status
 ```
-
-is optional.
 
 ---
 
 # 41. Document Workflow
 
-Basic document lifecycle:
+Baseline:
 
 ```text
-MISSING
+UPLOADED
    ↓
-AVAILABLE
+UNVERIFIED
    ↓
-UPLOADED / RECORDED
+UNDER_REVIEW
    ↓
 VERIFIED
 ```
 
-Document metadata may exist without an uploaded file.
+Possible alternative:
+
+```text
+REJECTED
+```
+
+Exact status implementation may be simplified if `is_verified` remains the V1 persistence model.
 
 ---
 
-# 42. Document Verification
+# 42. Document Upload
 
-Workflow:
+Upload success must not imply verification.
 
-```text
-Document
-    ↓
-Review
-    ↓
-┌──────────────┐
-│ Valid?       │
-└──────┬───────┘
-       │
- ┌─────┴─────┐
- │           │
-YES          NO
- │           │
- ▼           ▼
-VERIFIED   REJECTED /
-           CORRECTION REQUIRED
-```
+Family User uploads are always unverified initially.
 
-Document verification must record:
+---
+
+# 43. Document Verification
+
+Verification requires an authorized actor.
+
+Verification records:
 
 ```text
 verified_by
 verified_at
 ```
 
+and workflow/audit information where applicable.
+
 ---
 
-# 43. Source Form Workflow
+# 44. Paper Source Workflow
 
-Where registration originates from paper:
+Paper forms may follow:
 
 ```text
-Receive Paper Form
-      ↓
-Assign / Record Form Number
-      ↓
-Create Form Submission
-      ↓
-Optional Scan Upload
-      ↓
+Received
+   ↓
+Registered
+   ↓
 Data Entry
-      ↓
-Review Against Source
-      ↓
+   ↓
+Review
+   ↓
+Correction if required
+   ↓
 Verification
-      ↓
+   ↓
 Approval
 ```
 
-The digital record must remain traceable to its source form.
+Source documents remain traceable.
 
 ---
 
-# 44. Additional Paper Pages
+# 45. Correction Workflow
 
-If the paper form has additional member pages:
-
-```text
-Main Form
-   +
-Additional Page 1
-   +
-Additional Page 2
-```
-
-they belong to the same logical submission where applicable.
-
-The digital system does not inherit the paper row limit.
-
----
-
-# 45. Sensitive Data Correction
-
-Sensitive fields include at minimum:
-
-```text
-National ID
-Identity data
-Health data
-Disability data
-Sensitive documents
-```
-
-For significant corrections after verification:
-
-```text
-Request Change
-     ↓
-Check Permission
-     ↓
-Enter Reason
-     ↓
-Apply Change
-     ↓
-Audit Old/New Values
-```
-
----
-
-# 46. National ID Correction
-
-For a verified Person:
-
-```text
-Current National ID
-      ↓
-Edit Requested
-      ↓
-Permission Check
-      ↓
-Duplicate Check
-      ↓
-Reason Required
-      ↓
-Update
-      ↓
-Audit
-```
-
-If the new ID matches another Person:
-
-```text
-STOP
-↓
-Duplicate Review
-```
-
----
-
-# 47. Approved Record Update
-
-Real-world changes after approval are not necessarily errors.
+A correction fixes incorrect recorded information.
 
 Example:
 
 ```text
-Family changes residence.
+Wrong birth date
 ```
 
-This should create a new valid historical event rather than "correcting" the old residence.
-
-Distinguish:
+Correction should record:
 
 ```text
-CORRECTION
-```
-
-from:
-
-```text
-REAL-WORLD UPDATE
+Previous Value
+New Value
+Reason
+Actor
+Timestamp
 ```
 
 ---
 
-# 48. Correction vs Update
+# 46. Real-World Change Workflow
 
-### Correction
-
-The previously entered value was incorrect.
+A real-world change creates new historical state where appropriate.
 
 Example:
 
 ```text
-National ID typed incorrectly.
+Family moved
 ```
 
-### Update
-
-The previous value was correct at the time, but reality changed.
-
-Example:
+Correct behavior:
 
 ```text
-Family moved to another location.
+End old residence
+Create new residence
 ```
 
-Corrections may modify a value with audit history.
+not:
 
-Updates should normally preserve the previous historical state.
+```text
+Overwrite old residence
+```
 
 ---
 
-# 49. Case Note Workflow
+# 47. Family Portal Architecture
 
-Case notes are append-oriented:
+Family Portal workflow:
 
 ```text
-Family / Person
-      ↓
-Add Note
-      ↓
-Select Note Type
-      ↓
-Set Confidentiality
-      ↓
-Save
-      ↓
-Timeline
+Authenticated Family User
+          ↓
+Resolve Authorized Family
+          ↓
+View Permitted Canonical Data
+          ↓
+Submit Proposed Change
+          ↓
+Change Request
+          ↓
+Staff Review
+          ↓
+Approval
+          ↓
+Domain Action
+          ↓
+Canonical Registry
 ```
-
-Existing notes should not normally be overwritten.
 
 ---
 
-# 50. Confidential Notes
+# 48. Family User Account Lifecycle
 
-Before displaying a confidential note:
+Baseline:
 
 ```text
-User
- ↓
-Permission Check
- ↓
-Authorized?
- ├── YES → Display
- └── NO  → Hide
+ACCOUNT CREATED
+       ↓
+IDENTITY VERIFICATION
+       ↓
+USER-PERSON LINK
+       ↓
+FAMILY ELIGIBILITY CHECK
+       ↓
+ACTIVATED
+       ↓
+ACTIVE
 ```
 
-Search and exports must follow the same rule.
+Possible later states:
+
+```text
+SUSPENDED
+
+ENDED
+```
 
 ---
 
-# 51. Family Archive Workflow
+# 49. Public Registration
 
-Archiving a family:
+Anonymous public Family registration is outside V1.
+
+Family User account creation/activation is controlled.
+
+---
+
+# 50. User-Person Link Workflow
 
 ```text
-Family
+PENDING_VERIFICATION
+        ↓
+     VERIFIED
+        ↓
+      ACTIVE
+```
+
+Possible transitions:
+
+```text
+ACTIVE → SUSPENDED
+
+ACTIVE → ENDED
+
+SUSPENDED → ACTIVE
+```
+
+Reactivation requires authorization.
+
+---
+
+# 51. Link Verification
+
+A Family User must not verify their own User-Person Link.
+
+Verification requires an authorized internal actor/process.
+
+---
+
+# 52. Dynamic Family Eligibility
+
+An ACTIVE User-Person Link does not permanently guarantee Family access.
+
+Every relevant request must evaluate current eligibility.
+
+Recommended V1:
+
+```text
+Active User
++
+Active User-Person Link
++
+Active Person
++
+Active Family Membership
++
+Current Household Head
+```
+
+unless an approved representative policy applies.
+
+---
+
+# 53. Access-Reevaluation Events
+
+Family Portal eligibility must be reconsidered after:
+
+```text
+Household Head Change
+
+Membership Transfer
+
+Person Death
+
+Family Archive
+
+User Suspension
+
+User-Person Link Suspension
+
+User-Person Link End
+```
+
+---
+
+# 54. Change Request Workflow
+
+Canonical lifecycle:
+
+```text
+DRAFT
   ↓
-Archive Request
+SUBMITTED
   ↓
-Check Permission
-  ↓
-Select Reason
-  ↓
-Validate Active Processes
-  ↓
-Archive
-  ↓
-Audit
-```
-
-Archiving MUST NOT delete:
-
-- Persons.
-- Membership history.
-- Assessments.
-- Assistance.
-- Notes.
-- Documents.
-- Audit history.
-
----
-
-# 52. Person Archive Workflow
-
-A Person may be archived in exceptional circumstances such as confirmed duplicate or erroneous creation.
-
-Workflow:
-
-```text
-Person
- ↓
-Archive Request
- ↓
-Check Dependencies
- ↓
-Select Reason
- ↓
-Resolve References
- ↓
-Archive
- ↓
-Audit
-```
-
-A Person MUST NOT be archived merely because they:
-
-```text
-Move
-Marry
-Leave a household
-Die
-```
-
----
-
-# 53. Deceased Person Workflow
-
-```text
-Person
- ↓
-Record Death
- ↓
-life_status = DECEASED
- ↓
-Record Date if Known
- ↓
-Review Household Role
- ↓
-Preserve History
- ↓
-Audit
-```
-
-Death is a life-status change, not deletion.
-
----
-
-# 54. Data Import Workflow
-
-```text
-Upload Import File
-       ↓
-Create Import Batch
-       ↓
-Validate Structure
-       ↓
-Validate Rows
-       ↓
-Duplicate Check
-       ↓
-Preview Results
-       ↓
-Authorized Confirmation
-       ↓
-Import Valid Rows
-       ↓
-Report Failed Rows
-       ↓
-Audit
-```
-
-No bulk import should silently bypass validation.
-
----
-
-# 55. Import Batch States
-
-Recommended:
-
-```text
-UPLOADED
-VALIDATING
-VALIDATED
-READY
-IMPORTING
-COMPLETED
-COMPLETED_WITH_ERRORS
-FAILED
-```
-
-This becomes relevant when Excel/CSV import is implemented.
-
----
-
-# 56. Export Workflow
-
-```text
-User Requests Export
-       ↓
-Permission Check
-       ↓
-Apply Record Scope
-       ↓
-Apply Field Restrictions
-       ↓
-Generate Export
-       ↓
-Audit Sensitive Export
-```
-
-Viewing data does not automatically grant export permission.
-
----
-
-# 57. Search Workflow
-
-```text
-Search Input
-    ↓
-Normalize Search
-    ↓
-Apply User Scope
-    ↓
-Search Authorized Records
-    ↓
-Mask Restricted Fields
-    ↓
-Display Results
-```
-
-Search MUST NOT be used to bypass permissions.
-
----
-
-# 58. Family Profile Workflow
-
-The Family Profile is the primary operational workspace.
-
-```text
-Family
- │
- ├── Overview
- ├── Members
- ├── Residence
- ├── Health Summary
- ├── Education
- ├── Employment
- ├── Needs
- ├── Assistance
- ├── Assessments
- ├── Documents
- ├── Notes
- └── History
-```
-
-Actions available on each section depend on permissions and workflow state.
-
----
-
-# 59. Review Queue
-
-Reviewers should have a queue containing records such as:
-
-```text
 UNDER_REVIEW
-```
-
-Potential queue information:
-
-```text
-Family Code
-Household Head
-Form Number
-Submitted By
-Submitted At
-Duplicate Warning
-Priority
-```
-
----
-
-# 60. Correction Queue
-
-Data Entry users should be able to see records assigned/returned to them:
-
-```text
-RETURNED_FOR_CORRECTION
-```
-
-including:
-
-```text
-Return Reason
-Reviewer
-Returned At
-Affected Sections
+  ├── RETURNED_FOR_CLARIFICATION
+  │            ↓
+  │       RESUBMITTED
+  │            ↓
+  └──────── UNDER_REVIEW
+               │
+        ┌──────┴──────┐
+        ↓             ↓
+     REJECTED      APPROVED
+                       ↓
+                    APPLIED
 ```
 
 ---
 
-# 61. Approval Queue
+# 55. Change Request DRAFT
 
-Authorized approvers should see:
+The requester may edit their own DRAFT request where authorized.
 
-```text
-VERIFIED
-```
-
-records awaiting:
-
-```text
-APPROVE
-```
-
-The approval process should not require searching manually for eligible records.
+A DRAFT is not visible in normal Staff review queues unless explicitly designed otherwise.
 
 ---
 
-# 62. Workflow Notifications
+# 56. Change Request Submission
 
-V1 MAY provide in-application notifications for:
+Submission must:
 
 ```text
-Record returned for correction
-Record awaiting review
-Record verified
-Record approved
-Duplicate requires review
-Household head requires review
-```
+Authenticate
 
-External SMS/email notifications are not required for core V1 unless later approved.
+Authorize Family Scope
+
+Validate Request Type
+
+Validate Target
+
+Validate Proposed Data
+
+Validate Required Documents
+
+Set submitted_by
+
+Set submitted_at
+
+Transition to SUBMITTED
+
+Create Workflow Event
+```
 
 ---
 
-# 63. Workflow Event History
+# 57. SUBMITTED
 
-Important workflow transitions should produce a timeline.
+SUBMITTED means:
+
+```text
+Requester has formally sent the request for review.
+```
+
+Canonical registry data remains unchanged.
+
+---
+
+# 58. UNDER_REVIEW
+
+Authorized Staff accepts/opens the request for review.
+
+The reviewer may:
+
+```text
+Inspect canonical data
+
+Inspect proposed data
+
+Inspect supporting documents
+
+Check duplicates
+
+Request clarification
+
+Reject
+
+Approve
+```
+
+subject to permission.
+
+---
+
+# 59. RETURNED_FOR_CLARIFICATION
+
+The reviewer requires additional Family User information.
+
+A Family-visible clarification message must be provided.
+
+Internal Staff notes must remain separate.
+
+---
+
+# 60. RESUBMITTED
+
+The Family User has responded to clarification.
+
+The response must be traceable.
+
+The request returns to review.
+
+---
+
+# 61. REJECTED
+
+Rejection is terminal in the baseline workflow.
+
+It must record:
+
+```text
+rejected_by
+
+rejected_at
+
+rejection_reason
+```
+
+A future reopen/appeal workflow requires explicit design.
+
+---
+
+# 62. APPROVED
+
+APPROVED means:
+
+```text
+The proposed operation is authorized for application.
+```
+
+It does not mean:
+
+```text
+Canonical data has already changed.
+```
+
+---
+
+# 63. APPLIED
+
+APPLIED means:
+
+```text
+The approved Domain Action completed successfully
+and canonical registry data was updated.
+```
+
+Therefore:
+
+```text
+APPROVED ≠ APPLIED
+```
+
+---
+
+# 64. Change Request Application Workflow
+
+```text
+APPROVED
+   ↓
+Acquire Lock
+   ↓
+Re-read Current Registry
+   ↓
+Revalidate Request
+   ↓
+Authorize Application
+   ↓
+Select Domain Action
+   ↓
+Begin Transaction
+   ↓
+Execute Canonical Change
+   ↓
+Write Audit
+   ↓
+Write Workflow Event
+   ↓
+Set applied_by / applied_at
+   ↓
+Set APPLIED
+   ↓
+Commit
+```
+
+---
+
+# 65. Application Revalidation
+
+Approval may have occurred earlier.
+
+The canonical registry may have changed since then.
+
+Application must therefore revalidate current state.
 
 Example:
 
 ```text
-2026-09-22 09:10
-Draft created by User A
-
-2026-09-22 10:35
-Submitted by User A
-
-2026-09-22 11:20
-Review started by User B
-
-2026-09-22 11:45
-Returned for correction by User B
-
-2026-09-22 13:10
-Corrected by User A
-
-2026-09-22 14:00
-Verified by User B
-
-2026-09-22 15:30
-Approved by User C
+Approved Household Head change
+        ↓
+Before application, proposed head leaves Family
+        ↓
+Application must fail safely
 ```
 
 ---
 
-# 64. Workflow Events vs Audit Log
+# 66. Application Failure
 
-These are related but conceptually different.
-
-### Workflow Event
-
-Explains lifecycle movement:
-
-```text
-UNDER_REVIEW → VERIFIED
-```
-
-### Audit Log
-
-Records important data/system changes:
-
-```text
-national_id:
-804000001
-→
-804000011
-```
-
-One user action may create both.
-
----
-
-# 65. Recommended workflow_events Table
-
-Database V1 should be extended with:
-
-```text
-workflow_events
-```
-
-Recommended fields:
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| workflowable_type | VARCHAR | No |
-| workflowable_id | BIGINT | No |
-| from_status | VARCHAR(30) | Yes |
-| to_status | VARCHAR(30) | No |
-| action | VARCHAR(50) | No |
-| reason | TEXT | Yes |
-| metadata | JSONB | Yes |
-| performed_by | BIGINT | Yes |
-| created_at | TIMESTAMP | No |
-
-This provides a reusable workflow timeline for:
-
-```text
-Form Submission
-Assessment
-Need
-```
-
-and potentially other workflow-controlled entities.
-
----
-
-# 66. Optimistic Concurrency
-
-When a user opens a record and another user changes it before the first user saves:
-
-```text
-User A opens Version 5
-User B saves Version 6
-User A attempts save
-```
-
-the application SHOULD detect the stale state for critical operations.
-
-Possible implementation:
-
-```text
-updated_at
-```
-
-or explicit:
-
-```text
-version
-```
-
-checking.
-
-The user should not unknowingly overwrite newer data.
-
----
-
-# 67. Failure Handling
-
-A failed workflow action MUST NOT leave partial critical changes.
-
-Example:
-
-```text
-Move Person
-```
-
-If old membership is closed but new membership creation fails:
+If canonical application fails:
 
 ```text
 ROLLBACK
 ```
 
-The Person must remain in the original consistent state.
+The request must not become APPLIED.
+
+Baseline behavior:
+
+```text
+Remain APPROVED
+```
+
+The failure should be logged/audited appropriately.
 
 ---
 
-# 68. Idempotency
+# 67. Application Retry
 
-Critical actions exposed through APIs SHOULD be designed to reduce accidental duplicate execution where appropriate.
+An authorized retry may occur after the underlying issue is resolved.
+
+Retry must still:
+
+```text
+Lock
+
+Revalidate
+
+Authorize
+
+Execute transaction
+```
+
+---
+
+# 68. Application Idempotency
+
+If a request is already:
+
+```text
+APPLIED
+```
+
+another application attempt must not repeat the canonical mutation.
+
+---
+
+# 69. Concurrent Application
+
+Two actors/processes attempting to apply the same request simultaneously must not create duplicate domain changes.
+
+Use:
+
+```text
+Transaction
+
+Row Lock
+
+State Check
+```
+
+---
+
+# 70. Contact Update Request
+
+```text
+DRAFT
+ ↓
+SUBMITTED
+ ↓
+REVIEW
+ ↓
+APPROVED
+ ↓
+UpdatePersonContactAction
+ ↓
+APPLIED
+```
+
+V1 uses review even if Contact Update is classified LOW risk.
+
+---
+
+# 71. Residence Update Request
+
+```text
+Family User proposes residence
+        ↓
+Review
+        ↓
+Approval
+        ↓
+ChangeFamilyResidenceAction
+        ↓
+End old current residence
+        ↓
+Create new current residence
+        ↓
+APPLIED
+```
+
+---
+
+# 72. Person Correction Request
+
+```text
+Proposed correction
+      ↓
+Review current canonical value
+      ↓
+Review supporting evidence
+      ↓
+Approve / Reject
+      ↓
+Controlled correction action
+      ↓
+Audit old/new values
+```
+
+---
+
+# 73. Add Family Member Request
+
+```text
+Proposed Member
+      ↓
+Review
+      ↓
+Duplicate Detection
+      ↓
+Existing Person?
+ ┌─────────────┴──────────────┐
+ ↓                            ↓
+YES                           NO
+ ↓                            ↓
+Reuse Person             Create Person
+ └─────────────┬──────────────┘
+               ↓
+        Create Membership
+               ↓
+             APPLIED
+```
+
+---
+
+# 74. Birth Report Request
+
+A Birth Report must not directly create a Person.
+
+```text
+BIRTH_REPORT
+    ↓
+Review
+    ↓
+Duplicate Check
+    ↓
+Approval
+    ↓
+CreatePersonAction
+    ↓
+AddFamilyMemberAction
+    ↓
+APPLIED
+```
+
+---
+
+# 75. Death Report Request
+
+```text
+DEATH_REPORT
+    ↓
+Review
+    ↓
+Evidence / Verification
+    ↓
+Approval
+    ↓
+RecordPersonDeathAction
+    ↓
+Head / Access Review if applicable
+    ↓
+APPLIED
+```
+
+The reported date is not canonical until application succeeds.
+
+---
+
+# 76. Marriage Update Request
+
+```text
+MARRIAGE_UPDATE
+       ↓
+Review
+       ↓
+Determine Required Domain Effects
+       ↓
+Approve
+       ↓
+Update Marital Status
+and/or
+Person Relationship
+and/or
+Membership Operation
+       ↓
+APPLIED
+```
+
+No automatic Family transfer is assumed.
+
+---
+
+# 77. Membership Change Request
+
+Membership change is high impact.
+
+Application must use approved membership Domain Actions and preserve history.
+
+---
+
+# 78. Household Head Change Request
+
+Recommended risk:
+
+```text
+HIGH
+```
+
+Workflow:
+
+```text
+Request
+  ↓
+Review
+  ↓
+Validate Proposed Head
+  ↓
+Approval
+  ↓
+ChangeHouseholdHeadAction
+  ↓
+Reevaluate Portal Access
+  ↓
+APPLIED
+```
+
+---
+
+# 79. Document Update Request
+
+```text
+Upload Document
+      ↓
+Change Request
+      ↓
+Review
+      ↓
+Document Verification where required
+      ↓
+Approval
+      ↓
+Apply metadata/document change
+      ↓
+APPLIED
+```
+
+Upload alone does not verify the document.
+
+---
+
+# 80. OTHER Request
+
+`OTHER` must not become an unrestricted mutation mechanism.
+
+It may collect a request that requires Staff interpretation.
+
+Application requires an explicitly selected authorized Domain Action.
+
+No arbitrary payload-to-database update is allowed.
+
+---
+
+# 81. Change Request Risk
+
+Possible levels:
+
+```text
+LOW
+MEDIUM
+HIGH
+```
+
+Risk may influence:
+
+```text
+Evidence
+
+Reviewer
+
+Approver
+
+Maker-Checker
+
+Re-authentication
+
+Application Permission
+```
+
+---
+
+# 82. Review Queues
+
+Staff Application should expose operational queues rather than requiring users to manually search every entity.
+
+Recommended queues:
+
+```text
+Form Review
+
+Returned for Correction
+
+Verification
+
+Approval
+
+Duplicate Review
+
+Change Requests
+
+Clarification Responses
+
+Approved Awaiting Application
+
+Household Head Review
+
+Document Verification
+```
+
+---
+
+# 83. Queue Meaning
+
+An operational queue is a filtered view of authoritative workflow state.
+
+It is not a separate source of truth.
+
+Example:
+
+```text
+Approved Awaiting Application
+```
+
+is derived from:
+
+```text
+change_requests.status = APPROVED
+```
+
+---
+
+# 84. Queue Authorization
+
+Users must only see queue items within their:
+
+```text
+Role
+
+Permission
+
+Data Scope
+
+Object Scope
+```
+
+---
+
+# 85. Notifications
+
+Notifications are triggered by backend workflow events.
 
 Examples:
 
 ```text
-Approve
-Move Person
-Create Assistance
-```
+Request Submitted
 
-Repeated requests should not accidentally create duplicate business events.
+Request Returned for Clarification
+
+Request Approved
+
+Request Rejected
+
+Request Applied
+
+Account Activated
+```
 
 ---
 
-# 69. Validation Layers
+# 86. After-Commit Notifications
 
-Workflow validation occurs at:
-
-```text
-UI
- ↓
-Application / Service Layer
- ↓
-Database Constraints
-```
-
-Critical rules must not depend solely on UI behavior.
-
----
-
-# 70. Workflow Services
-
-Laravel implementation SHOULD avoid placing complex workflow logic directly inside controllers or Filament pages.
-
-Recommended service/action classes:
-
-```text
-SubmitFormAction
-StartReviewAction
-ReturnForCorrectionAction
-VerifyFormAction
-ApproveFormAction
-
-ChangeHouseholdHeadAction
-MovePersonToFamilyAction
-
-ResolveDuplicateAction
-
-UpdateResidenceAction
-
-CreateNeedAction
-VerifyNeedAction
-RecordAssistanceAction
-```
-
-This makes workflow behavior reusable and testable.
-
----
-
-# 71. Authorization Integration
-
-Every workflow action must perform authorization.
+Where notification delivery is not part of canonical integrity, it should occur after successful transaction commit.
 
 Conceptually:
 
 ```text
-User
- ↓
-Can perform action?
- ↓
-Is transition valid?
- ↓
-Does record satisfy requirements?
- ↓
-Execute
- ↓
+Commit Business State
+        ↓
+Dispatch Notification
+```
+
+not:
+
+```text
+Send SMS
+   ↓
+SMS fails
+   ↓
+Rollback valid registry change
+```
+
+---
+
+# 87. Notification Failure
+
+Notification delivery failure does not change committed workflow state.
+
+Delivery may be retried independently.
+
+---
+
+# 88. Domain Actions
+
+Recommended actions include:
+
+```text
+CreateFamilyAction
+
+CreatePersonAction
+
+AddFamilyMemberAction
+
+TransferFamilyMemberAction
+
+ChangeHouseholdHeadAction
+
+ChangeFamilyResidenceAction
+
+RecordPersonDeathAction
+
+CreateAssessmentAction
+
+CompleteAssessmentAction
+
+SubmitFormAction
+
+VerifyFormAction
+
+ApproveFormAction
+
+CreateNeedAction
+
+RecordAssistanceAction
+
+VerifyDocumentAction
+
+SubmitChangeRequestAction
+
+StartChangeRequestReviewAction
+
+ReturnChangeRequestForClarificationAction
+
+ResubmitChangeRequestAction
+
+ApproveChangeRequestAction
+
+RejectChangeRequestAction
+
+ApplyChangeRequestAction
+```
+
+---
+
+# 89. Domain Action Responsibilities
+
+Depending on operation, an Action should handle:
+
+```text
+Authorization context
+
+Current-state validation
+
+Business rules
+
+Concurrency protection
+
+Transaction
+
+Canonical mutation
+
+Workflow transition
+
 Audit
-```
 
-Detailed role/action mapping is defined in:
-
-```text
-06-PERMISSIONS.md
+Domain events
 ```
 
 ---
 
-# 72. Workflow Tests
+# 90. Thin Controllers
 
-Critical workflows MUST have automated tests.
+API controllers should remain thin.
 
-Minimum scenarios:
+Preferred:
 
 ```text
-Draft can be submitted when valid.
+HTTP Request
+    ↓
+Form Request
+    ↓
+Policy
+    ↓
+Controller
+    ↓
+Domain Action
+    ↓
+Resource Response
+```
 
-Invalid Draft cannot be submitted.
+Controllers should not contain large duplicated workflow logic.
 
-Reviewer can return a submission.
+---
 
-Return reason is required.
+# 91. Semantic Endpoints
 
-Corrected submission can be resubmitted.
+Important workflow operations should use meaningful endpoints where appropriate.
 
-Reviewer can verify.
+Examples:
 
-Unauthorized user cannot verify.
+```text
+POST /api/v1/change-requests/{request}/submit
 
-Approver can approve.
+POST /api/v1/change-requests/{request}/start-review
 
-Draft cannot jump directly to Approved.
+POST /api/v1/change-requests/{request}/return
 
-Family cannot have two active household heads.
+POST /api/v1/change-requests/{request}/approve
 
-Person cannot have two active primary memberships.
+POST /api/v1/change-requests/{request}/reject
 
-Moving Person preserves Person ID.
+POST /api/v1/change-requests/{request}/apply
+```
 
-Residence update preserves previous residence.
+Similarly:
 
-Duplicate detection does not auto-merge.
+```text
+POST /api/v1/families/{family}/change-household-head
+```
 
-National ID correction triggers duplicate check.
+may be preferable to generic field mutation.
 
-Assistance does not automatically close Need.
+---
 
-Archive preserves history.
+# 92. HTTP Retry Safety
+
+Clients may retry requests because of network problems.
+
+High-impact endpoints must therefore consider:
+
+```text
+Idempotency
+
+Current-state validation
+
+Duplicate submission
+
+Concurrency
 ```
 
 ---
 
-# 73. Workflow Invariants
+# 93. Workflow Comments
 
-The following invariants must always remain true:
+Workflow comments should distinguish:
 
 ```text
-WF-INV-001
-A DRAFT cannot become APPROVED directly.
+Internal Staff Comment
 
-WF-INV-002
-A returned record must have a correction reason.
+Family-visible Clarification
 
-WF-INV-003
-Verification and approval are distinct actions.
+Family-visible Rejection Reason
+```
 
-WF-INV-004
-Duplicate detection never performs automatic merge.
+Internal comments must not accidentally be exposed through Family Portal resources.
 
-WF-INV-005
-Moving a Person never creates a new Person identity.
+---
 
-WF-INV-006
-A Family normally has only one active household head.
+# 94. Workflow Ownership
 
-WF-INV-007
-A Person normally has only one active primary household membership.
+The workflow belongs to the backend/domain layer.
 
-WF-INV-008
-Residence updates preserve relevant history.
+Correct:
 
-WF-INV-009
-Need and Assistance lifecycles remain separate.
+```text
+Frontend:
+"Approve this request"
 
-WF-INV-010
-Critical workflow transitions are auditable.
+Backend:
+"Is approval currently allowed?"
+```
 
-WF-INV-011
-Invalid transitions are rejected server-side.
+Incorrect:
 
-WF-INV-012
-Failed multi-record transitions do not leave partial state.
+```text
+Frontend:
+"Set status = APPROVED"
 ```
 
 ---
 
-# 74. Approved Workflow Decisions V1
+# 95. API Status Exposure
 
-### WF-ADR-001
+The API may expose:
 
-Registration begins as `DRAFT`.
+```text
+status
 
-### WF-ADR-002
+allowed_actions
+```
 
-Data entry and verification are separate stages.
+where useful.
 
-### WF-ADR-003
+`allowed_actions` can improve UX but remains informational.
 
-Verification and final approval are separate stages.
-
-### WF-ADR-004
-
-Returned records require a reason.
-
-### WF-ADR-005
-
-Correction history is preserved.
-
-### WF-ADR-006
-
-Approved records use controlled updates.
-
-### WF-ADR-007
-
-Corrections and real-world updates are treated differently.
-
-### WF-ADR-008
-
-Duplicate Persons are reviewed by humans.
-
-### WF-ADR-009
-
-Household-head changes reuse existing Person identities.
-
-### WF-ADR-010
-
-Moving Persons preserves membership history.
-
-### WF-ADR-011
-
-Residence changes preserve residence history.
-
-### WF-ADR-012
-
-Needs and Assistance use independent workflows.
-
-### WF-ADR-013
-
-Archiving does not mean hard deletion.
-
-### WF-ADR-014
-
-Important transitions produce workflow history and/or audit events.
-
-### WF-ADR-015
-
-Critical multi-record transitions are transactional.
+The backend must still authorize any submitted action independently.
 
 ---
 
-# 75. Pending Workflow Decisions
+# 96. Family Portal Status Presentation
 
-The following may be finalized during implementation planning.
+Family Portal should use understandable status labels.
 
-### PWF-001 — Review Assignment
-
-Determine whether reviewers:
+Internal:
 
 ```text
-Select from shared queue
+RETURNED_FOR_CLARIFICATION
+```
+
+may display as:
+
+```text
+Needs additional information
+```
+
+or localized Arabic equivalent.
+
+The canonical machine state remains stable.
+
+---
+
+# 97. Executive Workflow Metrics
+
+Executive Dashboard may derive metrics such as:
+
+```text
+Pending Reviews
+
+Pending Approvals
+
+Average Review Time
+
+Returned Requests
+
+Applied Requests
+
+Duplicate Review Backlog
+
+Data Verification Progress
+```
+
+Metrics must not change workflow state.
+
+---
+
+# 98. Workflow Time Metrics
+
+Workflow events may support calculation of:
+
+```text
+Submission-to-Review Time
+
+Review-to-Approval Time
+
+Approval-to-Application Time
+
+Clarification Response Time
+```
+
+These values should normally be derived rather than manually entered.
+
+---
+
+# 99. Workflow Escalation
+
+Automatic escalation may be added later.
+
+V1 does not require automatic escalation unless operational requirements are approved.
+
+Future examples:
+
+```text
+Request pending > N days
+
+High-risk request pending approval
+
+Large duplicate-review backlog
+```
+
+---
+
+# 100. Scheduled Jobs
+
+Scheduled jobs may:
+
+```text
+Send reminders
+
+Generate queue summaries
+
+Detect stale workflow items
+```
+
+but must not automatically perform high-risk canonical decisions unless explicitly authorized by business policy.
+
+---
+
+# 101. Background Jobs
+
+Background jobs must revalidate state when executing.
+
+A queued job must not assume the state remains unchanged since dispatch.
+
+---
+
+# 102. Job Idempotency
+
+Retryable jobs that mutate state must be designed to avoid duplicate effects.
+
+---
+
+# 103. Transaction Failure
+
+If a transaction fails:
+
+```text
+No partial canonical mutation
+
+No false final workflow state
+
+No false APPLIED state
+```
+
+The client receives a controlled error.
+
+---
+
+# 104. Workflow Error Messages
+
+User-facing errors should be useful without exposing:
+
+```text
+Database SQL
+
+Stack Traces
+
+Sensitive Data
+
+Internal Security Details
+```
+
+---
+
+# 105. Authorization Failure
+
+Unauthorized transition requests should be rejected server-side.
+
+The frontend hiding the action is not sufficient.
+
+---
+
+# 106. Object-Level Authorization
+
+A valid workflow action on one Family does not authorize the same action on another Family.
+
+Every target object requires authorization.
+
+---
+
+# 107. Family User Workflow Permissions
+
+A Family User may, where authorized:
+
+```text
+Create own DRAFT Change Request
+
+Edit own DRAFT
+
+Submit own request
+
+View own authorized requests
+
+Respond to clarification
+
+Resubmit
+
+Upload supporting documents
+
+Track status
+```
+
+A Family User may not:
+
+```text
+Start Staff Review
+
+Verify
+
+Approve
+
+Reject
+
+Apply
+
+Edit internal review notes
+```
+
+---
+
+# 108. Staff Workflow Permissions
+
+Staff permissions are separated by operation.
+
+Examples:
+
+```text
+change-request.review
+
+change-request.return
+
+change-request.approve
+
+change-request.reject
+
+change-request.apply
+```
+
+Having one permission does not automatically grant all others.
+
+---
+
+# 109. High-Risk Separation
+
+For HIGH-risk workflows, future policy may require:
+
+```text
+Reviewer ≠ Approver
 ```
 
 or:
 
 ```text
-Receive explicitly assigned records
+Approver ≠ Applier
 ```
 
-or both.
-
-### PWF-002 — Approval Requirement
-
-Determine whether all registrations require final approval after verification or whether this may vary by assessment type.
-
-### PWF-003 — Duplicate Merge
-
-Determine whether V1 includes a complete Person merge tool or only duplicate review and administrator resolution.
-
-### PWF-004 — Correction Scope
-
-Determine whether returned records unlock:
-
-```text
-Entire form
-```
-
-or only:
-
-```text
-Sections flagged by reviewer
-```
-
-### PWF-005 — Reverification
-
-Define which changes to an approved record require renewed verification.
-
-### PWF-006 — SLA
-
-Determine whether review/correction queues require deadlines or escalation indicators.
-
-### PWF-007 — Notification Channels
-
-Determine whether V1 requires only in-app notifications or external channels.
+Exact requirements remain pending.
 
 ---
 
-# 76. Workflow State Ownership
+# 110. Workflow Concurrency
 
-Status fields belong to their respective entities.
+Critical workflows must use locking and state checks.
+
+Candidates include:
+
+```text
+Household Head Change
+
+Family Membership Transfer
+
+Residence Change
+
+Change Request Application
+
+Person Death
+
+Duplicate Resolution
+```
+
+---
+
+# 111. Stale UI State
 
 Example:
 
 ```text
-form_submissions.status
-assessments.status
-family_needs.status
+Reviewer opens APPROVED request
+
+Another authorized actor applies it
+
+First reviewer still sees old screen
+
+First reviewer clicks Apply
 ```
 
-Do NOT create one global `status` representing the state of the entire family.
-
-A Family may simultaneously have:
-
-```text
-Approved Registration
-+
-Active Need
-+
-Draft Follow-up Assessment
-+
-Verified Document
-```
-
-Each lifecycle remains independent.
+Backend must respond based on current database state and must not apply twice.
 
 ---
 
-# 77. Documentation Dependencies
+# 112. Optimistic UI
 
-This document depends on:
+The frontend may use optimistic UI only for operations where failure can be safely reconciled.
+
+High-risk canonical operations should generally wait for authoritative backend confirmation.
+
+---
+
+# 113. Workflow Audit Context
+
+Where appropriate, audit context may include:
 
 ```text
-01-PRODUCT.md
-02-DATA-DICTIONARY.md
-03-BUSINESS-RULES.md
-04-DATABASE.md
+User
+
+Request ID
+
+IP/context metadata
+
+Action
+
+Target
+
+Previous state
+
+New state
 ```
 
-It informs:
+Sensitive metadata collection must remain proportional.
+
+---
+
+# 114. Workflow Testing
+
+Every important workflow requires automated tests covering:
 
 ```text
-06-PERMISSIONS.md
-07-ROADMAP.md
-Laravel implementation
-Automated tests
-Filament UI actions
+Happy Path
+
+Invalid Transition
+
+Unauthorized Actor
+
+Wrong Object Scope
+
+Missing Required Data
+
+Concurrency
+
+Rollback
+
+Idempotency
+
+Audit
+
+Workflow Event
+
+Sensitive Field Exposure
 ```
 
 ---
 
-# 78. Document Status
+# 115. Change Request Tests
+
+Required scenarios include:
+
+```text
+DRAFT → SUBMITTED
+
+SUBMITTED → UNDER_REVIEW
+
+UNDER_REVIEW → RETURNED_FOR_CLARIFICATION
+
+RETURNED_FOR_CLARIFICATION → RESUBMITTED
+
+RESUBMITTED → UNDER_REVIEW
+
+UNDER_REVIEW → APPROVED
+
+UNDER_REVIEW → REJECTED
+
+APPROVED → APPLIED
+```
+
+and invalid transitions.
+
+---
+
+# 116. Application Failure Test
+
+Required:
+
+```text
+APPROVED request
+     ↓
+Domain Action fails
+     ↓
+Transaction rolls back
+     ↓
+Canonical data unchanged
+     ↓
+Request remains APPROVED
+```
+
+---
+
+# 117. Application Idempotency Test
+
+Required:
+
+```text
+Apply APPROVED request
+     ↓
+APPLIED
+     ↓
+Apply again
+     ↓
+No second canonical mutation
+```
+
+---
+
+# 118. Family Scope Test
+
+Required:
+
+```text
+Family User A
+    ↓
+Request belonging to Family B
+    ↓
+Denied
+```
+
+even when the request ID is known.
+
+---
+
+# 119. Document Workflow Test
+
+Family User upload:
+
+```text
+Upload succeeds
+     ↓
+Document remains UNVERIFIED
+```
+
+until authorized verification occurs.
+
+---
+
+# 120. Household Head Test
+
+Two concurrent attempts must never result in:
+
+```text
+Two active Household Heads
+```
+
+---
+
+# 121. Workflow Invariants
+
+```text
+WF-INV-001
+Workflow state transitions are authoritative only when performed by Laravel.
+
+WF-INV-002
+Frontend clients cannot directly set protected workflow states.
+
+WF-INV-003
+Filament cannot bypass workflow rules.
+
+WF-INV-004
+Workflow history is preserved.
+
+WF-INV-005
+Workflow Events are append-only.
+
+WF-INV-006
+Workflow Events and Audit are distinct.
+
+WF-INV-007
+Invalid transitions are rejected.
+
+WF-INV-008
+Authorization is checked server-side for every protected transition.
+
+WF-INV-009
+Object-level authorization applies to workflow actions.
+
+WF-INV-010
+Maker-checker separation applies where required.
+
+WF-INV-011
+Duplicate Persons are never automatically merged.
+
+WF-INV-012
+Membership transfer preserves history.
+
+WF-INV-013
+Household Head changes are transactional.
+
+WF-INV-014
+Residence changes preserve history.
+
+WF-INV-015
+Unknown death dates are not invented.
+
+WF-INV-016
+Assessment completion does not silently overwrite canonical registry data.
+
+WF-INV-017
+Assistance does not automatically close a Need.
+
+WF-INV-018
+Uploaded documents are not automatically verified.
+
+WF-INV-019
+Family User submissions use controlled Change Requests.
+
+WF-INV-020
+Family User submissions do not directly mutate canonical registry data.
+
+WF-INV-021
+APPROVED and APPLIED are distinct.
+
+WF-INV-022
+Change Request application revalidates current state.
+
+WF-INV-023
+Change Request application is transactional.
+
+WF-INV-024
+An APPLIED Change Request cannot be applied again.
+
+WF-INV-025
+Application failure cannot produce partial canonical state.
+
+WF-INV-026
+Family Users cannot review/approve/reject/apply their own requests.
+
+WF-INV-027
+Internal Staff workflow notes are not exposed to Family Users.
+
+WF-INV-028
+Family Portal access is reevaluated after relevant registry changes.
+
+WF-INV-029
+Notification failure does not reverse committed business state.
+
+WF-INV-030
+Critical workflow operations protect against concurrency.
+
+WF-INV-031
+Workflow actions reuse the Laravel Domain Layer regardless of initiating interface.
+
+WF-INV-032
+Background jobs revalidate current state before mutation.
+
+WF-INV-033
+Operational queues derive from authoritative workflow state.
+
+WF-INV-034
+High-risk actions must receive authoritative backend confirmation before the UI treats them as complete.
+
+WF-INV-035
+Client-provided status values are not trusted as transition authority.
+```
+
+---
+
+# 122. Approved Workflow Decisions
+
+### WF-ADR-001
+Workflow state is explicitly stored.
+
+### WF-ADR-002
+Workflow history is stored separately in `workflow_events`.
+
+### WF-ADR-003
+Workflow Events and Audit are separate concepts.
+
+### WF-ADR-004
+Workflow Events are append-only.
+
+### WF-ADR-005
+Staff data-entry workflows support review and correction.
+
+### WF-ADR-006
+Verification and approval are distinct where required.
+
+### WF-ADR-007
+Duplicate detection requires human review.
+
+### WF-ADR-008
+Automatic Person merge is prohibited.
+
+### WF-ADR-009
+Membership transfers preserve history.
+
+### WF-ADR-010
+Household Head change is a controlled transactional operation.
+
+### WF-ADR-011
+Household Head death triggers review rather than automatic replacement.
+
+### WF-ADR-012
+Residence change preserves history.
+
+### WF-ADR-013
+Assessments remain point-in-time records.
+
+### WF-ADR-014
+Need and Assistance maintain separate workflows.
+
+### WF-ADR-015
+Document upload and verification are separate.
+
+### WF-ADR-016
+Family User activation requires identity verification.
+
+### WF-ADR-017
+Family User identity uses User-Person Links.
+
+### WF-ADR-018
+Family User eligibility is dynamically reevaluated.
+
+### WF-ADR-019
+Family User substantive updates use Change Requests.
+
+### WF-ADR-020
+Change Requests support clarification and resubmission.
+
+### WF-ADR-021
+APPROVED and APPLIED are separate states.
+
+### WF-ADR-022
+Application invokes explicit Domain Actions.
+
+### WF-ADR-023
+Application revalidates canonical state.
+
+### WF-ADR-024
+Application is transactional.
+
+### WF-ADR-025
+Application is idempotent.
+
+### WF-ADR-026
+Failed application leaves the baseline request APPROVED.
+
+### WF-ADR-027
+Family User uploaded documents remain unverified.
+
+### WF-ADR-028
+Notifications originate from backend workflow events.
+
+### WF-ADR-029
+Notification delivery failure does not invalidate committed state.
+
+### WF-ADR-030
+Critical workflows use concurrency protection.
+
+### WF-ADR-031
+Family Users cannot perform Staff review/approval/application actions.
+
+### WF-ADR-032
+Laravel is the authoritative workflow layer.
+
+### WF-ADR-033
+Next.js presents workflows but does not own transition authority.
+
+### WF-ADR-034
+Filament reuses the same workflow/domain operations.
+
+### WF-ADR-035
+Semantic API actions are preferred for important workflow transitions.
+
+### WF-ADR-036
+Operational queues are derived views of canonical workflow state.
+
+### WF-ADR-037
+After-commit processing is preferred for non-critical notification delivery.
+
+### WF-ADR-038
+Queued mutating operations must revalidate state and be retry-safe.
+```
+
+---
+
+# 123. Pending Workflow Decisions
+
+```text
+PWF-001
+Exact Staff form statuses by form type.
+
+PWF-002
+Exact Assessment workflow by Assessment type.
+
+PWF-003
+Exact Need workflow and closure rules.
+
+PWF-004
+Exact Document rejection/replacement workflow.
+
+PWF-005
+Exact Duplicate Resolution escalation process.
+
+PWF-006
+Future Person merge workflow.
+
+PWF-007
+Exact Household Head eligibility workflow.
+
+PWF-008
+Exact Family User activation workflow.
+
+PWF-009
+Exact identity-verification evidence.
+
+PWF-010
+Whether multiple Family Users are supported in V1.
+
+PWF-011
+Guardian / Authorized Representative workflow.
+
+PWF-012
+Exact risk classification for every Change Request type.
+
+PWF-013
+Exact maker-checker requirements by risk level.
+
+PWF-014
+Whether HIGH-risk requests require a second approver.
+
+PWF-015
+Whether approver and applier must differ for selected operations.
+
+PWF-016
+Whether APPLICATION_FAILED becomes a formal status.
+
+PWF-017
+Exact stale-request expiration policy.
+
+PWF-018
+Exact notification channels.
+
+PWF-019
+Whether selected LOW-risk requests may later auto-apply.
+
+PWF-020
+Exact request cancellation/withdrawal workflow.
+
+PWF-021
+Whether rejected requests may be appealed or reopened.
+
+PWF-022
+Exact automatic reminder/escalation rules.
+
+PWF-023
+Exact re-authentication rules for high-risk transitions.
+
+PWF-024
+Exact import approval workflow.
+
+PWF-025
+Exact export approval workflow for sensitive datasets.
+```
+
+---
+
+# 124. Recommended V1 Family Portal Workflow
+
+For initial production, use the security-first model:
+
+```text
+Verified Household Head
+        ↓
+Authenticated FAMILY_USER
+        ↓
+Authorized Family Scope
+        ↓
+Read Permitted Data
+        ↓
+Submit Change Request
+        ↓
+Staff Review
+        ↓
+Staff Approval
+        ↓
+Controlled Domain Action
+        ↓
+Canonical Registry
+```
+
+Avoid direct Family User canonical CRUD in V1.
+
+---
+
+# 125. Workflow Implementation Order
+
+Recommended implementation sequence:
+
+```text
+1. Workflow Event infrastructure
+
+2. Domain Action conventions
+
+3. Basic Staff review workflow
+
+4. Family Membership operations
+
+5. Household Head operation
+
+6. Residence operation
+
+7. Person Death operation
+
+8. Assessment workflow
+
+9. Need / Assistance workflows
+
+10. Document verification workflow
+
+11. Family User identity lifecycle
+
+12. Change Request engine
+
+13. Change Request type handlers
+
+14. Operational queues
+
+15. Notifications
+
+16. Workflow metrics
+```
+
+---
+
+# 126. Workflow Definition of Done
+
+A workflow is not considered implemented merely because buttons and statuses exist.
+
+It is complete only when:
+
+```text
+States are defined
+
+Transitions are defined
+
+Authorized actors are defined
+
+Invalid transitions are rejected
+
+Server-side authorization exists
+
+Current-state validation exists
+
+Transactions exist where required
+
+Concurrency is addressed
+
+Workflow Events are written
+
+Audit is written where required
+
+Failure behavior is defined
+
+Idempotency is addressed where required
+
+API responses are controlled
+
+Frontend handles success/error states
+
+Tests cover valid and invalid paths
+```
+
+---
+
+# 127. Final Workflow Principle
+
+Famboook follows:
+
+```text
+User Intent
+    ↓
+Interface
+    ↓
+Requested Action
+    ↓
+Laravel Authorization
+    ↓
+Workflow Rule
+    ↓
+Domain Action
+    ↓
+Transaction
+    ↓
+Canonical State
+    ↓
+Workflow History
+```
+
+not:
+
+```text
+Button Click
+    ↓
+status = "APPROVED"
+```
+
+The UI represents workflow.
+
+Laravel controls workflow.
+
+PostgreSQL persists workflow state and history.
+
+---
+
+# 128. Document Status
 
 ```text
 Project: Famboook
 Document: Workflows & State Transitions
-Version: 1.0
+Version: 1.2
 Status: APPROVED
 Date: 2026-09-22
 ```
 
 ---
 
-# 79. Change Log
+# 129. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Approved | Initial Famboook workflows and state transitions |
-
----
-
-# 80. Next Step
-
-Current documentation status:
-
-```text
-01-PRODUCT.md                 APPROVED
-02-DATA-DICTIONARY.md         APPROVED
-03-BUSINESS-RULES.md          APPROVED
-04-DATABASE.md                APPROVED
-05-WORKFLOWS.md               APPROVED
-06-PERMISSIONS.md             NEXT
-07-ROADMAP.md
-```
-
-The next document must define exactly:
-
-```text
-WHO
-CAN DO WHAT
-ON WHICH DATA
-AT WHICH WORKFLOW STATE
-```
-
-before implementation begins.
+| 1.0 | 2026-09-22 | Superseded | Initial workflow definition |
+| 1.1 | 2026-09-22 | Superseded | Added Family Portal identity lifecycle, Change Request workflow, application rules, concurrency, idempotency, queues and Family self-service workflows |
+| 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative workflow layer, clarified Next.js/Filament workflow boundaries, added semantic API actions, after-commit notifications, retry-safe background processing, queue derivation and expanded workflow testing/invariants |
