@@ -2,7 +2,7 @@
 ## Implementation Roadmap
 
 **Document:** `07-ROADMAP.md`  
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System
@@ -13,309 +13,436 @@
 
 This document defines the implementation roadmap for Famboook.
 
-It converts the approved product, data, business, database, workflow, and authorization architecture into an executable development plan.
+It converts the approved product, data, business-rule, database, workflow, and authorization architecture into an ordered delivery plan.
 
-This roadmap defines:
+The roadmap is designed to prevent premature UI development, duplicated business logic, weak authorization boundaries, and database redesign later in the project.
 
-```text
-Implementation Phases
-Phase Dependencies
-Phase Deliverables
-Definition of Done
-Testing Requirements
-Security Requirements
-Pilot Strategy
-Production Readiness
-Deferred Features
-```
-
-This document does not redefine the architecture.
-
-Implementation must remain aligned with:
+The implementation sequence follows:
 
 ```text
-00-PROJECT-CONTEXT.md
-01-PRODUCT.md
-02-DATA-DICTIONARY.md
-03-BUSINESS-RULES.md
-04-DATABASE.md
-05-WORKFLOWS.md
-06-PERMISSIONS.md
-```
-
----
-
-# 2. Roadmap Principles
-
-Development follows these principles:
-
-```text
-Architecture Before Implementation
-
-Database Integrity Before UI Convenience
-
-Canonical Registry Before Case Management
-
-Staff Operations Before Family Self-Service
-
-Domain Actions Before Change Requests
-
-Authorization Before Exposure
-
-Auditability From the Beginning
-
-Security by Default
-
-Automated Tests During Development
-
-Pilot Before Full Production
-```
-
----
-
-# 3. Implementation Strategy
-
-Famboook will be implemented incrementally.
-
-Each phase must produce a stable, testable result before dependent phases begin.
-
-The general sequence is:
-
-```text
-Architecture Baseline
-        ↓
-Laravel Foundation
-        ↓
-Authentication & RBAC
-        ↓
-Reference Data
-        ↓
-Family & Person Registry
-        ↓
-Memberships & Relationships
-        ↓
-Residence & Source Forms
-        ↓
-Staff Data Entry
-        ↓
-Verification & Approval
-        ↓
-Extended Registry Data
-        ↓
-Assessments
-        ↓
-Needs & Assistance
-        ↓
-Documents & Case Notes
-        ↓
-Family User Identity
-        ↓
-Family Portal
-        ↓
-Change Requests
-        ↓
-Search & Duplicate Management
-        ↓
-Reports
-        ↓
-Import / Export
-        ↓
-Security Hardening
-        ↓
-Testing & UAT
-        ↓
-Deployment & Pilot
-        ↓
-Production Rollout
-```
-
----
-
-# 4. Target Technical Architecture
-
-Initial implementation direction:
-
-```text
-Backend:
-Laravel 12+
-
-Database:
-PostgreSQL 16+
-
-Staff Administration:
-Filament
-
-Authentication:
-Laravel Authentication
-
-Authorization:
-Spatie Laravel Permission
-Laravel Policies
-
-Audit:
-Activity/Audit Logging
-Workflow Events
-
-File Storage:
-Private Storage
-
-Queue:
-Laravel Queue
-
-Frontend:
-Server-rendered / Filament initially
-```
-
-Family Portal technology will be selected based on UX requirements.
-
-Possible implementation:
-
-```text
-Separate Laravel / Filament Panel
-
-or
-
-Laravel + Livewire
-
-or
-
-Dedicated Frontend
-```
-
-A separate Next.js application is not mandatory for V1.
-
----
-
-# 5. Portal Architecture
-
-Famboook contains two user-facing contexts:
-
-```text
-STAFF PORTAL
-
-FAMILY PORTAL
-```
-
-They share:
-
-```text
-Database
-Domain Models
-Domain Actions
-Authorization Rules
-Workflow Engine
-Audit Infrastructure
-```
-
-but expose different capabilities.
-
----
-
-# 6. Staff Portal
-
-Primary users:
-
-```text
-SUPER_ADMIN
-
-ADMINISTRATOR
-
-DATA_ENTRY
-
-REVIEWER
-
-SOCIAL_WORKER
-
-REPORTS_VIEWER
-```
-
-Primary functions:
-
-```text
-Registry Management
-Data Entry
-Verification
+Architecture
+    ↓
+Backend Foundation
+    ↓
+Authentication & Authorization
+    ↓
+Frontend Foundation
+    ↓
+Design System
+    ↓
+Registry Core
+    ↓
+Operational Workflows
+    ↓
 Case Management
-Change Request Review
-Reports
-Administration
+    ↓
+Family Identity
+    ↓
+Family Portal
+    ↓
+Change Requests
+    ↓
+Reporting
+    ↓
+Security / UAT
+    ↓
+Pilot
+    ↓
+Production
 ```
 
 ---
 
-# 7. Family Portal
+# 2. Final Technology Stack
 
-Primary V1 user:
-
-```text
-FAMILY_USER
-```
-
-Initial recommended eligibility:
+## Frontend
 
 ```text
-Verified Current Household Head
+Next.js
+React
+TypeScript
+Tailwind CSS
+shadcn/ui
+Radix UI
+Lucide Icons
 ```
 
-Primary functions:
+## Data / Forms
 
 ```text
-View permitted Family information
-
-View permitted Family members
-
-View current residence
-
-Submit Change Requests
-
-Upload supporting documents
-
-Respond to clarification
-
-Track requests
-
-Receive notifications
+TanStack Query
+React Hook Form
+Zod
 ```
 
-Family Portal does not directly modify canonical registry records.
+## Backend
+
+```text
+Laravel 12
+REST API
+Laravel Sanctum
+Laravel Policies
+Domain Actions / Services
+Spatie Permission
+Laravel Queue
+Audit Logging
+```
+
+## Database
+
+```text
+PostgreSQL 16+
+```
+
+## Staff Application
+
+```text
+Custom Next.js
+```
+
+## Executive Dashboard
+
+```text
+Custom Next.js
+```
+
+## Family Portal
+
+```text
+Custom Next.js
+```
+
+## System Administration
+
+```text
+Filament
+```
+
+## Files
+
+```text
+Laravel Private Storage
+```
 
 ---
 
-# 8. Roadmap Phase Model
+# 3. Architecture Principle
 
-Each phase contains:
+The primary architecture is:
 
 ```text
-Objective
-
-Dependencies
-
-Deliverables
-
-Testing
-
-Definition of Done
+Browser
+   ↓
+Next.js
+   ↓ HTTPS / JSON
+Laravel REST API
+   ↓
+Policies / Validation
+   ↓
+Domain Actions
+   ↓
+PostgreSQL
 ```
 
-A phase is not complete merely because its UI exists.
+System Administration:
+
+```text
+Filament
+   ↓
+Laravel Domain Layer
+   ↓
+PostgreSQL
+```
 
 ---
 
-# 9. Phase 0 — Architecture Baseline
+# 4. Responsibility Boundaries
+
+## Next.js
+
+Responsible for:
+
+```text
+Presentation
+
+Navigation
+
+UX
+
+Forms
+
+Tables
+
+Interactive workflows
+
+Client-side UX validation
+
+Server-state presentation
+
+Responsive layouts
+
+RTL
+
+Family Portal experience
+
+Executive visualization
+```
+
+Next.js is not authoritative for:
+
+```text
+Authorization
+
+Business Rules
+
+Canonical Validation
+
+Workflow Transitions
+
+Canonical Data Mutation
+```
+
+---
+
+# 5. Laravel
+
+Laravel is authoritative for:
+
+```text
+Authentication
+
+Authorization
+
+Validation
+
+Business Rules
+
+Domain Actions
+
+Workflow Transitions
+
+Canonical Mutation
+
+Audit
+
+Notifications
+
+Files
+
+Queues
+
+API Contracts
+```
+
+---
+
+# 6. PostgreSQL
+
+PostgreSQL is responsible for:
+
+```text
+Canonical Persistence
+
+Referential Integrity
+
+Constraints
+
+Indexes
+
+Transactions
+
+Concurrency Support
+
+Historical Data
+```
+
+---
+
+# 7. Filament
+
+Filament is restricted to:
+
+```text
+System Administration
+
+High Administration
+
+Users
+
+Roles
+
+Permissions
+
+Reference Data
+
+System Settings
+
+Audit
+
+Jobs
+
+Maintenance
+```
+
+Filament is not the primary operational Staff Application.
+
+---
+
+# 8. Implementation Philosophy
+
+Famboook will be implemented:
+
+```text
+Domain First
+
+API First
+
+Security First
+
+Workflow Aware
+
+Design-System Driven
+
+Testable
+
+Incremental
+```
+
+---
+
+# 9. Development Rule
+
+Do not implement a feature simply because a screen can be drawn.
+
+A feature begins only after its:
+
+```text
+Domain Model
+
+Business Rules
+
+Permissions
+
+Workflow
+
+API Contract
+
+Data Exposure Rules
+```
+
+are sufficiently defined.
+
+---
+
+# 10. Delivery Strategy
+
+Development should proceed in vertical, testable increments.
+
+Example:
+
+```text
+Family List
+
+Backend Query
++
+Policy
++
+API Resource
++
+API Endpoint
++
+Next.js Screen
++
+Loading State
++
+Empty State
++
+Error State
++
+Tests
+```
+
+rather than building all backend code first and all frontend code much later.
+
+---
+
+# 11. Phase Overview
+
+```text
+Phase 0   Architecture Baseline
+
+Phase 1   Repository & Development Environment
+
+Phase 2   Laravel Backend Foundation
+
+Phase 3   PostgreSQL & Core Database Foundation
+
+Phase 4   Authentication & RBAC Foundation
+
+Phase 5   Next.js Frontend Foundation
+
+Phase 6   Famboook Design System
+
+Phase 7   Reference Data & System Administration
+
+Phase 8   Family & Person Registry
+
+Phase 9   Memberships, Relationships & Residence
+
+Phase 10  Staff Registry Experience
+
+Phase 11  Workflow, Verification & Approval
+
+Phase 12  Health, Disability, Education & Employment
+
+Phase 13  Assessments
+
+Phase 14  Needs & Assistance
+
+Phase 15  Documents & Case Notes
+
+Phase 16  Family User Identity & Access
+
+Phase 17  Family Portal Foundation
+
+Phase 18  Change Request Engine
+
+Phase 19  Family Portal Self-Service
+
+Phase 20  Search & Duplicate Management
+
+Phase 21  Operational & Executive Dashboards
+
+Phase 22  Reports
+
+Phase 23  Import & Export
+
+Phase 24  Notifications & Background Processing
+
+Phase 25  Security Hardening
+
+Phase 26  Performance & Reliability
+
+Phase 27  Comprehensive Testing & UAT
+
+Phase 28  Deployment Foundation
+
+Phase 29  Pilot
+
+Phase 30  Production Rollout
+
+Phase 31  Post-Launch Improvement
+```
+
+---
+
+# 12. Phase 0 — Architecture Baseline
 
 ## Objective
 
-Freeze the minimum architecture required to safely begin implementation.
+Freeze the implementation baseline before coding begins.
 
-## Dependencies
-
-```text
-None
-```
-
-## Deliverables
-
-Review:
+## Required Documents
 
 ```text
 00-PROJECT-CONTEXT.md
@@ -335,1602 +462,1387 @@ Review:
 07-ROADMAP.md
 ```
 
-Resolve implementation-blocking pending decisions.
-
----
-
-# 10. Phase 0 Critical Decisions
-
-Must be resolved before affected implementation begins:
+## Tasks
 
 ```text
-Family Code format
+Review cross-document consistency
 
-Person Code format
+Resolve implementation-blocking decisions
 
-National ID validation policy
+Confirm technology stack
 
-Initial reference vocabularies
+Confirm deployment topology
 
-Family User activation method
+Confirm authentication model
 
-Family User authentication identifier
+Confirm API-first architecture
 
-Household Head-only Portal policy
+Confirm Staff/Family/Admin boundaries
 
-Reviewer / Approver responsibility
-
-Change Request initial types
-
-Sensitive field visibility
-
-Document storage policy
+Confirm repository structure
 ```
 
-Not every future decision must be resolved before coding.
-
----
-
-# 11. Phase 0 Definition of Done
+## Exit Criteria
 
 ```text
-Core documents approved
+Architecture approved
 
-No contradictory core architecture
+Core invariants documented
 
-Canonical Family/Person model agreed
+Stack approved
 
-Membership model agreed
+Critical authorization model approved
 
-Workflow model agreed
+Core database relationships approved
 
-Authorization model agreed
-
-Family Portal model agreed
-
-Change Request model agreed
-
-Blocking decisions identified/resolved
+No major contradiction between documents
 ```
 
 ---
 
-# 12. Phase 1 — Laravel Foundation
+# 13. Phase 1 — Repository & Development Environment
 
 ## Objective
 
-Create the technical application foundation.
+Create a clean and reproducible project workspace.
 
-## Dependencies
+## Structure
 
 ```text
-Phase 0
+Famboook/
+├── docs/
+├── backend/
+├── frontend/
+├── .gitignore
+└── README.md
 ```
 
-## Deliverables
+## Tasks
 
 ```text
-Laravel project
+Initialize Laravel project in backend/
 
-PostgreSQL connection
+Initialize Next.js project in frontend/
 
-Environment configuration
+Configure Git
 
-Local development setup
+Configure environment examples
 
-Git integration
+Configure formatting/linting
 
-Base application configuration
+Configure local PostgreSQL
 
-Timezone strategy
+Document local setup
 
-Locale configuration
-
-Arabic support
-
-RTL preparation
-
-Queue configuration
-
-Logging configuration
-
-Private file storage configuration
+Establish branch/commit conventions
 ```
 
----
+## Security
 
-# 13. Development Environments
-
-Recommended:
+Never commit:
 
 ```text
-local
+.env
 
-testing
+Passwords
 
-staging
+API secrets
 
-production
+Production keys
+
+Real Family data
+
+Scanned real forms
+
+Real identity documents
 ```
 
-Real Family data must not be placed in:
+## Exit Criteria
 
 ```text
-Git
+Laravel runs locally
 
-public repositories
-
-development fixtures
-
-automated tests
-```
-
----
-
-# 14. Phase 1 Testing
-
-Verify:
-
-```text
-Application boots
+Next.js runs locally
 
 PostgreSQL connection works
 
-Migrations execute
+Repository clean
 
-Queue works
-
-Storage is private
-
-Tests execute
-
-Arabic content renders correctly
+Environment reproducible
 ```
 
 ---
 
-# 15. Phase 1 Definition of Done
-
-```text
-Laravel operational
-
-PostgreSQL operational
-
-Base test suite operational
-
-Environment separation established
-
-Private storage established
-
-Repository clean and reproducible
-```
-
----
-
-# 16. Phase 2 — Authentication & RBAC Foundation
+# 14. Phase 2 — Laravel Backend Foundation
 
 ## Objective
 
-Implement Staff authentication and authorization foundation before exposing registry data.
+Establish the authoritative application core.
 
-## Dependencies
+## Tasks
 
 ```text
-Phase 1
+Install/configure Laravel 12
+
+Configure API routes
+
+Create /api/v1 namespace
+
+Configure API response conventions
+
+Configure exception handling
+
+Configure logging
+
+Configure validation conventions
+
+Create Domain Action structure
+
+Create DTO conventions
+
+Create API Resource conventions
+
+Configure private storage
+
+Configure queue foundation
 ```
 
-## Deliverables
-
-Install/configure:
+## Suggested Structure
 
 ```text
-Authentication
-
-Spatie Laravel Permission
-
-Policies
-
-Roles
-
-Permissions
-
-User activation/deactivation
-
-Login throttling
-
-Password reset
+backend/app/
+├── Actions/
+├── DTOs/
+├── Enums/
+├── Http/
+│   ├── Controllers/
+│   │   └── Api/
+│   │       └── V1/
+│   ├── Requests/
+│   └── Resources/
+├── Models/
+├── Policies/
+├── Services/
+└── Support/
 ```
 
-Initial roles:
+## Exit Criteria
 
 ```text
-SUPER_ADMIN
-ADMINISTRATOR
-DATA_ENTRY
-REVIEWER
-SOCIAL_WORKER
-REPORTS_VIEWER
-FAMILY_USER
-```
+/api/v1 available
 
----
+Standard API errors defined
 
-# 17. Permission Seeder
+Domain Action convention established
 
-Create version-controlled definitions for:
+API Resource convention established
 
-```text
-Roles
+Private storage configured
 
-Permissions
-
-Role-Permission mappings
-```
-
-Seeder must be:
-
-```text
-Repeatable
-
-Predictable
-
-Safe
-```
-
----
-
-# 18. Staff Portal Access
-
-Create initial Staff Panel.
-
-Verify:
-
-```text
-Staff login
-
-Role-based navigation
-
-Resource authorization
-
-Inactive user denial
+Basic backend tests passing
 ```
 
 ---
 
-# 19. Phase 2 Testing
-
-Test:
-
-```text
-Authentication
-
-Role assignment
-
-Permission enforcement
-
-Policy enforcement
-
-Inactive users
-
-Unauthorized routes
-
-Staff Portal access
-```
-
----
-
-# 20. Phase 2 Definition of Done
-
-```text
-Authentication working
-
-Roles seeded
-
-Permissions seeded
-
-Policies foundation working
-
-Staff Portal protected
-
-Negative authorization tests passing
-```
-
----
-
-# 21. Phase 3 — Reference Data
+# 15. Phase 3 — PostgreSQL & Core Database Foundation
 
 ## Objective
 
-Create stable reference vocabularies before transactional registry features depend on them.
+Implement the first canonical schema safely.
 
-## Dependencies
-
-```text
-Phase 2
-```
-
-## Deliverables
-
-Initial lookup tables:
+## Initial Migration Groups
 
 ```text
-relationship_types
+users
 
-marital_statuses
+reference tables
 
-governorates
-
-localities
-
-housing_types
-
-tenure_types
-
-housing_condition_types
-
-health_condition_types
-
-disability_types
-
-education_levels
-
-education_statuses
-
-employment_statuses
-
-employment_sectors
-
-document_types
-
-need_types
-
-assistance_types
-
-note_types
-
-assessment_types
-
-form_types
-```
-
-Only verified source values should be seeded.
-
----
-
-# 22. Reference Data Rules
-
-Reference records should use:
-
-```text
-Stable Code
-
-Arabic Label
-
-English Label where useful
-
-Active Flag
-
-Sort Order
-```
-
-Avoid hard-coded display values in application logic.
-
----
-
-# 23. Phase 3 Definition of Done
-
-```text
-Required lookups migrated
-
-Approved values seeded
-
-Reference administration authorized
-
-Inactive values preserved
-
-Tests passing
-```
-
----
-
-# 24. Phase 4 — Family & Person Registry
-
-## Objective
-
-Implement the two primary registry identities.
-
-## Dependencies
-
-```text
-Phase 3
-```
-
-## Deliverables
-
-Tables:
-
-```text
 families
 
 persons
-```
 
-Models:
-
-```text
-Family
-
-Person
-```
-
-Business codes:
-
-```text
-FAM-XXXXXX
-
-PER-XXXXXX
-```
-
-Final formats follow approved configuration.
-
----
-
-# 25. Family Registry Features
-
-Implement:
-
-```text
-Create Family
-
-View Family
-
-Update permitted Family fields
-
-Archive Family
-
-Search by Family Code
-
-Registration Source
-
-Paper Form Number
-
-Status
-```
-
----
-
-# 26. Person Registry Features
-
-Implement:
-
-```text
-Create Person
-
-View Person
-
-Update Person
-
-Archive where valid
-
-Search by Person Code
-
-Search by Name
-
-Search by National ID where authorized
-```
-
----
-
-# 27. National ID Handling
-
-Implement:
-
-```text
-VARCHAR storage
-
-Normalization
-
-Validation
-
-Masking
-
-Duplicate warning
-
-Permission-controlled full visibility
-```
-
-Do not use National ID as database PK.
-
----
-
-# 28. Derived Data
-
-Do not store canonical:
-
-```text
-Age
-
-Family Size
-
-Child Count
-
-Male Count
-
-Female Count
-```
-
-unless future performance requirements justify controlled projections.
-
----
-
-# 29. Phase 4 Testing
-
-Test:
-
-```text
-Family Code uniqueness
-
-Person Code uniqueness
-
-National ID normalization
-
-National ID masking
-
-Soft deletion/archive rules
-
-Permissions
-
-Search scope
-```
-
----
-
-# 30. Phase 4 Definition of Done
-
-```text
-Family registry stable
-
-Person registry stable
-
-Permanent business codes working
-
-Sensitive identity controls working
-
-Tests passing
-```
-
----
-
-# 31. Phase 5 — Family Memberships & Relationships
-
-## Objective
-
-Connect independent Persons to Families without destroying Person identity.
-
-## Dependencies
-
-```text
-Phase 4
-```
-
-## Deliverables
-
-Tables:
-
-```text
 family_memberships
 
 person_relationships
+
+family_residences
 ```
+
+Later migrations follow approved dependency order.
+
+## Tasks
+
+```text
+Configure PostgreSQL 16+
+
+Create migrations
+
+Add foreign keys
+
+Add critical indexes
+
+Add partial unique indexes
+
+Add chronological constraints
+
+Create model relationships
+
+Create factories
+
+Create synthetic seed data
+```
+
+## Critical Constraints
 
 Implement:
 
 ```text
-Add Family Member
+One active Family membership per Person
 
-End Membership
+One active Household Head per Family
 
-Change Household Head
+One current residence per Family
 
-Transfer Person
+death_date >= birth_date when both exist
+```
 
-Relationship Management
+## Exit Criteria
+
+```text
+Core migrations pass
+
+Rollback works
+
+Constraints tested
+
+Synthetic factories available
+
+No real data committed
+```
+
+---
+
+# 16. Phase 4 — Authentication & RBAC Foundation
+
+## Objective
+
+Establish authentication and centralized authorization before operational features.
+
+## Tasks
+
+```text
+Configure Laravel Sanctum
+
+Configure first-party cookie/session authentication
+
+Configure CSRF
+
+Configure CORS
+
+Install/configure Spatie Permission
+
+Create initial roles
+
+Create initial permissions
+
+Create Policies
+
+Create /api/v1/me
+
+Create authenticated API tests
+```
+
+## Initial Roles
+
+```text
+SUPER_ADMIN
+
+ADMINISTRATOR
+
+DATA_ENTRY
+
+REVIEWER
+
+SOCIAL_WORKER
+
+REPORTS_VIEWER
+
+FAMILY_USER
+```
+
+## Security Rule
+
+Do not store primary authentication bearer tokens in:
+
+```text
+localStorage
+```
+
+## Exit Criteria
+
+```text
+Login works
+
+Logout works
+
+Authenticated API works
+
+Unauthenticated API denied
+
+Roles work
+
+Permissions work
+
+Policies work
+
+/api/v1/me works
+```
+
+---
+
+# 17. Phase 5 — Next.js Frontend Foundation
+
+## Objective
+
+Create the frontend application architecture before building business screens.
+
+## Tasks
+
+```text
+Initialize Next.js
+
+Configure TypeScript
+
+Configure Tailwind CSS
+
+Configure shadcn/ui
+
+Configure Radix UI
+
+Configure Lucide Icons
+
+Configure TanStack Query
+
+Configure React Hook Form
+
+Configure Zod
+
+Create API client
+
+Create authentication integration
+
+Create route groups
+
+Create global error handling
+
+Create loading conventions
+
+Create RTL foundation
+
+Create responsive application shell
+```
+
+## Recommended Structure
+
+```text
+frontend/
+├── app/
+│   ├── (auth)/
+│   ├── (staff)/
+│   └── (family)/
+├── components/
+│   ├── ui/
+│   └── famboook/
+├── features/
+├── hooks/
+├── lib/
+└── types/
+```
+
+## Exit Criteria
+
+```text
+Authentication UI connected
+
+Protected routes work
+
+Staff shell works
+
+Family shell foundation exists
+
+RTL works
+
+API client works
+
+TanStack Query works
+```
+
+---
+
+# 18. Phase 6 — Famboook Design System
+
+## Objective
+
+Create a reusable product design language before business screens multiply.
+
+Famboook must not become:
+
+```text
+A generic admin template
+```
+
+## Foundation
+
+Define:
+
+```text
+Colors
+
+Typography
+
+Spacing
+
+Radius
+
+Shadows
+
+Borders
+
+Surfaces
+
+States
+
+Breakpoints
+
+RTL behavior
+
+Dark/light capability
+```
+
+## Generic Components
+
+```text
+Button
+
+Input
+
+Textarea
+
+Select
+
+Checkbox
+
+Radio
+
+DatePicker
+
+Badge
+
+Avatar
+
+Card
+
+StatCard
+
+DataTable
+
+Pagination
+
+Tabs
+
+Drawer
+
+Dialog
+
+Dropdown
+
+Tooltip
+
+Timeline
+
+EmptyState
+
+LoadingState
+
+ErrorState
+
+Skeleton
+```
+
+## Domain Components
+
+```text
+FamilyHeader
+
+FamilyProfileHeader
+
+PersonIdentityCard
+
+FamilyMemberRow
+
+FamilyMemberCard
+
+HouseholdHeadBadge
+
+VerificationBadge
+
+StatusBadge
+
+ResidenceHistory
+
+AssessmentSummary
+
+NeedCard
+
+AssistanceCard
+
+AssistanceTimeline
+
+ChangeRequestCard
+
+ChangeRequestTimeline
+
+ReviewPanel
+
+DuplicateCandidateCard
+
+ActivityTimeline
+```
+
+## UX States
+
+Every reusable feature must consider:
+
+```text
+Loading
+
+Empty
+
+Success
+
+Warning
+
+Error
+
+Disabled
+
+Read-only
+
+Restricted
+```
+
+## Exit Criteria
+
+```text
+Core design tokens approved
+
+Core components reusable
+
+RTL verified
+
+Responsive behavior verified
+
+Staff shell visually consistent
+
+Family Portal can reuse same system
+```
+
+---
+
+# 19. Phase 7 — Reference Data & System Administration
+
+## Objective
+
+Implement high-administration capabilities.
+
+## Filament Scope
+
+Install/configure Filament for:
+
+```text
+Users
+
+Roles
+
+Permissions
+
+Reference Data
+
+System Settings
+
+Audit access
+
+Queue/job monitoring where appropriate
+```
+
+## Reference Data
+
+Initial candidates:
+
+```text
+Marital Statuses
+
+Relationship Types
+
+Document Types
+
+Need Types
+
+Assistance Types
+
+Assessment Types
+
+Education Levels
+
+Employment Statuses
+```
+
+## Rules
+
+Reference data must use:
+
+```text
+Stable code
+
+Display name
+
+Active state
+
+Sort order
+```
+
+## Exit Criteria
+
+```text
+Filament secured
+
+Only authorized users can access
+
+Reference data manageable
+
+Role/permission administration functional
+```
+
+---
+
+# 20. Phase 8 — Family & Person Registry
+
+## Objective
+
+Implement canonical Family and Person domains.
+
+## Backend
+
+Implement:
+
+```text
+Family model
+
+Person model
+
+FamilyPolicy
+
+PersonPolicy
+
+Family API Resources
+
+Person API Resources
+
+CreateFamilyAction
+
+CreatePersonAction
+
+Update permitted fields
+
+Archive behavior
+```
+
+## APIs
+
+Initial examples:
+
+```text
+GET    /api/v1/families
+
+POST   /api/v1/families
+
+GET    /api/v1/families/{family}
+
+GET    /api/v1/persons
+
+POST   /api/v1/persons
+
+GET    /api/v1/persons/{person}
+```
+
+Exact API design remains semantic and permission-aware.
+
+## Frontend
+
+Build:
+
+```text
+Family List
+
+Family Create
+
+Family Profile
+
+Person List
+
+Person Create
+
+Person Profile
+```
+
+## Exit Criteria
+
+```text
+Family CRUD/domain operations controlled
+
+Person operations controlled
+
+Authorization tested
+
+Pagination implemented
+
+Sensitive fields controlled
+```
+
+---
+
+# 21. Phase 9 — Memberships, Relationships & Residence
+
+## Objective
+
+Represent actual Family structure rather than paper-form rows.
+
+## Implement
+
+```text
+Family Memberships
+
+Relationship Types
+
+Person Relationships
+
+Household Head
 
 Membership History
+
+Family Residence
+
+Residence History
 ```
 
----
-
-# 32. Membership Invariants
-
-Enforce:
-
-```text
-One active primary Family membership per Person in V1
-
-At most one active Household Head per Family
-
-Membership end >= start
-
-Person identity survives transfer
-
-Historical memberships remain preserved
-```
-
----
-
-# 33. Domain Actions
-
-Implement:
+## Domain Actions
 
 ```text
 AddFamilyMemberAction
 
-ChangeHouseholdHeadAction
-
 TransferFamilyMemberAction
 
-EndFamilyMembershipAction
-```
+ChangeHouseholdHeadAction
 
-Critical actions use database transactions.
-
----
-
-# 34. Phase 5 Testing
-
-Test:
-
-```text
-One active membership
-
-One active Head
-
-Head change
-
-Person transfer
-
-Historical memberships
-
-Concurrent Head changes
-
-Concurrent transfers
-```
-
----
-
-# 35. Phase 5 Definition of Done
-
-```text
-Family membership canonical model operational
-
-Household Head rules enforced
-
-Transfer preserves Person identity
-
-Relationships operational
-
-History preserved
-
-Concurrency tests passing
-```
-
----
-
-# 36. Phase 6 — Residence & Source Forms
-
-## Objective
-
-Implement Family location history and source-form traceability.
-
-## Dependencies
-
-```text
-Phase 5
-```
-
-## Deliverables
-
-Tables:
-
-```text
-family_residences
-
-form_submissions
-
-form_types
-```
-
-Implement:
-
-```text
-Current Residence
-
-Residence History
-
-Displacement Information
-
-Source Form Number
-
-Source Form Type
-
-Source Document Association
-```
-
----
-
-# 37. Residence Action
-
-Implement:
-
-```text
 ChangeFamilyResidenceAction
 ```
 
-Transaction:
+## Critical Tests
 
 ```text
-Close current residence
-+
-Create new current residence
-+
-Audit
+Cannot have two active Family memberships
+
+Cannot have two active Household Heads
+
+Cannot have two current residences
+
+Transfer preserves history
+
+Residence change preserves history
 ```
 
----
+## Frontend
 
-# 38. Residence Invariant
-
-At most:
+Build:
 
 ```text
-One current residence per Family
-```
-
----
-
-# 39. Phase 6 Definition of Done
-
-```text
-Residence history operational
-
-Current residence constraint enforced
-
-Source forms traceable
-
-Paper source can be linked
-
-Tests passing
-```
-
----
-
-# 40. Phase 7 — Staff Data Entry
-
-## Objective
-
-Create the operational workflow for digitizing Family data.
-
-## Dependencies
-
-```text
-Phase 6
-```
-
-## Deliverables
-
-Multi-step Staff data entry:
-
-```text
-Family
-
-Household Head
-
 Family Members
 
-Relationships
+Member Details
 
-Residence
+Household Head indicator
 
-Health / Disability
+Relationship view
 
-Education / Employment
+Residence section
 
-Needs
-
-Documents
-
-Notes
-
-Review
-
-Submit
+Residence history
 ```
 
-Extended modules may be progressively enabled as their phases complete.
-
----
-
-# 41. Draft Behavior
-
-Draft records may be incomplete.
-
-Implement:
+## Exit Criteria
 
 ```text
-Save Draft
+Family structure works
 
-Resume Draft
+Historical relationships preserved
 
-Validation on step
+Critical transactions tested
 
-Submission validation
+Concurrency protection works
 ```
 
 ---
 
-# 42. Submission Validation
-
-Before completion:
-
-```text
-Family exists
-
-Household Head exists
-
-Membership valid
-
-Required data present
-
-Blocking duplicate issues resolved
-
-Source traceability present where required
-```
-
----
-
-# 43. Phase 7 Definition of Done
-
-```text
-Data Entry user can create complete Family record
-
-Draft/resume works
-
-Validation works
-
-Submission works
-
-Permissions enforced
-
-Tests passing
-```
-
----
-
-# 44. Phase 8 — Workflow Events, Verification & Approval
+# 22. Phase 10 — Staff Registry Experience
 
 ## Objective
 
-Implement controlled internal workflow.
+Turn core registry features into a professional operational experience.
 
-## Dependencies
+## Screens
 
 ```text
-Phase 7
+Staff Dashboard
+
+Family Search
+
+Family Profile
+
+Person Search
+
+Person Profile
+
+Create Family
+
+Add Member
+
+Change Household Head
+
+Change Residence
+
+Transfer Member
 ```
 
-## Deliverables
+## UX Requirements
 
-Table:
+```text
+Fast navigation
+
+Clear hierarchy
+
+Contextual actions
+
+Drawers/dialogs where appropriate
+
+Minimal page reloads
+
+Clear status badges
+
+Responsive tables/cards
+
+RTL-first behavior
+```
+
+## Exit Criteria
+
+```text
+Staff can complete core registry work
+
+No dependency on Filament for daily registry operations
+
+Domain actions used consistently
+```
+
+---
+
+# 23. Phase 11 — Workflow, Verification & Approval
+
+## Objective
+
+Implement controlled Staff processing.
+
+## Backend
+
+Implement:
 
 ```text
 workflow_events
+
+Form statuses
+
+Review transitions
+
+Correction transitions
+
+Verification
+
+Approval
+
+Maker-checker checks
 ```
 
-Workflow:
+## Frontend
+
+Build queues:
 
 ```text
-DRAFT
-↓
-DATA_ENTRY_COMPLETED
-↓
-UNDER_REVIEW
-├── RETURNED_FOR_CORRECTION
-│   ↓
-│ CORRECTED
-│   ↓
-└── UNDER_REVIEW
-    ↓
- VERIFIED
-    ↓
- APPROVED
+Pending Review
+
+Returned for Correction
+
+Pending Verification
+
+Pending Approval
+```
+
+## Exit Criteria
+
+```text
+Workflow transitions backend-controlled
+
+History available
+
+Unauthorized transitions rejected
+
+Operational queues functional
 ```
 
 ---
 
-# 45. Workflow Actions
-
-Implement:
-
-```text
-CompleteFormEntryAction
-
-SubmitFormForReviewAction
-
-ReturnFormForCorrectionAction
-
-ResubmitFormAction
-
-VerifyFormAction
-
-ApproveFormAction
-```
-
----
-
-# 46. Workflow Requirements
-
-Implement:
-
-```text
-State validation
-
-Authorization
-
-Maker-checker
-
-Reason capture
-
-Workflow Events
-
-Audit
-
-Transactions
-
-Concurrency protection
-```
-
----
-
-# 47. Phase 8 Definition of Done
-
-```text
-All valid transitions work
-
-Invalid transitions fail
-
-Reviewer workflow operational
-
-Approval operational
-
-Workflow history preserved
-
-Maker-checker enforced
-
-Tests passing
-```
-
----
-
-# 48. Phase 9 — Health, Disability, Education & Employment
+# 24. Phase 12 — Health, Disability, Education & Employment
 
 ## Objective
 
-Implement repeatable Person-level profile domains.
+Add repeatable Person profile domains.
 
-## Dependencies
-
-```text
-Phase 5
-Phase 2 authorization
-```
-
-## Deliverables
-
-Tables:
+## Implement
 
 ```text
-person_health_profiles
+Health Profiles
 
-person_health_conditions
+Health Conditions
 
-person_disabilities
+Disabilities
 
-person_education
+Education
 
-person_employment
+Employment
 ```
 
----
+## Security
 
-# 49. Sensitive Data Controls
+Health/disability data must use restricted permissions.
 
-Health and disability require:
+## Frontend
 
-```text
-Dedicated permissions
+Add structured Person Profile sections.
 
-Restricted views
-
-Secure serialization
-
-Audit where required
-```
-
----
-
-# 50. Phase 9 Definition of Done
+## Exit Criteria
 
 ```text
 Repeatable records supported
 
-History supported
-
 Sensitive access controlled
 
-No fixed paper-row limits
-
-Tests passing
+History preserved where applicable
 ```
 
 ---
 
-# 51. Phase 10 — Assessments
+# 25. Phase 13 — Assessments
 
 ## Objective
 
-Separate point-in-time assessments from permanent registry identity.
+Support point-in-time Family assessments.
 
-## Dependencies
+## Implement
 
 ```text
-Phase 8
-Phase 9 where relevant
+Assessment Types
+
+Assessments
+
+Form Submissions
+
+Assessment Workflow
+
+Versioned form structures where required
 ```
 
-## Deliverables
+## Principle
 
-Table:
+Assessment data:
 
 ```text
-assessments
+does not automatically overwrite canonical registry data
 ```
 
-Workflow:
+## Frontend
+
+Build:
 
 ```text
-DRAFT
-↓
-IN_PROGRESS
-↓
-COMPLETED
-↓
-UNDER_REVIEW
-↓
-VERIFIED
+Assessment List
+
+Assessment Detail
+
+Assessment Form
+
+Assessment Review
 ```
 
----
-
-# 52. Assessment Rule
-
-Assessment answers must not silently overwrite canonical registry fields.
-
-Canonical changes use controlled Domain Actions.
-
----
-
-# 53. Phase 10 Definition of Done
+## Exit Criteria
 
 ```text
-Multiple assessments per Family supported
+Assessments versionable
 
-Assessment history preserved
+Workflow controlled
 
-Assessment workflow operational
-
-Canonical data remains independent
-
-Tests passing
+Source/date/actor traceable
 ```
 
 ---
 
-# 54. Phase 11 — Needs & Assistance
+# 26. Phase 14 — Needs & Assistance
 
 ## Objective
 
-Implement case-management needs and assistance without conflating them.
+Implement case-management support.
 
-## Dependencies
+## Implement
 
 ```text
-Phase 10
+Family Needs
+
+Need Status
+
+Need Priority
+
+Assistance Records
+
+Need-Assistance linking
 ```
 
-## Deliverables
-
-Tables:
+## Rule
 
 ```text
-family_needs
-
-assistance_records
+Assistance
+≠
+Automatic Need Closure
 ```
 
-Need workflow:
+## Frontend
+
+Build:
 
 ```text
-IDENTIFIED
-↓
-VERIFIED
-↓
-ACTIVE
-├── PARTIALLY_MET
-└── MET
-    ↓
- CLOSED
+Needs Panel
+
+Need Detail
+
+Assistance Timeline
+
+Record Assistance
 ```
 
----
-
-# 55. Assistance Rules
-
-Assistance:
+## Exit Criteria
 
 ```text
-May link to Family
-
-May link to Person
-
-May link to Need
-
-Does not automatically close Need
-```
-
----
-
-# 56. Phase 11 Definition of Done
-
-```text
-Needs operational
-
-Assistance operational
-
-Need lifecycle works
+Needs tracked independently
 
 Assistance history preserved
 
-No automatic eligibility decisions
-
-Tests passing
+Permissions tested
 ```
 
 ---
 
-# 57. Phase 12 — Documents & Case Notes
+# 27. Phase 15 — Documents & Case Notes
 
 ## Objective
 
-Implement secure evidence and case documentation.
+Implement protected supporting information.
 
-## Dependencies
-
-```text
-Phase 8
-```
-
-## Deliverables
-
-```text
-documents
-
-person_notes
-
-case_notes
-```
+## Documents
 
 Implement:
 
 ```text
-Private Upload
+Private uploads
 
-Authorized Download
+Document metadata
 
-Document Type
+Verification
 
-Verification Status
+Family documents
 
-Confidential Notes
+Person documents
+
+Assessment/request supporting documents
+```
+
+## Case Notes
+
+Implement:
+
+```text
+Person Notes
 
 Case Notes
 
-Document History
+Visibility levels
+
+Confidential notes
 ```
 
----
+## Security
 
-# 58. Document Security
+No public storage URLs for sensitive files.
 
-Files must not be publicly accessible.
-
-Flow:
+## Exit Criteria
 
 ```text
-Authenticate
-↓
-Authorize
-↓
-Stream / Temporary Authorized Access
-```
-
----
-
-# 59. Phase 12 Definition of Done
-
-```text
-Private storage enforced
+Authorized download works
 
 Unauthorized download denied
 
-Document verification separated from upload
+Family Portal cannot see Staff-only notes
 
-Confidential notes protected
-
-Tests passing
+Document verification separate from upload
 ```
 
 ---
 
-# 60. Phase 13 — Family User Identity & Access
+# 28. Phase 16 — Family User Identity & Access
 
 ## Objective
 
-Create the secure identity bridge between system User and registry Person.
+Establish secure Family Portal identity before self-service functionality.
 
-## Dependencies
-
-```text
-Phase 2
-Phase 5
-Phase 12
-```
-
-## Deliverables
-
-Implement:
+## Implement
 
 ```text
+user_person_links
+
 FAMILY_USER role
 
-User-Person Links
+Identity verification
 
-Identity Verification
-
-Family Eligibility
+Link verification
 
 Activation
 
 Suspension
 
-Ending Access
+End link
 
-Family Scope Resolver
+FamilyAccessService
 ```
 
----
-
-# 61. Family User Resolution
-
-Authorization chain:
+## Resolution
 
 ```text
-Authenticated User
-      ↓
-Active User-Person Link
-      ↓
+User
+ ↓
+User-Person Link
+ ↓
 Person
-      ↓
-Active Family Membership
-      ↓
-Household Head Eligibility
-      ↓
-Authorized Family
+ ↓
+Family Membership
+ ↓
+Household Head / Policy
+ ↓
+Family
+```
+
+## Tests
+
+```text
+Cross-Family denial
+
+Suspended link denial
+
+Inactive membership denial
+
+Household Head change reevaluation
+
+Person death reevaluation
+```
+
+## Exit Criteria
+
+```text
+Verified Family User can resolve authorized Family
+
+Unauthorized Family access impossible
+
+No users.family_id shortcut
 ```
 
 ---
 
-# 62. Initial Family User Policy
-
-Recommended V1:
-
-```text
-Current verified Household Head only
-```
-
-Architecture must remain extensible for future:
-
-```text
-Guardian
-
-Authorized Representative
-
-Other approved adult member
-```
-
----
-
-# 63. Family User Activation
-
-Implement approved activation process.
-
-Conceptually:
-
-```text
-Account
-↓
-Identity Verification
-↓
-Existing Person Match
-↓
-User-Person Link Verification
-↓
-Family Eligibility
-↓
-Activation
-```
-
----
-
-# 64. Family User Lifecycle
-
-```text
-PENDING_VERIFICATION
-↓
-VERIFIED
-↓
-ACTIVE
-├── SUSPENDED
-└── ENDED
-```
-
----
-
-# 65. Automatic Access Reevaluation
-
-Trigger authorization reevaluation after:
-
-```text
-Household Head Change
-
-Person Transfer
-
-Membership End
-
-Death
-
-Family Archive
-
-User Suspension
-```
-
----
-
-# 66. Phase 13 Security Tests
-
-Test:
-
-```text
-Unlinked User denied
-
-Wrong Person denied
-
-Non-Head denied where Head-only
-
-Old Head loses eligibility
-
-Family Code alone grants nothing
-
-Person Code alone grants nothing
-
-Cross-Family access denied
-```
-
----
-
-# 67. Phase 13 Definition of Done
-
-```text
-Family User identity verified
-
-User-Person link operational
-
-Family scope server-side
-
-Head eligibility enforced
-
-Lifecycle operational
-
-IDOR tests passing
-```
-
----
-
-# 68. Phase 14 — Family Portal
+# 29. Phase 17 — Family Portal Foundation
 
 ## Objective
 
-Provide a simple secure self-service experience for authorized Family Users.
+Create the authenticated Family self-service experience.
 
-## Dependencies
+## Routes
+
+Possible structure:
 
 ```text
-Phase 13
+(family)/
+├── home/
+├── family/
+├── members/
+├── residence/
+├── requests/
+├── documents/
+└── notifications/
 ```
 
-## Deliverables
-
-Family Portal pages:
+## Initial Read Capabilities
 
 ```text
-Login
+Family Overview
 
-Dashboard
+Permitted Members
 
-Family Summary
+Permitted Person Data
 
-Family Members
+Residence
 
-Current Residence
-
-My Requests
-
-Documents where permitted
-
-Notifications
-
-Account
-```
-
----
-
-# 69. Family Portal UX
-
-Family Portal should prioritize:
-
-```text
-Arabic
-
-RTL
-
-Mobile-first design
-
-Simple navigation
-
-Low bandwidth
-
-Clear status messages
-
-Accessible forms
-```
-
----
-
-# 70. Family Portal Data Exposure
-
-Initial safe baseline:
-
-```text
-Family Summary
-
-Basic member information
-
-Current residence
-
-Own requests
-
-Permitted documents
+Request History
 
 Notifications
 ```
 
-Restricted by default:
+## Security
+
+API uses dedicated context-aware Resources.
+
+Example:
 
 ```text
-Full National IDs of other members
+FamilyPortalPersonResource
+```
 
-Health details
+## Exit Criteria
 
-Disability details
+```text
+Family Portal works
 
-Confidential notes
+Only authorized Family visible
 
-Internal workflow metadata
+Sensitive fields filtered server-side
 
-Audit logs
-
-Staff-only documents
+Responsive RTL experience complete
 ```
 
 ---
 
-# 71. Phase 14 Definition of Done
-
-```text
-Family User can log in
-
-Authorized Family displayed
-
-Unauthorized Families inaccessible
-
-Sensitive fields filtered
-
-Mobile/RTL tested
-
-No canonical editing exposed
-
-Security tests passing
-```
-
----
-
-# 72. Phase 15 — Change Request Engine
+# 30. Phase 18 — Change Request Engine
 
 ## Objective
 
-Allow Family Users to propose registry changes without directly modifying canonical records.
+Implement controlled Family self-service mutation.
 
-## Dependencies
-
-```text
-Phase 14
-Domain Actions from previous phases
-Workflow Events
-Documents
-```
-
-## Deliverables
-
-Tables:
+## Tables
 
 ```text
+change_request_types
+
 change_requests
-
-change_request_items / structured payload support
 ```
 
-Final physical design follows `04-DATABASE.md`.
-
----
-
-# 73. Change Request Workflow
-
-Implement:
+## Statuses
 
 ```text
 DRAFT
-↓
+
 SUBMITTED
-↓
+
 UNDER_REVIEW
-├── RETURNED_FOR_CLARIFICATION
-│       ↓
-│   RESUBMITTED
-│       ↓
-│  UNDER_REVIEW
-│
-├── REJECTED
-│
-└── APPROVED
-       ↓
-    APPLIED
+
+RETURNED_FOR_CLARIFICATION
+
+RESUBMITTED
+
+APPROVED
+
+REJECTED
+
+APPLIED
+```
+
+## Implement Domain Actions
+
+```text
+SubmitChangeRequestAction
+
+StartChangeRequestReviewAction
+
+ReturnChangeRequestForClarificationAction
+
+ResubmitChangeRequestAction
+
+ApproveChangeRequestAction
+
+RejectChangeRequestAction
+
+ApplyChangeRequestAction
+```
+
+## Critical Rule
+
+```text
+APPROVED
+≠
+APPLIED
+```
+
+## Application
+
+```text
+APPROVED
+   ↓
+Lock
+   ↓
+Revalidate
+   ↓
+Domain Action
+   ↓
+Canonical Change
+   ↓
+Audit
+   ↓
+APPLIED
+```
+
+## Exit Criteria
+
+```text
+Workflow complete
+
+Transactions tested
+
+Idempotency tested
+
+Concurrency tested
+
+Failure rollback tested
 ```
 
 ---
 
-# 74. Initial Request Types
+# 31. Phase 19 — Family Portal Self-Service
 
-Recommended:
+## Objective
+
+Connect Family Portal UX to the Change Request Engine.
+
+## Initial Request Types
 
 ```text
 CONTACT_UPDATE
@@ -1941,6 +1853,10 @@ PERSON_CORRECTION
 
 ADD_FAMILY_MEMBER
 
+MEMBERSHIP_CHANGE
+
+HOUSEHOLD_HEAD_CHANGE
+
 BIRTH_REPORT
 
 DEATH_REPORT
@@ -1948,229 +1864,51 @@ DEATH_REPORT
 MARRIAGE_UPDATE
 
 DOCUMENT_UPDATE
+
+OTHER
 ```
 
-Potential later V1 types:
+## UX
+
+Build:
 
 ```text
-MEMBERSHIP_CHANGE
+Request Wizard
 
-HOUSEHOLD_HEAD_CHANGE
+Proposed Changes Review
+
+Supporting Documents
+
+Submit Confirmation
+
+Request Timeline
+
+Clarification Response
+
+Status Tracking
 ```
 
-after policy approval.
-
----
-
-# 75. Change Request Application
-
-Critical rule:
+## Exit Criteria
 
 ```text
-Family Request
-      ↓
-Approval
-      ↓
-Existing Domain Action
-      ↓
-Canonical Registry
-```
+Family User can safely request changes
 
-Do not implement duplicate business logic specifically for Family Portal.
+Canonical registry remains Staff-controlled
 
----
-
-# 76. APPROVED vs APPLIED
-
-Maintain distinction:
-
-```text
-APPROVED
-=
-Authorized
-```
-
-```text
-APPLIED
-=
-Canonical transaction successfully completed
+Family-visible/internal notes separated
 ```
 
 ---
 
-# 77. Application Engine
-
-Implement:
-
-```text
-ApplyChangeRequestAction
-```
-
-Responsibilities:
-
-```text
-Authorize
-
-Lock Request
-
-Check APPROVED
-
-Revalidate canonical data
-
-Run type-specific Domain Action
-
-Audit changes
-
-Create Workflow Event
-
-Mark APPLIED
-
-Commit
-```
-
----
-
-# 78. Application Failure
-
-V1 baseline:
-
-```text
-Rollback transaction
-
-Remain APPROVED
-
-Log failure
-
-Allow controlled retry
-```
-
-Never partially apply a request.
-
----
-
-# 79. Add Family Member Request
-
-Implementation must:
-
-```text
-Run Duplicate Detection
-
-Reuse existing Person if confirmed
-
-Create Person only when required
-
-Create Membership
-
-Preserve identity rules
-```
-
----
-
-# 80. Birth Request
-
-Implementation must:
-
-```text
-Validate newborn data
-
-Run Duplicate Detection
-
-Create Person after approval/application
-
-Create Family Membership
-
-Create verified relationships
-```
-
----
-
-# 81. Death Request
-
-Implementation must:
-
-```text
-Validate Person
-
-Validate death information
-
-Apply life status
-
-Preserve Person
-
-Trigger Head review if needed
-
-Trigger Portal access reevaluation
-```
-
----
-
-# 82. Phase 15 Testing
-
-Test:
-
-```text
-Family User can create allowed request
-
-Cannot directly modify registry
-
-Cannot approve own request
-
-Reviewer can return request
-
-Family User can resubmit
-
-Approval does not falsely imply application
-
-Application modifies canonical data
-
-Double application blocked
-
-Failed application rolls back
-
-Wrong Family denied
-```
-
----
-
-# 83. Phase 15 Definition of Done
-
-```text
-Change Request workflow complete
-
-Initial request types operational
-
-Review queue operational
-
-Approval operational
-
-Application engine operational
-
-Audit complete
-
-Idempotency enforced
-
-Security tests passing
-```
-
----
-
-# 84. Phase 16 — Search & Duplicate Management
+# 32. Phase 20 — Search & Duplicate Management
 
 ## Objective
 
-Provide safe registry discovery and duplicate review.
+Provide safe, high-quality registry discovery.
 
-## Dependencies
+## Search
 
-```text
-Phase 4
-Phase 5
-Phase 15
-```
-
-## Deliverables
-
-Search:
+Implement:
 
 ```text
 Family Code
@@ -2179,20 +1917,14 @@ Person Code
 
 Name
 
-National ID
+National ID where authorized
 
-Mobile
-
-Paper Form Number
+Mobile where authorized
 ```
 
-subject to permissions.
+## Duplicate Detection
 
----
-
-# 85. Duplicate Detection
-
-Implement classifications:
+Classes:
 
 ```text
 EXACT
@@ -2202,96 +1934,128 @@ PROBABLE
 POSSIBLE
 ```
 
-Signals may include:
+## Duplicate Review
+
+Build:
 
 ```text
-National ID
+Duplicate Candidate List
 
-Name
+Side-by-side comparison
 
-Birth Date
+Review decision
 
-Gender
-
-Mobile
-
-Family context
+Existing Person reuse
 ```
 
----
-
-# 86. Duplicate Review
-
-Outcomes:
-
-```text
-NOT_DUPLICATE
-
-SAME_PERSON
-
-UNRESOLVED
-```
+## Rule
 
 No automatic Person merge.
 
----
-
-# 87. Phase 16 Definition of Done
+## Exit Criteria
 
 ```text
-Search permission-aware
+Arabic search usable
 
-Sensitive search protected
+Sensitive search permission-aware
 
-Duplicate warnings operational
-
-Human resolution operational
-
-No automatic merge
-
-Tests passing
+Duplicate workflow operational
 ```
 
 ---
 
-# 88. Phase 17 — Reports & Dashboard
+# 33. Phase 21 — Operational & Executive Dashboards
 
 ## Objective
 
-Provide operational and management reporting from canonical data.
+Build decision-support interfaces without mixing them with System Administration.
 
-## Dependencies
+## Operational Dashboard
+
+Possible metrics:
 
 ```text
-Stable registry modules
+Families
+
+Persons
+
+Pending Reviews
+
+Pending Approvals
+
+Change Requests
+
+Duplicate Reviews
+
+Open Needs
+
+Recent Assistance
 ```
 
-## Deliverables
+## Executive Dashboard
 
-Potential dashboards:
+Possible metrics:
 
 ```text
-Total Families
+Family Coverage
 
-Total Persons
+Population Structure
 
-Family Size
+Residence / Displacement
 
-Gender Distribution
+Needs
 
-Age Distribution
+Assistance
 
-Children
+Assessment Coverage
 
-Elderly
+Data Quality
 
-Disability
+Workflow Performance
+```
 
-Chronic Conditions
+## Architecture
 
-Residence
+```text
+Next.js Dashboard
+     ↓
+Laravel Reporting API
+     ↓
+Authorized Aggregate Queries
+```
 
-Displacement
+## Exit Criteria
+
+```text
+Operational dashboard useful
+
+Executive dashboard custom-built
+
+No Filament dependency for executive reporting
+```
+
+---
+
+# 34. Phase 22 — Reports
+
+## Objective
+
+Provide controlled analytical reporting.
+
+## Initial Reports
+
+Potential reports:
+
+```text
+Family Registry Summary
+
+Population Demographics
+
+Household Composition
+
+Residence / Displacement
+
+Health / Disability
 
 Education
 
@@ -2300,411 +2064,349 @@ Employment
 Needs
 
 Assistance
+
+Assessment Coverage
+
+Workflow Performance
+
+Data Quality
 ```
 
----
+## Security
 
-# 89. Derived Statistics
-
-Calculate from canonical data.
-
-Examples:
-
-```text
-family_size
-
-children_under_5
-
-elderly_count
-
-disabled_count
-```
-
-Avoid manually maintained duplicate counters.
-
----
-
-# 90. Report Security
-
-Reports must respect:
+Every report must enforce:
 
 ```text
 Permission
 
 Data Scope
 
-Field restrictions
-
-Sensitive-data policy
+Field Visibility
 ```
 
-Aggregate access does not automatically grant person-level access.
-
----
-
-# 91. Phase 17 Definition of Done
+## Exit Criteria
 
 ```text
-Core dashboards accurate
+Reports authorized
 
-Derived statistics validated
+Aggregates validated
 
-Permissions enforced
-
-Sensitive reporting controlled
-
-Tests passing
+Sensitive drill-down controlled
 ```
 
 ---
 
-# 92. Phase 18 — Import & Export
+# 35. Phase 23 — Import & Export
 
 ## Objective
 
-Support controlled data movement where operationally required.
+Support controlled bulk data movement.
 
-## Dependencies
-
-```text
-Stable registry
-
-Duplicate detection
-
-Authorization
-```
-
-## Deliverables
-
-Potential import:
+## Import Workflow
 
 ```text
-Excel/CSV
-
+Upload
+ ↓
+Parse
+ ↓
+Validate
+ ↓
+Duplicate Check
+ ↓
 Preview
-
-Validation
-
-Duplicate Detection
-
-Error Report
-
-Batch Traceability
+ ↓
+Review
+ ↓
+Apply
 ```
 
----
+No uncontrolled direct insert into canonical tables.
 
-# 93. Import Rule
+## Export
 
-Imports must use the same domain rules as normal application operations.
-
-No direct database bypass.
-
----
-
-# 94. Export
-
-Implement:
+Separate permissions:
 
 ```text
-Basic Export
+export.basic
 
-Personal Data Export
+export.sensitive
 
-Sensitive Export
+export.identity-data
+
+export.health-data
 ```
 
-based on permissions.
-
----
-
-# 95. Export Audit
-
-Record:
+## Exit Criteria
 
 ```text
-User
+Import validation works
 
-Scope
+Failed rows visible
 
-Filters
-
-Fields
-
-Timestamp
-
-Reason where required
-```
-
----
-
-# 96. Phase 18 Definition of Done
-
-```text
-Import validated
-
-Import traceable
-
-Duplicate rules respected
-
-Export scoped
-
-Sensitive export protected
+Canonical apply controlled
 
 Exports audited
+
+Sensitive exports protected
 ```
 
 ---
 
-# 97. Phase 19 — Security Hardening
+# 36. Phase 24 — Notifications & Background Processing
 
 ## Objective
 
-Perform dedicated security review before pilot.
+Move non-critical asynchronous work away from synchronous requests.
 
-## Dependencies
+## Notification Events
+
+Examples:
 
 ```text
-Core V1 features complete
+Change Request Submitted
+
+Returned for Clarification
+
+Approved
+
+Rejected
+
+Applied
+
+Account Activated
 ```
 
-## Review Areas
+## Queue Candidates
 
 ```text
-Authentication
-
-Authorization
-
-IDOR
-
-CSRF
-
-XSS
-
-SQL Injection
-
-Mass Assignment
-
-File Uploads
-
-Private Downloads
-
-Sensitive Data
-
-Rate Limiting
-
-Session Security
-
-Password Recovery
-
-OTP if used
-
-Audit
-
-Exports
-
-Logs
-
-Backups
-```
-
----
-
-# 98. Sensitive Data Review
-
-Verify:
-
-```text
-National ID
-
-Health
-
-Disability
-
-Documents
-
-Mobile
-
-Residence
-
-Confidential Notes
-```
-
-are not exposed through:
-
-```text
-API
-
-Logs
-
-Error pages
-
-Exports
-
 Notifications
 
-URLs
+Large exports
 
-Frontend payloads
+Imports
+
+Report generation
+
+Document processing
+
+Scheduled reminders
 ```
 
-without authorization.
+## Principle
 
----
-
-# 99. File Upload Security
-
-Implement:
+Use:
 
 ```text
-Allowed MIME types
-
-Size limits
-
-Randomized/private filenames
-
-Private storage
-
-Authorization on retrieval
-
-Malicious upload protections where available
+After Commit
 ```
 
----
+for notifications dependent on successful canonical changes.
 
-# 100. Family Portal Security
-
-Dedicated testing:
+## Exit Criteria
 
 ```text
-IDOR
+Queue operational
 
-Cross-Family access
+Failed jobs observable
 
-Member access
+Retry behavior safe
 
-Change Request ownership
-
-Document ownership
-
-User-Person link
-
-Head eligibility
-
-Old Head access
-
-Transfer access
-
-Death access
-
-Enumeration
-
-Rate limiting
+Notifications do not corrupt workflow state
 ```
 
 ---
 
-# 101. Phase 19 Definition of Done
-
-```text
-Critical security findings resolved
-
-IDOR tests passing
-
-Sensitive data review complete
-
-Private documents verified
-
-Rate limiting configured
-
-Production security checklist complete
-```
-
----
-
-# 102. Phase 20 — Comprehensive Testing & UAT
+# 37. Phase 25 — Security Hardening
 
 ## Objective
 
-Validate system behavior with realistic workflows before deployment.
+Prepare Famboook for sensitive real-world data.
 
-## Dependencies
+## Tasks
 
 ```text
-Phase 19
+Review all Policies
+
+Review all API Resources
+
+Review object-level authorization
+
+Test IDOR protection
+
+Review field-level exposure
+
+Review file authorization
+
+Review CORS
+
+Review CSRF
+
+Review cookie configuration
+
+Review rate limiting
+
+Review session security
+
+Review password policy
+
+Introduce 2FA where approved
+
+Review audit coverage
+
+Review logs
+
+Review secrets handling
+
+Review export security
 ```
 
-## Automated Testing
+## Security Testing
 
-Required categories:
+Explicitly test:
+
+```text
+Cross-Family access
+
+Privilege escalation
+
+Unauthorized API access
+
+Unauthorized file access
+
+Sensitive field leakage
+
+Mass assignment
+
+Invalid workflow transitions
+
+Role manipulation
+
+Export abuse
+```
+
+## Exit Criteria
+
+```text
+Critical findings resolved
+
+Sensitive data exposure reviewed
+
+Authorization test suite passes
+```
+
+---
+
+# 38. Phase 26 — Performance & Reliability
+
+## Objective
+
+Ensure Famboook performs reliably with real registry volume.
+
+## Tasks
+
+```text
+Profile slow API endpoints
+
+Review PostgreSQL indexes
+
+Eliminate N+1 queries
+
+Test pagination
+
+Test Family Profile queries
+
+Test Person search
+
+Test reporting queries
+
+Test queue behavior
+
+Test file delivery
+
+Introduce caching only where measured
+```
+
+## Potential Infrastructure
+
+```text
+Redis
+```
+
+may be introduced if justified for:
+
+```text
+Cache
+
+Sessions
+
+Queues
+```
+
+It is not mandatory by architecture.
+
+## Exit Criteria
+
+```text
+Critical screens meet acceptable performance
+
+No major N+1 issues
+
+Indexes validated
+
+Queue stable
+```
+
+---
+
+# 39. Phase 27 — Comprehensive Testing & UAT
+
+## Objective
+
+Validate the system technically and operationally.
+
+## Automated Tests
 
 ```text
 Unit Tests
 
 Feature Tests
 
-Authorization Tests
+Policy Tests
+
+API Tests
 
 Workflow Tests
 
 Database Constraint Tests
 
-Concurrency Tests
+Transaction Tests
 
-Security Tests
+Authorization Tests
+
+Family Scope Tests
 ```
 
----
+## Frontend Tests
 
-# 103. End-to-End Scenarios
-
-Test complete scenarios:
+Focus on:
 
 ```text
-New Family Registration
+Critical forms
 
-Existing Person Reuse
+Authentication
 
-Duplicate Candidate
+Navigation
 
-Household Head Change
+Workflow actions
 
-Person Transfer
+Family Portal
 
-Residence Change
-
-Form Correction
-
-Verification
-
-Assessment
-
-Need
-
-Assistance
-
-Family User Activation
-
-Family Portal Access
-
-Add Member Request
-
-Birth Report
-
-Death Report
-
-Change Request Clarification
-
-Change Request Approval
-
-Change Request Application
+Error states
 ```
 
----
+## UAT Actors
 
-# 104. UAT
-
-User Acceptance Testing should include representatives from:
+Include representatives of:
 
 ```text
 Data Entry
@@ -2715,277 +2417,676 @@ Administrator
 
 Social Worker
 
+Reports Viewer
+
 Family User
 ```
 
-where operationally possible.
-
----
-
-# 105. UAT Data
-
-Use:
+## Exit Criteria
 
 ```text
-Fictional
+Critical defects resolved
 
-Synthetic
+UAT approved
 
-or properly authorized/anonymized
-```
+Core workflows accepted
 
-data.
-
-Avoid uncontrolled copies of production Family data.
-
----
-
-# 106. Phase 20 Definition of Done
-
-```text
-Critical automated tests pass
-
-End-to-end scenarios pass
-
-UAT completed
-
-Critical UAT issues resolved
-
-Authorization matrix validated
-
-Data integrity validated
+Security-critical tests pass
 ```
 
 ---
 
-# 107. Phase 21 — Deployment & Pilot
+# 40. Phase 28 — Deployment Foundation
 
 ## Objective
 
-Deploy a controlled production-like pilot before broad adoption.
+Prepare production infrastructure.
 
-## Dependencies
+## Initial Topology
 
 ```text
-Phase 20
+famboook.com
+→ Next.js
+
+api.famboook.com
+→ Laravel API
+
+admin.famboook.com
+→ Laravel / Filament
+
+PostgreSQL
+→ Private / non-public
 ```
 
-## Deliverables
+## Infrastructure
+
+Configure:
 
 ```text
-Production infrastructure
+HTTPS
 
-SSL
+DNS
 
-Database
+Environment variables
+
+Application secrets
+
+PostgreSQL
 
 Private storage
 
-Queue worker
+Queue workers
 
 Scheduler
+
+Logs
 
 Backups
 
 Monitoring
-
-Error logging
-
-Deployment procedure
-
-Rollback procedure
 ```
 
----
+## Sanctum
 
-# 108. Pilot Strategy
-
-Do not begin with the entire target population.
-
-Recommended:
+Validate:
 
 ```text
-Small controlled Family sample
-      ↓
-Data Entry
-      ↓
-Verification
-      ↓
-Family Portal activation
-      ↓
-Change Request testing
-      ↓
-Operational feedback
-      ↓
-Corrections
+Cookie domain
+
+Secure cookies
+
+SameSite
+
+Stateful domains
+
+CORS
+
+CSRF
 ```
 
----
-
-# 109. Pilot Sample
-
-Exact sample size is an operational decision.
-
-The pilot should be large enough to include:
+## Exit Criteria
 
 ```text
-Small Family
+Staging environment stable
 
-Large Family
+HTTPS works
 
-Missing National ID
+Authentication works across approved hosts
 
-Possible duplicate
+Database private
 
-Displaced Family
+Backup configured
 
-Health case
-
-Disability case
-
-Family with multiple needs
-
-Household Head change
-
-Family User Portal
-
-Change Request
+Restore tested
 ```
 
 ---
 
-# 110. Pilot Monitoring
-
-Monitor:
-
-```text
-Data Entry time
-
-Validation errors
-
-Duplicate frequency
-
-Reviewer workload
-
-Change Request volume
-
-Family User usability
-
-Authorization failures
-
-Performance
-
-Support issues
-
-Data quality
-```
-
----
-
-# 111. Phase 21 Definition of Done
-
-```text
-Deployment stable
-
-Backups verified
-
-Pilot users trained
-
-Pilot completed
-
-Critical pilot issues resolved
-
-Production readiness approved
-```
-
----
-
-# 112. Phase 22 — Production Rollout
+# 41. Phase 29 — Pilot
 
 ## Objective
 
-Expand from pilot to operational use.
+Validate Famboook with a controlled real-world dataset and limited users.
 
-## Dependencies
+## Pilot Scope
+
+Use a limited approved Family subset.
+
+## Monitor
 
 ```text
-Successful Pilot
+Data Entry speed
+
+Duplicate rate
+
+Workflow delays
+
+User errors
+
+Family Portal usability
+
+Data quality
+
+Performance
+
+Security incidents
+
+Support requests
 ```
+
+## Rule
+
+Do not migrate the entire population before pilot findings are reviewed.
+
+## Exit Criteria
+
+```text
+Pilot findings documented
+
+Critical issues resolved
+
+Operational SOPs updated
+
+Production rollout approved
+```
+
+---
+
+# 42. Phase 30 — Production Rollout
+
+## Objective
+
+Deploy Famboook as the official operational registry.
 
 ## Activities
 
 ```text
-User onboarding
+Production deployment
 
-Staff training
+Initial user provisioning
 
-Family User activation
+Role assignment
 
-Controlled data migration
+Approved data migration
 
-Operational support
+Training
 
-Monitoring
+Support procedures
 
 Backup verification
 
-Security monitoring
+Monitoring
 
-Data quality monitoring
+Incident response
 ```
 
----
+## Rollout Strategy
 
-# 113. Production Rollout Strategy
+Prefer controlled rollout rather than one irreversible bulk launch.
 
-Prefer staged expansion:
-
-```text
-Pilot
-↓
-Limited Production
-↓
-Expanded Production
-↓
-Full Operational Use
-```
-
-rather than one-time full migration.
-
----
-
-# 114. Production Definition of Done
+## Exit Criteria
 
 ```text
 System stable
 
-Operational roles assigned
+Users operational
 
 Support process active
 
-Backups tested
-
-Security controls active
+Backups validated
 
 Monitoring active
-
-Data quality process active
-
-Change management process active
 ```
 
 ---
 
-# 115. Cross-Phase Audit Requirement
+# 43. Phase 31 — Post-Launch Improvement
 
-Audit infrastructure must not be postponed until the end.
-
-Introduce audit as soon as critical canonical data begins to exist.
-
-Audit at minimum:
+Potential future capabilities:
 
 ```text
-Person identity changes
+PWA
+
+Native Mobile Application
+
+Advanced Analytics
+
+External Integrations
+
+Advanced Duplicate Matching
+
+Authorized Representatives
+
+Guardian Accounts
+
+Multi-Family Access
+
+Automated Low-Risk Change Requests
+
+Advanced Search
+
+Materialized Reporting Views
+
+SMS Integration
+
+Email Integration
+
+External Identity Verification
+
+Advanced Case Management
+```
+
+These are not required for V1 unless separately approved.
+
+---
+
+# 44. MVP Strategy
+
+Famboook should not wait for every future capability before delivering value.
+
+Three delivery milestones are recommended.
+
+---
+
+# 45. MVP 1 — Internal Registry
+
+Includes:
+
+```text
+Authentication
+
+RBAC
+
+Family Registry
+
+Person Registry
+
+Memberships
+
+Household Head
+
+Relationships
+
+Residence
+
+Staff Application
+
+Basic Workflow
+
+Basic Search
+
+Audit
+```
+
+Outcome:
+
+```text
+Staff can operate a structured digital Family Registry.
+```
+
+---
+
+# 46. MVP 2 — Case Management
+
+Adds:
+
+```text
+Health
+
+Disability
+
+Education
+
+Employment
+
+Assessments
+
+Needs
+
+Assistance
+
+Documents
+
+Case Notes
+
+Reports
+```
+
+Outcome:
+
+```text
+Famboook becomes a Family Registry + Case Management platform.
+```
+
+---
+
+# 47. MVP 3 — Family Self-Service
+
+Adds:
+
+```text
+Family User Identity
+
+Family Portal
+
+Change Requests
+
+Supporting Documents
+
+Notifications
+
+Controlled Self-Service
+```
+
+Outcome:
+
+```text
+Verified Family representatives can safely interact with the registry.
+```
+
+---
+
+# 48. Executive Reporting Milestone
+
+Executive Dashboard may begin once sufficient canonical data exists.
+
+Do not build executive charts over unstable or poorly defined data.
+
+Recommended dependency:
+
+```text
+Registry
++
+Assessments
++
+Needs / Assistance
++
+Workflow Data
+        ↓
+Executive Dashboard
+```
+
+---
+
+# 49. Design System Milestone
+
+Design System must begin before broad Staff UI development.
+
+It should evolve during implementation.
+
+Do not wait to create every possible component before feature development.
+
+Use:
+
+```text
+Foundation
+   ↓
+First components
+   ↓
+Real feature usage
+   ↓
+Refinement
+   ↓
+Expansion
+```
+
+---
+
+# 50. API Contract Strategy
+
+Frontend and backend should agree on explicit API contracts.
+
+For each endpoint define:
+
+```text
+Method
+
+Path
+
+Authentication
+
+Permission
+
+Request Schema
+
+Response Resource
+
+Error Cases
+
+Pagination
+
+Workflow Conditions
+```
+
+---
+
+# 51. API Versioning
+
+Initial API:
+
+```text
+/api/v1
+```
+
+Breaking external contract changes should not be introduced casually.
+
+Internal implementation may evolve without changing the contract.
+
+---
+
+# 52. Frontend Data Strategy
+
+Use:
+
+```text
+TanStack Query
+```
+
+for:
+
+```text
+Server state
+
+Caching
+
+Invalidation
+
+Loading
+
+Refetch
+
+Mutations
+```
+
+Do not duplicate canonical server data into unnecessary global client stores.
+
+---
+
+# 53. Form Strategy
+
+Use:
+
+```text
+React Hook Form
++
+Zod
+```
+
+for frontend form experience.
+
+Laravel remains authoritative.
+
+```text
+Zod
+→ UX validation
+
+Laravel
+→ Security/business validation
+```
+
+---
+
+# 54. Frontend Component Strategy
+
+Prefer domain-aware composition.
+
+Example:
+
+```text
+FamilyProfile
+├── FamilyHeader
+├── FamilyStats
+├── HouseholdHeadCard
+├── MembersSection
+├── ResidenceSection
+├── NeedsSection
+└── ActivityTimeline
+```
+
+rather than a generic database-admin form.
+
+---
+
+# 55. Responsive Strategy
+
+The product must support:
+
+```text
+Desktop
+
+Tablet
+
+Mobile
+```
+
+Family Portal requires especially strong mobile usability.
+
+Staff data-heavy interfaces may optimize primarily for desktop/tablet while remaining usable on smaller screens.
+
+---
+
+# 56. RTL Strategy
+
+Arabic RTL is a first-class requirement.
+
+Test:
+
+```text
+Navigation
+
+Tables
+
+Forms
+
+Drawers
+
+Dialogs
+
+Icons
+
+Breadcrumbs
+
+Timelines
+
+Charts
+
+Pagination
+
+Date inputs
+```
+
+Do not postpone RTL testing until project completion.
+
+---
+
+# 57. Low-Bandwidth Strategy
+
+Optimize for constrained connections.
+
+Guidelines:
+
+```text
+Paginate large data
+
+Avoid unnecessary payloads
+
+Compress assets
+
+Lazy-load heavy sections
+
+Avoid excessive client JavaScript
+
+Avoid unnecessary images
+
+Cache appropriate read data
+
+Provide clear loading states
+```
+
+---
+
+# 58. Accessibility
+
+Design components should consider:
+
+```text
+Keyboard navigation
+
+Focus states
+
+Labels
+
+Contrast
+
+Semantic markup
+
+Screen-reader structure
+
+Touch target size
+```
+
+---
+
+# 59. Error Handling
+
+Define standard API errors.
+
+Possible categories:
+
+```text
+VALIDATION_ERROR
+
+UNAUTHENTICATED
+
+FORBIDDEN
+
+NOT_FOUND
+
+CONFLICT
+
+INVALID_STATE
+
+DUPLICATE_CANDIDATE
+
+DOMAIN_RULE_VIOLATION
+
+SERVER_ERROR
+```
+
+Frontend should map these to understandable UX.
+
+---
+
+# 60. Conflict Handling
+
+Use HTTP conflict semantics where appropriate for:
+
+```text
+Stale state
+
+Concurrent update
+
+Invalid current workflow state
+
+Uniqueness conflict
+```
+
+Exact status codes should be standardized during API foundation.
+
+---
+
+# 61. Audit Strategy
+
+Audit must be integrated while features are built.
+
+Do not postpone audit implementation until the end.
+
+Critical operations include:
+
+```text
+Family changes
+
+Person changes
 
 National ID changes
 
@@ -2995,1752 +3096,1452 @@ Household Head changes
 
 Residence changes
 
-Workflow decisions
+Death recording
+
+Document verification
 
 Change Request application
 
-User-Person link changes
-
-Permission changes
+Role/permission changes
 
 Sensitive exports
 ```
 
 ---
 
-# 116. Cross-Phase Workflow Requirement
+# 62. Data Migration Strategy
 
-Do not implement workflow states as UI labels only.
+Existing paper/legacy data requires controlled migration.
 
-Every workflow requires:
-
-```text
-State
-
-Allowed Transitions
-
-Authorization
-
-Domain Validation
-
-Workflow Event
-
-Audit
-
-Tests
-```
-
----
-
-# 117. Cross-Phase Authorization Requirement
-
-Every new module must answer:
+Pipeline:
 
 ```text
-Who can View?
-
-Who can Create?
-
-Who can Update?
-
-Who can Archive?
-
-Which records?
-
-Which fields?
-
-Which workflow states?
-
-Which sensitive values?
-
-What is audited?
-```
-
-before the feature is considered complete.
-
----
-
-# 118. Cross-Phase Database Requirement
-
-Critical business invariants should be protected at the strongest reasonable layer:
-
-```text
-Database Constraint
-
-Backend Domain Rule
-
-Authorization
-
-UI Validation
-```
-
-Do not rely on UI alone.
-
----
-
-# 119. Cross-Phase Data Privacy Requirement
-
-Every feature involving:
-
-```text
-National ID
-
-Health
-
-Disability
-
-Documents
-
-Residence
-
-Mobile
-
-Case Notes
-```
-
-requires explicit privacy review.
-
----
-
-# 120. Cross-Phase Family Portal Requirement
-
-No Family Portal feature may assume:
-
-```text
-FAMILY_USER role
-=
-access to all Family data
-```
-
-Authorization must always resolve:
-
-```text
-User
-
-Person Link
-
-Membership
-
-Family
-
-Eligibility
-
-Field Policy
-```
-
----
-
-# 121. Cross-Phase Change Request Requirement
-
-No Change Request type is complete until it defines:
-
-```text
-Payload
-
+Source
+ ↓
+Staging
+ ↓
 Validation
-
-Evidence
-
-Risk
-
-Reviewer
-
-Approver
-
-Domain Action
-
-Application behavior
-
-Audit
-
-Notifications
-
-Tests
-```
-
----
-
-# 122. Cross-Phase Testing Requirement
-
-Do not leave tests until Phase 20.
-
-Every phase includes its own automated tests.
-
-Phase 20 is:
-
-```text
-Comprehensive Validation
-```
-
-not:
-
-```text
-First time testing.
-```
-
----
-
-# 123. Cross-Phase Documentation Requirement
-
-When implementation changes an approved architecture decision:
-
-```text
-Update documentation
-      ↓
-Record decision
-      ↓
-Implement
-```
-
-Do not allow documentation and implementation to silently diverge.
-
----
-
-# 124. Initial MVP Definition
-
-Famboook V1 MVP should provide:
-
-```text
-Secure Staff Authentication
-
-RBAC
-
-Family Registry
-
-Person Registry
-
-Membership History
-
-Household Head
-
-Person Relationships
-
-Residence
-
-Paper Form Traceability
-
-Staff Data Entry
-
-Verification
-
-Approval
-
-Health / Disability
-
-Education / Employment
-
-Assessments
-
-Needs
-
-Assistance
-
-Documents
-
-Case Notes
-
-Family User Identity
-
-Family Portal
-
-Change Requests
-
-Search
-
+ ↓
+Normalization
+ ↓
 Duplicate Detection
-
-Core Reports
-
-Audit
-
-Backup
-
-Security Controls
+ ↓
+Review
+ ↓
+Canonical Import
 ```
+
+Do not directly import unverified spreadsheets into canonical tables.
 
 ---
 
-# 125. V1 Family Portal MVP
+# 63. Paper Form Digitization
 
-Must include:
+Paper forms remain source evidence.
+
+Digitization should preserve:
 
 ```text
-Authentication
+Paper Form Number
 
-Verified User-Person Link
+Source
 
-Family Scope
+Entry Actor
 
-Family Summary
+Entry Date
 
-Member Summary
+Verification State
 
-Residence
-
-Change Request Creation
-
-Request Tracking
-
-Clarification Response
-
-Supporting Documents
-
-Notifications
+Supporting scan where authorized
 ```
+
+The database model must not reproduce paper rows literally.
 
 ---
 
-# 126. V1 Change Request MVP
+# 64. Synthetic Development Data
 
-Recommended initial types:
+All local/demo/testing environments should use synthetic Family data.
 
-```text
-CONTACT_UPDATE
-
-RESIDENCE_UPDATE
-
-PERSON_CORRECTION
-
-ADD_FAMILY_MEMBER
-
-BIRTH_REPORT
-
-DEATH_REPORT
-
-MARRIAGE_UPDATE
-
-DOCUMENT_UPDATE
-```
+Never use real National IDs or sensitive health information in Git.
 
 ---
 
-# 127. V1 Staff Portal MVP
+# 65. Database Migration Discipline
 
-Must support:
+Each schema change requires:
 
 ```text
-Family Management
-
-Person Management
-
-Membership Management
-
-Data Entry
+Migration
 
 Review
 
-Verification
-
-Approval
-
-Assessments
-
-Needs
-
-Assistance
-
-Documents
-
-Case Notes
-
-Change Request Review
-
-Family User Administration
-
-Reports
-```
-
----
-
-# 128. Explicitly Deferred Features
-
-Unless later prioritized:
-
-```text
-Native Mobile App
-
-Full Offline Synchronization
-
-Automatic Person Merge
-
-AI Eligibility Decisions
-
-Automated Assistance Eligibility
-
-Public Family Profiles
-
-Anonymous Public Registration
-
-Accounting
-
-Payment Processing
-
-Biometric Identification
-
-Complex External Integrations
-
-Advanced GIS
-
-Advanced Predictive Analytics
-```
-
----
-
-# 129. Future Candidate — Authorized Representatives
-
-Architecture supports future:
-
-```text
-Guardian
-
-Authorized Representative
-
-Adult Family Member
-```
-
-without redefining Person identity.
-
-This is not enabled until business and authorization rules are approved.
-
----
-
-# 130. Future Candidate — Dedicated Frontend
-
-A dedicated frontend may later be justified for:
-
-```text
-Advanced Family Portal UX
-
-Public-facing services
-
-PWA
-
-Offline-assisted workflows
-
-Complex dashboards
-```
-
-The API/domain architecture should permit this without requiring it for V1.
-
----
-
-# 131. Future Candidate — Mobile/PWA
-
-Potential:
-
-```text
-PWA
-
-Installable Family Portal
-
-Offline read cache
-
-Draft submission support
-```
-
-must undergo security review because of sensitive Family data.
-
----
-
-# 132. Future Candidate — Integrations
-
-Possible future integrations:
-
-```text
-SMS
-
-Email
-
-External Identity Verification
-
-External Assistance Systems
-
-Government registries
-
-Humanitarian platforms
-```
-
-No integration should bypass Famboook authorization and audit rules.
-
----
-
-# 133. Future Candidate — Advanced Duplicate Resolution
-
-Potential:
-
-```text
-Similarity scoring
-
-Phonetic Arabic matching
-
-Merge candidate queue
-
-Controlled manual merge
-```
-
-Automatic merge remains prohibited unless explicitly redesigned and approved.
-
----
-
-# 134. Development Priority Rules
-
-When choosing between features:
-
-```text
-Data Integrity
->
-Workflow Correctness
->
-Security
->
-Operational Necessity
->
-UX Enhancement
->
-Visual Polish
-```
-
-This does not mean UX is unimportant.
-
-It means visual convenience must not weaken registry integrity.
-
----
-
-# 135. Recommended Development Milestones
-
-For project tracking, phases may be grouped into milestones:
-
-```text
-M1 — Foundation
-
-M2 — Core Registry
-
-M3 — Staff Operations
-
-M4 — Case Management
-
-M5 — Family Self-Service
-
-M6 — Reporting & Data Operations
-
-M7 — Security & Quality
-
-M8 — Pilot & Production
-```
-
----
-
-# 136. M1 — Foundation
-
-Includes:
-
-```text
-Phase 0
-Phase 1
-Phase 2
-Phase 3
-```
-
-Result:
-
-```text
-Stable technical and authorization foundation.
-```
-
----
-
-# 137. M2 — Core Registry
-
-Includes:
-
-```text
-Phase 4
-Phase 5
-Phase 6
-```
-
-Result:
-
-```text
-Canonical Family/Person registry operational.
-```
-
----
-
-# 138. M3 — Staff Operations
-
-Includes:
-
-```text
-Phase 7
-Phase 8
-Phase 9
-```
-
-Result:
-
-```text
-Staff can digitize, review, verify, and maintain registry data.
-```
-
----
-
-# 139. M4 — Case Management
-
-Includes:
-
-```text
-Phase 10
-Phase 11
-Phase 12
-```
-
-Result:
-
-```text
-Assessments, Needs, Assistance, Documents, and Notes operational.
-```
-
----
-
-# 140. M5 — Family Self-Service
-
-Includes:
-
-```text
-Phase 13
-Phase 14
-Phase 15
-```
-
-Result:
-
-```text
-Verified Household Head can securely interact with Family data through controlled Change Requests.
-```
-
----
-
-# 141. M6 — Reporting & Data Operations
-
-Includes:
-
-```text
-Phase 16
-Phase 17
-Phase 18
-```
-
-Result:
-
-```text
-Search, duplicate review, reports, imports, and exports operational.
-```
-
----
-
-# 142. M7 — Security & Quality
-
-Includes:
-
-```text
-Phase 19
-Phase 20
-```
-
-Result:
-
-```text
-System security and operational behavior validated.
-```
-
----
-
-# 143. M8 — Pilot & Production
-
-Includes:
-
-```text
-Phase 21
-Phase 22
-```
-
-Result:
-
-```text
-Controlled production adoption.
-```
-
----
-
-# 144. Milestone Dependency
-
-```text
-M1
-↓
-M2
-↓
-M3
-↓
-M4
-↓
-M5
-↓
-M6
-↓
-M7
-↓
-M8
-```
-
-Some individual engineering tasks may overlap where dependencies permit.
-
----
-
-# 145. Issue Tracking Structure
-
-Recommended issue hierarchy:
-
-```text
-Milestone
-   ↓
-Epic
-   ↓
-Feature
-   ↓
-User Story
-   ↓
-Technical Task
-   ↓
 Test
+
+Rollback consideration
 ```
 
-Example:
-
-```text
-M5 — Family Self-Service
-
-Epic:
-Change Requests
-
-Feature:
-Birth Report
-
-User Story:
-As a Family User,
-I want to report a newborn
-so the Family registry can be updated after verification.
-
-Tasks:
-Migration
-Model
-Policy
-Action
-Form
-Review UI
-Application Handler
-Audit
-Tests
-```
+Do not rely on manual production SQL changes.
 
 ---
 
-# 146. Branch Strategy
+# 66. Seeder Strategy
 
-Recommended simple strategy:
-
-```text
-main
-```
-
-for stable code.
-
-Feature branches:
-
-```text
-feature/family-registry
-
-feature/person-registry
-
-feature/family-memberships
-
-feature/change-requests
-```
-
-Bug fixes:
-
-```text
-fix/<description>
-```
-
-Keep strategy simple while team size is small.
-
----
-
-# 147. Commit Strategy
-
-Use clear commits:
-
-```text
-feat: add family registry
-
-feat: implement family memberships
-
-feat: add household head change action
-
-feat: add family portal scope resolver
-
-feat: add change request workflow
-
-fix: prevent duplicate active household head
-
-test: add family portal authorization tests
-
-docs: update family user workflow
-```
-
----
-
-# 148. Database Migration Strategy
-
-Prefer:
-
-```text
-Small focused migrations
-
-Foreign keys
-
-Indexes
-
-Constraints
-
-Reversible migrations where practical
-```
-
-Do not manually edit production schema outside controlled migration procedures.
-
----
-
-# 149. Seeder Strategy
-
-Seed:
+Use deterministic seeders for:
 
 ```text
 Roles
 
 Permissions
 
-Approved Reference Data
+Reference Data
 
-Development-only fictional fixtures
+Change Request Types
 ```
 
-Never seed real Family information into source control.
+Production seeders must not create uncontrolled demo users or sensitive sample data.
 
 ---
 
-# 150. Backup Strategy
+# 67. Git Workflow
 
-Before production define:
+Recommended normal flow:
+
+```powershell
+git status
+git add .
+git commit -m "..."
+git push
+```
+
+Commits should represent coherent implementation units.
+
+Examples:
 
 ```text
-Database backup frequency
+feat: add family registry API
 
-File backup frequency
+feat: add staff family profile
+
+feat: implement household head workflow
+
+feat: add family portal authentication
+
+test: cover change request application
+
+docs: update deployment architecture
+```
+
+---
+
+# 68. Branch Strategy
+
+For an initial small development team, avoid unnecessary Git complexity.
+
+A practical model:
+
+```text
+main
++
+short-lived feature branches when needed
+```
+
+Production release branching may be introduced later if team/release complexity requires it.
+
+---
+
+# 69. Definition of Done — Backend Feature
+
+A backend feature is complete when:
+
+```text
+Migration complete if required
+
+Model/domain structure complete
+
+Validation complete
+
+Authorization complete
+
+Domain Action complete
+
+Transaction defined where needed
+
+Audit implemented where required
+
+API Resource complete
+
+API endpoint complete
+
+Tests pass
+
+Error behavior defined
+```
+
+---
+
+# 70. Definition of Done — Frontend Feature
+
+A frontend feature is complete when:
+
+```text
+API integrated
+
+Loading state implemented
+
+Empty state implemented
+
+Error state implemented
+
+Authorization-aware UX implemented
+
+Responsive behavior tested
+
+RTL tested
+
+Form validation implemented
+
+Success/error feedback implemented
+
+Design System components reused
+```
+
+---
+
+# 71. Definition of Done — Workflow Feature
+
+A workflow feature is complete when:
+
+```text
+States defined
+
+Transitions defined
+
+Permissions defined
+
+Invalid transitions rejected
+
+Workflow events recorded
+
+Audit recorded
+
+Transaction implemented
+
+Concurrency addressed
+
+Idempotency addressed where needed
+
+UI actions connected
+
+Tests complete
+```
+
+---
+
+# 72. Definition of Done — Sensitive Feature
+
+A sensitive feature additionally requires:
+
+```text
+Field exposure reviewed
+
+Object authorization tested
+
+Logging reviewed
+
+Export implications reviewed
+
+Family Portal exposure reviewed
+
+File access reviewed where relevant
+```
+
+---
+
+# 73. Testing Pyramid
+
+Use a balanced strategy:
+
+```text
+Many focused Unit Tests
+
+Many Backend Feature/Policy Tests
+
+Critical Integration Tests
+
+Selected Frontend Tests
+
+Selected End-to-End Tests
+```
+
+Do not depend only on manual browser testing.
+
+---
+
+# 74. Critical Automated Test Areas
+
+Priority tests:
+
+```text
+Authentication
+
+Authorization
+
+Family Scope
+
+Household Head invariant
+
+Membership invariant
+
+Residence invariant
+
+Person death
+
+Duplicate handling
+
+Change Request workflow
+
+Change Request application
+
+Private documents
+
+Sensitive fields
+
+Exports
+```
+
+---
+
+# 75. CI Foundation
+
+Introduce CI early enough to prevent broken main branch.
+
+Initial CI should run:
+
+```text
+Backend tests
+
+Frontend type checking
+
+Frontend linting
+
+Frontend build
+```
+
+Later:
+
+```text
+Security checks
+
+End-to-end tests
+```
+
+---
+
+# 76. Environment Strategy
+
+At minimum:
+
+```text
+Local
+
+Staging
+
+Production
+```
+
+Production data must not be casually copied into development environments.
+
+---
+
+# 77. Staging
+
+Staging should resemble production architecture sufficiently to test:
+
+```text
+Subdomains
+
+Sanctum
+
+Cookies
+
+CORS
+
+CSRF
+
+Private storage
+
+Queues
+
+Scheduler
+
+Deployment
+```
+
+---
+
+# 78. Secrets
+
+Secrets belong in environment/secret management.
+
+Never Git:
+
+```text
+APP_KEY
+
+DB_PASSWORD
+
+SMTP_PASSWORD
+
+Storage Credentials
+
+API Keys
+```
+
+---
+
+# 79. Database Backup
+
+Before production rollout define:
+
+```text
+Backup schedule
 
 Retention
+
+Storage location
 
 Encryption
 
 Restore procedure
 
-Restore testing
+Restore test frequency
 ```
-
-A backup is not considered reliable until restore is tested.
 
 ---
 
-# 151. Monitoring Strategy
+# 80. File Backup
+
+Database backup alone is insufficient if documents are stored separately.
+
+Private file storage requires an appropriate backup/recovery strategy.
+
+---
+
+# 81. Monitoring
 
 Production monitoring should cover:
 
 ```text
 Application errors
 
+API failures
+
 Queue failures
 
-Failed logins
-
-Suspicious access
-
-Storage
+Disk/storage
 
 Database health
 
 Backup status
 
-Performance
+Authentication anomalies
 
-Critical workflow failures
+Performance
 ```
 
 ---
 
-# 152. Logging Strategy
+# 82. Logging
 
-Logs must be useful without leaking sensitive data.
+Logs must support troubleshooting without leaking excessive sensitive information.
 
-Do not routinely log:
+Never log:
 
 ```text
-Full National IDs
-
 Passwords
 
-OTP codes
-
-Medical details
-
-Uploaded document content
-
 Authentication secrets
+
+Full sensitive document contents
+```
+
+Sensitive identity data should be minimized.
+
+---
+
+# 83. Deployment
+
+Deployment should be repeatable.
+
+Avoid manual server modifications that cannot be reproduced.
+
+Preferred future process:
+
+```text
+Git
+ ↓
+Build/Test
+ ↓
+Deploy
+ ↓
+Migrate
+ ↓
+Restart Workers
+ ↓
+Health Check
 ```
 
 ---
 
-# 153. Performance Baseline
+# 84. Migration Deployment
 
-Initial design should support at least the expected operational population without architectural redesign.
-
-Use:
+Production migration process must include:
 
 ```text
-Indexes
+Backup consideration
 
-Pagination
+Migration review
 
-Eager loading
+Compatibility
 
-Query optimization
+Rollback strategy
 
-Background jobs
-
-Caching where safe
+Worker compatibility
 ```
 
-based on measured need.
+High-risk schema changes may require staged deployment.
 
 ---
 
-# 154. Performance Testing
+# 85. Release Gate
 
-Test representative:
-
-```text
-Family list
-
-Person search
-
-Large Family profile
-
-Reports
-
-Change Request queue
-
-Duplicate search
-```
-
-before production rollout.
-
----
-
-# 155. Large Family Handling
-
-No UI or database design should assume a fixed number of Family members.
-
-Use:
+A production release should not proceed if:
 
 ```text
-Pagination
+Critical tests fail
 
-Search
+Known critical authorization vulnerability exists
 
-Filtering
+Migration is unreviewed
 
-Repeatable records
-```
+Backup is unavailable for high-risk migration
 
-where needed.
-
----
-
-# 156. Arabic & RTL Requirement
-
-Staff and Family-facing interfaces should support:
-
-```text
-Arabic
-
-RTL
-
-Arabic names
-
-Arabic search behavior
-
-Arabic validation messages
-```
-
-from early development, not as a final cosmetic phase.
-
----
-
-# 157. Accessibility
-
-Family Portal should consider:
-
-```text
-Readable typography
-
-Clear contrast
-
-Large touch targets
-
-Clear errors
-
-Keyboard usability where relevant
-
-Simple language
+Required environment configuration is missing
 ```
 
 ---
 
-# 158. Low-Bandwidth Requirement
+# 86. Pilot Data Strategy
 
-Family Portal should avoid unnecessary:
+The first real dataset should be limited.
 
-```text
-Large JavaScript bundles
-
-Large images
-
-Heavy animations
-
-Repeated network calls
-```
-
-because self-service should remain usable under constrained connectivity.
-
----
-
-# 159. Error Handling
-
-User-facing errors should not expose:
+Start with enough Families to validate:
 
 ```text
-Stack traces
+Data structure
 
-SQL
+Data-entry process
 
-Server paths
+Duplicate detection
 
-Secrets
-
-Internal IDs unnecessarily
-```
-
-Production error pages must be safe.
-
----
-
-# 160. Data Migration Preparation
-
-If historical Family data exists in:
-
-```text
-Excel
-
-Paper Forms
-
-Previous databases
-```
-
-do not import immediately.
-
-First:
-
-```text
-Profile Source Data
-
-Map Fields
-
-Normalize Values
-
-Define Duplicate Strategy
-
-Run Dry Import
-
-Review Errors
-
-Reconcile
-
-Then Import
-```
-
----
-
-# 161. Paper Data Migration
-
-Paper entry should preserve:
-
-```text
-Source Form Number
-
-Source Document
-
-Entry Actor
-
-Entry Date
-
-Verification Actor
-
-Verification Date
-```
-
-where available.
-
----
-
-# 162. Production Data Quality
-
-Create operational reports for:
-
-```text
-Missing Household Head
-
-Multiple Head anomalies
-
-Missing National IDs where expected
-
-Possible duplicates
-
-Incomplete relationships
-
-Missing current residence
-
-Unresolved Change Requests
-
-Approved but unapplied requests
-```
-
----
-
-# 163. Exception Queues
-
-Recommended:
-
-```text
-Duplicate Review
-
-Head Review Required
-
-Returned Forms
-
-Pending Verification
-
-Change Requests
-
-Clarification Required
-
-Approved Awaiting Application
-
-Document Verification
-
-Data Quality Exceptions
-```
-
----
-
-# 164. Deployment Gate
-
-Production deployment requires:
-
-```text
-Migrations reviewed
-
-Tests passing
-
-Authorization tests passing
-
-Backup available
-
-Rollback plan
-
-Environment secrets configured
-
-Debug disabled
-
-Storage protected
-
-Queue running
-
-Scheduler running
-
-Monitoring active
-```
-
----
-
-# 165. Release Gate
-
-A feature is releasable only when:
-
-```text
-Business rules implemented
-
-Authorization implemented
-
-Validation implemented
-
-Audit implemented where required
-
-Tests pass
-
-Documentation synchronized
-
-No critical security issue
-```
-
----
-
-# 166. V1 Completion Gate
-
-V1 is complete when:
-
-```text
-Core Registry operational
-
-Staff workflow operational
-
-Case Management operational
-
-Family Portal operational
-
-Change Requests operational
-
-Sensitive data protected
-
-Reports operational
-
-Audit operational
-
-Backups operational
-
-Security review completed
-
-UAT completed
-
-Pilot completed successfully
-```
-
----
-
-# 167. Post-V1 Review
-
-After initial production use, review:
-
-```text
-Actual Family Portal adoption
-
-Change Request types
-
-Review workload
-
-Duplicate patterns
-
-Data quality
+Household structure
 
 Performance
 
-Security events
-
-User feedback
-
-Need for PWA
-
-Need for external integrations
-
-Need for additional Family Users
+User training
 ```
+
+before large-scale migration.
 
 ---
 
-# 168. Roadmap Governance
+# 87. Training
 
-Roadmap changes should be intentional.
-
-When adding a major feature:
-
-```text
-Identify Business Need
-↓
-Review Product Impact
-↓
-Review Data Impact
-↓
-Review Database Impact
-↓
-Review Workflow Impact
-↓
-Review Permission Impact
-↓
-Update Roadmap
-↓
-Implement
-```
-
----
-
-# 169. Architecture Governance
-
-Do not bypass approved architecture because a UI shortcut appears easier.
+Operational training should be role-specific.
 
 Examples:
 
-Do not add:
-
 ```text
-persons.family_id
+Data Entry Training
+
+Reviewer Training
+
+Social Worker Training
+
+Administrator Training
+
+Family User Guidance
 ```
-
-as a new canonical shortcut if membership is canonical.
-
-Do not let:
-
-```text
-FAMILY_USER
-```
-
-directly update Persons because it is easier than Change Requests.
-
-Do not store:
-
-```text
-family_size
-```
-
-manually merely because a report needs it.
 
 ---
 
-# 170. Roadmap Invariants
+# 88. SOPs
+
+Operational SOPs should accompany production.
+
+Potential SOPs:
+
+```text
+Family Registration
+
+Duplicate Review
+
+Household Head Change
+
+Person Death
+
+Membership Transfer
+
+Document Verification
+
+Change Request Review
+
+Sensitive Export
+
+Account Recovery
+```
+
+---
+
+# 89. Data Quality
+
+Data quality monitoring should include:
+
+```text
+Missing National IDs where expected
+
+Potential duplicate National IDs
+
+Potential duplicate Persons
+
+Families without Household Head
+
+Families with invalid membership state
+
+Missing current residence
+
+Invalid date relationships
+
+Unverified records
+```
+
+---
+
+# 90. Data Quality Dashboard
+
+A Staff Data Quality view may eventually show:
+
+```text
+Missing Required Data
+
+Duplicate Candidates
+
+Unverified Records
+
+Families Requiring Head Review
+
+Incomplete Assessments
+
+Invalid/Expired Documents
+```
+
+---
+
+# 91. Technical Debt Rule
+
+Technical debt may be accepted deliberately.
+
+It must not compromise:
+
+```text
+Security
+
+Canonical Data Integrity
+
+Authorization
+
+Auditability
+
+Historical Integrity
+```
+
+---
+
+# 92. Deferred Features
+
+Unless separately approved, defer:
+
+```text
+Native mobile application
+
+Public self-registration
+
+External public API
+
+Automated Person merging
+
+AI-driven eligibility decisions
+
+Complex workflow builder
+
+Multi-tenant SaaS architecture
+
+Advanced analytics warehouse
+
+Real-time WebSocket architecture
+
+Redis dependency without measured need
+```
+
+---
+
+# 93. Future PWA
+
+The Next.js Family Portal may later support PWA capabilities.
+
+Possible features:
+
+```text
+Installability
+
+Offline shell
+
+Cached safe read views
+
+Background synchronization where appropriate
+```
+
+Sensitive offline data requires separate security review.
+
+---
+
+# 94. Future Mobile Application
+
+Because Laravel provides an API-first backend, a future mobile application can reuse authorized domain APIs.
+
+Mobile requirements must not weaken current web security architecture.
+
+---
+
+# 95. External Integrations
+
+Potential future integrations:
+
+```text
+SMS
+
+Email
+
+Identity verification
+
+External assistance systems
+
+Data exchange APIs
+```
+
+All integrations require explicit security and data-sharing review.
+
+---
+
+# 96. Architecture Decision Discipline
+
+Significant changes should be documented before becoming accidental architecture.
+
+Examples:
+
+```text
+Switch authentication strategy
+
+Introduce Redis
+
+Introduce object storage
+
+Add representative accounts
+
+Introduce mobile API tokens
+
+Introduce external API
+
+Change Family membership model
+```
+
+---
+
+# 97. Roadmap Dependencies
+
+Important dependencies:
+
+```text
+Family Portal
+depends on
+Family User Identity
++
+Authorization
++
+Registry
+
+Change Requests
+depend on
+Workflows
++
+Domain Actions
++
+Family Portal Identity
+
+Executive Dashboard
+depends on
+Stable canonical data
+
+Sensitive exports
+depend on
+Authorization
++
+Audit
+
+Pilot
+depends on
+Security
++
+UAT
++
+Backup
+```
+
+---
+
+# 98. What Must Not Happen
+
+Do not:
+
+```text
+Build the whole UI before APIs exist
+
+Use Filament as the Staff Application
+
+Allow frontend direct database access
+
+Duplicate business logic in Next.js
+
+Allow Family Users direct canonical CRUD
+
+Return unrestricted Eloquent Models
+
+Store auth tokens in localStorage
+
+Make sensitive storage public
+
+Auto-merge duplicate Persons
+
+Store derived counts as canonical truth
+
+Skip Policies because buttons are hidden
+
+Skip transactions for multi-record operations
+
+Import real data directly without validation
+
+Commit real Family data to Git
+```
+
+---
+
+# 99. Recommended First Implementation Slice
+
+After documentation is synchronized, the first technical slice should be:
+
+```text
+Laravel 12
+    +
+PostgreSQL
+    +
+/api/v1
+    +
+Sanctum
+    +
+Spatie Permission
+    +
+Next.js
+    +
+Authentication
+    +
+Famboook App Shell
+```
+
+Then:
+
+```text
+Family
+    ↓
+Person
+    ↓
+Membership
+    ↓
+Household Head
+    ↓
+Residence
+```
+
+This establishes the core registry before secondary domains.
+
+---
+
+# 100. Recommended First User Journey
+
+The first complete Staff journey should be:
+
+```text
+Login
+  ↓
+Dashboard
+  ↓
+Create Family
+  ↓
+Create / Find Household Head
+  ↓
+Assign Household Head
+  ↓
+Add Family Members
+  ↓
+Set Relationships
+  ↓
+Add Current Residence
+  ↓
+Open Family Profile
+```
+
+This journey validates most core architectural decisions early.
+
+---
+
+# 101. Recommended Second User Journey
+
+```text
+Staff Login
+  ↓
+Search Family
+  ↓
+Open Family
+  ↓
+Change Residence
+  ↓
+Old Residence preserved
+  ↓
+New Residence becomes current
+  ↓
+Audit visible
+```
+
+This validates historical data and Domain Actions.
+
+---
+
+# 102. Recommended Third User Journey
+
+```text
+Verified Family User Login
+  ↓
+Open Family Portal
+  ↓
+View permitted Family data
+  ↓
+Submit Contact Update
+  ↓
+Staff Review
+  ↓
+Approve
+  ↓
+Apply
+  ↓
+Canonical data updated
+  ↓
+Family User sees final status
+```
+
+This validates the complete self-service architecture.
+
+---
+
+# 103. Recommended Fourth User Journey
+
+```text
+Family User
+  ↓
+Submit Death Report
+  ↓
+Staff Review
+  ↓
+Approval
+  ↓
+RecordPersonDeathAction
+  ↓
+Household Head Review if applicable
+  ↓
+Family access reevaluated
+```
+
+This validates high-impact workflow behavior.
+
+---
+
+# 104. Phase Completion Discipline
+
+Do not interpret the roadmap as:
+
+```text
+Finish every detail of Phase N
+before touching any code in Phase N+1
+```
+
+Some work may overlap.
+
+However, dependencies must remain respected.
+
+Example:
+
+The Design System may continue evolving while Registry screens are built.
+
+But Family Portal self-service must not bypass an unfinished authorization foundation.
+
+---
+
+# 105. Roadmap Invariants
 
 ```text
 RM-INV-001
-Person identity is independent from Family membership.
+Laravel remains the authoritative backend.
 
 RM-INV-002
-Family Membership is the canonical Family-Person association.
+PostgreSQL remains the canonical persistent database.
 
 RM-INV-003
-Historical memberships are preserved.
+Next.js is the primary product frontend.
 
 RM-INV-004
-Family Portal never directly modifies canonical registry data.
+Staff operational interfaces are custom Next.js interfaces.
 
 RM-INV-005
-Change Requests apply through approved Domain Actions.
+Family Portal is a custom Next.js interface.
 
 RM-INV-006
-Authorization is implemented before sensitive features are exposed.
+Executive Dashboard is a custom Next.js interface.
 
 RM-INV-007
-Audit is implemented alongside critical data operations.
+Filament is restricted to System / High Administration.
 
 RM-INV-008
-Automated testing occurs throughout development.
+All interfaces reuse the same Laravel domain layer.
 
 RM-INV-009
-Family Portal authorization derives from verified relationships.
+Business rules are not duplicated as authoritative frontend logic.
 
 RM-INV-010
-Sensitive data is denied by default.
+Authorization is implemented before sensitive operational functionality.
 
 RM-INV-011
-Documents remain private.
+The Design System begins before broad UI implementation.
 
 RM-INV-012
-Duplicate Persons are never automatically merged.
+Family and Person core domains precede secondary case-management domains.
 
 RM-INV-013
-Derived statistics come from canonical data.
+Family User identity precedes Family Portal mutation functionality.
 
 RM-INV-014
-Paper form structure does not define database structure.
+Family Portal canonical changes use Change Requests.
 
 RM-INV-015
-No fixed limit exists for digital Family members.
+Sensitive files remain private.
 
 RM-INV-016
-Workflow transitions are enforced server-side.
+Audit is implemented alongside critical features.
 
 RM-INV-017
-APPROVED and APPLIED remain distinct for Change Requests.
+Real data is not committed to source control.
 
 RM-INV-018
-Family User and Staff authorization remain separated.
+Critical workflows are tested before production.
 
 RM-INV-019
-Production follows successful security validation and UAT.
+Security hardening occurs before production rollout.
 
 RM-INV-020
-Full rollout follows controlled pilot.
+A pilot occurs before full production rollout.
+
+RM-INV-021
+Frontend applications never directly access PostgreSQL.
+
+RM-INV-022
+API contracts are versioned under /api/v1.
+
+RM-INV-023
+Laravel remains authoritative for validation.
+
+RM-INV-024
+Redis is introduced only when justified.
+
+RM-INV-025
+Executive reporting does not replace operational authorization.
+
+RM-INV-026
+Deployment must include backup and restore capability.
+
+RM-INV-027
+RTL is tested throughout implementation.
+
+RM-INV-028
+Family Portal is designed for mobile usability.
+
+RM-INV-029
+Imports do not directly bypass the domain layer.
+
+RM-INV-030
+Production releases require security and test gates.
 ```
 
 ---
 
-# 171. Approved Roadmap Decisions
+# 106. Approved Roadmap Decisions
 
 ### RM-ADR-001
-
-Implementation is phased rather than built as one monolithic release.
+Famboook uses an API-first implementation strategy.
 
 ### RM-ADR-002
-
-Laravel and PostgreSQL form the V1 backend foundation.
+Laravel 12 is the authoritative backend.
 
 ### RM-ADR-003
-
-Filament is the initial Staff Portal direction.
+PostgreSQL 16+ is the primary database.
 
 ### RM-ADR-004
-
-A dedicated Next.js frontend is not required for initial V1.
+Next.js + React + TypeScript is the primary frontend.
 
 ### RM-ADR-005
-
-Core Registry is implemented before Case Management.
+Tailwind CSS + shadcn/ui + Radix UI form the UI foundation.
 
 ### RM-ADR-006
-
-Staff operational workflows are implemented before Family self-service.
+Famboook maintains its own Design System.
 
 ### RM-ADR-007
-
-Family Portal is part of V1.
+Staff operations use custom Next.js interfaces.
 
 ### RM-ADR-008
-
-Change Requests are part of V1.
+Executive dashboards use custom Next.js interfaces.
 
 ### RM-ADR-009
-
-User-Person identity linking precedes Family Portal access.
+Family Portal uses custom Next.js interfaces.
 
 ### RM-ADR-010
-
-Family Portal uses existing canonical Domain Actions.
+Filament is restricted to System / High Administration.
 
 ### RM-ADR-011
-
-Security testing is a dedicated phase but security is implemented throughout development.
+Laravel Sanctum provides first-party web authentication.
 
 ### RM-ADR-012
-
-Testing occurs during every phase.
+Spatie Permission provides RBAC.
 
 ### RM-ADR-013
-
-Pilot precedes broad production rollout.
+Laravel Policies provide object authorization.
 
 ### RM-ADR-014
-
-Real personal data is not committed to Git.
+Domain Actions contain important business operations.
 
 ### RM-ADR-015
-
-Private file storage is established from the foundation.
+The API is versioned under `/api/v1`.
 
 ### RM-ADR-016
-
-Reports use canonical data.
+TanStack Query manages frontend server state.
 
 ### RM-ADR-017
-
-Imports do not bypass domain rules.
+React Hook Form + Zod provide frontend form UX.
 
 ### RM-ADR-018
-
-Sensitive exports are permission-controlled and audited.
+Laravel remains authoritative for validation.
 
 ### RM-ADR-019
-
-Arabic and RTL are first-class requirements.
+Private storage is used for sensitive documents.
 
 ### RM-ADR-020
+Redis is not required for the initial architecture.
 
-Family Portal should be mobile-friendly and low-bandwidth aware.
+### RM-ADR-021
+Reference/system administration may use Filament.
 
----
+### RM-ADR-022
+Core Registry is implemented before Family self-service.
 
-# 172. Remaining Pre-Implementation Decisions
+### RM-ADR-023
+Family User identity is implemented before Family Portal mutation.
 
-Before or during the relevant phase, finalize:
+### RM-ADR-024
+Change Requests mediate Family User canonical changes.
 
-```text
-Family Code exact format
+### RM-ADR-025
+Operational and Executive dashboards remain separate from Filament.
 
-Person Code exact format
+### RM-ADR-026
+Audit is implemented incrementally with domain features.
 
-National ID exact validation
+### RM-ADR-027
+Search and duplicate management are explicit product capabilities.
 
-Reference vocabularies
+### RM-ADR-028
+Imports use validation/staging before canonical application.
 
-Family User activation method
+### RM-ADR-029
+Exports require dedicated authorization.
 
-Family User login identifier
+### RM-ADR-030
+Security hardening occurs before pilot/production.
 
-OTP requirements
+### RM-ADR-031
+A controlled pilot precedes full rollout.
 
-Household Head-only policy confirmation
+### RM-ADR-032
+Initial deployment uses separate app/API/admin hosts.
 
-Multiple Family User policy
+### RM-ADR-033
+Production PostgreSQL is not publicly exposed.
 
-Sensitive Family Portal field visibility
+### RM-ADR-034
+RTL is a first-class implementation requirement.
 
-Change Request risk matrix
+### RM-ADR-035
+Low-bandwidth performance is a first-class implementation concern.
 
-Reviewer / Approver separation
+### RM-ADR-036
+Development and demo environments use synthetic data.
 
-Approver / Applier separation
+### RM-ADR-037
+CI should be introduced during foundation work.
 
-Initial request types
+### RM-ADR-038
+Staging must test the real authentication/subdomain architecture.
 
-Document evidence requirements
+### RM-ADR-039
+MVP delivery is divided into Registry, Case Management, and Family Self-Service.
 
-Notification channels
-
-Backup retention
-
-Deployment environment
-```
-
-These decisions do not all block Phase 1.
-
-They must be resolved before the affected feature is implemented.
-
----
-
-# 173. Immediate Next Development Step
-
-After this roadmap is approved:
-
-```text
-Documentation Phase
-        ↓
-COMPLETE
-```
-
-Then begin:
-
-```text
-PHASE 0
-Architecture Baseline Review
-```
-
-followed immediately by:
-
-```text
-PHASE 1
-Laravel Foundation
-```
-
-The first implementation work should therefore be:
-
-```text
-1. Review project repository
-
-2. Confirm Laravel/PHP/PostgreSQL environment
-
-3. Create backend Laravel application
-
-4. Configure PostgreSQL
-
-5. Configure environment files
-
-6. Configure Arabic/RTL baseline
-
-7. Configure private storage
-
-8. Configure queues
-
-9. Configure testing
-
-10. Commit clean foundation
-```
-
-Do not begin with:
-
-```text
-Family UI
-
-Dashboard charts
-
-Family Portal screens
-
-Change Request forms
-```
-
-before the underlying architecture exists.
-
----
-
-# 174. Project Status After Roadmap Approval
-
-```text
-DISCOVERY
-    ✓
-
-PRODUCT DEFINITION
-    ✓
-
-DATA DICTIONARY
-    ✓
-
-BUSINESS RULES
-    ✓
-
-DATABASE ARCHITECTURE
-    ✓
-
-WORKFLOWS
-    ✓
-
-PERMISSIONS
-    ✓
-
-IMPLEMENTATION ROADMAP
-    ✓
-
-        ↓
-
-DEVELOPMENT
+### RM-ADR-040
+Native mobile and advanced integrations remain post-V1 unless separately approved.
 ```
 
 ---
 
-# 175. Document Status
+# 107. Pending Roadmap Decisions
+
+```text
+PRM-001
+Exact local development environment for PostgreSQL.
+
+PRM-002
+Exact production hosting provider.
+
+PRM-003
+Exact Next.js hosting/runtime strategy.
+
+PRM-004
+Exact Laravel hosting/runtime strategy.
+
+PRM-005
+Exact PostgreSQL hosting strategy.
+
+PRM-006
+Exact private file storage provider.
+
+PRM-007
+Exact queue driver at launch.
+
+PRM-008
+Exact session driver at launch.
+
+PRM-009
+Whether Redis is required at launch.
+
+PRM-010
+Exact CI/CD provider and workflow.
+
+PRM-011
+Exact staging domain names.
+
+PRM-012
+Exact production backup schedule.
+
+PRM-013
+Exact monitoring platform.
+
+PRM-014
+Exact error tracking platform.
+
+PRM-015
+Exact log retention.
+
+PRM-016
+Exact 2FA implementation and rollout.
+
+PRM-017
+Exact initial pilot Family count.
+
+PRM-018
+Exact legacy/paper migration volume.
+
+PRM-019
+Exact initial Staff user count.
+
+PRM-020
+Exact training plan.
+
+PRM-021
+Exact production rollout batches.
+
+PRM-022
+Exact Family Portal launch timing relative to Staff Registry.
+
+PRM-023
+Exact notification channels at launch.
+
+PRM-024
+Whether PWA capabilities are part of V1 or post-V1.
+
+PRM-025
+Exact end-to-end testing framework.
+
+PRM-026
+Exact frontend unit/component testing framework.
+
+PRM-027
+Exact deployment rollback strategy.
+
+PRM-028
+Exact disaster-recovery targets.
+
+PRM-029
+Exact accessibility target level.
+
+PRM-030
+Exact performance SLAs.
+```
+
+---
+
+# 108. Immediate Next Steps
+
+After the documentation set is synchronized:
+
+```text
+1. Finalize 00-PROJECT-CONTEXT.md
+
+2. Commit documentation baseline
+
+3. Create Laravel 12 project in backend/
+
+4. Create Next.js project in frontend/
+
+5. Configure PostgreSQL
+
+6. Establish /api/v1
+
+7. Configure Sanctum
+
+8. Configure Spatie Permission
+
+9. Build authentication baseline
+
+10. Establish frontend App Shell
+
+11. Establish Famboook Design System foundation
+
+12. Implement Family / Person core
+```
+
+---
+
+# 109. Current Project Position
+
+At the end of this document update:
+
+```text
+Requirements
+      ✓
+
+Product Definition
+      ✓
+
+Data Dictionary
+      ✓
+
+Business Rules
+      ✓
+
+Database Architecture
+      ✓
+
+Workflows
+      ✓
+
+Permissions
+      ✓
+
+Roadmap
+      ✓
+
+Project Context Sync
+      ↓
+NEXT
+```
+
+No production implementation should begin before the final Project Context synchronization is completed.
+
+---
+
+# 110. Final Roadmap Principle
+
+Famboook will not be built as:
+
+```text
+Database
+   ↓
+Generic Admin Panel
+   ↓
+More Screens
+```
+
+It will be built as:
+
+```text
+Domain
+   ↓
+Business Rules
+   ↓
+Secure Laravel Core
+   ↓
+PostgreSQL
+   ↓
+Versioned API
+   ↓
+Famboook Design System
+   ↓
+Purpose-Built Next.js Experiences
+```
+
+The result should feel like a coherent product, not a collection of CRUD pages.
+
+---
+
+# 111. Document Status
 
 ```text
 Project: Famboook
 Document: Implementation Roadmap
-Version: 1.1
+Version: 1.2
 Status: APPROVED
 Date: 2026-09-22
 ```
 
 ---
 
-# 176. Change Log
+# 112. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap before full Family Portal architecture |
-| 1.1 | 2026-09-22 | Approved | Integrated Family User identity, Family Portal, Change Requests, authorization, workflow application, security testing, pilot strategy, phase dependencies, milestone structure, and production rollout |
-
----
-
-# 177. Final Roadmap
-
-```text
-PHASE 0
-Architecture Baseline
-        ↓
-PHASE 1
-Laravel Foundation
-        ↓
-PHASE 2
-Authentication & RBAC
-        ↓
-PHASE 3
-Reference Data
-        ↓
-PHASE 4
-Family & Person Registry
-        ↓
-PHASE 5
-Memberships & Relationships
-        ↓
-PHASE 6
-Residence & Source Forms
-        ↓
-PHASE 7
-Staff Data Entry
-        ↓
-PHASE 8
-Verification & Approval
-        ↓
-PHASE 9
-Health / Disability / Education / Employment
-        ↓
-PHASE 10
-Assessments
-        ↓
-PHASE 11
-Needs & Assistance
-        ↓
-PHASE 12
-Documents & Case Notes
-        ↓
-PHASE 13
-Family User Identity & Access
-        ↓
-PHASE 14
-Family Portal
-        ↓
-PHASE 15
-Change Requests
-        ↓
-PHASE 16
-Search & Duplicate Management
-        ↓
-PHASE 17
-Reports & Dashboard
-        ↓
-PHASE 18
-Import & Export
-        ↓
-PHASE 19
-Security Hardening
-        ↓
-PHASE 20
-Testing & UAT
-        ↓
-PHASE 21
-Deployment & Pilot
-        ↓
-PHASE 22
-Production Rollout
-```
-
----
-
-# 178. Development Start Point
-
-The documentation baseline is complete.
-
-Development starts from:
-
-```text
-Phase 0
-→ Architecture Baseline Review
-```
-
-then:
-
-```text
-Phase 1
-→ Laravel Foundation
-```
-
-Every subsequent implementation step must reference this roadmap and the relevant architecture document before development begins.
+| 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
+| 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2 | 2026-09-22 | Approved | Replaced Filament-first operational architecture with API-first Laravel + custom Next.js Staff/Executive/Family applications, restricted Filament to System Administration, introduced frontend/design-system foundations, revised implementation phases, MVP strategy, deployment topology, security gates and vertical delivery approach |
