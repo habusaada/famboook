@@ -1,12 +1,11 @@
 # Famboook
-## Permissions & Access Control
+## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.1  
+**Version:** 1.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
-**Project:** Famboook — Family Registry & Case Management System  
-**Authorization Model:** RBAC + Data Scope + Field-Level Access + Workflow State
+**Project:** Famboook — Family Registry & Case Management System
 
 ---
 
@@ -14,112 +13,118 @@
 
 This document defines the authorization and access-control architecture for Famboook.
 
-It specifies:
+It defines:
 
-```text
-Who may access the system
+- Authentication vs authorization
+- Roles
+- Permissions
+- Data scopes
+- Object-level authorization
+- Field-level authorization
+- Workflow-aware authorization
+- Family Portal authorization
+- User-Person linking
+- Staff authorization
+- System Administration authorization
+- Sensitive-data access
+- API authorization
+- File authorization
+- Export authorization
+- Testing requirements
 
-What each role may do
-
-Which records each user may access
-
-Which fields each user may see
-
-Which workflow transitions each user may perform
-
-How Family Users access their Family
-
-How sensitive data is protected
-
-How Change Requests are authorized
-
-How Staff and Family Portal permissions remain separated
-```
-
-This document applies to:
-
-```text
-Staff Portal
-Family Portal
-Filament
-Future API
-Future Frontend
-Reports
-Exports
-Documents
-Workflow Actions
-```
+The goal is to ensure that every actor sees and performs only what they are explicitly authorized to access.
 
 ---
 
-# 2. Authorization Principles
+# 2. Authorization Authority
 
-Famboook follows these authorization principles:
+Laravel is the authoritative authorization layer.
+
+All application interfaces must use the same authorization model.
 
 ```text
-Deny by Default
-
-Least Privilege
-
-Explicit Permissions
-
-Server-Side Enforcement
-
-Data Scope Enforcement
-
-Field-Level Protection
-
-Workflow-Aware Authorization
-
-Sensitive Data Protection
-
-Separation of Duties
-
-No Shared Accounts
-
-Audit Critical Actions
-
-Family Users Never Receive Staff Privileges
-
-Family Portal Access Is Relationship-Based
+Next.js Staff Application
+        │
+        ▼
+Laravel API
+        │
+        ▼
+Policies + Permissions + Data Scope
+        │
+        ▼
+Domain Actions
 ```
+
+```text
+Next.js Family Portal
+        │
+        ▼
+Laravel API
+        │
+        ▼
+Policies + Family Access Policy
+        │
+        ▼
+Domain Actions
+```
+
+```text
+Filament System Administration
+        │
+        ▼
+Laravel
+        │
+        ▼
+Policies + Permissions
+        │
+        ▼
+Domain Actions
+```
+
+No interface defines an independent authorization system.
 
 ---
 
-# 3. Authorization Architecture
+# 3. Authorization Model
 
-Authorization is not determined by Role alone.
+Famboook authorization is not based on roles alone.
 
-The effective authorization model is:
+For Staff:
 
 ```text
 ROLE
-  +
++
 PERMISSION
-  +
++
 DATA SCOPE
-  +
++
+OBJECT ACCESS
++
 FIELD ACCESS
-  +
++
 WORKFLOW STATE
-  +
++
 DOMAIN RULES
 ```
 
-For Family Portal:
+For Family Users:
 
 ```text
 FAMILY_USER
-  +
++
 ACTIVE USER-PERSON LINK
-  +
++
 ACTIVE FAMILY MEMBERSHIP
-  +
++
 FAMILY ACCESS POLICY
-  +
++
+OBJECT ACCESS
++
 FIELD ACCESS
-  +
++
 WORKFLOW STATE
++
+DOMAIN RULES
 ```
 
 ---
@@ -129,2389 +134,152 @@ WORKFLOW STATE
 Authentication answers:
 
 ```text
-Who is this User?
+Who are you?
 ```
 
 Authorization answers:
 
 ```text
-What may this User do?
+What are you allowed to do?
 ```
 
-Registry identity answers:
+A successfully authenticated user is not automatically authorized to access a Family, Person, Document, or workflow action.
+
+Therefore:
 
 ```text
-Which Person does this User represent?
+Authenticated
+≠
+Authorized
 ```
-
-These concepts must remain separate.
 
 ---
 
-# 5. User vs Person
+# 5. Authentication Identity vs Registry Identity
 
-Famboook intentionally separates:
+Famboook separates:
 
 ```text
-users
+User
 ```
 
 from:
 
 ```text
-persons
-```
-
-Meaning:
-
-```text
-User
-=
-Authentication Identity
-
 Person
-=
-Registry Identity
 ```
 
-A Staff User may exist without a Person record.
+`users` represent authentication identities.
 
-A Family User normally requires an approved link to a Person.
+`persons` represent people in the Family Registry.
 
----
-
-# 6. Authorization Technology
-
-Recommended Laravel authorization stack:
-
-```text
-spatie/laravel-permission
-
-Laravel Policies
-
-Laravel Gates
-
-Query Scopes
-
-Domain Actions / Services
-
-API Resources / DTOs
-```
-
-Filament must use the same authorization layer.
+They are not the same entity.
 
 ---
 
-# 7. Role-Based Access Control
+# 6. User-Person Link
 
-Initial roles:
-
-```text
-SUPER_ADMIN
-
-ADMINISTRATOR
-
-DATA_ENTRY
-
-REVIEWER
-
-SOCIAL_WORKER
-
-REPORTS_VIEWER
-
-FAMILY_USER
-```
-
----
-
-# 8. Role Labels
-
-Suggested Arabic labels:
-
-```text
-SUPER_ADMIN
-مدير النظام الأعلى
-
-ADMINISTRATOR
-مدير النظام
-
-DATA_ENTRY
-مدخل بيانات
-
-REVIEWER
-مدقق / مراجع
-
-SOCIAL_WORKER
-باحث / أخصائي اجتماعي
-
-REPORTS_VIEWER
-مستخدم التقارير
-
-FAMILY_USER
-مستخدم الأسرة / رب الأسرة
-```
-
-The Arabic label for `FAMILY_USER` may later be adjusted according to the final policy if authorized representatives are supported.
-
----
-
-# 9. SUPER_ADMIN
-
-Purpose:
-
-```text
-Technical/system-level administration.
-```
-
-May include:
-
-```text
-System configuration
-Role management
-Permission management
-User administration
-Reference data administration
-Emergency troubleshooting
-Full technical access where required
-```
-
-Use very few accounts.
-
----
-
-# 10. SUPER_ADMIN Rule
-
-`SUPER_ADMIN` must not become a routine operational role.
-
-Recommended:
-
-```text
-1–2 controlled accounts
-```
-
-with stronger security requirements.
-
----
-
-# 11. ADMINISTRATOR
-
-Purpose:
-
-```text
-Operational administration and high-level business control.
-```
-
-Typical responsibilities:
-
-```text
-Approve records
-Manage operational users
-Manage selected reference data
-Handle exceptional workflow actions
-Review high-risk Change Requests
-Apply high-risk approved changes
-Review audit information
-```
-
-Administrator is not automatically equivalent to unrestricted technical access.
-
----
-
-# 12. DATA_ENTRY
-
-Purpose:
-
-```text
-Enter and correct registry data.
-```
-
-Typical capabilities:
-
-```text
-Create Family
-Create Person
-Add Family Member
-Create Residence
-Enter assessments
-Upload source documents
-Submit forms
-Correct returned forms
-```
-
-Normally cannot:
-
-```text
-Verify own submission
-Approve
-Manage users
-Manage roles
-Manage permissions
-Merge Persons
-Access unrestricted audit
-Perform unrestricted sensitive exports
-```
-
----
-
-# 13. REVIEWER
-
-Purpose:
-
-```text
-Review and verify submitted records.
-```
-
-Typical capabilities:
-
-```text
-View submitted records
-Review source forms
-Review duplicate warnings
-Return for correction
-Verify forms
-Review Change Requests
-Return Change Requests for clarification
-Verify supporting documents
-```
-
-Normally cannot:
-
-```text
-Final approve high-risk operations
-Manage users
-Manage roles
-Manage permissions
-```
-
----
-
-# 14. SOCIAL_WORKER
-
-Purpose:
-
-```text
-Case management and follow-up.
-```
-
-Typical capabilities:
-
-```text
-View assigned/authorized Families
-View relevant Persons
-Create assessments
-Manage needs
-Record assistance
-Create case notes
-Create person notes
-Review relevant documents
-```
-
-Sensitive access depends on approved operational need.
-
----
-
-# 15. REPORTS_VIEWER
-
-Purpose:
-
-```text
-Reporting and aggregate analysis.
-```
-
-Typical capabilities:
-
-```text
-Dashboard
-Aggregate reports
-Demographic reports
-Needs reports
-Assistance reports
-Approved exports
-```
-
-By default:
-
-```text
-No unrestricted National IDs
-
-No unrestricted confidential notes
-
-No unrestricted identity documents
-
-No unrestricted person-level health details
-```
-
----
-
-# 16. FAMILY_USER
-
-Purpose:
-
-```text
-Allow an authorized Family representative to securely access Family Portal.
-```
-
-Typical V1 capabilities:
-
-```text
-View own authorized Family
-
-View permitted Family members
-
-View permitted Family information
-
-View permitted current residence
-
-View own Change Requests
-
-Create Change Requests
-
-Submit Change Requests
-
-Respond to clarification
-
-Resubmit Change Requests
-
-Upload supporting documents
-
-View Family-visible request decisions
-
-Receive notifications
-```
-
-Family User does not receive direct Staff Portal access.
-
----
-
-# 17. FAMILY_USER Is Not a Staff Role
-
-`FAMILY_USER` must never implicitly inherit:
-
-```text
-DATA_ENTRY
-REVIEWER
-SOCIAL_WORKER
-ADMINISTRATOR
-```
-
-permissions.
-
-Family Portal permissions are explicitly assigned.
-
----
-
-# 18. Family User Canonical Update Rule
-
-Family User must not directly modify canonical registry tables such as:
-
-```text
-families
-
-persons
-
-family_memberships
-
-family_residences
-
-person_health_conditions
-
-person_disabilities
-
-person_education
-
-person_employment
-```
-
-Canonical changes are proposed through:
-
-```text
-change_requests
-```
-
-and applied through controlled domain actions after approval.
-
----
-
-# 19. Permission Naming Convention
-
-Use:
-
-```text
-<resource>.<action>
-```
-
-Examples:
-
-```text
-family.view
-
-person.update
-
-form.verify
-
-change_request.submit
-
-document.verify
-```
-
-Permission names should remain stable.
-
----
-
-# 20. Family Permissions
-
-```text
-family.view
-
-family.create
-
-family.update
-
-family.archive
-
-family.restore
-
-family.change_head
-
-family.view_history
-```
-
----
-
-# 21. Person Permissions
-
-```text
-person.view
-
-person.create
-
-person.update
-
-person.archive
-
-person.restore
-
-person.view_history
-
-person.transfer_family
-```
-
----
-
-# 22. Membership Permissions
-
-```text
-membership.view
-
-membership.create
-
-membership.update
-
-membership.end
-
-membership.change_relationship
-
-membership.view_history
-```
-
----
-
-# 23. Residence Permissions
-
-```text
-residence.view
-
-residence.create
-
-residence.update
-
-residence.close
-
-residence.view_history
-```
-
----
-
-# 24. Health Permissions
-
-```text
-health.view
-
-health.create
-
-health.update
-
-health_condition.view
-
-health_condition.create
-
-health_condition.update
-
-health_condition.end
-```
-
-Health data is:
-
-```text
-RESTRICTED
-```
-
----
-
-# 25. Disability Permissions
-
-```text
-disability.view
-
-disability.create
-
-disability.update
-
-disability.end
-```
-
-Disability data is:
-
-```text
-RESTRICTED
-```
-
----
-
-# 26. Education Permissions
-
-```text
-education.view
-
-education.create
-
-education.update
-
-education.end
-
-education.view_history
-```
-
----
-
-# 27. Employment Permissions
-
-```text
-employment.view
-
-employment.create
-
-employment.update
-
-employment.end
-
-employment.view_history
-```
-
----
-
-# 28. Assessment Permissions
-
-```text
-assessment.view
-
-assessment.create
-
-assessment.update
-
-assessment.complete
-
-assessment.review
-
-assessment.verify
-
-assessment.view_history
-```
-
----
-
-# 29. Form Permissions
-
-```text
-form.view
-
-form.create
-
-form.update
-
-form.submit
-
-form.send_to_review
-
-form.review
-
-form.return
-
-form.correct
-
-form.resubmit
-
-form.verify
-
-form.approve
-
-form.archive
-
-form.view_history
-
-form.view_source
-```
-
----
-
-# 30. Need Permissions
-
-```text
-need.view
-
-need.create
-
-need.update
-
-need.verify
-
-need.activate
-
-need.mark_partially_met
-
-need.mark_met
-
-need.close
-
-need.view_history
-```
-
----
-
-# 31. Assistance Permissions
-
-```text
-assistance.view
-
-assistance.create
-
-assistance.update
-
-assistance.void
-
-assistance.view_history
-```
-
-Assistance records should not normally be physically deleted.
-
----
-
-# 32. Document Permissions
-
-```text
-document.view
-
-document.upload
-
-document.update_metadata
-
-document.verify
-
-document.replace
-
-document.archive
-
-document.download
-```
-
----
-
-# 33. Note Permissions
-
-```text
-person_note.view
-
-person_note.create
-
-case_note.view
-
-case_note.create
-
-confidential_note.view
-
-confidential_note.create
-```
-
----
-
-# 34. National ID Permissions
-
-National ID receives dedicated permissions:
-
-```text
-national_id.view
-
-national_id.view_full
-
-national_id.update
-```
-
----
-
-# 35. National ID Visibility Modes
-
-Possible field-level modes:
-
-```text
-HIDDEN
-
-MASKED
-
-FULL
-```
-
-Example:
-
-```text
-804****32
-```
-
----
-
-# 36. Export Permissions
-
-```text
-export.basic
-
-export.personal_data
-
-export.sensitive_data
-```
-
-Export permission is separate from normal view permission.
-
----
-
-# 37. Report Permissions
-
-```text
-report.dashboard
-
-report.family
-
-report.demographics
-
-report.health
-
-report.needs
-
-report.assistance
-
-report.export
-```
-
----
-
-# 38. Audit Permissions
-
-```text
-audit.view
-
-audit.view_sensitive
-```
-
-Normal Family Users have neither.
-
----
-
-# 39. Workflow History Permission
-
-```text
-workflow_history.view
-```
-
-This refers to internal workflow history.
-
-Family User request history is exposed through dedicated Family Portal resources, not unrestricted workflow history.
-
----
-
-# 40. User Administration Permissions
-
-```text
-user.view
-
-user.create
-
-user.update
-
-user.activate
-
-user.deactivate
-
-user.reset_access
-```
-
----
-
-# 41. Role Permissions
-
-```text
-role.view
-
-role.create
-
-role.update
-
-role.delete
-```
-
----
-
-# 42. Permission Administration
-
-```text
-permission.view
-
-permission.assign
-```
-
-This is highly privileged.
-
----
-
-# 43. Reference Data Permissions
-
-```text
-reference.view
-
-reference.create
-
-reference.update
-
-reference.deactivate
-```
-
----
-
-# 44. System Settings Permissions
-
-```text
-system_settings.view
-
-system_settings.update
-```
-
----
-
-# 45. User-Person Link Permissions
-
-New V1 permissions:
-
-```text
-user_person_link.view
-
-user_person_link.create
-
-user_person_link.verify
-
-user_person_link.activate
-
-user_person_link.suspend
-
-user_person_link.end
-
-user_person_link.view_history
-```
-
-These are staff permissions.
-
-Family User cannot verify their own identity link.
-
----
-
-# 46. Family Portal Permissions
-
-Recommended Family Portal permissions:
-
-```text
-family_portal.access
-
-family_portal.family.view
-
-family_portal.member.view
-
-family_portal.residence.view
-
-family_portal.document.view
-
-family_portal.request.view
-
-family_portal.notification.view
-```
-
-These permissions are always subject to Family scope.
-
----
-
-# 47. Change Request Permissions
-
-Recommended:
-
-```text
-change_request.view
-
-change_request.create
-
-change_request.update_draft
-
-change_request.submit
-
-change_request.review
-
-change_request.return
-
-change_request.resubmit
-
-change_request.approve
-
-change_request.reject
-
-change_request.apply
-
-change_request.view_history
-
-change_request.view_internal_notes
-```
-
----
-
-# 48. Family User Change Request Permissions
-
-Recommended Family User bundle:
-
-```text
-change_request.view
-
-change_request.create
-
-change_request.update_draft
-
-change_request.submit
-
-change_request.resubmit
-```
-
-But these permissions are constrained to:
-
-```text
-Authorized Family
-+
-Allowed Request Types
-+
-Allowed Workflow States
-```
-
----
-
-# 49. Family User Cannot Review Own Request
-
-Family User never receives:
-
-```text
-change_request.review
-
-change_request.approve
-
-change_request.reject
-
-change_request.apply
-```
-
----
-
-# 50. Notification Permissions
-
-```text
-notification.view
-
-notification.mark_read
-```
-
-Staff notification administration, if later needed, should use separate permissions.
-
----
-
-# 51. Data Scope
-
-Role and Permission answer:
-
-```text
-What action may the User perform?
-```
-
-Data Scope answers:
-
-```text
-On which records?
-```
-
----
-
-# 52. Staff Data Scopes
-
-Recommended V1:
-
-```text
-ALL
-
-ASSIGNED
-
-CREATED_BY_ME
-```
-
-Future:
-
-```text
-REGION
-
-BRANCH
-
-TEAM
-
-CASELOAD
-```
-
-only when operational requirements justify them.
-
----
-
-# 53. Family Portal Data Scopes
-
-Family Portal introduces:
-
-```text
-SELF
-
-FAMILY
-```
-
----
-
-# 54. SELF Scope
-
-`SELF` means:
-
-```text
-The Person linked to the authenticated User.
-```
-
-Resolution:
+Family Portal access requires an explicit relationship:
 
 ```text
 User
-  ↓
+ ↓
+User-Person Link
+ ↓
+Person
+```
+
+A User-Person Link must be verified according to approved identity-verification rules.
+
+---
+
+# 7. Family Authorization Resolution
+
+Family Portal authorization is dynamically resolved:
+
+```text
+Authenticated User
+        ↓
 Active User-Person Link
-  ↓
-Person
-```
-
----
-
-# 55. FAMILY Scope
-
-`FAMILY` means:
-
-```text
-The Family reached through the linked Person's active Family Membership,
-subject to Family access policy.
-```
-
-Resolution:
-
-```text
-User
-  ↓
-Active User-Person Link
-  ↓
-Person
-  ↓
+        ↓
+Active Person
+        ↓
 Active Family Membership
-  ↓
-Family
+        ↓
+Family Access Policy
+        ↓
+Authorized Family
 ```
 
----
-
-# 56. Family Scope Is Dynamic
-
-Do not store canonical authorization as:
+The system must not rely on:
 
 ```text
 users.family_id
 ```
 
-Family scope must be resolved from current relationships.
-
-This allows:
-
-```text
-Person transfer
-
-Household Head change
-
-Membership ending
-
-Death
-
-Access suspension
-```
-
-to affect authorization correctly.
+as canonical Family authorization.
 
 ---
 
-# 57. FAMILY_USER Scope
+# 8. Authorization Technologies
 
-Recommended V1:
-
-```text
-FAMILY_USER
-→ SELF + authorized FAMILY
-```
-
-but field visibility differs between:
+The primary authorization implementation uses:
 
 ```text
-SELF
+Laravel Policies
+
+Laravel Gates where appropriate
+
+Spatie Laravel Permission
+
+Query/Data Scopes
+
+Domain Actions
+
+Laravel API Resources
 ```
 
-and:
-
-```text
-OTHER FAMILY MEMBER
-```
-
----
-
-# 58. Family Portal Household Head Rule
-
-Security-first V1 recommendation:
-
-Family-wide access requires:
-
-```text
-Active User
-
-Active User-Person Link
-
-Active Person
-
-Active Family Membership
-
-is_household_head = TRUE
-```
-
-unless a future approved representative model is enabled.
+Each mechanism has a different responsibility.
 
 ---
 
-# 59. Role Does Not Establish Family Scope
+# 9. Spatie Permission Responsibility
 
-This is invalid:
+Spatie Permission manages:
 
 ```text
-User has FAMILY_USER role
-→ therefore can access Family 510
-```
-
-Correct:
-
-```text
-FAMILY_USER role
-+
-family_portal.access
-+
-active User-Person link
-+
-active Membership
-+
-Household Head eligibility
-=
-authorized Family scope
-```
-
----
-
-# 60. ALL Scope
-
-`ALL` means:
-
-```text
-All records allowed by the permission and field rules.
-```
-
-It does not mean:
-
-```text
-All fields
-All sensitive information
-All workflow actions
-```
-
----
-
-# 61. ASSIGNED Scope
-
-Useful for:
-
-```text
-REVIEWER
-SOCIAL_WORKER
-```
-
-Examples:
-
-```text
-Assigned review requests
-
-Assigned cases
-
-Assigned Families
-```
-
----
-
-# 62. CREATED_BY_ME Scope
-
-Useful for:
-
-```text
-DATA_ENTRY
-```
-
-particularly for Draft records before submission.
-
----
-
-# 63. Scope Enforcement
-
-Scope must be enforced in database queries.
-
-Do not:
-
-```text
-Fetch all records
-then hide unauthorized records in UI.
-```
-
----
-
-# 64. Family Portal Object-Level Authorization
-
-Every Family Portal request must validate the target resource.
-
-Example:
-
-```text
-/family-portal/families/510
-```
-
-Server must verify:
-
-```text
-Family 510 belongs to authenticated Family scope.
-```
-
-Never trust route IDs.
-
----
-
-# 65. Person Object-Level Authorization
-
-Family User requesting:
-
-```text
-/persons/1825
-```
-
-must pass:
-
-```text
-Is SELF?
-or
-Is Person an authorized active member of FAMILY?
-```
-
-and then field-level restrictions are applied.
-
----
-
-# 66. Change Request Object Authorization
-
-Family User may view a Change Request only when:
-
-```text
-request.family_id
-=
-authorized Family
-```
-
-and request visibility policy allows it.
-
----
-
-# 67. Document Object Authorization
-
-Document access must check:
-
-```text
-Document Context
-
-Family Scope
-
-Person Scope
-
-Change Request Scope
-
-Document Type
-
-Sensitivity
-
-Download Permission
-```
-
-Possession of a file URL is never authorization.
-
----
-
-# 68. Field-Level Access
-
-Record access does not imply access to every field.
-
-Example:
-
-```text
-Family User may view Person
-```
-
-does not imply:
-
-```text
-Family User may view Person National ID
-```
-
----
-
-# 69. Field Visibility Levels
-
-Recommended:
-
-```text
-FULL
-
-MASKED
-
-HIDDEN
-```
-
----
-
-# 70. Family User — Own Person Fields
-
-Recommended baseline for `SELF`:
-
-```text
-Person Code           FULL
-Full Name             FULL
-Gender                FULL
-Birth Date            FULL
-Life Status           FULL
-Mobile                FULL
-Alternate Mobile      FULL where applicable
-Marital Status        FULL
-National ID           MASKED by default
-Family Relationship   FULL
-```
-
-Full National ID may be shown only if explicitly approved.
-
----
-
-# 71. Family User — Other Member Fields
-
-Recommended baseline:
-
-```text
-Person Code           FULL
-Full Name             FULL
-Gender                FULL
-Birth Date            FULL or policy-controlled
-Life Status           FULL
-Relationship          FULL
-Mobile                HIDDEN by default
-National ID           HIDDEN by default
-Alternate Mobile      HIDDEN
-```
-
-This protects adult members from unnecessary disclosure.
-
----
-
-# 72. Minor Member Fields
-
-A Household Head may operationally need more information about dependent minors.
-
-However, V1 must not assume unrestricted access to every sensitive field.
-
-Specific minor/dependent visibility should be policy-controlled.
-
----
-
-# 73. Spouse Data
-
-Being Household Head does not automatically justify unrestricted access to all spouse-sensitive data.
-
-Default:
-
-```text
-Identity summary       Allowed
-
-National ID            Hidden/Masked
-
-Health                  Hidden unless explicitly approved
-
-Confidential Notes      Hidden
-```
-
----
-
-# 74. Health Data in Family Portal
-
-Default V1:
-
-```text
-Family User
-→ no unrestricted person-level health data
-```
-
-Possible future controlled views may include:
-
-```text
-SELF health data
-
-Dependent minor health data
-
-Selected household-level indicators
-```
-
-only after explicit policy approval.
-
----
-
-# 75. Disability Data in Family Portal
-
-Default:
-
-```text
-Restricted
-```
-
-Family User should not automatically receive unrestricted disability details for all members.
-
----
-
-# 76. Confidential Notes
-
-Always hidden from Family Portal:
-
-```text
-person_notes where confidential
-
-case_notes where confidential
-
-internal reviewer notes
-
-internal audit notes
-```
-
-unless a future explicit disclosure workflow is created.
-
----
-
-# 77. Internal Audit
-
-Family Users never receive:
-
-```text
-audit.view
-audit.view_sensitive
-```
-
-Family-facing history must use a dedicated safe representation.
-
----
-
-# 78. Internal Workflow Metadata
-
-Family Users do not receive unrestricted:
-
-```text
-workflow_events.metadata
-```
-
-They may receive simplified status history such as:
-
-```text
-Submitted
-Under Review
-Returned
-Approved
-Applied
-```
-
----
-
-# 79. Change Request Proposed Data
-
-Family User may view proposed data for their authorized request.
-
-Staff visibility depends on:
-
-```text
-Role
-Permission
-Request Type
-Sensitive Field Rules
-```
-
----
-
-# 80. Sensitive Change Request Payloads
-
-Examples:
-
-```text
-National ID correction
-
-Health-related correction
-
-Disability-related update
-```
-
-must receive field-level restrictions.
-
-Generic:
-
-```text
-change_request.view
-```
-
-must not automatically expose all sensitive JSON payload content.
-
----
-
-# 81. Request Type Authorization
-
-Not every Family User necessarily receives every Change Request type.
-
-Recommended type-specific authorization:
-
-```text
-change_request.contact.create
-
-change_request.residence.create
-
-change_request.person_correction.create
-
-change_request.add_member.create
-
-change_request.membership_change.create
-
-change_request.head_change.create
-
-change_request.birth.create
-
-change_request.death.create
-
-change_request.marriage.create
-
-change_request.document.create
-```
-
----
-
-# 82. Why Type-Specific Permissions
-
-This allows future policy such as:
-
-```text
-All Family Users
-→ Contact Update
-
-Verified Household Heads
-→ Add Member
-
-Verified Household Heads
-→ Birth Report
-
-Higher assurance
-→ Household Head Change
-```
-
-without redesigning the authorization system.
-
----
-
-# 83. Recommended Family User Request Permissions
-
-Initial V1 recommendation:
-
-```text
-change_request.contact.create
-
-change_request.residence.create
-
-change_request.person_correction.create
-
-change_request.add_member.create
-
-change_request.birth.create
-
-change_request.death.create
-
-change_request.marriage.create
-
-change_request.document.create
-```
-
-Potentially restricted initially:
-
-```text
-change_request.membership_change.create
-
-change_request.head_change.create
-```
-
-until workflow policy is finalized.
-
----
-
-# 84. Workflow-State Authorization
-
-Permission alone is not enough.
-
-Example:
-
-```text
-change_request.update_draft
-```
-
-works only when:
-
-```text
-status = DRAFT
-```
-
----
-
-# 85. Family User State Rules
-
-Family User may:
-
-```text
-DRAFT
-→ edit
-
-DRAFT
-→ submit
-
-RETURNED_FOR_CLARIFICATION
-→ provide clarification
-
-RETURNED_FOR_CLARIFICATION
-→ resubmit
-```
-
-Family User may not modify:
-
-```text
-UNDER_REVIEW
-
-APPROVED
-
-REJECTED
-
-APPLIED
-```
-
-except through explicitly permitted response workflows.
-
----
-
-# 86. Staff Change Request State Rules
-
-Reviewer:
-
-```text
-SUBMITTED
-→ UNDER_REVIEW
-
-UNDER_REVIEW
-→ RETURNED_FOR_CLARIFICATION
-
-UNDER_REVIEW
-→ recommended/authorized outcome
-```
-
-Approver:
-
-```text
-UNDER_REVIEW
-→ APPROVED
-
-UNDER_REVIEW
-→ REJECTED
-```
-
-Applier:
-
-```text
-APPROVED
-→ APPLIED
-```
-
-Exact separation depends on risk level and role policy.
-
----
-
-# 87. Maker-Checker
-
-For internal form workflow:
-
-```text
-Data Entry User
-≠
-Reviewer
-```
-
-where practical.
-
-For Family Change Requests:
-
-```text
-Family User
-≠
-Reviewer
-
-Family User
-≠
-Approver
-
-Family User
-≠
-Applier
-```
-
-always.
-
----
-
-# 88. Reviewer vs Approver
-
-For high-risk requests, recommended:
-
-```text
-Reviewer
-≠
-Approver
-```
-
-Examples:
-
-```text
-National ID correction
-
-Household Head change
-
-Membership transfer
-
-Death report
-```
-
-subject to staffing capacity.
-
----
-
-# 89. Approver vs Applier
-
-V1 may allow:
-
-```text
-Approver = Applier
-```
-
-for lower-risk requests.
-
-High-risk operations may later require separation.
-
-The system architecture must support both.
-
----
-
-# 90. Risk-Level Authorization
-
-Potential request levels:
-
-```text
-LOW
-MEDIUM
-HIGH
-```
-
-Risk may determine:
-
-```text
-Required evidence
-
-Reviewer role
-
-Approver role
-
-Application method
-
-Additional confirmation
-```
-
----
-
-# 91. Low-Risk Example
-
-Possible:
-
-```text
-Contact Update
-```
-
-may require:
-
-```text
-Review
-Approval
-Apply
-```
-
-with a simpler authorization path.
-
----
-
-# 92. High-Risk Example
-
-Possible:
-
-```text
-Household Head Change
-```
-
-may require:
-
-```text
-Review
-
-Evidence
-
-Independent Approval
-
-Controlled Application
-
-Portal Access Reevaluation
-```
-
----
-
-# 93. User-Person Link Authorization
-
-Creating or activating a User-Person link is security-sensitive.
-
-Required permissions are separated:
-
-```text
-user_person_link.create
-
-user_person_link.verify
-
-user_person_link.activate
-```
-
-One action must not automatically imply the others.
-
----
-
-# 94. Self-Link Prohibition
-
-Family User cannot execute:
-
-```text
-user_person_link.verify
-```
-
-on their own proposed identity link.
-
-Verification requires an authorized process.
-
----
-
-# 95. Family User Activation
-
-Recommended authorization:
-
-```text
-Authorized Staff
-      ↓
-Verify Identity
-      ↓
-Verify User-Person Link
-      ↓
-Validate Family Eligibility
-      ↓
-Activate Link
-      ↓
-Assign/Confirm FAMILY_USER Role
-      ↓
-Audit
-```
-
----
-
-# 96. Family User Suspension
-
-Permission:
-
-```text
-user_person_link.suspend
-```
-
-or account-level:
-
-```text
-user.deactivate
-```
-
-depending on whether suspension applies to:
-
-```text
-One identity relationship
-```
-
-or:
-
-```text
-Entire User account
-```
-
----
-
-# 97. Family User Access Ending
-
-Permission:
-
-```text
-user_person_link.end
-```
-
-Required:
-
-```text
-Reason
-Actor
-Timestamp
-Audit
-```
-
----
-
-# 98. Household Head Change Authorization Impact
-
-After Head change:
-
-```text
-Old Head Family-wide authorization
-→ reevaluate immediately
-
-New Head
-→ does not automatically receive account access
-```
-
-New Head requires:
-
-```text
-User
-+
-Verified User-Person Link
-+
-Activation
-```
-
----
-
-# 99. Person Transfer Authorization Impact
-
-If linked Person moves to another Family:
-
-```text
-Old Family authorization must end/recalculate.
-```
-
-Access to the target Family is not automatically granted unless the new membership and Family Portal policy allow it.
-
----
-
-# 100. Death Authorization Impact
-
-If linked Person is confirmed deceased:
-
-```text
-Family Portal access must be suspended/ended according to policy.
-```
-
-Historical account attribution remains preserved.
-
----
-
-# 101. Family Archive Authorization Impact
-
-Archived Family must not remain normally accessible through Family Portal.
-
-Any exception requires explicit policy.
-
----
-
-# 102. Document Upload by Family User
-
-Family User may receive:
-
-```text
-document.upload
-```
-
-only through authorized Change Request/document workflows.
-
-Upload does not grant:
-
-```text
-document.verify
-```
-
----
-
-# 103. Document Verification
-
-Family User never verifies their own uploaded supporting document.
-
-Verification requires authorized Staff.
-
----
-
-# 104. Document Download
-
-Family User may download only documents explicitly visible to Family Portal.
-
-They cannot download documents merely because:
-
-```text
-document.family_id
-=
-their Family
-```
-
-Document Type and sensitivity must also permit it.
-
----
-
-# 105. Document Storage Authorization
-
-File storage must remain private.
-
-Flow:
-
-```text
-Request File
-      ↓
-Authenticate
-      ↓
-Authorize Resource
-      ↓
-Authorize Document
-      ↓
-Stream / Temporary Signed Access
-```
-
----
-
-# 106. Notifications
-
-Family User permissions:
-
-```text
-notification.view
-
-notification.mark_read
-```
-
-only for their own User account.
-
----
-
-# 107. Notification Ownership
-
-Query must enforce:
-
-```text
-notifiable_id
-=
-authenticated user
-```
-
-and correct notifiable type.
-
----
-
-# 108. Notification Privacy
-
-Notification payload must not expose sensitive information that the user could not otherwise view.
-
----
-
-# 109. Search Permissions
-
-Staff search may include:
-
-```text
-family.search
-
-person.search
-```
-
-or be incorporated into view permissions.
-
-Family User must not receive global:
-
-```text
-person.search
-family.search
-```
-
----
-
-# 110. Family Portal Member Search
-
-If Family Portal needs search/filter:
-
-```text
-Search only within authorized Family members.
-```
-
-This is not a global registry search permission.
-
----
-
-# 111. Reporting Permissions
-
-Staff reporting follows:
-
-```text
-Permission
-+
-Data Scope
-+
-Field Restrictions
-```
-
-Family User does not receive general reporting access.
-
----
-
-# 112. Family Summary
-
-Family Portal may expose a dedicated:
-
-```text
-Family Summary
-```
-
-without granting:
-
-```text
-report.family
-```
-
-This distinction keeps Staff Reports separate from Family-facing views.
-
----
-
-# 113. Aggregate Health Reports
-
-A Staff user may be allowed to view:
-
-```text
-Aggregate chronic disease count
-```
-
-without receiving:
-
-```text
-Person-level diagnosis list
-```
-
-Aggregate reporting permissions may differ from record-level permissions.
-
----
-
-# 114. Export Authorization
-
-Export flow:
-
-```text
-Check Export Permission
-      ↓
-Resolve Scope
-      ↓
-Resolve Fields
-      ↓
-Apply Masking
-      ↓
-Generate
-      ↓
-Audit
-```
-
----
-
-# 115. Family User Export
-
-Default V1:
-
-```text
-No generic export permissions.
-```
-
-If later required:
-
-```text
-family_portal.summary.download
-```
-
-should generate a controlled Family-facing document.
-
----
-
-# 116. Sensitive Export Audit
-
-Record:
-
-```text
-User
-
-Export Type
-
-Filters
-
-Data Scope
-
-Fields
-
-Timestamp
-
-Row Count where practical
-
-Reason where required
-```
-
----
-
-# 117. API Authorization
-
-Future APIs must use the same:
-
-```text
-Policies
+Roles
 
 Permissions
 
-Scopes
+Role-Permission Assignment
 
-Field Rules
+User-Role Assignment
+
+Direct Permission Assignment where explicitly needed
+```
+
+It does not replace:
+
+```text
+Object-Level Authorization
+
+Family Scope Resolution
+
+Field-Level Authorization
 
 Workflow Rules
+
+Domain Rules
 ```
 
-Do not build separate authorization semantics for API clients.
-
 ---
 
-# 118. API Serialization
+# 10. Laravel Policies
 
-Use:
+Policies are the primary object-level authorization mechanism.
 
-```text
-Laravel API Resources
-
-DTOs
-
-Transformers
-```
-
-to ensure unauthorized fields never reach the client.
-
----
-
-# 119. Filament Authorization
-
-Filament Resources must use:
-
-```text
-Policies
-```
-
-for:
-
-```text
-ViewAny
-
-View
-
-Create
-
-Update
-
-Delete / Archive
-
-Restore
-```
-
-Custom Filament actions must also authorize through the backend.
-
----
-
-# 120. Navigation Is Not Security
-
-Hiding a Filament navigation item is not authorization.
-
-A user manually entering a route must still be denied if unauthorized.
-
----
-
-# 121. Family Portal Frontend Is Not Security
-
-Hiding a button in React/Blade/Livewire does not prevent the request.
-
-All Family Portal operations require server-side authorization.
-
----
-
-# 122. Policy Classes
-
-Recommended:
+Recommended policies include:
 
 ```text
 FamilyPolicy
@@ -2526,2126 +294,2941 @@ AssessmentPolicy
 
 FormSubmissionPolicy
 
+ChangeRequestPolicy
+
+DocumentPolicy
+
 FamilyNeedPolicy
 
 AssistanceRecordPolicy
 
-DocumentPolicy
-
-PersonNotePolicy
-
-CaseNotePolicy
-
-ChangeRequestPolicy
-
 UserPersonLinkPolicy
 
 UserPolicy
+
+ReportPolicy
+
+ExportPolicy
 ```
 
 ---
 
-# 123. FamilyPolicy
+# 11. Domain Action Authorization
 
-Conceptually:
+Critical Domain Actions must not assume that controller authorization is sufficient.
 
-```text
-Staff:
-permission + staff scope
+Where appropriate, actions should receive authorization context or independently verify required permission/domain conditions.
 
-Family User:
-family_portal.family.view
-+
-resolved Family scope
-```
-
-Do not implement one unrestricted `family.view` path for both contexts without scope differentiation.
+This provides defense in depth.
 
 ---
 
-# 124. PersonPolicy
+# 12. Frontend Authorization
 
-Conceptually:
+Next.js may use permission information to improve UX.
+
+Examples:
 
 ```text
-Staff
-→ person.view + staff scope
+Hide Create Family button
 
-Family User
-→ family_portal.member.view
-   +
-   SELF/FAMILY relationship
-   +
-   field restrictions
+Disable unavailable workflow action
+
+Hide System Administration link
+
+Display read-only view
 ```
+
+However:
+
+```text
+Frontend permission checks
+≠
+Security enforcement
+```
+
+Laravel remains authoritative.
 
 ---
 
-# 125. ChangeRequestPolicy
+# 13. `/api/v1/me`
 
-Example conceptual checks:
-
-```text
-View:
-permission
-+
-authorized Family
-
-Create:
-FAMILY_USER
-+
-active Family scope
-+
-allowed request type
-
-Update:
-request owned/authorized
-+
-status = DRAFT
-
-Submit:
-authorized Family
-+
-status = DRAFT
-+
-validation complete
-
-Review:
-staff permission
-+
-scope
-+
-status allows review
-
-Approve:
-staff permission
-+
-scope
-+
-state
-+
-separation rules
-
-Apply:
-staff permission
-+
-status = APPROVED
-```
-
----
-
-# 126. UserPersonLinkPolicy
-
-Sensitive operations include:
+The API may expose an authenticated-user context endpoint:
 
 ```text
-Verify
-Activate
-Suspend
-End
+GET /api/v1/me
 ```
 
-These must not be accessible to Family Users themselves unless a future secure automated verification service is explicitly designed.
-
----
-
-# 127. Domain Action Authorization
-
-Critical operations must reauthorize inside the application/domain layer.
-
-Example:
-
-```text
-ApplyChangeRequestAction
-```
-
-must not assume authorization simply because a Controller already checked it.
-
----
-
-# 128. ApplyChangeRequestAction
-
-Conceptual authorization:
-
-```text
-Check change_request.apply
-
-Check Staff scope
-
-Check status = APPROVED
-
-Check separation-of-duty rules
-
-Check current Family state
-
-Check request type
-
-Check domain authorization
-
-Execute transaction
-```
-
----
-
-# 129. Change Household Head Action
-
-Authorization requires:
-
-```text
-family.change_head
-```
-
-for direct Staff action.
-
-If initiated through approved Change Request:
-
-```text
-change_request.apply
-+
-domain authorization
-```
-
-ultimately invokes the same controlled domain operation.
-
----
-
-# 130. Person Transfer Action
-
-Requires:
-
-```text
-person.transfer_family
-```
-
-for direct Staff operation.
-
-Family User cannot directly transfer a Person.
-
----
-
-# 131. National ID Update
-
-Requires:
-
-```text
-person.update
-
-national_id.update
-```
-
-plus:
-
-```text
-Reason
-
-Duplicate Check
-
-Audit
-
-Potential evidence
-```
-
-If initiated from Family Portal, the Family User only submits:
-
-```text
-PERSON_CORRECTION
-```
-
-request.
-
----
-
-# 132. National ID View
-
-Recommended baseline:
-
-```text
-SUPER_ADMIN
-→ FULL where operationally required
-
-ADMINISTRATOR
-→ FULL where operationally required
-
-DATA_ENTRY
-→ FULL or MASKED based on task
-
-REVIEWER
-→ FULL where identity verification requires it
-
-SOCIAL_WORKER
-→ MASKED by default
-
-REPORTS_VIEWER
-→ HIDDEN by default
-
-FAMILY_USER SELF
-→ MASKED by default
-
-FAMILY_USER OTHER MEMBER
-→ HIDDEN by default
-```
-
-Final values require operational approval.
-
----
-
-# 133. Health Access
-
-Recommended baseline:
-
-```text
-SUPER_ADMIN
-→ permission-controlled
-
-ADMINISTRATOR
-→ permission-controlled
-
-DATA_ENTRY
-→ where required for data entry
-
-REVIEWER
-→ where required for verification
-
-SOCIAL_WORKER
-→ where required for case work
-
-REPORTS_VIEWER
-→ aggregate only by default
-
-FAMILY_USER
-→ hidden by default
-```
-
----
-
-# 134. Disability Access
-
-Same security classification as Health unless explicitly separated.
-
----
-
-# 135. Confidential Note Access
-
-Recommended:
-
-```text
-ADMINISTRATOR
-SOCIAL_WORKER
-```
-
-where required.
-
-Potential Reviewer access depends on operational policy.
-
-Never Family User.
-
----
-
-# 136. Role Permission Matrix Legend
-
-```text
-✓
-Allowed baseline
-
-—
-Not allowed baseline
-
-R
-Restricted / additional field or scope rule
-
-S
-Self/Family scope only
-```
-
----
-
-# 137. High-Level Role Matrix
-
-| Capability | Super Admin | Administrator | Data Entry | Reviewer | Social Worker | Reports Viewer | Family User |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Staff Portal | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| Family Portal | R | R | — | — | — | — | ✓ |
-| View Families | ✓ | ✓ | ✓ | ✓ | ✓ | R | S |
-| Create Family | ✓ | ✓ | ✓ | — | R | — | — |
-| Update Canonical Family | ✓ | ✓ | ✓ | — | R | — | — |
-| View Persons | ✓ | ✓ | ✓ | ✓ | ✓ | R | S |
-| Create Person | ✓ | ✓ | ✓ | — | R | — | — |
-| Direct Person Update | ✓ | ✓ | ✓ | — | R | — | — |
-| Submit Internal Form | ✓ | ✓ | ✓ | — | R | — | — |
-| Verify Internal Form | ✓ | ✓ | — | ✓ | — | — | — |
-| Approve Internal Form | ✓ | ✓ | — | — | — | — | — |
-| Create Change Request | R | R | — | — | — | — | ✓ |
-| Review Change Request | ✓ | ✓ | — | ✓ | R | — | — |
-| Approve Change Request | ✓ | ✓ | — | R | — | — | — |
-| Apply Change Request | ✓ | ✓ | — | R | — | — | — |
-| Return Request | ✓ | ✓ | — | ✓ | R | — | — |
-| Reject Request | ✓ | ✓ | — | R | — | — | — |
-| Upload Support Document | ✓ | ✓ | ✓ | R | ✓ | — | S |
-| Verify Document | ✓ | ✓ | — | ✓ | R | — | — |
-| View Needs | ✓ | ✓ | ✓ | ✓ | ✓ | R | R |
-| Manage Needs | ✓ | ✓ | R | R | ✓ | — | — |
-| Record Assistance | ✓ | ✓ | R | — | ✓ | — | — |
-| View Confidential Notes | ✓ | R | — | R | ✓ | — | — |
-| View Full National ID | ✓ | R | R | R | — | — | — |
-| View Audit | ✓ | ✓ | — | R | — | — | — |
-| Manage Users | ✓ | ✓ | — | — | — | — | — |
-| Manage Roles | ✓ | R | — | — | — | — | — |
-| Manage Permissions | ✓ | R | — | — | — | — | — |
-| Verify User-Person Link | ✓ | ✓ | — | R | R | — | — |
-| Activate Family User | ✓ | ✓ | — | — | R | — | — |
-| Sensitive Export | ✓ | R | — | — | R | — | — |
-
----
-
-# 138. FAMILY_USER Baseline Permission Bundle
-
-Recommended:
-
-```text
-family_portal.access
-
-family_portal.family.view
-
-family_portal.member.view
-
-family_portal.residence.view
-
-family_portal.request.view
-
-family_portal.notification.view
-
-change_request.view
-
-change_request.create
-
-change_request.update_draft
-
-change_request.submit
-
-change_request.resubmit
-
-change_request.contact.create
-
-change_request.residence.create
-
-change_request.person_correction.create
-
-change_request.add_member.create
-
-change_request.birth.create
-
-change_request.death.create
-
-change_request.marriage.create
-
-change_request.document.create
-
-document.upload
-
-notification.view
-
-notification.mark_read
-```
-
-Potential later permissions:
-
-```text
-family_portal.document.view
-
-change_request.membership_change.create
-
-change_request.head_change.create
-```
-
-after policy approval.
-
----
-
-# 139. DATA_ENTRY Baseline Bundle
-
-Typical:
-
-```text
-family.view
-family.create
-family.update
-
-person.view
-person.create
-person.update
-
-membership.view
-membership.create
-membership.update
-
-residence.view
-residence.create
-residence.update
-
-assessment.view
-assessment.create
-assessment.update
-
-form.view
-form.create
-form.update
-form.submit
-form.send_to_review
-form.correct
-form.resubmit
-
-document.view
-document.upload
-
-reference.view
-```
-
-Sensitive permissions are assigned separately.
-
----
-
-# 140. REVIEWER Baseline Bundle
-
-Typical:
-
-```text
-family.view
-
-person.view
-
-membership.view
-
-residence.view
-
-assessment.view
-assessment.review
-assessment.verify
-
-form.view
-form.review
-form.return
-form.verify
-form.view_history
-form.view_source
-
-document.view
-document.verify
-
-change_request.view
-change_request.review
-change_request.return
-change_request.view_history
-
-workflow_history.view
-```
-
-High-risk approval is not baseline.
-
----
-
-# 141. SOCIAL_WORKER Baseline Bundle
-
-Typical:
-
-```text
-family.view
-
-person.view
-
-membership.view
-
-residence.view
-
-assessment.view
-assessment.create
-assessment.update
-
-need.view
-need.create
-need.update
-need.verify
-need.activate
-need.mark_partially_met
-need.mark_met
-need.close
-
-assistance.view
-assistance.create
-assistance.update
-
-person_note.view
-person_note.create
-
-case_note.view
-case_note.create
-
-document.view
-document.upload
-```
-
-Confidential and health permissions are separately controlled.
-
----
-
-# 142. REPORTS_VIEWER Baseline Bundle
-
-Typical:
-
-```text
-report.dashboard
-
-report.family
-
-report.demographics
-
-report.needs
-
-report.assistance
-
-export.basic
-```
-
-No sensitive person-level data by default.
-
----
-
-# 143. ADMINISTRATOR Baseline Bundle
-
-Administrator may receive broad operational permissions including:
-
-```text
-family.*
-person.*
-membership.*
-residence.*
-
-assessment.*
-
-form.*
-
-need.*
-assistance.*
-
-document.*
-
-change_request.*
-
-user_person_link.*
-
-user.*
-
-reference.*
-
-audit.view
-
-workflow_history.view
-```
-
-But:
-
-```text
-role.*
-permission.*
-system_settings.*
-audit.view_sensitive
-export.sensitive_data
-```
-
-should remain explicitly controlled.
-
----
-
-# 144. SUPER_ADMIN Bypass
-
-Spatie/Laravel may use:
-
-```php
-Gate::before(...)
-```
-
-for `SUPER_ADMIN`.
-
-If used:
-
-```text
-Keep accounts minimal
-
-Audit critical actions
-
-Use stronger authentication
-
-Do not use Super Admin for normal daily work
-```
-
----
-
-# 145. No Wildcard Assumption
-
-Do not rely on:
-
-```text
-family.*
-```
-
-unless wildcard permission support is deliberately configured.
-
-Seed explicit permissions.
-
----
-
-# 146. User Deactivation
-
-When:
-
-```text
-users.is_active = false
-```
-
-the User must be denied access.
-
-Historical attribution remains.
-
-Do not delete the User merely to remove access.
-
----
-
-# 147. Family User Account vs Link Suspension
-
-Two different actions:
-
-```text
-User Account Deactivation
-```
-
-blocks all access.
-
-```text
-User-Person Link Suspension
-```
-
-blocks access through that identity relationship.
-
-Both should remain available conceptually.
-
----
-
-# 148. Session Security
-
-Recommended:
-
-```text
-Secure password hashing
-
-CSRF protection
-
-Secure cookies
-
-Session invalidation
-
-Login throttling
-
-Account deactivation enforcement
-
-Password reset protection
-```
-
----
-
-# 149. Privileged Account Security
-
-Recommended for:
-
-```text
-SUPER_ADMIN
-ADMINISTRATOR
-```
-
-and potentially:
-
-```text
-REVIEWER
-```
-
-to support:
-
-```text
-2FA
-```
-
-before production if operationally feasible.
-
----
-
-# 150. Family User Authentication Security
-
-Because Family Portal exposes personal data, authentication must include appropriate:
-
-```text
-Identity verification
-
-Secure credential setup
-
-Rate limiting
-
-OTP protection where used
-
-Session protection
-
-Account recovery controls
-```
-
----
-
-# 151. Account Recovery
-
-Family User recovery must not rely solely on publicly knowable Family information.
-
-Examples of unsafe recovery factors alone:
-
-```text
-Family Code
-
-Head Name
-
-Family Size
-```
-
-Recovery must use an approved secure process.
-
----
-
-# 152. Enumeration Protection
-
-Authentication and Family User activation endpoints should avoid exposing whether a particular:
-
-```text
-National ID
-
-Mobile
-
-Person
-
-Family
-```
-
-exists unnecessarily.
-
-Example generic response:
-
-```text
-If the provided information is eligible, the next verification step will be sent.
-```
-
-where appropriate.
-
----
-
-# 153. Rate Limiting
-
-Apply throttling to:
-
-```text
-Login
-
-OTP
-
-Password Reset
-
-Identity Verification
-
-Family User Activation
-
-Change Request Submission where abuse is possible
-```
-
----
-
-# 154. Family Code Security
-
-Family Code is an identifier, not a secret.
-
-Possession of:
-
-```text
-FAM-000510
-```
-
-must never grant Family access.
-
----
-
-# 155. Person Code Security
-
-Likewise:
-
-```text
-PER-001825
-```
-
-is an identifier, not authentication.
-
----
-
-# 156. Direct Object Reference Protection
-
-Every resource must resist IDOR attacks.
-
-Example:
-
-```text
-/family-portal/change-requests/101
-```
-
-changing:
-
-```text
-101
-```
-
-to:
-
-```text
-102
-```
-
-must not expose another Family's request.
-
----
-
-# 157. Sensitive Download Audit
-
-Recommended audit for:
-
-```text
-Identity document downloads
-
-Medical document downloads
-
-Sensitive exports
-```
-
-Record:
+Possible response concepts:
 
 ```text
 User
-Document
-Timestamp
-Action
-```
 
----
-
-# 158. Change Request Application Audit
-
-Always audit:
-
-```text
-Request Code
-
-Request Type
-
-Family
-
-Affected Person
-
-Approver
-
-Applier
-
-Canonical entities changed
-
-Timestamp
-```
-
-without unnecessarily duplicating sensitive values.
-
----
-
-# 159. Permission Change Audit
-
-Changes to:
-
-```text
 Roles
 
 Permissions
 
-User Roles
+Portal Type
 
-User-Person Links
-
-Family User Activation
-
-Family User Suspension
+Selected UX capabilities
 ```
 
-must be audited.
+This information supports frontend rendering.
+
+It must not be treated as permanent authorization proof.
 
 ---
 
-# 160. Permission Cache
+# 14. Staff Roles
 
-When using Spatie Permission:
+Initial internal roles:
 
 ```text
-Permission cache must be invalidated correctly after permission changes.
+SUPER_ADMIN
+
+ADMINISTRATOR
+
+DATA_ENTRY
+
+REVIEWER
+
+SOCIAL_WORKER
+
+REPORTS_VIEWER
 ```
 
-Deployment and seed procedures must account for this.
-
----
-
-# 161. Seeder Strategy
-
-Roles and permissions should be defined in version-controlled seed/config definitions.
-
-Seeder behavior should be:
-
-```text
-Repeatable
-
-Predictable
-
-Safe
-```
-
-Do not silently remove existing assignments without an explicit migration/administrative decision.
-
----
-
-# 162. Family User Role Seeder
-
-Create:
+External role:
 
 ```text
 FAMILY_USER
 ```
 
-with only the approved Family Portal permissions.
+---
 
-Do not copy permissions from a Staff role.
+# 15. SUPER_ADMIN
+
+`SUPER_ADMIN` is the highest technical/system role.
+
+Typical responsibilities may include:
+
+```text
+System configuration
+
+User administration
+
+Role administration
+
+Permission administration
+
+Reference data administration
+
+Technical monitoring
+
+System maintenance
+```
+
+SUPER_ADMIN does not mean business rules should be bypassed.
 
 ---
 
-# 163. Authorization Tests
+# 16. ADMINISTRATOR
 
-Every sensitive feature requires authorization tests.
+`ADMINISTRATOR` represents high-level operational administration.
 
-Test:
+Potential responsibilities:
 
 ```text
-Allowed User succeeds
+Manage authorized registry operations
 
-Unauthorized Role fails
+Manage workflows
 
-Wrong Scope fails
+Manage selected users
 
-Wrong Family fails
+Review operational queues
 
-Wrong Workflow State fails
+Access broad reports
 
-Restricted Field remains hidden
+Perform approved high-impact operations
+```
 
-Direct URL access fails
+Exact permissions are explicitly assigned.
 
-API access fails
+---
+
+# 17. DATA_ENTRY
+
+Typical responsibilities:
+
+```text
+Create Family drafts
+
+Create Person drafts
+
+Enter source forms
+
+Edit permitted draft data
+
+Submit completed data for review
+
+Respond to correction requests
+```
+
+DATA_ENTRY does not automatically receive:
+
+```text
+Approval
+
+Sensitive exports
+
+Role administration
+
+System settings
 ```
 
 ---
 
-# 164. FAMILY_USER Tests
+# 18. REVIEWER
 
-Must test:
+Typical responsibilities:
 
 ```text
-Can access Family Portal when active.
+Review submitted data
 
-Cannot access Staff Portal.
+Return for correction
 
-Can view authorized Family.
+Verify permitted records
 
-Cannot view another Family.
+Review Change Requests
 
-Can view permitted members.
+Review documents
 
-Cannot view hidden sensitive member fields.
+Review duplicates
+```
 
-Can create allowed Change Request.
+Approval permissions remain separately assignable.
 
-Cannot create disallowed request type.
+---
 
-Can edit own Draft.
+# 19. SOCIAL_WORKER
 
-Cannot edit Under Review request.
+Typical responsibilities:
 
-Can respond to Returned request.
+```text
+View authorized Family profiles
 
-Cannot approve own request.
+Conduct Assessments
 
-Cannot apply own request.
+Identify Needs
 
-Cannot verify own document.
+Record permitted Case Notes
 
-Cannot verify own User-Person link.
+Record/track Assistance
 
-Cannot view internal audit.
+View permitted health/social information
+```
 
-Cannot view confidential notes.
+Sensitive access remains explicitly controlled.
+
+---
+
+# 20. REPORTS_VIEWER
+
+Typical responsibilities:
+
+```text
+View approved dashboards
+
+View approved reports
+
+Access aggregate data
+```
+
+This role does not automatically receive:
+
+```text
+Canonical edit permissions
+
+Sensitive row-level exports
+
+System administration
 ```
 
 ---
 
-# 165. Head Change Authorization Tests
+# 21. FAMILY_USER
 
-Test:
+`FAMILY_USER` is an external self-service role.
+
+It may provide access to:
 
 ```text
-Old Head loses Family-wide eligibility.
+Family Portal
 
-New Head does not automatically receive account.
+Permitted Family information
 
-New Head with verified active account may gain access.
+Permitted member information
 
-Unrelated User cannot gain access by knowing Family Code.
+Own Change Requests
+
+Supporting document uploads
+
+Notifications
+```
+
+It does not provide Staff access.
+
+---
+
+# 22. Role vs Domain Status
+
+`FAMILY_USER` must not be replaced with:
+
+```text
+HOUSEHOLD_HEAD
+```
+
+as an authorization role.
+
+Household Head is a domain state.
+
+FAMILY_USER is an authorization role.
+
+Conceptually:
+
+```text
+User Role
+FAMILY_USER
+
+Person Membership State
+is_household_head = TRUE
+```
+
+These remain separate.
+
+---
+
+# 23. V1 Family User Eligibility
+
+Recommended V1 eligibility:
+
+```text
+Verified current Household Head
+```
+
+Therefore Family-wide access may require:
+
+```text
+User status = ACTIVE
+
+User has FAMILY_USER role
+
+User-Person Link = ACTIVE
+
+Person = ACTIVE
+
+Family Membership = ACTIVE
+
+is_household_head = TRUE
+
+Family = accessible
+```
+
+Future policies may support authorized representatives or guardians.
+
+---
+
+# 24. Role Does Not Grant Family Scope
+
+This is prohibited:
+
+```text
+User has FAMILY_USER
+        ↓
+Can access every Family
+```
+
+Correct:
+
+```text
+FAMILY_USER
+    +
+Verified User-Person Link
+    +
+Current Membership
+    +
+Family Access Policy
+    ↓
+Specific authorized Family
 ```
 
 ---
 
-# 166. Person Transfer Authorization Tests
+# 25. Staff Data Scopes
 
-Test:
-
-```text
-Old Family scope removed after transfer.
-
-Target Family scope requires current eligibility.
-
-Historical requests remain historically attributed.
-
-No cross-Family leakage occurs.
-```
-
----
-
-# 167. Death Authorization Tests
-
-Test:
-
-```text
-Deceased linked Person no longer retains active Family Portal eligibility.
-
-Historical User/Person relationship remains.
-
-Household Head death triggers access review.
-```
-
----
-
-# 168. Change Request Authorization Tests
-
-Test:
-
-```text
-Family User A cannot view Family User B request.
-
-Family User cannot modify SUBMITTED request.
-
-Reviewer cannot review outside scope.
-
-Unauthorized Reviewer cannot see sensitive payload.
-
-Approver cannot approve invalid state.
-
-Applier cannot apply REJECTED request.
-
-APPLIED request cannot be reapplied.
-```
-
----
-
-# 169. Sensitive Field Tests
-
-Test:
-
-```text
-National ID FULL
-National ID MASKED
-National ID HIDDEN
-
-Health record allowed
-Health record denied
-
-Confidential note allowed
-Confidential note denied
-```
-
-Tests should verify API payloads, not only UI visibility.
-
----
-
-# 170. Export Tests
-
-Test:
-
-```text
-Basic export excludes sensitive fields.
-
-Personal-data export requires permission.
-
-Sensitive export requires permission.
-
-Scope applies to export.
-
-Export is audited.
-```
-
----
-
-# 171. Authorization Invariants
-
-```text
-AUTH-INV-001
-All access is denied unless explicitly authorized.
-
-AUTH-INV-002
-Role alone does not determine record access.
-
-AUTH-INV-003
-Data scope is enforced server-side.
-
-AUTH-INV-004
-Field-level restrictions apply independently of record access.
-
-AUTH-INV-005
-Workflow permission does not bypass invalid workflow state.
-
-AUTH-INV-006
-Family User cannot directly modify canonical registry data.
-
-AUTH-INV-007
-Family User cannot review, approve, reject, or apply their own Change Request.
-
-AUTH-INV-008
-Family User Family scope derives from verified relationships.
-
-AUTH-INV-009
-Family Code is not an authorization credential.
-
-AUTH-INV-010
-Person Code is not an authorization credential.
-
-AUTH-INV-011
-Family User cannot access another Family by modifying resource IDs.
-
-AUTH-INV-012
-Family User does not receive unrestricted National IDs.
-
-AUTH-INV-013
-Family User does not receive confidential internal notes.
-
-AUTH-INV-014
-Family User does not receive internal audit logs.
-
-AUTH-INV-015
-Family-uploaded documents are not self-verified.
-
-AUTH-INV-016
-Sensitive exports require dedicated permission.
-
-AUTH-INV-017
-Permission changes are audited.
-
-AUTH-INV-018
-User deactivation preserves historical attribution.
-
-AUTH-INV-019
-User and Person remain separate identities.
-
-AUTH-INV-020
-User-Person verification cannot be self-approved by Family User.
-
-AUTH-INV-021
-Household Head changes trigger Family Portal authorization reevaluation.
-
-AUTH-INV-022
-Person transfers trigger scope reevaluation.
-
-AUTH-INV-023
-Death triggers relevant Portal access reevaluation.
-
-AUTH-INV-024
-Authorization applies equally to UI and API.
-
-AUTH-INV-025
-Navigation visibility is not security.
-
-AUTH-INV-026
-Sensitive fields must not be delivered to unauthorized clients.
-
-AUTH-INV-027
-Document authorization is checked before file delivery.
-
-AUTH-INV-028
-Change Request type authorization is explicit.
-
-AUTH-INV-029
-Family Portal search is limited to authorized Family scope.
-
-AUTH-INV-030
-Canonical domain actions reauthorize critical operations.
-```
-
----
-
-# 172. Approved Authorization Decisions
-
-### AUTH-ADR-001
-
-Famboook uses RBAC plus Data Scope.
-
-### AUTH-ADR-002
-
-Field-level restrictions are required for sensitive information.
-
-### AUTH-ADR-003
-
-Workflow state participates in authorization.
-
-### AUTH-ADR-004
-
-Spatie Laravel Permission is the recommended RBAC package.
-
-### AUTH-ADR-005
-
-Laravel Policies are the primary record-level authorization mechanism.
-
-### AUTH-ADR-006
-
-Query scope is enforced server-side.
-
-### AUTH-ADR-007
-
-Sensitive export uses dedicated permissions.
-
-### AUTH-ADR-008
-
-Audit access is separate from normal record access.
-
-### AUTH-ADR-009
-
-National ID has separate view/full/update permissions.
-
-### AUTH-ADR-010
-
-Confidential notes have separate permissions.
-
-### AUTH-ADR-011
-
-User accounts are deactivated rather than deleted for access removal.
-
-### AUTH-ADR-012
-
-Permission changes are auditable.
-
-### AUTH-ADR-013
-
-Staff workflow actions use explicit permissions.
-
-### AUTH-ADR-014
-
-Maker-checker separation is supported.
-
-### AUTH-ADR-015
-
-Super Admin access is exceptional rather than routine.
-
-### AUTH-ADR-016
-
-`FAMILY_USER` is a dedicated non-staff role.
-
-### AUTH-ADR-017
-
-Family User authorization uses User-Person links.
-
-### AUTH-ADR-018
-
-Family-wide authorization derives from current Family Membership.
-
-### AUTH-ADR-019
-
-Family User canonical modifications use Change Requests.
-
-### AUTH-ADR-020
-
-Family User does not receive direct canonical CRUD.
-
-### AUTH-ADR-021
-
-Family Portal introduces SELF and FAMILY scopes.
-
-### AUTH-ADR-022
-
-Family User field access differs between SELF and other Family members.
-
-### AUTH-ADR-023
-
-Family User cannot verify their own User-Person link.
-
-### AUTH-ADR-024
-
-Family User cannot verify their own uploaded supporting documents.
-
-### AUTH-ADR-025
-
-Change Request types may have dedicated create permissions.
-
-### AUTH-ADR-026
-
-Family User cannot access internal audit logs.
-
-### AUTH-ADR-027
-
-Family User cannot access confidential internal notes.
-
-### AUTH-ADR-028
-
-Family User does not receive global Person/Family search.
-
-### AUTH-ADR-029
-
-Family Code and Person Code are identifiers, not credentials.
-
-### AUTH-ADR-030
-
-Family Portal file access uses server-side document authorization.
-
-### AUTH-ADR-031
-
-Household Head, membership, and death changes trigger Portal scope reevaluation.
-
-### AUTH-ADR-032
-
-API and UI use the same authorization rules.
-
-### AUTH-ADR-033
-
-Critical Domain Actions perform authorization in addition to controller/UI checks.
-
----
-
-# 173. Pending Authorization Decisions
-
-### PAUTH-001 — Reviewer Scope
-
-Choose:
+Initial Staff data scopes may include:
 
 ```text
 ALL
 
 ASSIGNED
 
-Hybrid
+CREATED_BY_ME
 ```
 
----
-
-### PAUTH-002 — Social Worker Scope
-
-Choose:
+Future scopes may include:
 
 ```text
-ALL
+REGION
 
-ASSIGNED
+BRANCH
+
+TEAM
 
 CASELOAD
 ```
 
 ---
 
-### PAUTH-003 — Data Entry National ID Access
+# 26. ALL Scope
 
-Choose:
-
-```text
-FULL
-
-MASKED except while editing
-
-FULL only for assigned records
-```
-
----
-
-### PAUTH-004 — Final Approval Authority
-
-Choose:
-
-```text
-ADMINISTRATOR
-```
-
-or introduce:
-
-```text
-APPROVER
-```
-
----
-
-### PAUTH-005 — Sensitive Export Roles
-
-Define exactly which roles may receive:
-
-```text
-export.sensitive_data
-```
-
----
-
-### PAUTH-006 — Duplicate Merge Permission
-
-If merge is implemented, define:
-
-```text
-person.merge
-```
-
-and authorized roles.
-
-Recommendation:
-
-```text
-Defer merge tool from initial V1.
-```
-
----
-
-### PAUTH-007 — Confidential Note Roles
-
-Finalize whether Reviewer receives:
-
-```text
-confidential_note.view
-```
-
----
-
-### PAUTH-008 — Privileged 2FA
-
-Determine whether 2FA is mandatory for:
-
-```text
-SUPER_ADMIN
-
-ADMINISTRATOR
-
-REVIEWER
-```
-
-before production.
-
----
-
-### PAUTH-009 — Regional Scope
-
-Determine whether V1 requires:
-
-```text
-REGION
-BRANCH
-```
-
-scope.
-
-Do not introduce without operational need.
-
----
-
-### PAUTH-010 — Family User Eligibility
-
-Finalize whether V1 Family-wide access is limited to:
-
-```text
-Current Household Head
-```
-
-Recommendation:
-
-```text
-YES for initial V1.
-```
-
----
-
-### PAUTH-011 — Multiple Family Users
-
-Determine whether a Family may have:
-
-```text
-One Family User
-
-Multiple authorized Family Users
-```
-
-Recommendation:
-
-Start with:
-
-```text
-Current Household Head
-```
-
-while keeping architecture extensible.
-
----
-
-### PAUTH-012 — Authorized Representative
-
-Determine future support for:
-
-```text
-GUARDIAN
-
-AUTHORIZED_REPRESENTATIVE
-```
-
-Do not enable until business rules are defined.
-
----
-
-### PAUTH-013 — Full Self National ID
-
-Determine whether Family User may view their own:
-
-```text
-FULL National ID
-```
-
-Recommendation:
-
-```text
-MASKED by default.
-```
-
----
-
-### PAUTH-014 — Other Adult Member Birth Date
-
-Determine whether Household Head may see full Birth Date of adult Family members.
-
----
-
-### PAUTH-015 — Dependent Minor Data
-
-Define enhanced Household Head visibility for dependent minors.
-
----
-
-### PAUTH-016 — Family Health Visibility
-
-Determine whether Family User may access:
-
-```text
-SELF health information
-
-Minor dependent health information
-
-Household health indicators
-```
-
-Default:
-
-```text
-Hidden.
-```
-
----
-
-### PAUTH-017 — Needs Visibility
-
-Determine which:
-
-```text
-Needs
-```
-
-are visible in Family Portal.
-
----
-
-### PAUTH-018 — Assistance Visibility
-
-Determine which:
-
-```text
-Assistance Records
-```
-
-are visible in Family Portal.
-
----
-
-### PAUTH-019 — Canonical Documents
-
-Determine which verified Person/Family documents Family User may download.
-
----
-
-### PAUTH-020 — Household Head Change Request
-
-Determine whether Family User receives:
-
-```text
-change_request.head_change.create
-```
-
-in initial V1.
-
----
-
-### PAUTH-021 — Membership Change Request
-
-Determine whether Family User receives:
-
-```text
-change_request.membership_change.create
-```
-
-in initial V1.
-
----
-
-### PAUTH-022 — Change Request Reviewer vs Approver
-
-Define which risk levels require:
-
-```text
-Reviewer ≠ Approver
-```
-
----
-
-### PAUTH-023 — Approver vs Applier
-
-Define whether high-risk requests require:
-
-```text
-Approver ≠ Applier
-```
-
----
-
-### PAUTH-024 — Sensitive Request Payload
-
-Finalize field-level access rules for sensitive JSON payloads.
-
----
-
-### PAUTH-025 — Sensitive Read Audit
-
-Determine whether merely viewing:
-
-```text
-National ID
-
-Health
-
-Medical Documents
-```
-
-must create an access audit event.
-
----
-
-### PAUTH-026 — Family User Account Creation
-
-Finalize whether accounts are created through:
-
-```text
-Invitation
-
-Staff-assisted activation
-
-Verified self-registration
-
-Combination
-```
-
----
-
-### PAUTH-027 — Authentication Identifier
-
-Finalize:
-
-```text
-Mobile
-
-Email
-
-Username
-
-Combination
-```
-
-for Family Users.
-
----
-
-# 174. Recommended V1 Family User Policy
-
-Until pending decisions are resolved, recommended secure baseline:
-
-```text
-FAMILY_USER
-=
-Current verified Household Head only
-```
-
-Requirements:
-
-```text
-Active User
-
-FAMILY_USER role
-
-Active User-Person Link
-
-Active Person
-
-Active Family Membership
-
-Current Household Head
-```
-
----
-
-# 175. Recommended Family User Access
-
-Allow:
-
-```text
-Family summary
-
-Basic member information
-
-Current residence
-
-Own request history
-
-Submit approved Change Request types
-
-Upload supporting evidence
-
-Notifications
-```
-
-Restrict:
-
-```text
-Full National IDs of other members
-
-Health details
-
-Disability details
-
-Confidential notes
-
-Internal workflow metadata
-
-Audit logs
-
-Staff-only documents
-
-Global search
-
-Generic exports
-```
-
----
-
-# 176. Recommended Change Request Separation
-
-Low/medium-risk:
-
-```text
-Family User
-→ Reviewer
-→ Administrator Approval/Application
-```
-
-High-risk:
-
-```text
-Family User
-→ Reviewer
-→ Independent Approver
-→ Controlled Application
-```
-
-The architecture supports both without redesign.
-
----
-
-# 177. Permission Review Checklist
-
-Before granting a permission ask:
-
-```text
-Does this role need the action?
-
-On which records?
-
-On which Family?
-
-On which Person?
-
-Which fields?
-
-Which workflow states?
-
-Does it expose Restricted data?
-
-Can it modify canonical data?
-
-Does it require audit?
-
-Does it require separation of duties?
-
-Can the same result be achieved with less access?
-```
-
----
-
-# 178. Family Portal Security Checklist
-
-Before production:
-
-```text
-User-Person link verified
-
-Family scope server-side
-
-Head eligibility enforced
-
-IDOR tests passing
-
-Sensitive fields masked/hidden
-
-No internal notes exposed
-
-No audit data exposed
-
-No direct canonical CRUD
-
-Change Requests authorized by type
-
-Documents private
-
-Downloads authorized
-
-OTP/login rate limiting
-
-Account recovery secured
-
-Sessions secured
-
-User suspension enforced
-
-Head changes revoke/recalculate access
-
-Person transfer recalculates access
-
-Death recalculates access
-```
-
----
-
-# 179. Implementation Order
-
-Recommended authorization implementation:
-
-```text
-1. Install Spatie Permission
-
-2. Create Staff Roles
-
-3. Create FAMILY_USER
-
-4. Seed Permissions
-
-5. Implement Policies
-
-6. Implement Staff Data Scopes
-
-7. Implement User-Person Link authorization
-
-8. Implement SELF/FAMILY scope resolver
-
-9. Implement Family Portal Policies
-
-10. Implement Field-Level Transformers
-
-11. Implement Change Request permissions
-
-12. Implement Request-Type permissions
-
-13. Implement Workflow-state authorization
-
-14. Implement Document authorization
-
-15. Implement Sensitive field masking
-
-16. Implement Export authorization
-
-17. Implement Audit permissions
-
-18. Implement authorization tests
-
-19. Implement IDOR/security tests
-```
-
----
-
-# 180. Authorization Definition of Done
-
-A feature is not authorization-complete until it has:
+`ALL` means the user may access all records of the permitted resource type subject to:
 
 ```text
 Permission
 
-Policy
+Field restrictions
+
+Workflow restrictions
+
+Domain restrictions
+```
+
+It does not mean unrestricted system access.
+
+---
+
+# 27. ASSIGNED Scope
+
+`ASSIGNED` limits access to records assigned to the user or their authorized work queue.
+
+Exact assignment model may differ by module.
+
+---
+
+# 28. CREATED_BY_ME Scope
+
+`CREATED_BY_ME` limits relevant operations to records created by the authenticated user.
+
+This may be useful for draft/data-entry workflows.
+
+---
+
+# 29. Family Portal Data Scope
+
+Family Portal uses:
+
+```text
+SELF
+
+FAMILY
+```
+
+rather than Staff scopes.
+
+`SELF` means data belonging to the linked Person.
+
+`FAMILY` means permitted information within the currently authorized Family.
+
+---
+
+# 30. Object-Level Authorization
+
+Every protected object requires authorization.
+
+Example:
+
+```text
+GET /api/v1/families/100
+```
+
+must verify access to Family `100`.
+
+Knowing the ID is not authorization.
+
+---
+
+# 31. IDOR Protection
+
+The application must explicitly protect against Insecure Direct Object Reference attacks.
+
+Example:
+
+```text
+Family User belongs to Family 100
+
+User changes URL:
+
+/families/100
+→
+/families/101
+```
+
+Laravel must reject unauthorized access to Family 101.
+
+---
+
+# 32. Query Scoping
+
+Authorization should begin at query level where practical.
+
+Example concept:
+
+```text
+Family::query()
+    ->visibleTo($user)
+```
+
+This reduces accidental retrieval of unauthorized objects.
+
+Policies must still protect direct object operations.
+
+---
+
+# 33. Field-Level Authorization
+
+Famboook supports three conceptual visibility levels:
+
+```text
+FULL
+
+MASKED
+
+HIDDEN
+```
+
+---
+
+# 34. FULL
+
+The authorized user receives the full value.
+
+Example:
+
+```text
+National ID:
+123456789
+```
+
+---
+
+# 35. MASKED
+
+Only a protected representation is exposed.
+
+Example:
+
+```text
+National ID:
+*****6789
+```
+
+Exact masking policy remains configurable.
+
+---
+
+# 36. HIDDEN
+
+The field is not exposed.
+
+Prefer:
+
+```text
+Field omitted
+```
+
+rather than sending the sensitive value and hiding it with CSS.
+
+---
+
+# 37. API Field Security
+
+Sensitive fields must be filtered server-side.
+
+Prohibited:
+
+```text
+Laravel sends national_id
+        ↓
+React hides it
+```
+
+Correct:
+
+```text
+Laravel authorization
+        ↓
+API Resource decides exposure
+        ↓
+Unauthorized field never leaves server
+```
+
+---
+
+# 38. Person Field Classification
+
+Example baseline:
+
+| Field | Staff Authorized | Family User Self | Other Family Member |
+|---|---|---|---|
+| Person Code | FULL | FULL | FULL |
+| Full Name | FULL | FULL | FULL |
+| Gender | FULL | FULL | FULL |
+| Birth Date | FULL | FULL | FULL |
+| Life Status | FULL | FULL | FULL |
+| Relationship | FULL | FULL | FULL |
+| Mobile | Permission-based | FULL | HIDDEN by default |
+| Alternate Mobile | Permission-based | FULL | HIDDEN by default |
+| National ID | Permission-based | MASKED by default | HIDDEN |
+| Health | Restricted | Policy-based | HIDDEN by default |
+| Disability | Restricted | Policy-based | HIDDEN by default |
+| Staff Notes | Permission-based | HIDDEN | HIDDEN |
+| Audit Metadata | Permission-based | HIDDEN | HIDDEN |
+
+Final visibility may be further restricted.
+
+---
+
+# 39. National ID Permission
+
+Recommended permissions:
+
+```text
+person.national-id.view
+
+person.national-id.view-masked
+
+person.national-id.update
+```
+
+A general:
+
+```text
+person.view
+```
+
+must not automatically expose full National ID.
+
+---
+
+# 40. Health Permissions
+
+Recommended:
+
+```text
+health.view
+
+health.create
+
+health.update
+
+health.delete
+```
+
+Family Portal health visibility is controlled separately.
+
+---
+
+# 41. Disability Permissions
+
+Recommended:
+
+```text
+disability.view
+
+disability.create
+
+disability.update
+
+disability.delete
+```
+
+---
+
+# 42. Confidential Notes
+
+Recommended:
+
+```text
+case-note.view
+
+case-note.create
+
+case-note.update
+
+case-note.delete
+
+confidential-note.view
+```
+
+Family Users must not receive `confidential-note.view`.
+
+---
+
+# 43. Family Permissions
+
+Recommended:
+
+```text
+family.view
+
+family.create
+
+family.update
+
+family.archive
+
+family.restore
+
+family.change-household-head
+
+family.view-history
+```
+
+---
+
+# 44. Person Permissions
+
+Recommended:
+
+```text
+person.view
+
+person.create
+
+person.update
+
+person.archive
+
+person.view-history
+
+person.record-death
+
+person.correct
+```
+
+---
+
+# 45. Membership Permissions
+
+Recommended:
+
+```text
+family-membership.view
+
+family-membership.create
+
+family-membership.update
+
+family-membership.end
+
+family-membership.transfer
+```
+
+---
+
+# 46. Residence Permissions
+
+Recommended:
+
+```text
+residence.view
+
+residence.create
+
+residence.update
+
+residence.change
+
+residence.view-history
+```
+
+---
+
+# 47. Assessment Permissions
+
+Recommended:
+
+```text
+assessment.view
+
+assessment.create
+
+assessment.update
+
+assessment.complete
+
+assessment.review
+
+assessment.verify
+
+assessment.approve
+```
+
+---
+
+# 48. Form Permissions
+
+Recommended:
+
+```text
+form.view
+
+form.create
+
+form.update
+
+form.submit
+
+form.review
+
+form.return
+
+form.verify
+
+form.approve
+```
+
+---
+
+# 49. Need Permissions
+
+Recommended:
+
+```text
+need.view
+
+need.create
+
+need.update
+
+need.close
+
+need.cancel
+```
+
+---
+
+# 50. Assistance Permissions
+
+Recommended:
+
+```text
+assistance.view
+
+assistance.create
+
+assistance.update
+
+assistance.reverse
+```
+
+Deletion of Assistance should generally be avoided if it represents an actual historical event.
+
+---
+
+# 51. Document Permissions
+
+Recommended:
+
+```text
+document.view
+
+document.upload
+
+document.update
+
+document.verify
+
+document.reject
+
+document.download
+
+document.delete
+```
+
+Download is a distinct permission from metadata viewing where appropriate.
+
+---
+
+# 52. Change Request Permissions
+
+Recommended:
+
+```text
+change-request.view
+
+change-request.create
+
+change-request.update-own-draft
+
+change-request.submit
+
+change-request.review
+
+change-request.return
+
+change-request.resubmit
+
+change-request.approve
+
+change-request.reject
+
+change-request.apply
+
+change-request.view-internal-notes
+```
+
+---
+
+# 53. Family User Change Request Permissions
+
+FAMILY_USER may receive:
+
+```text
+change-request.create
+
+change-request.update-own-draft
+
+change-request.submit
+
+change-request.resubmit
+```
+
+and scoped view access.
+
+It must not receive:
+
+```text
+change-request.review
+
+change-request.approve
+
+change-request.reject
+
+change-request.apply
+
+change-request.view-internal-notes
+```
+
+---
+
+# 54. User Administration Permissions
+
+Recommended:
+
+```text
+user.view
+
+user.create
+
+user.update
+
+user.activate
+
+user.suspend
+
+user.reset-access
+
+user.link-person
+
+user.verify-person-link
+```
+
+---
+
+# 55. Role Administration Permissions
+
+Recommended:
+
+```text
+role.view
+
+role.create
+
+role.update
+
+role.delete
+
+role.assign
+
+permission.view
+
+permission.assign
+```
+
+These permissions should be restricted to System/High Administration.
+
+---
+
+# 56. Reference Data Permissions
+
+Recommended:
+
+```text
+reference-data.view
+
+reference-data.create
+
+reference-data.update
+
+reference-data.deactivate
+```
+
+Reference data should generally be deactivated rather than destructively deleted when already used.
+
+---
+
+# 57. Audit Permissions
+
+Recommended:
+
+```text
+audit.view
+
+audit.view-sensitive
+```
+
+Audit access is highly restricted.
+
+---
+
+# 58. Workflow History Permission
+
+Recommended:
+
+```text
+workflow-history.view
+```
+
+Family Users should not receive unrestricted internal workflow history.
+
+They receive a simplified request timeline instead.
+
+---
+
+# 59. Report Permissions
+
+Recommended:
+
+```text
+report.view
+
+report.view-sensitive
+
+dashboard.view-operational
+
+dashboard.view-executive
+```
+
+---
+
+# 60. Export Permissions
+
+Recommended:
+
+```text
+export.basic
+
+export.sensitive
+
+export.identity-data
+
+export.health-data
+```
+
+Export authorization is separate from ordinary screen viewing.
+
+---
+
+# 61. Import Permissions
+
+Recommended:
+
+```text
+import.upload
+
+import.validate
+
+import.review
+
+import.apply
+```
+
+Uploading a file must not imply permission to apply data to the canonical registry.
+
+---
+
+# 62. System Administration Permissions
+
+Recommended:
+
+```text
+system.settings.view
+
+system.settings.update
+
+system.jobs.view
+
+system.jobs.manage
+
+system.health.view
+
+system.reference-data.manage
+```
+
+---
+
+# 63. Filament Access
+
+Filament is restricted to:
+
+```text
+System Administration
+
+High Administration
+```
+
+It is not the normal Staff operational interface.
+
+Users require explicit permission to access Filament.
+
+Example:
+
+```text
+system-admin.access
+```
+
+---
+
+# 64. Filament Does Not Bypass Authorization
+
+Filament access does not imply unrestricted access to all Models.
+
+Resources/pages/actions must still use:
+
+```text
+Policies
+
+Permissions
+
+Domain Actions
+```
+
+where appropriate.
+
+---
+
+# 65. SUPER_ADMIN Boundary
+
+SUPER_ADMIN may receive broad technical privileges.
+
+However, even SUPER_ADMIN should not silently bypass:
+
+```text
+Audit
+
+Critical transactions
+
+Workflow history
+
+Database constraints
+
+Domain invariants
+```
+
+Technical power does not erase data integrity.
+
+---
+
+# 66. Workflow-Aware Authorization
+
+Permission alone does not guarantee an action is currently allowed.
+
+Example:
+
+```text
+User has change-request.approve
+```
+
+but request status is:
+
+```text
+DRAFT
+```
+
+Approval must be denied.
+
+Authorization therefore includes:
+
+```text
+Permission
++
+Workflow State
+```
+
+---
+
+# 67. Maker-Checker Authorization
+
+Where maker-checker applies:
+
+```text
+Actor A creates/submits
+```
+
+and:
+
+```text
+Actor A attempts incompatible review/approval
+```
+
+the operation must be rejected even if Actor A holds the general permission.
+
+---
+
+# 68. Family User Ownership
+
+Family User Change Request access requires both:
+
+```text
+Authorized Family Scope
+```
+
+and where applicable:
+
+```text
+Request ownership / allowed relationship
+```
+
+A Family User must not access another Family's requests.
+
+---
+
+# 69. Family User DRAFT Access
+
+Family User may edit:
+
+```text
+Own authorized DRAFT
+```
+
+but not another user's draft unless future shared-family-user policy explicitly permits it.
+
+---
+
+# 70. Submitted Request Editing
+
+Once submitted, unrestricted editing is prohibited.
+
+The workflow determines whether the user may respond through clarification/resubmission.
+
+---
+
+# 71. Change Request Staff Notes
+
+Internal fields such as:
+
+```text
+review_notes
+```
+
+must be STAFF_ONLY unless explicitly separated into Family-visible content.
+
+---
+
+# 72. Family-Visible Clarification
+
+Clarification text intended for Family Users should have a dedicated safe representation.
+
+Do not reuse confidential internal notes as Family-visible messages.
+
+---
+
+# 73. Document Object Authorization
+
+Document access must consider:
+
+```text
+Actor
+
+Document Context
+
+Family
+
+Person
+
+Change Request
+
+Document Type
+
+Field Sensitivity
+
+Workflow State
+```
+
+A valid document ID is not sufficient.
+
+---
+
+# 74. Private File Download
+
+Recommended flow:
+
+```text
+Browser
+  ↓
+Laravel authorized endpoint
+  ↓
+DocumentPolicy
+  ↓
+Private Storage
+  ↓
+Controlled response / temporary delivery
+```
+
+Not:
+
+```text
+Browser
+  ↓
+Public storage path
+```
+
+---
+
+# 75. Signed URLs
+
+If temporary signed storage URLs are later used:
+
+```text
+Authorization must occur before URL issuance.
+```
+
+URLs should:
+
+```text
+Expire
+
+Be scoped
+
+Avoid unnecessary exposure
+```
+
+---
+
+# 76. Search Authorization
+
+Search results must obey authorization.
+
+Example:
+
+A user without access to Family B must not discover Family B through search suggestions.
+
+Search authorization includes both:
+
+```text
+Row filtering
++
+Field filtering
+```
+
+---
+
+# 77. Family User Search
+
+FAMILY_USER must not receive global:
+
+```text
+Person Search
+
+Family Search
+
+National ID Search
+```
+
+Family Portal search is restricted to the authorized Family context where needed.
+
+---
+
+# 78. Reports Authorization
+
+Reports must apply:
+
+```text
+Permission
 
 Data Scope
 
-Field Rules
+Sensitive Field Rules
+```
 
-Workflow-State Rules
+A report must not become an authorization bypass.
 
-Domain Authorization
+---
 
-API/UI Enforcement
+# 79. Executive Dashboard
 
-Negative Tests
+Executive Dashboard is a custom Next.js interface.
 
-Sensitive Data Review
+It uses Laravel APIs and authorization like every other frontend.
 
-Audit Requirements
+Executive visualization does not imply unrestricted underlying record access.
+
+---
+
+# 80. Aggregate Data
+
+Aggregate reporting may expose statistics without exposing underlying restricted identities.
+
+Example:
+
+```text
+Number of families with identified need
+```
+
+may be permitted while the viewer cannot access each Family's confidential case details.
+
+---
+
+# 81. Drill-Down
+
+Dashboard drill-down requires separate authorization.
+
+Permission to see:
+
+```text
+125 Families
+```
+
+does not automatically grant permission to open all 125 Family records.
+
+---
+
+# 82. Export Authorization
+
+Exports are high-risk because they allow bulk extraction.
+
+Therefore:
+
+```text
+View Permission
+≠
+Export Permission
+```
+
+Sensitive exports may require additional approval or audit.
+
+---
+
+# 83. Export Audit
+
+Exports should record:
+
+```text
+Actor
+
+Export Type
+
+Scope
+
+Timestamp
+
+Relevant filters
+
+Record count where appropriate
+```
+
+Sensitive values should not be duplicated unnecessarily into logs.
+
+---
+
+# 84. Import Authorization
+
+Import workflow separates:
+
+```text
+Upload
+
+Validate
+
+Review
+
+Apply
+```
+
+Different permissions may be assigned to each stage.
+
+---
+
+# 85. API Authorization
+
+Every protected API endpoint requires server-side authorization.
+
+Routes must not rely solely on frontend route guards.
+
+---
+
+# 86. API Route Guards
+
+Authentication middleware verifies the session.
+
+Policies/permissions verify the requested operation.
+
+Conceptually:
+
+```text
+Sanctum Authentication
+       ↓
+Permission / Policy
+       ↓
+Domain Rules
 ```
 
 ---
 
-# 181. Documentation Synchronization
+# 87. Sanctum Boundary
 
-The authorization model now aligns with:
+Laravel Sanctum provides first-party web authentication.
+
+A valid Sanctum session means:
 
 ```text
-01-PRODUCT.md v1.1
-
-02-DATA-DICTIONARY.md v1.1
-
-03-BUSINESS-RULES.md v1.1
-
-04-DATABASE.md v1.1
-
-05-WORKFLOWS.md v1.1
+User identity is authenticated
 ```
 
-`07-ROADMAP.md` must include implementation phases for:
+It does not mean:
 
 ```text
-RBAC
-
-Staff Authorization
-
-Family User Authentication
-
-User-Person Linking
-
-Family Scope Resolver
-
-Family Portal
-
-Change Request Engine
-
-Sensitive Field Masking
-
-Document Security
-
-Authorization Testing
-
-IDOR Testing
-
-Workflow Security
-
-Pilot Family User Testing
+User may access every API endpoint
 ```
 
 ---
 
-# 182. Document Status
+# 88. No localStorage Authorization Token
+
+The primary web architecture does not store authentication bearer tokens in:
+
+```text
+localStorage
+```
+
+Authorization is still performed server-side for every protected request.
+
+---
+
+# 89. CSRF
+
+State-changing first-party cookie-authenticated requests must follow Laravel/Sanctum CSRF protections.
+
+The frontend must not bypass CSRF protection.
+
+---
+
+# 90. CORS
+
+CORS configuration must explicitly allow only approved application origins.
+
+Initial topology:
+
+```text
+famboook.com
+
+api.famboook.com
+
+admin.famboook.com
+```
+
+CORS is not authorization.
+
+---
+
+# 91. Subdomain Authentication
+
+If cookie/session authentication spans approved Famboook subdomains, configuration must deliberately define:
+
+```text
+Cookie Domain
+
+Secure Cookies
+
+SameSite behavior
+
+Sanctum Stateful Domains
+
+CORS
+
+CSRF
+```
+
+Production configuration must use HTTPS.
+
+---
+
+# 92. API Resource Authorization
+
+API Resources control field exposure after object authorization.
+
+Examples:
+
+```text
+PersonDetailResource
+
+FamilyMemberResource
+
+FamilyPortalPersonResource
+```
+
+These may expose different fields for the same Person.
+
+---
+
+# 93. No Unrestricted Serialization
+
+Prohibited:
+
+```text
+return $person;
+```
+
+when the Model contains fields not authorized for every caller.
+
+Prefer:
+
+```text
+return new PersonDetailResource($person);
+```
+
+with controlled exposure.
+
+---
+
+# 94. Mass Assignment Security
+
+Authorization does not make unrestricted input safe.
+
+Prohibited:
+
+```text
+$person->update($request->all());
+```
+
+for sensitive canonical operations.
+
+Use:
+
+```text
+Validated DTO
+   ↓
+Domain Action
+   ↓
+Explicit allowed mutation
+```
+
+---
+
+# 95. Sensitive Field Updates
+
+Sensitive fields require dedicated permission and validation.
+
+Examples:
+
+```text
+National ID
+
+Life Status
+
+Death Date
+
+Household Head
+
+Family Membership
+
+Verified Document State
+```
+
+Generic `person.update` must not necessarily authorize all sensitive changes.
+
+---
+
+# 96. Death Authorization
+
+Recording official death should require:
+
+```text
+person.record-death
+```
+
+and appropriate data scope/domain conditions.
+
+A Family User does not receive this permission.
+
+They submit:
+
+```text
+DEATH_REPORT
+```
+
+instead.
+
+---
+
+# 97. Household Head Authorization
+
+Direct Staff operation requires:
+
+```text
+family.change-household-head
+```
+
+plus relevant scope and domain validation.
+
+Family User submits:
+
+```text
+HOUSEHOLD_HEAD_CHANGE
+```
+
+Change Request instead.
+
+---
+
+# 98. Membership Transfer Authorization
+
+Direct transfer requires:
+
+```text
+family-membership.transfer
+```
+
+plus authorization to affected Family context(s).
+
+Family User cannot directly transfer canonical membership.
+
+---
+
+# 99. Document Verification Authorization
+
+Uploading a document does not grant:
+
+```text
+document.verify
+```
+
+A Family User can upload permitted supporting documents but cannot verify them.
+
+---
+
+# 100. User-Person Link Authorization
+
+Creating/verifying Family User identity links is sensitive.
+
+Recommended permissions:
+
+```text
+user.link-person
+
+user.verify-person-link
+
+user.activate
+```
+
+The target Family User cannot self-verify the link.
+
+---
+
+# 101. Account Activation
+
+Account activation requires:
+
+```text
+Verified identity
+
+Eligible Person relationship
+
+Authorized Staff/System action
+```
+
+Exact activation mechanism remains pending.
+
+---
+
+# 102. Account Suspension
+
+Authorized administrators may suspend an account.
+
+Suspension should immediately prevent authenticated protected access according to session/security design.
+
+---
+
+# 103. Link Suspension
+
+A User-Person Link may be suspended independently from the User account.
+
+Example:
+
+```text
+Identity relationship requires investigation
+```
+
+The account may exist while Family Portal access is denied.
+
+---
+
+# 104. Access Re-evaluation
+
+Family Portal access is dynamic.
+
+Relevant events include:
+
+```text
+Household Head Change
+
+Membership Transfer
+
+Person Death
+
+Family Archive
+
+Account Suspension
+
+Link Suspension
+
+Link End
+```
+
+The next authorization check must reflect current canonical state.
+
+---
+
+# 105. No Permanent Frontend Scope Cache
+
+The frontend may cache server state for UX through TanStack Query.
+
+However, cached authorization context must not be considered permanent authority.
+
+Laravel reauthorizes requests.
+
+---
+
+# 106. Permission Caching
+
+Spatie permission caching may be used according to package architecture.
+
+Permission changes must be reflected safely and promptly according to security requirements.
+
+---
+
+# 107. Navigation Authorization
+
+Next.js navigation should reflect user capabilities.
+
+Example Staff navigation:
+
+```text
+Dashboard
+
+Families
+
+Persons
+
+Assessments
+
+Needs
+
+Assistance
+
+Requests
+
+Reports
+```
+
+Only relevant sections should be displayed.
+
+But hidden navigation is not a security boundary.
+
+---
+
+# 108. Family Portal Navigation
+
+Possible navigation:
+
+```text
+Home
+
+My Family
+
+Members
+
+Residence
+
+Requests
+
+Documents
+
+Notifications
+```
+
+Visibility depends on approved Family Portal capabilities.
+
+---
+
+# 109. Filament Navigation
+
+Filament navigation should focus on:
+
+```text
+Users
+
+Roles
+
+Permissions
+
+Reference Data
+
+System Settings
+
+Audit
+
+Jobs
+
+Technical Administration
+```
+
+Operational Staff workflows should remain in the custom Next.js Staff Application.
+
+---
+
+# 110. Permission Naming Convention
+
+Use:
+
+```text
+resource.action
+```
+
+Examples:
+
+```text
+family.view
+
+person.create
+
+assessment.approve
+
+change-request.apply
+
+document.verify
+
+report.view
+```
+
+This convention must remain consistent.
+
+---
+
+# 111. Permission Granularity
+
+Avoid both extremes:
+
+Too broad:
+
+```text
+admin
+```
+
+Too fragmented:
+
+```text
+person-first-name-view
+person-last-name-view
+person-birth-day-view
+...
+```
+
+Field-level rules should handle sensitive-field differences without creating unusable permission catalogs.
+
+---
+
+# 112. Default Deny
+
+Authorization follows:
+
+```text
+Default Deny
+```
+
+If no explicit rule grants an operation:
+
+```text
+DENY
+```
+
+This is especially important for sensitive Family Portal fields.
+
+---
+
+# 113. Least Privilege
+
+Users should receive the minimum permissions required for their responsibilities.
+
+Roles should not accumulate unrelated capabilities merely for convenience.
+
+---
+
+# 114. Separation of Duties
+
+High-risk functions may require separation among:
+
+```text
+Creator
+
+Reviewer
+
+Approver
+
+Applier
+
+System Administrator
+```
+
+Exact separation remains operation-specific.
+
+---
+
+# 115. Emergency Access
+
+If emergency/break-glass access is introduced later, it must require:
+
+```text
+Explicit activation
+
+Reason
+
+Strong authentication
+
+Time limitation
+
+Enhanced audit
+
+Review
+```
+
+No silent emergency bypass is permitted.
+
+---
+
+# 116. Audit Authorization
+
+Audit records are sensitive.
+
+Only explicitly authorized roles may access them.
+
+Audit access itself may be auditable.
+
+---
+
+# 117. Audit Integrity
+
+Ordinary operational users must not be able to modify/delete audit history.
+
+---
+
+# 118. Security Logging
+
+Authorization failures may be logged where useful.
+
+Logs should avoid exposing unnecessary sensitive data.
+
+Repeated suspicious object-access failures may support future security monitoring.
+
+---
+
+# 119. Error Responses
+
+Authorization failures should not unnecessarily reveal whether a restricted object exists.
+
+Depending on endpoint/context, responses may use:
+
+```text
+403 Forbidden
+```
+
+or:
+
+```text
+404 Not Found
+```
+
+according to the security strategy.
+
+---
+
+# 120. Family Portal Privacy
+
+Family access does not imply unrestricted access to every adult member's sensitive information.
+
+Sensitive categories require explicit policy.
+
+Examples:
+
+```text
+Health
+
+Disability
+
+National ID
+
+Private Mobile
+
+Confidential Notes
+
+Sensitive Documents
+```
+
+---
+
+# 121. Adult Member Privacy
+
+Exact policy for adult Family members remains pending.
+
+Until resolved, restricted sensitive fields should default to:
+
+```text
+HIDDEN
+```
+
+for other Family members.
+
+---
+
+# 122. Minor Privacy
+
+Guardian/parent access rules for minors require explicit policy.
+
+Family membership alone must not be used as the only sensitive-data authorization rule.
+
+---
+
+# 123. Health Portal Visibility
+
+Health data is:
+
+```text
+HIDDEN BY DEFAULT
+```
+
+in Family Portal until explicit visibility rules are approved.
+
+---
+
+# 124. Needs Portal Visibility
+
+Needs may later be selectively visible.
+
+Exact rules remain pending.
+
+Internal scoring, confidential notes, or prioritization logic should not automatically be exposed.
+
+---
+
+# 125. Assistance Portal Visibility
+
+Assistance records may later be selectively visible.
+
+Internal operational information remains separate from Family-visible assistance history.
+
+---
+
+# 126. Notifications Authorization
+
+Users may only retrieve notifications addressed to their own authenticated identity.
+
+A user cannot request another user's notifications by ID.
+
+---
+
+# 127. Notification Content
+
+Notification payloads should contain minimal sensitive data.
+
+The notification should normally link the user to an authorized application view rather than embedding full confidential content.
+
+---
+
+# 128. Family Portal Change Request Visibility
+
+Family Users may view requests within their authorized Family scope according to ownership/shared-family policy.
+
+Internal Staff-only fields are excluded.
+
+---
+
+# 129. Executive Authorization
+
+Executive access should normally emphasize:
+
+```text
+Aggregate KPIs
+
+Operational trends
+
+Program indicators
+
+High-level drill-down where authorized
+```
+
+Executive role does not automatically mean access to every sensitive identity/health field.
+
+---
+
+# 130. System Administration vs Executive Access
+
+These concepts are distinct.
+
+```text
+Executive Dashboard
+→ Business / operational insight
+
+Filament System Administration
+→ Technical / configuration control
+```
+
+An executive user does not automatically need Filament.
+
+A technical System Administrator does not automatically need confidential case details.
+
+---
+
+# 131. Authorization Testing
+
+Every major resource requires authorization tests.
+
+Test categories:
+
+```text
+Unauthenticated
+
+Correct Permission
+
+Missing Permission
+
+Wrong Data Scope
+
+Wrong Object Scope
+
+Wrong Workflow State
+
+Sensitive Field Exposure
+
+Cross-Family Access
+
+Family User Ownership
+
+System Administration Access
+```
+
+---
+
+# 132. IDOR Tests
+
+Required examples:
+
+```text
+Family User A → Family B
+DENY
+
+Family User A → Person in Family B
+DENY
+
+Family User A → Change Request in Family B
+DENY
+
+Family User A → Document in Family B
+DENY
+```
+
+---
+
+# 133. Field Exposure Tests
+
+Required:
+
+```text
+Unauthorized National ID
+→ absent or masked
+
+Unauthorized Health Data
+→ absent
+
+Staff Notes in Family Portal
+→ absent
+
+Internal Workflow Metadata
+→ absent
+```
+
+---
+
+# 134. Workflow Authorization Tests
+
+Required:
+
+```text
+Family User attempts approve
+→ DENY
+
+Reviewer without approve permission attempts approval
+→ DENY
+
+Approver attempts invalid-state approval
+→ DENY
+
+Unauthorized Staff attempts apply
+→ DENY
+```
+
+---
+
+# 135. Filament Authorization Tests
+
+Required:
+
+```text
+Ordinary Staff accesses admin.famboook.com
+→ DENY
+
+Authorized System Administrator
+→ ALLOW
+
+Authorized Filament user attempts prohibited domain operation
+→ Domain Policy still applies
+```
+
+---
+
+# 136. Export Tests
+
+Required:
+
+```text
+Can View Report
++
+Cannot Export
+→ Export denied
+```
+
+and:
+
+```text
+Can Export Basic
++
+Cannot Export Identity Data
+→ Sensitive identity fields excluded/denied
+```
+
+---
+
+# 137. Authorization Invariants
+
+```text
+AUTH-INV-001
+Authentication and authorization are separate.
+
+AUTH-INV-002
+Laravel is the authoritative authorization layer.
+
+AUTH-INV-003
+All interfaces use the same authorization model.
+
+AUTH-INV-004
+Roles alone do not determine access.
+
+AUTH-INV-005
+Permissions alone do not override data scope.
+
+AUTH-INV-006
+Permissions alone do not override workflow state.
+
+AUTH-INV-007
+User and Person are separate identities.
+
+AUTH-INV-008
+Family Portal requires an explicit active User-Person Link.
+
+AUTH-INV-009
+Family Portal access is dynamically resolved through canonical membership.
+
+AUTH-INV-010
+FAMILY_USER role alone does not authorize any Family.
+
+AUTH-INV-011
+No canonical users.family_id shortcut is used.
+
+AUTH-INV-012
+Object IDs never constitute authorization.
+
+AUTH-INV-013
+Object-level authorization is enforced server-side.
+
+AUTH-INV-014
+Sensitive field authorization is enforced server-side.
+
+AUTH-INV-015
+Unauthorized sensitive fields must not be sent to the browser.
+
+AUTH-INV-016
+Family membership does not grant unrestricted sensitive-data access.
+
+AUTH-INV-017
+Health data is restricted by default.
+
+AUTH-INV-018
+Confidential Staff notes are never exposed to Family Users.
+
+AUTH-INV-019
+Family Users cannot directly mutate protected canonical registry state.
+
+AUTH-INV-020
+Family Users cannot review, approve, reject, or apply Change Requests.
+
+AUTH-INV-021
+Document upload does not imply document verification permission.
+
+AUTH-INV-022
+Private document access requires authorization.
+
+AUTH-INV-023
+View permission does not automatically grant export permission.
+
+AUTH-INV-024
+Filament access does not bypass Policies or Domain Actions.
+
+AUTH-INV-025
+SUPER_ADMIN does not bypass database/domain integrity.
+
+AUTH-INV-026
+Frontend navigation visibility is not a security boundary.
+
+AUTH-INV-027
+Frontend permission state is not authoritative.
+
+AUTH-INV-028
+API Resources control sensitive field exposure.
+
+AUTH-INV-029
+High-risk actions may require separation of duties.
+
+AUTH-INV-030
+Authorization follows default-deny and least-privilege principles.
+
+AUTH-INV-031
+Executive access and System Administration access are distinct.
+
+AUTH-INV-032
+A valid Sanctum session does not imply resource authorization.
+
+AUTH-INV-033
+Family Portal access must reflect current canonical state.
+
+AUTH-INV-034
+Search and reports must respect authorization.
+
+AUTH-INV-035
+Imports and exports require explicit permissions.
+
+AUTH-INV-036
+Background jobs performing protected actions must operate under authorized system/domain rules.
+
+AUTH-INV-037
+Sensitive information must not be protected only by client-side hiding.
+
+AUTH-INV-038
+Cross-Family access must be explicitly denied unless authorized.
+
+AUTH-INV-039
+Family User identity verification cannot be self-approved.
+
+AUTH-INV-040
+System Administration permissions do not automatically grant confidential case-data access.
+```
+
+---
+
+# 138. Approved Authorization Decisions
+
+### AUTH-ADR-001
+Laravel is the authoritative authorization layer.
+
+### AUTH-ADR-002
+Spatie Laravel Permission provides RBAC.
+
+### AUTH-ADR-003
+Laravel Policies provide object-level authorization.
+
+### AUTH-ADR-004
+Query/Data Scopes restrict accessible record sets.
+
+### AUTH-ADR-005
+Field-level authorization is required for sensitive information.
+
+### AUTH-ADR-006
+Roles do not replace object/data-scope authorization.
+
+### AUTH-ADR-007
+Users and Persons remain separate identities.
+
+### AUTH-ADR-008
+Family Users require explicit User-Person Links.
+
+### AUTH-ADR-009
+User-Person Links require verification.
+
+### AUTH-ADR-010
+Family access derives from current canonical membership.
+
+### AUTH-ADR-011
+No canonical `users.family_id` authorization shortcut is used.
+
+### AUTH-ADR-012
+FAMILY_USER is separate from Household Head domain status.
+
+### AUTH-ADR-013
+Recommended V1 Family User eligibility is verified current Household Head.
+
+### AUTH-ADR-014
+Family User sensitive access follows default-deny.
+
+### AUTH-ADR-015
+National ID supports field-specific authorization.
+
+### AUTH-ADR-016
+Health and disability information are restricted.
+
+### AUTH-ADR-017
+Confidential Staff notes are not Family-visible.
+
+### AUTH-ADR-018
+Family Users use Change Requests rather than unrestricted canonical CRUD.
+
+### AUTH-ADR-019
+Family Users cannot perform Staff workflow actions.
+
+### AUTH-ADR-020
+Document download requires authorization.
+
+### AUTH-ADR-021
+Upload and verification permissions are separate.
+
+### AUTH-ADR-022
+Search respects row and field authorization.
+
+### AUTH-ADR-023
+Family Users do not receive global Family/Person search.
+
+### AUTH-ADR-024
+Report and export permissions are separate.
+
+### AUTH-ADR-025
+Sensitive exports may use dedicated permissions.
+
+### AUTH-ADR-026
+Audit access is restricted.
+
+### AUTH-ADR-027
+Frontend authorization checks exist for UX only.
+
+### AUTH-ADR-028
+API Resources enforce context-specific field exposure.
+
+### AUTH-ADR-029
+Next.js Staff Application uses Laravel authorization.
+
+### AUTH-ADR-030
+Next.js Family Portal uses Laravel authorization.
+
+### AUTH-ADR-031
+Executive Dashboard uses Laravel authorization.
+
+### AUTH-ADR-032
+Filament is restricted to System / High Administration.
+
+### AUTH-ADR-033
+Filament does not bypass Policies or Domain Actions.
+
+### AUTH-ADR-034
+System Administration and Executive access are distinct.
+
+### AUTH-ADR-035
+Laravel Sanctum provides first-party authentication.
+
+### AUTH-ADR-036
+Primary web authentication does not rely on localStorage bearer tokens.
+
+### AUTH-ADR-037
+CORS is not treated as authorization.
+
+### AUTH-ADR-038
+Object-level IDOR protection is mandatory.
+
+### AUTH-ADR-039
+Authorization uses default-deny.
+
+### AUTH-ADR-040
+Authorization follows least privilege.
+
+### AUTH-ADR-041
+Critical Domain Actions may reauthorize for defense in depth.
+
+### AUTH-ADR-042
+Permission naming follows `resource.action`.
+
+### AUTH-ADR-043
+Family Portal authorization is reevaluated after relevant canonical changes.
+
+### AUTH-ADR-044
+View access does not automatically grant drill-down, export, or sensitive-field access.
+```
+
+---
+
+# 139. Pending Authorization Decisions
+
+```text
+PAUTH-001
+Exact Family User identity-verification mechanism.
+
+PAUTH-002
+Exact Family User account activation mechanism.
+
+PAUTH-003
+Whether Family Portal V1 supports more than one Family User per Family.
+
+PAUTH-004
+Guardian authorization rules.
+
+PAUTH-005
+Authorized Representative rules.
+
+PAUTH-006
+Exact adult-member privacy policy.
+
+PAUTH-007
+Exact minor/guardian privacy policy.
+
+PAUTH-008
+Exact Family Portal National ID masking format.
+
+PAUTH-009
+Whether Family User may view their own full National ID.
+
+PAUTH-010
+Exact Family Portal health visibility.
+
+PAUTH-011
+Exact Family Portal disability visibility.
+
+PAUTH-012
+Exact Needs visibility.
+
+PAUTH-013
+Exact Assistance visibility.
+
+PAUTH-014
+Exact Document types visible to Family Users.
+
+PAUTH-015
+Exact Staff Data Scope assignment model.
+
+PAUTH-016
+Whether REGION is required in V1.
+
+PAUTH-017
+Whether BRANCH is required in V1.
+
+PAUTH-018
+Exact maker-checker rules by operation.
+
+PAUTH-019
+Exact HIGH-risk approval separation.
+
+PAUTH-020
+Whether selected actions require re-authentication.
+
+PAUTH-021
+Exact Staff/System Administrator 2FA policy.
+
+PAUTH-022
+Exact session timeout policy.
+
+PAUTH-023
+Exact account recovery authorization.
+
+PAUTH-024
+Exact export approval requirements.
+
+PAUTH-025
+Exact sensitive-report permissions.
+
+PAUTH-026
+Exact audit-sensitive permission scope.
+
+PAUTH-027
+Exact emergency/break-glass policy.
+
+PAUTH-028
+Exact Filament role eligibility.
+
+PAUTH-029
+Whether executive users receive record drill-down by default or separate permission.
+
+PAUTH-030
+Exact handling of permissions after role changes during an active session.
+
+PAUTH-031
+Exact API rate-limit policies by actor type.
+
+PAUTH-032
+Exact signed-document URL expiry policy.
+
+PAUTH-033
+Whether Family User request visibility is requester-only or shared among authorized Family Users when multiple users are later supported.
+```
+
+---
+
+# 140. Initial Role Matrix
+
+This is a baseline, not a substitute for explicit permissions.
+
+| Capability | Super Admin | Administrator | Data Entry | Reviewer | Social Worker | Reports Viewer | Family User |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Staff App | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| Family Portal | Policy | Policy | Policy | Policy | Policy | Policy | ✓ |
+| Filament | ✓ | Limited/Policy | — | — | — | — | — |
+| View Family | ✓ | ✓ | Scope | Scope | Scope | Report scope | Own authorized |
+| Create Family | ✓ | ✓ | ✓ | Policy | Policy | — | — |
+| Update Canonical Family | ✓ | ✓ | Draft/limited | Policy | Limited | — | — |
+| View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
+| Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
+| Record Official Death | Permission | Permission | — | Policy | — | — | — |
+| Change Household Head | Permission | Permission | — | Policy | — | — | Request only |
+| Transfer Membership | Permission | Permission | — | Policy | — | — | Request only |
+| Assessments | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| Needs | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| Assistance | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| Review Change Request | Permission | ✓ | — | ✓ | Policy | — | — |
+| Approve Change Request | Permission | Permission | — | Permission | Policy | — | — |
+| Apply Change Request | Permission | Permission | — | Permission | Policy | — | — |
+| Submit Change Request | — | — | — | — | — | — | ✓ |
+| View Audit | ✓ | Permission | — | Limited | — | — | — |
+| View Executive Dashboard | Permission | Permission | — | — | Policy | ✓ | — |
+| Export Basic | Permission | Permission | Policy | Policy | Policy | Permission | — |
+| Export Sensitive | Permission | Permission | — | Policy | Policy | Policy | — |
+| Manage Users/Roles | ✓ | Permission | — | — | — | — | — |
+| System Settings | ✓ | Permission | — | — | — | — | — |
+
+`Policy`, `Scope`, and `Permission` deliberately indicate that role membership alone is insufficient.
+
+---
+
+# 141. Authorization Request Pattern
+
+Typical Staff request:
+
+```text
+User
+ ↓
+Sanctum Authentication
+ ↓
+Route Middleware
+ ↓
+Permission
+ ↓
+Policy
+ ↓
+Data/Object Scope
+ ↓
+Workflow State
+ ↓
+Domain Rule
+ ↓
+Domain Action
+```
+
+Typical Family Portal request:
+
+```text
+FAMILY_USER
+ ↓
+Sanctum Authentication
+ ↓
+Active User-Person Link
+ ↓
+Active Membership
+ ↓
+Family Access Policy
+ ↓
+Object Authorization
+ ↓
+Field Authorization
+ ↓
+Workflow Rule
+ ↓
+Domain Action
+```
+
+---
+
+# 142. Authorization Failure Principle
+
+Authorization must fail safely.
+
+If Famboook cannot establish that the actor is permitted:
+
+```text
+DENY
+```
+
+The system must never infer authorization from:
+
+```text
+Visible button
+
+Known URL
+
+Known object ID
+
+Frontend role state
+
+Family surname
+
+Family code
+
+Paper form number
+
+National ID knowledge
+```
+
+---
+
+# 143. Definition of Authorization Readiness
+
+Authorization is ready for implementation when:
+
+```text
+Initial roles are defined
+
+Permission naming convention is approved
+
+Core permission catalog is defined
+
+Family User identity model is approved
+
+Family access resolution is approved
+
+Sensitive field categories are identified
+
+Policies are mapped to core resources
+
+Workflow actions are permission-aware
+
+Filament boundary is defined
+
+Staff/Executive/Family interfaces share Laravel authorization
+
+Default-deny is accepted
+
+Authorization test requirements are defined
+```
+
+Not every future privacy exception must be resolved before the foundation is implemented.
+
+Unresolved sensitive visibility defaults to denial.
+
+---
+
+# 144. Final Authorization Principle
+
+Famboook does not ask only:
+
+```text
+"What role does this user have?"
+```
+
+It asks:
+
+```text
+Who is the user?
+
+What role do they have?
+
+What permission do they have?
+
+Which records are in their scope?
+
+Are they authorized for this exact object?
+
+Which fields may they see?
+
+Is this action valid in the current workflow state?
+
+Do domain rules allow it?
+```
+
+Therefore:
+
+```text
+Role
+  ↓
+Permission
+  ↓
+Scope
+  ↓
+Object
+  ↓
+Field
+  ↓
+Workflow
+  ↓
+Domain Rule
+  ↓
+Authorized Action
+```
+
+Laravel answers these questions.
+
+Next.js presents the resulting experience.
+
+Filament remains subject to the same rules.
+
+---
+
+# 145. Document Status
 
 ```text
 Project: Famboook
-Document: Permissions & Access Control
-Version: 1.1
+Document: Permissions & Authorization
+Version: 1.2
 Status: APPROVED
 Date: 2026-09-22
 ```
 
 ---
 
-# 183. Change Log
+# 146. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Approved | Initial Staff RBAC, scopes, field-level restrictions, workflow authorization, sensitive data and export controls |
-| 1.1 | 2026-09-22 | Approved | Added FAMILY_USER, SELF/FAMILY scopes, User-Person Link permissions, Family Portal authorization, Change Request permissions, request-type permissions, member field restrictions, document authorization, IDOR protection, Family User security rules, and Portal authorization tests |
-
----
-
-# 184. Next Step
-
-Documentation synchronization is now:
-
-```text
-00-PROJECT-CONTEXT.md          APPROVED
-
-01-PRODUCT.md                  UPDATED — v1.1
-
-02-DATA-DICTIONARY.md          UPDATED — v1.1
-
-03-BUSINESS-RULES.md           UPDATED — v1.1
-
-04-DATABASE.md                 UPDATED — v1.1
-
-05-WORKFLOWS.md                UPDATED — v1.1
-
-06-PERMISSIONS.md              UPDATED — v1.1
-
-        ↓
-
-07-ROADMAP.md                  NEXT
-```
-
-The Roadmap must convert the approved architecture into implementation phases without weakening:
-
-```text
-Person identity independence
-
-Historical Family Membership
-
-Family User separation
-
-Change Request architecture
-
-Workflow history
-
-Sensitive data protection
-
-Server-side authorization
-
-Auditability
-
-Testing
-```
+| 1.0 | 2026-09-22 | Superseded | Initial permissions model |
+| 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
+| 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
