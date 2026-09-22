@@ -6,302 +6,382 @@
 **Status:** Approved  
 **Last Updated:** 2026-09-22  
 **Project:** Famboook — Family Registry & Case Management System  
-**Database:** PostgreSQL
+**Database:** PostgreSQL 16+  
+**Backend:** Laravel
 
 ---
 
 # 1. Purpose
 
-This document defines the logical and physical database architecture for Famboook V1.
+This document defines the physical database architecture for Famboook.
 
 It translates the approved:
 
-- `01-PRODUCT.md`
-- `02-DATA-DICTIONARY.md`
-- `03-BUSINESS-RULES.md`
-- `05-WORKFLOWS.md`
+```text
+Product Definition
+Data Dictionary
+Business Rules
+```
 
-into a PostgreSQL-oriented relational model.
+into a relational PostgreSQL model suitable for Laravel implementation.
 
-This document defines:
+The architecture supports:
 
-- Core tables.
-- Primary keys.
-- Foreign keys.
-- Unique constraints.
-- Indexes.
-- Nullability.
-- Historical-data strategy.
-- Reference tables.
-- Workflow history.
-- Delete behavior.
-- Sensitive-data considerations.
-- Laravel implementation conventions.
-
-Actual Laravel migrations must follow this document.
+```text
+Family Registry
+Person Registry
+Historical Family Membership
+Household Head Management
+Residence & Displacement
+Health
+Disability
+Education
+Employment
+Assessments
+Paper/Digital Source Forms
+Needs
+Assistance
+Documents
+Case Notes
+Family Portal
+Family User Accounts
+Change Requests
+Workflow History
+Notifications
+Permissions
+Audit
+Reporting
+```
 
 ---
 
-# 2. Database Technology
+# 2. Database Principles
 
-Famboook V1 uses:
+Famboook follows these database principles:
 
 ```text
-PostgreSQL
+Normalize core registry data.
+
+Preserve history.
+
+Do not model paper-form limits as database limits.
+
+Separate authentication identity from registry identity.
+
+Separate Person identity from Family membership.
+
+Separate proposed changes from canonical registry data.
+
+Use relational tables for canonical domain data.
+
+Use JSONB only where flexible structured metadata is justified.
+
+Use database constraints for critical invariants where feasible.
+
+Use application/domain logic for complex business rules.
+
+Avoid destructive cascades on historical data.
+
+Audit critical operations.
+
+Use private storage for sensitive files.
 ```
 
-Recommended production version:
+---
+
+# 3. Database Engine
+
+Recommended:
 
 ```text
 PostgreSQL 16+
 ```
 
-The application layer is expected to use:
+Reasons include:
 
 ```text
-Laravel
+Strong relational constraints
+Partial unique indexes
+JSONB
+Transactional integrity
+Advanced indexing
+Reliable concurrency
+Laravel support
 ```
-
-with:
-
-```text
-Eloquent ORM
-```
-
----
-
-# 3. Core Database Principles
-
-## DB-P01 — Internal Primary Keys
-
-Core tables use internal primary keys.
-
-Recommended:
-
-```text
-BIGINT
-```
-
-Laravel:
-
-```php
-$table->id();
-```
-
-Public identifiers such as:
-
-```text
-FAM-000510
-PER-001825
-```
-
-are business identifiers, not primary keys.
-
----
-
-## DB-P02 — Foreign Keys
-
-Relationships must use database foreign keys wherever appropriate.
-
-Example:
-
-```text
-family_memberships.family_id
-    → families.id
-```
-
----
-
-## DB-P03 — Referential Integrity
-
-Critical relationships must be enforced by PostgreSQL.
-
-Application validation alone is not sufficient.
-
----
-
-## DB-P04 — Historical Data
-
-Historical information should normally be preserved rather than overwritten.
-
----
-
-## DB-P05 — Sensitive Data
-
-Sensitive fields require application-level authorization and, where approved, encryption.
-
----
-
-## DB-P06 — No Production Data in Git
-
-Production data, dumps, forms, documents, and exports must never be committed to the repository.
 
 ---
 
 # 4. Core Architecture
 
-The V1 relational model is organized into the following domains:
-
 ```text
-IDENTITY
-├── families
-├── persons
-├── family_memberships
-└── person_relationships
+IDENTITY & REGISTRY
+
+families
+persons
+family_memberships
+relationship_types
+person_relationships
+marital_statuses
+
 
 LOCATION
-└── family_residences
 
-HEALTH
-├── person_health_profiles
-├── person_health_conditions
-└── person_disabilities
+governorates
+localities
+housing_types
+tenure_types
+housing_condition_types
+family_residences
 
-SOCIOECONOMIC
-├── person_education
-└── person_employment
+
+HEALTH & DISABILITY
+
+person_health_profiles
+health_condition_types
+person_health_conditions
+disability_types
+person_disabilities
+
+
+EDUCATION & EMPLOYMENT
+
+education_levels
+education_statuses
+person_education
+
+employment_statuses
+employment_sectors
+person_employment
+
 
 ASSESSMENT & WORKFLOW
-├── assessments
-├── form_submissions
-└── workflow_events
 
-CASE MANAGEMENT
-├── family_needs
-├── assistance_records
-├── person_notes
-└── case_notes
+assessment_types
+assessments
+
+form_types
+form_submissions
+
+workflow_events
+
 
 DOCUMENTS
-└── documents
 
-SECURITY
-├── users
-├── roles
-├── permissions
-└── audit_logs
+document_types
+documents
 
-REFERENCE DATA
-└── lookup tables
+
+NEEDS & ASSISTANCE
+
+need_types
+family_needs
+
+assistance_types
+assistance_records
+
+
+CASE MANAGEMENT
+
+note_types
+person_notes
+case_notes
+
+
+FAMILY PORTAL & SELF-SERVICE
+
+user_person_links
+
+change_request_types
+change_requests
+
+notifications
+
+
+SECURITY & ACCESS
+
+users
+roles
+permissions
+model_has_roles
+model_has_permissions
+role_has_permissions
+
+
+AUDIT
+
+audit_logs
 ```
 
 ---
 
-# 5. Important Architecture Decision — Family Membership
+# 5. Identifier Strategy
 
-Data Dictionary V1 originally represented current family membership using:
+Internal primary keys:
 
 ```text
-persons.family_id
+BIGINT
 ```
 
-Database V1 replaces that as the canonical membership model with:
+Examples:
 
 ```text
-family_memberships
+families.id
+persons.id
+change_requests.id
 ```
 
-Therefore:
+Business identifiers are stored separately.
+
+Examples:
 
 ```text
+FAM-000510
+PER-001825
+CRQ-000101
+ASM-000250
+```
+
+Business identifiers must not be used as physical primary keys.
+
+---
+
+# 6. Timestamp Standard
+
+Standard Laravel timestamps:
+
+```text
+created_at
+updated_at
+```
+
+Historical/domain timestamps are stored separately.
+
+Examples:
+
+```text
+submitted_at
+verified_at
+approved_at
+applied_at
+started_at
+ended_at
+```
+
+Recommended internal timestamp policy:
+
+```text
+UTC
+```
+
+Application UI may convert timestamps to the required local timezone.
+
+---
+
+# 7. Soft Deletion Strategy
+
+Soft deletes may be used for selected primary entities such as:
+
+```text
+families
 persons
 ```
 
-represents human identity.
+using:
 
-And:
+```text
+deleted_at
+```
+
+However, soft deletion must not replace proper domain history.
+
+Example:
+
+```text
+Person moves Family
+```
+
+must use:
 
 ```text
 family_memberships
 ```
 
-represents household membership.
-
-This allows:
+not:
 
 ```text
-Person
-  ↓
-Family A
-2025 → 2026
-  ↓
-Family B
-2026 → Present
+persons.deleted_at
 ```
-
-without creating another Person record.
-
-`persons.family_id` SHOULD NOT be the canonical family relationship.
 
 ---
 
-# 6. families
+# 8. families
 
 Purpose:
 
-Represents a household/family identity.
+Represents one persistent Family/household registry entity.
 
 ```text
 families
 ```
 
+Recommended columns:
+
 | Column | Type | Null | Constraint |
 |---|---|---:|---|
 | id | BIGINT | No | PK |
-| family_code | VARCHAR(20) | No | UNIQUE |
+| family_code | VARCHAR(30) | No | UNIQUE |
 | status | VARCHAR(30) | No | |
 | registration_date | DATE | No | |
-| registration_source | VARCHAR(30) | No | |
-| paper_form_no | VARCHAR(50) | Yes | |
+| registration_source | VARCHAR(50) | No | |
+| paper_form_no | VARCHAR(100) | Yes | |
 | notes | TEXT | Yes | |
 | created_by | BIGINT | Yes | FK users |
 | updated_by | BIGINT | Yes | FK users |
 | created_at | TIMESTAMP | No | |
 | updated_at | TIMESTAMP | No | |
-| deleted_at | TIMESTAMP | Yes | Soft delete |
+| deleted_at | TIMESTAMP | Yes | |
 
-### Indexes
-
-```text
-UNIQUE family_code
-
-INDEX status
-INDEX registration_date
-INDEX created_at
-```
-
-### Example
+Example:
 
 ```text
-id: 510
-family_code: FAM-000510
-status: APPROVED
+FAM-000510
 ```
 
 ---
 
-# 7. persons
+# 9. Family Code Constraint
+
+```sql
+UNIQUE (family_code)
+```
+
+The application generates Family Codes.
+
+The code must remain immutable during normal operations.
+
+---
+
+# 10. persons
 
 Purpose:
 
-Represents one human identity.
+Represents one persistent human identity.
 
-```text
-persons
-```
+Recommended columns:
 
 | Column | Type | Null | Constraint |
 |---|---|---:|---|
 | id | BIGINT | No | PK |
-| person_code | VARCHAR(20) | No | UNIQUE |
-| full_name | VARCHAR(200) | No | |
-| national_id | VARCHAR(20) | Yes | See ID rules |
+| person_code | VARCHAR(30) | No | UNIQUE |
+| full_name | VARCHAR(255) | No | |
+| national_id | VARCHAR(20) | Yes | |
 | gender | VARCHAR(20) | No | |
 | birth_date | DATE | Yes | |
-| marital_status_id | BIGINT | Yes | FK |
-| life_status | VARCHAR(20) | No | |
-| mobile | VARCHAR(20) | Yes | |
-| alternate_mobile | VARCHAR(20) | Yes | |
+| death_date | DATE | Yes | |
+| marital_status_id | BIGINT | Yes | FK marital_statuses |
+| life_status | VARCHAR(30) | No | |
+| mobile | VARCHAR(30) | Yes | |
+| alternate_mobile | VARCHAR(30) | Yes | |
 | notes | TEXT | Yes | |
 | is_active | BOOLEAN | No | DEFAULT TRUE |
 | created_by | BIGINT | Yes | FK users |
@@ -310,46 +390,120 @@ persons
 | updated_at | TIMESTAMP | No | |
 | deleted_at | TIMESTAMP | Yes | |
 
-### Indexes
+Important:
 
 ```text
-UNIQUE person_code
-
-INDEX national_id
-INDEX full_name
-INDEX mobile
-INDEX birth_date
-INDEX life_status
+persons does NOT contain canonical family_id.
 ```
 
-National ID uniqueness requires special handling because:
-
-- IDs may be missing.
-- Legacy duplicates may require review.
-- Duplicate-resolution workflows must remain possible.
-
-The final production constraint will be decided after confirming the official National ID rules.
-
----
-
-# 8. family_memberships
-
-Purpose:
-
-Represents the relationship between a Person and a Family over time.
-
-This is a core Famboook table.
+Family membership is represented through:
 
 ```text
 family_memberships
 ```
+
+---
+
+# 11. Person Code Constraint
+
+```sql
+UNIQUE (person_code)
+```
+
+Example:
+
+```text
+PER-001825
+```
+
+---
+
+# 12. Death Date Constraint
+
+Recommended database check:
+
+```sql
+CHECK (
+    death_date IS NULL
+    OR birth_date IS NULL
+    OR death_date >= birth_date
+)
+```
+
+Application/domain validation additionally enforces:
+
+```text
+death_date must not be future date
+
+life_status = ALIVE
+→ death_date normally NULL
+
+death_date present
+→ life_status normally DECEASED
+```
+
+Complex lifecycle rules remain in domain logic.
+
+---
+
+# 13. National ID
+
+Use:
+
+```text
+VARCHAR
+```
+
+not:
+
+```text
+INTEGER
+BIGINT
+```
+
+This preserves:
+
+```text
+Leading zeros
+Formatting
+Future format flexibility
+```
+
+The exact encryption/search strategy remains a pending security decision.
+
+---
+
+# 14. National ID Index
+
+Initial index:
+
+```sql
+CREATE INDEX idx_persons_national_id
+ON persons (national_id);
+```
+
+If a normalized/search-hash architecture is introduced, this index should be replaced accordingly.
+
+Do not create an unconditional uniqueness rule until exceptional identity cases and the approved National ID policy are finalized.
+
+Exact duplicate conflicts are handled through duplicate review.
+
+---
+
+# 15. family_memberships
+
+Purpose:
+
+Canonical historical relationship between Person and Family.
+
+Recommended columns:
 
 | Column | Type | Null | Constraint |
 |---|---|---:|---|
 | id | BIGINT | No | PK |
 | family_id | BIGINT | No | FK families |
 | person_id | BIGINT | No | FK persons |
-| relationship_type_id | BIGINT | No | FK |
+| relationship_type_id | BIGINT | No | FK relationship_types |
 | is_household_head | BOOLEAN | No | DEFAULT FALSE |
 | paper_sequence_no | SMALLINT | Yes | |
 | started_at | DATE | Yes | |
@@ -362,18 +516,18 @@ family_memberships
 | created_at | TIMESTAMP | No | |
 | updated_at | TIMESTAMP | No | |
 
-### Relationships
+---
+
+# 16. One Active Family per Person
+
+V1 rule:
 
 ```text
-families 1 ─── N family_memberships
-persons  1 ─── N family_memberships
+One Person
+→ maximum one active primary Family membership
 ```
 
-### Important Rule
-
-A Person should normally have only one active primary family membership.
-
-Recommended PostgreSQL partial unique index:
+PostgreSQL partial unique index:
 
 ```sql
 CREATE UNIQUE INDEX uq_person_active_family_membership
@@ -383,13 +537,7 @@ WHERE is_active = TRUE;
 
 ---
 
-# 9. One Household Head Per Family
-
-Only one active membership should normally be marked:
-
-```text
-is_household_head = true
-```
+# 17. One Active Household Head
 
 Recommended PostgreSQL partial unique index:
 
@@ -400,13 +548,17 @@ WHERE is_active = TRUE
 AND is_household_head = TRUE;
 ```
 
-This enforces the business rule at database level.
+This protects:
+
+```text
+Maximum one active Household Head per Family
+```
+
+Existence of exactly one Head is enforced through domain/workflow logic because transitional states may temporarily exist within transactions.
 
 ---
 
-# 10. Membership Date Integrity
-
-Recommended constraint:
+# 18. Membership Date Constraint
 
 ```sql
 CHECK (
@@ -416,224 +568,107 @@ CHECK (
 )
 ```
 
-When membership ends:
+---
+
+# 19. relationship_types
+
+Recommended columns:
 
 ```text
-is_active = false
-ended_at = <date>
+id BIGINT PK
+code VARCHAR(50) UNIQUE
+name_ar VARCHAR(150)
+name_en VARCHAR(150)
+description TEXT NULL
+is_active BOOLEAN DEFAULT TRUE
+sort_order INTEGER DEFAULT 0
+created_at
+updated_at
 ```
 
-Historical membership remains available.
+Example codes:
+
+```text
+HEAD
+SPOUSE
+SON
+DAUGHTER
+FATHER
+MOTHER
+BROTHER
+SISTER
+GRANDCHILD
+OTHER_RELATIVE
+OTHER
+```
+
+Final values require approval.
 
 ---
 
-# 11. relationship_types
+# 20. person_relationships
 
-Reference table:
-
-```text
-relationship_types
-```
-
-| Column | Type |
-|---|---|
-| id | BIGINT PK |
-| code | VARCHAR(20) UNIQUE |
-| name_ar | VARCHAR(100) |
-| name_en | VARCHAR(100) |
-| is_active | BOOLEAN |
-| sort_order | INTEGER |
-| created_at | TIMESTAMP |
-| updated_at | TIMESTAMP |
-
-Examples:
+Recommended columns:
 
 ```text
-REL-01 SELF
-REL-02 SPOUSE
-REL-03 SON
-REL-04 DAUGHTER
-REL-05 FATHER
-REL-06 MOTHER
-...
+id BIGINT PK
+
+person_id BIGINT FK persons
+related_person_id BIGINT FK persons
+
+relationship_type_id BIGINT FK relationship_types
+
+start_date DATE NULL
+end_date DATE NULL
+
+status VARCHAR(30)
+
+notes TEXT NULL
+
+created_at
+updated_at
 ```
 
----
-
-# 12. person_relationships
-
-Purpose:
-
-Represents direct relationships between Persons.
-
-```text
-person_relationships
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| related_person_id | BIGINT | No |
-| relationship_type_id | BIGINT | No |
-| start_date | DATE | Yes |
-| end_date | DATE | Yes |
-| status | VARCHAR(20) | No |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-### Foreign Keys
-
-```text
-person_id → persons.id
-related_person_id → persons.id
-relationship_type_id → relationship_types.id
-```
-
-### Constraint
+Constraint:
 
 ```sql
 CHECK (person_id <> related_person_id)
 ```
 
-### Recommended Indexes
-
-```text
-INDEX person_id
-INDEX related_person_id
-```
-
 ---
 
-# 13. marital_statuses
+# 21. marital_statuses
 
-```text
-marital_statuses
-```
-
-| Column | Type |
-|---|---|
-| id | BIGINT PK |
-| code | VARCHAR(20) UNIQUE |
-| name_ar | VARCHAR(100) |
-| name_en | VARCHAR(100) |
-| is_active | BOOLEAN |
-| sort_order | INTEGER |
-
----
-
-# 14. family_residences
-
-Purpose:
-
-Stores residence and displacement history.
-
-```text
-family_residences
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | No |
-| governorate_id | BIGINT | Yes |
-| locality_id | BIGINT | Yes |
-| neighborhood | VARCHAR(150) | Yes |
-| address_details | TEXT | Yes |
-| housing_type_id | BIGINT | Yes |
-| tenure_type_id | BIGINT | Yes |
-| housing_condition_id | BIGINT | Yes |
-| is_displaced | BOOLEAN | No |
-| displacement_location | TEXT | Yes |
-| displacement_date | DATE | Yes |
-| displacement_reason | TEXT | Yes |
-| is_current | BOOLEAN | No |
-| from_date | DATE | Yes |
-| to_date | DATE | Yes |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-### Foreign Key
-
-```text
-family_id → families.id
-```
-
-### Current Residence Constraint
-
-Recommended:
-
-```sql
-CREATE UNIQUE INDEX uq_family_current_residence
-ON family_residences (family_id)
-WHERE is_current = TRUE;
-```
-
-### Date Constraint
-
-```sql
-CHECK (
-    to_date IS NULL
-    OR from_date IS NULL
-    OR to_date >= from_date
-)
-```
-
----
-
-# 15. Geographic Reference Tables
-
-Recommended:
-
-```text
-governorates
-localities
-```
-
-Relationship:
-
-```text
-governorates
-      │
-      └── localities
-```
-
-### governorates
+Standard reference table:
 
 ```text
 id
 code
 name_ar
 name_en
+description
 is_active
+sort_order
+created_at
+updated_at
 ```
 
-### localities
+Potential codes:
 
 ```text
-id
-governorate_id
-code
-name_ar
-name_en
-is_active
+SINGLE
+MARRIED
+DIVORCED
+WIDOWED
+SEPARATED
+UNKNOWN
 ```
-
-Do not store every geographic value as uncontrolled text when reference data is available.
 
 ---
 
-# 16. Housing Reference Tables
+# 22. governorates
 
-```text
-housing_types
-tenure_types
-housing_condition_types
-```
-
-Standard structure:
+Recommended columns:
 
 ```text
 id
@@ -648,280 +683,338 @@ updated_at
 
 ---
 
-# 17. person_health_profiles
+# 23. localities
 
-Purpose:
-
-Current summary of Person health information.
+Recommended columns:
 
 ```text
-person_health_profiles
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| has_health_condition | BOOLEAN | No |
-| has_chronic_disease | BOOLEAN | No |
-| has_disability | BOOLEAN | No |
-| is_pregnant | BOOLEAN | No |
-| is_breastfeeding | BOOLEAN | No |
-| requires_follow_up | BOOLEAN | No |
-| notes | TEXT | Yes |
-| updated_at | TIMESTAMP | No |
-| created_at | TIMESTAMP | No |
-
-### Constraint
-
-```text
-UNIQUE person_id
+id
+governorate_id
+code
+name_ar
+name_en
+is_active
+sort_order
+created_at
+updated_at
 ```
 
 Relationship:
 
 ```text
-persons 1 ─── 0..1 person_health_profiles
+Governorate
+    │
+    └──< Localities
 ```
 
 ---
 
-# 18. health_condition_types
+# 24. housing_types
 
-```text
-health_condition_types
-```
-
-Standard reference structure:
-
-```text
-id
-code
-name_ar
-name_en
-is_chronic
-is_active
-sort_order
-```
+Standard reference table.
 
 ---
 
-# 19. person_health_conditions
+# 25. tenure_types
 
-```text
-person_health_conditions
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| health_condition_type_id | BIGINT | No |
-| details | TEXT | Yes |
-| severity | VARCHAR(20) | Yes |
-| requires_treatment | BOOLEAN | Yes |
-| requires_medication | BOOLEAN | Yes |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-### Indexes
-
-```text
-INDEX person_id
-INDEX health_condition_type_id
-```
+Standard reference table.
 
 ---
 
-# 20. disability_types
+# 26. housing_condition_types
 
-```text
-disability_types
-```
-
-Standard reference structure:
-
-```text
-id
-code
-name_ar
-name_en
-is_active
-sort_order
-```
+Standard reference table.
 
 ---
 
-# 21. person_disabilities
-
-```text
-person_disabilities
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| disability_type_id | BIGINT | No |
-| severity | VARCHAR(20) | Yes |
-| requires_assistance | BOOLEAN | Yes |
-| uses_assistive_device | BOOLEAN | Yes |
-| assistive_device | VARCHAR(200) | Yes |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-### Indexes
-
-```text
-INDEX person_id
-INDEX disability_type_id
-```
-
----
-
-# 22. person_education
+# 27. family_residences
 
 Purpose:
 
-Stores education history.
+Stores historical Family residence information.
+
+Recommended columns:
 
 ```text
-person_education
-```
+id BIGINT PK
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| is_enrolled | BOOLEAN | Yes |
-| education_level_id | BIGINT | Yes |
-| current_grade | VARCHAR(50) | Yes |
-| institution_name | VARCHAR(200) | Yes |
-| specialization | VARCHAR(200) | Yes |
-| education_status_id | BIGINT | Yes |
-| from_date | DATE | Yes |
-| to_date | DATE | Yes |
-| is_current | BOOLEAN | No |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
+family_id BIGINT FK families
 
-### Index
+governorate_id BIGINT NULL FK governorates
+locality_id BIGINT NULL FK localities
 
-```text
-INDEX person_id
+neighborhood VARCHAR(255) NULL
+address_details TEXT NULL
+
+housing_type_id BIGINT NULL FK housing_types
+tenure_type_id BIGINT NULL FK tenure_types
+housing_condition_id BIGINT NULL FK housing_condition_types
+
+is_displaced BOOLEAN DEFAULT FALSE
+
+displacement_location TEXT NULL
+displacement_date DATE NULL
+displacement_reason TEXT NULL
+
+is_current BOOLEAN DEFAULT TRUE
+
+from_date DATE NULL
+to_date DATE NULL
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
 ```
 
 ---
 
-# 23. Education Reference Tables
+# 28. One Current Residence
 
-```text
-education_levels
-education_statuses
+Recommended partial unique index:
+
+```sql
+CREATE UNIQUE INDEX uq_family_current_residence
+ON family_residences (family_id)
+WHERE is_current = TRUE;
 ```
-
-Use the standard reference-table structure.
 
 ---
 
-# 24. person_employment
+# 29. Residence Date Constraint
+
+```sql
+CHECK (
+    to_date IS NULL
+    OR from_date IS NULL
+    OR to_date >= from_date
+)
+```
+
+---
+
+# 30. person_health_profiles
 
 Purpose:
 
-Stores employment history.
+Current high-level health summary.
+
+Recommended columns:
 
 ```text
-person_employment
+id BIGINT PK
+person_id BIGINT UNIQUE FK persons
+
+has_health_condition BOOLEAN NULL
+has_chronic_disease BOOLEAN NULL
+has_disability BOOLEAN NULL
+
+is_pregnant BOOLEAN NULL
+is_breastfeeding BOOLEAN NULL
+
+requires_follow_up BOOLEAN NULL
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
 ```
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| employment_status_id | BIGINT | Yes |
-| occupation | VARCHAR(200) | Yes |
-| employer | VARCHAR(200) | Yes |
-| employment_sector_id | BIGINT | Yes |
-| has_income | BOOLEAN | Yes |
-| income_amount | NUMERIC(12,2) | Yes |
-| income_frequency | VARCHAR(30) | Yes |
-| from_date | DATE | Yes |
-| to_date | DATE | Yes |
-| is_current | BOOLEAN | No |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
----
-
-# 25. Employment Reference Tables
+Classification:
 
 ```text
-employment_statuses
-employment_sectors
-```
-
-Standard reference-table structure applies.
-
----
-
-# 26. assessments
-
-Purpose:
-
-Represents a data collection, verification, or follow-up event.
-
-```text
-assessments
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| assessment_code | VARCHAR(30) | No |
-| family_id | BIGINT | No |
-| assessment_type_id | BIGINT | No |
-| assessment_date | DATE | No |
-| collector_id | BIGINT | No |
-| reviewer_id | BIGINT | Yes |
-| status | VARCHAR(30) | No |
-| location | VARCHAR(255) | Yes |
-| source | VARCHAR(30) | No |
-| notes | TEXT | Yes |
-| submitted_at | TIMESTAMP | Yes |
-| verified_at | TIMESTAMP | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-### Constraints
-
-```text
-UNIQUE assessment_code
-```
-
-### Indexes
-
-```text
-INDEX family_id
-INDEX assessment_type_id
-INDEX assessment_date
-INDEX status
+RESTRICTED
 ```
 
 ---
 
-# 27. assessment_types
+# 31. health_condition_types
 
-Reference table:
+Standard reference table.
+
+Possible additional field:
 
 ```text
-assessment_types
+is_chronic BOOLEAN
 ```
 
-Examples:
+---
+
+# 32. person_health_conditions
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+person_id BIGINT FK persons
+health_condition_type_id BIGINT FK health_condition_types
+
+details TEXT NULL
+severity VARCHAR(50) NULL
+
+requires_treatment BOOLEAN NULL
+requires_medication BOOLEAN NULL
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
+```
+
+Classification:
+
+```text
+RESTRICTED
+```
+
+---
+
+# 33. disability_types
+
+Standard reference table.
+
+---
+
+# 34. person_disabilities
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+person_id BIGINT FK persons
+disability_type_id BIGINT FK disability_types
+
+severity VARCHAR(50) NULL
+requires_assistance BOOLEAN NULL
+uses_assistive_device BOOLEAN NULL
+assistive_device VARCHAR(255) NULL
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
+```
+
+Classification:
+
+```text
+RESTRICTED
+```
+
+---
+
+# 35. education_levels
+
+Standard reference table.
+
+---
+
+# 36. education_statuses
+
+Standard reference table.
+
+---
+
+# 37. person_education
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+person_id BIGINT FK persons
+
+is_enrolled BOOLEAN NULL
+education_level_id BIGINT NULL FK education_levels
+current_grade VARCHAR(100) NULL
+institution_name VARCHAR(255) NULL
+specialization VARCHAR(255) NULL
+education_status_id BIGINT NULL FK education_statuses
+
+from_date DATE NULL
+to_date DATE NULL
+is_current BOOLEAN DEFAULT FALSE
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
+```
+
+---
+
+# 38. employment_statuses
+
+Standard reference table.
+
+---
+
+# 39. employment_sectors
+
+Standard reference table.
+
+---
+
+# 40. person_employment
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+person_id BIGINT FK persons
+
+employment_status_id BIGINT NULL FK employment_statuses
+
+occupation VARCHAR(255) NULL
+employer VARCHAR(255) NULL
+
+employment_sector_id BIGINT NULL FK employment_sectors
+
+has_income BOOLEAN NULL
+income_amount NUMERIC(12,2) NULL
+income_frequency VARCHAR(50) NULL
+
+from_date DATE NULL
+to_date DATE NULL
+
+is_current BOOLEAN DEFAULT FALSE
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
+```
+
+Never use floating point for monetary values.
+
+---
+
+# 41. assessment_types
+
+Standard reference table.
+
+Potential codes:
 
 ```text
 INITIAL_REGISTRATION
@@ -933,44 +1026,78 @@ EMERGENCY_UPDATE
 
 ---
 
-# 28. form_submissions
+# 42. assessments
 
-Purpose:
-
-Represents the original source form and its data-entry/review lifecycle.
+Recommended columns:
 
 ```text
-form_submissions
+id BIGINT PK
+
+assessment_code VARCHAR(30) UNIQUE
+
+family_id BIGINT FK families
+assessment_type_id BIGINT FK assessment_types
+
+assessment_date DATE
+
+collector_id BIGINT NULL FK users
+reviewer_id BIGINT NULL FK users
+
+status VARCHAR(30)
+
+location TEXT NULL
+source VARCHAR(50) NULL
+notes TEXT NULL
+
+submitted_at TIMESTAMP NULL
+verified_at TIMESTAMP NULL
+
+created_at
+updated_at
 ```
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | No |
-| assessment_id | BIGINT | Yes |
-| form_type_id | BIGINT | No |
-| paper_form_no | VARCHAR(50) | Yes |
-| page_count | SMALLINT | Yes |
-| source_file | VARCHAR(500) | Yes |
-| entered_by | BIGINT | No |
-| entered_at | TIMESTAMP | No |
-| reviewed_by | BIGINT | Yes |
-| reviewed_at | TIMESTAMP | Yes |
-| status | VARCHAR(30) | No |
-| return_reason | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
+---
 
-### Indexes
+# 43. form_types
+
+Standard reference table.
+
+---
+
+# 44. form_submissions
+
+Recommended columns:
 
 ```text
-INDEX family_id
-INDEX assessment_id
-INDEX status
-INDEX paper_form_no
+id BIGINT PK
+
+family_id BIGINT FK families
+assessment_id BIGINT NULL FK assessments
+form_type_id BIGINT FK form_types
+
+paper_form_no VARCHAR(100) NULL
+page_count INTEGER NULL
+source_file VARCHAR(500) NULL
+
+entered_by BIGINT NULL FK users
+entered_at TIMESTAMP NULL
+
+reviewed_by BIGINT NULL FK users
+reviewed_at TIMESTAMP NULL
+
+status VARCHAR(30)
+
+return_reason TEXT NULL
+
+created_at
+updated_at
 ```
 
-### Approved V1 Workflow States
+---
+
+# 45. Form Submission Status
+
+Approved baseline:
 
 ```text
 DRAFT
@@ -983,9 +1110,13 @@ APPROVED
 ARCHIVED
 ```
 
-`status` represents the current workflow state.
+Current state is stored in:
 
-Historical transitions are stored separately in:
+```text
+form_submissions.status
+```
+
+State-transition history is stored in:
 
 ```text
 workflow_events
@@ -993,15 +1124,13 @@ workflow_events
 
 ---
 
-# 29. workflow_events
+# 46. workflow_events
 
 Purpose:
 
-Stores the immutable history of workflow state transitions for workflow-controlled entities.
+Stores immutable workflow state-transition history.
 
-```text
-workflow_events
-```
+Recommended columns:
 
 | Column | Type | Null | Constraint |
 |---|---|---:|---|
@@ -1016,43 +1145,40 @@ workflow_events
 | performed_by | BIGINT | Yes | FK users |
 | created_at | TIMESTAMP | No | |
 
-### Purpose
-
-Examples of workflow events:
+Examples:
 
 ```text
 DRAFT → DATA_ENTRY_COMPLETED
-DATA_ENTRY_COMPLETED → UNDER_REVIEW
+
 UNDER_REVIEW → RETURNED_FOR_CORRECTION
-RETURNED_FOR_CORRECTION → CORRECTED
-CORRECTED → UNDER_REVIEW
+
 UNDER_REVIEW → VERIFIED
+
 VERIFIED → APPROVED
+
+DRAFT → SUBMITTED
+
+UNDER_REVIEW → APPROVED
+
+APPROVED → APPLIED
 ```
 
-Need workflow events may include:
+---
 
-```text
-IDENTIFIED → VERIFIED
-VERIFIED → ACTIVE
-ACTIVE → PARTIALLY_MET
-PARTIALLY_MET → MET
-MET → CLOSED
-```
+# 47. Workflow Polymorphism
 
-### Polymorphic Relationship
-
-`workflow_events` may track different workflow-controlled entities.
+Conceptually:
 
 ```text
 workflow_events
       │
       ├── FormSubmission
       ├── Assessment
-      └── FamilyNeed
+      ├── FamilyNeed
+      └── ChangeRequest
 ```
 
-Laravel conceptual relationship:
+Laravel relationship:
 
 ```php
 public function workflowable()
@@ -1061,264 +1187,61 @@ public function workflowable()
 }
 ```
 
-Workflow-controlled models may expose:
+Workflow-controlled models may use:
 
 ```php
 public function workflowEvents()
 {
-    return $this->morphMany(
-        WorkflowEvent::class,
-        'workflowable'
-    );
+    return $this->morphMany(WorkflowEvent::class, 'workflowable');
 }
 ```
 
-### Foreign Key
+---
 
-```text
-performed_by → users.id
-```
-
-`performed_by` may be nullable for system-generated events where no direct user actor exists.
-
-### Indexes
+# 48. Workflow Event Indexes
 
 Recommended:
 
-```text
-INDEX (workflowable_type, workflowable_id)
-INDEX performed_by
-INDEX created_at
-INDEX to_status
-INDEX action
+```sql
+CREATE INDEX idx_workflow_events_entity
+ON workflow_events (workflowable_type, workflowable_id);
 ```
 
-The primary retrieval pattern is:
-
-```text
-workflowable_type
-+
-workflowable_id
-+
-created_at
+```sql
+CREATE INDEX idx_workflow_events_performed_by
+ON workflow_events (performed_by);
 ```
 
-to construct the chronological workflow timeline of a record.
+```sql
+CREATE INDEX idx_workflow_events_created_at
+ON workflow_events (created_at);
+```
 
-### Immutability
+```sql
+CREATE INDEX idx_workflow_events_to_status
+ON workflow_events (to_status);
+```
 
-Workflow events are historical records.
+---
 
-Normal application users MUST NOT:
+# 49. Workflow Event Immutability
+
+Normal application users must not:
 
 ```text
 UPDATE workflow_events
 DELETE workflow_events
 ```
 
-A new workflow transition creates a new event.
-
-Existing workflow history must not be overwritten.
-
-### Example
-
-```text
-workflowable_type: FormSubmission
-workflowable_id: 510
-
-from_status: UNDER_REVIEW
-to_status: VERIFIED
-
-action: VERIFY
-
-performed_by: 25
-created_at: 2026-09-22 14:00:00
-```
-
-### Relationship to Current Status
-
-`workflow_events` does not replace the current status stored on the business entity.
-
-For example:
-
-```text
-form_submissions.status
-```
-
-may contain:
-
-```text
-APPROVED
-```
-
-while:
-
-```text
-workflow_events
-```
-
-stores the history that led to that state:
-
-```text
-DRAFT
-→ DATA_ENTRY_COMPLETED
-→ UNDER_REVIEW
-→ RETURNED_FOR_CORRECTION
-→ CORRECTED
-→ UNDER_REVIEW
-→ VERIFIED
-→ APPROVED
-```
-
-This provides efficient access to the current state while preserving lifecycle history.
-
-### Relationship to Audit Logs
-
-`workflow_events` and `audit_logs` serve different purposes.
-
-```text
-workflow_events
-= lifecycle / state transition history
-
-audit_logs
-= data modification and system activity history
-```
-
-Example workflow event:
-
-```text
-UNDER_REVIEW
-→
-VERIFIED
-```
-
-Example audit event:
-
-```text
-national_id
-
-804000001
-→
-804000011
-```
-
-One business operation may create both:
-
-```text
-workflow_event
-+
-audit_log
-```
-
-### Delete Strategy
-
-Workflow events are historical records.
-
-Use:
-
-```text
-RESTRICT / NO ACTION
-```
-
-where appropriate.
-
-Do not cascade-delete workflow history through normal application operations.
-
-### Soft Delete
-
-`workflow_events` SHOULD NOT use soft deletes.
-
-The table is append-only for normal application operations.
-
-### Security
-
-Workflow history may reveal:
-
-```text
-User actions
-Correction reasons
-Review decisions
-Operational metadata
-```
-
-Access must therefore follow the authorization rules defined in:
-
-```text
-06-PERMISSIONS.md
-```
+Workflow events are append-only historical records.
 
 ---
 
-# 30. form_types
+# 50. document_types
 
-Reference table:
+Standard reference table.
 
-```text
-form_types
-```
-
-Allows future forms to be added without changing the core database.
-
----
-
-# 31. documents
-
-Purpose:
-
-Stores document metadata.
-
-Actual binary files are stored in private file storage.
-
-```text
-documents
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | Yes |
-| person_id | BIGINT | Yes |
-| document_type_id | BIGINT | No |
-| document_number | VARCHAR(100) | Yes |
-| is_available | BOOLEAN | No |
-| is_verified | BOOLEAN | No |
-| issue_date | DATE | Yes |
-| expiry_date | DATE | Yes |
-| file_path | VARCHAR(500) | Yes |
-| verified_by | BIGINT | Yes |
-| verified_at | TIMESTAMP | Yes |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-At least one owner should normally exist:
-
-```text
-family_id
-OR
-person_id
-```
-
-Recommended constraint:
-
-```sql
-CHECK (
-    family_id IS NOT NULL
-    OR person_id IS NOT NULL
-)
-```
-
----
-
-# 32. document_types
-
-Reference table:
-
-```text
-document_types
-```
-
-Examples:
+Potential codes:
 
 ```text
 NATIONAL_ID
@@ -1327,81 +1250,97 @@ MARRIAGE_CERTIFICATE
 DEATH_CERTIFICATE
 MEDICAL_REPORT
 DISABILITY_REPORT
+RESIDENCE_EVIDENCE
 OTHER
 ```
 
 ---
 
-# 33. family_needs
+# 51. documents
 
-Purpose:
-
-Stores identified needs.
+Recommended columns:
 
 ```text
-family_needs
-```
+id BIGINT PK
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | No |
-| person_id | BIGINT | Yes |
-| assessment_id | BIGINT | Yes |
-| need_type_id | BIGINT | No |
-| priority | VARCHAR(20) | Yes |
-| description | TEXT | Yes |
-| status | VARCHAR(30) | No |
-| identified_at | DATE | No |
-| is_verified | BOOLEAN | No |
-| verified_by | BIGINT | Yes |
-| verified_at | TIMESTAMP | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
+family_id BIGINT NULL FK families
+person_id BIGINT NULL FK persons
+change_request_id BIGINT NULL FK change_requests
 
-### Indexes
+document_type_id BIGINT FK document_types
 
-```text
-INDEX family_id
-INDEX person_id
-INDEX need_type_id
-INDEX status
-INDEX priority
-```
+document_number VARCHAR(100) NULL
 
-### Approved Lifecycle
+is_available BOOLEAN DEFAULT FALSE
+is_verified BOOLEAN DEFAULT FALSE
 
-```text
-IDENTIFIED
-    ↓
-VERIFIED
-    ↓
-ACTIVE
-    ↓
-PARTIALLY_MET
-    ↓
-MET
-    ↓
-CLOSED
-```
+issue_date DATE NULL
+expiry_date DATE NULL
 
-The lifecycle may branch according to the workflow rules defined in:
+file_path VARCHAR(500) NULL
 
-```text
-05-WORKFLOWS.md
+uploaded_by BIGINT NULL FK users
+
+verified_by BIGINT NULL FK users
+verified_at TIMESTAMP NULL
+
+notes TEXT NULL
+
+created_at
+updated_at
 ```
 
 ---
 
-# 34. need_types
+# 52. Document Context Constraint
 
-Reference table:
+A document must belong to at least one valid business context.
 
-```text
-need_types
+Conceptually:
+
+```sql
+CHECK (
+    family_id IS NOT NULL
+    OR person_id IS NOT NULL
+    OR change_request_id IS NOT NULL
+)
 ```
 
-Examples:
+Multiple contexts may exist where justified.
+
+Example:
+
+```text
+Change Request supporting document
++
+Person context
+```
+
+However, context promotion must be explicit.
+
+---
+
+# 53. Document Storage
+
+`file_path` must point to private storage.
+
+Do not expose sensitive files through:
+
+```text
+/public
+```
+
+or permanently public URLs.
+
+Downloads should pass through an authorized endpoint or short-lived signed mechanism.
+
+---
+
+# 54. need_types
+
+Standard reference table.
+
+Potential codes:
 
 ```text
 FOOD
@@ -1420,165 +1359,816 @@ OTHER
 
 ---
 
-# 35. assistance_records
+# 55. family_needs
 
-Purpose:
-
-Stores actual assistance events.
+Recommended columns:
 
 ```text
-assistance_records
-```
+id BIGINT PK
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | No |
-| person_id | BIGINT | Yes |
-| need_id | BIGINT | Yes |
-| assistance_type_id | BIGINT | No |
-| provider_name | VARCHAR(200) | Yes |
-| description | TEXT | Yes |
-| quantity | NUMERIC(12,2) | Yes |
-| unit | VARCHAR(50) | Yes |
-| estimated_value | NUMERIC(12,2) | Yes |
-| currency | VARCHAR(10) | Yes |
-| received_at | DATE | Yes |
-| distribution_reference | VARCHAR(100) | Yes |
-| notes | TEXT | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
+family_id BIGINT FK families
+person_id BIGINT NULL FK persons
+assessment_id BIGINT NULL FK assessments
 
-The optional:
+need_type_id BIGINT FK need_types
 
-```text
-need_id
-```
+priority VARCHAR(30) NULL
+description TEXT NULL
+status VARCHAR(30)
 
-allows assistance to be associated with a documented Need.
+identified_at DATE NULL
 
-Recording Assistance MUST NOT automatically close a Need.
+is_verified BOOLEAN DEFAULT FALSE
+verified_by BIGINT NULL FK users
+verified_at TIMESTAMP NULL
 
-Need status changes must follow the approved Need workflow.
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
 
----
-
-# 36. assistance_types
-
-Reference table:
-
-```text
-assistance_types
-```
-
-Separate from:
-
-```text
-need_types
-```
-
-because Need and Assistance are different business concepts.
-
----
-
-# 37. person_notes
-
-```text
-person_notes
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| person_id | BIGINT | No |
-| note_type_id | BIGINT | Yes |
-| note | TEXT | No |
-| is_confidential | BOOLEAN | No |
-| created_by | BIGINT | No |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-Person notes are append-oriented.
-
----
-
-# 38. case_notes
-
-```text
-case_notes
-```
-
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| family_id | BIGINT | No |
-| assessment_id | BIGINT | Yes |
-| person_id | BIGINT | Yes |
-| note_type_id | BIGINT | Yes |
-| note | TEXT | No |
-| is_confidential | BOOLEAN | No |
-| created_by | BIGINT | No |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
-
-Case notes are append-oriented.
-
-Hard deletion should not be available to normal users.
-
----
-
-# 39. note_types
-
-Reference table:
-
-```text
-note_types
-```
-
-Allows categorization such as:
-
-```text
-GENERAL
-FOLLOW_UP
-VERIFICATION
-PROTECTION
-HEALTH
-CORRECTION
-OTHER
+created_at
+updated_at
 ```
 
 ---
 
-# 40. users
+# 56. Need Status
+
+Conceptual lifecycle:
+
+```text
+IDENTIFIED
+VERIFIED
+ACTIVE
+PARTIALLY_MET
+MET
+CLOSED
+```
+
+---
+
+# 57. assistance_types
+
+Standard reference table.
+
+---
+
+# 58. assistance_records
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+family_id BIGINT FK families
+person_id BIGINT NULL FK persons
+need_id BIGINT NULL FK family_needs
+
+assistance_type_id BIGINT FK assistance_types
+
+provider_name VARCHAR(255) NULL
+description TEXT NULL
+
+quantity NUMERIC(12,2) NULL
+unit VARCHAR(50) NULL
+
+estimated_value NUMERIC(12,2) NULL
+currency VARCHAR(10) NULL
+
+received_at DATE NULL
+distribution_reference VARCHAR(100) NULL
+
+notes TEXT NULL
+
+created_by BIGINT NULL FK users
+updated_by BIGINT NULL FK users
+
+created_at
+updated_at
+```
+
+---
+
+# 59. note_types
+
+Standard reference table.
+
+---
+
+# 60. person_notes
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+person_id BIGINT FK persons
+note_type_id BIGINT NULL FK note_types
+
+note TEXT
+
+is_confidential BOOLEAN DEFAULT FALSE
+
+created_by BIGINT FK users
+
+created_at
+updated_at
+```
+
+---
+
+# 61. case_notes
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+family_id BIGINT FK families
+assessment_id BIGINT NULL FK assessments
+person_id BIGINT NULL FK persons
+
+note_type_id BIGINT NULL FK note_types
+
+note TEXT
+
+is_confidential BOOLEAN DEFAULT FALSE
+
+created_by BIGINT FK users
+
+created_at
+updated_at
+```
+
+Internal notes must never be automatically exposed to Family Portal users.
+
+---
+
+# 62. users
 
 Laravel authentication table.
 
-Core design:
+Recommended core columns:
+
+```text
+id BIGINT PK
+
+name VARCHAR(255)
+
+email VARCHAR(255) NULL
+mobile VARCHAR(30) NULL
+
+email_verified_at TIMESTAMP NULL
+mobile_verified_at TIMESTAMP NULL
+
+password VARCHAR(255)
+
+is_active BOOLEAN DEFAULT TRUE
+
+last_login_at TIMESTAMP NULL
+
+remember_token VARCHAR(100) NULL
+
+created_at
+updated_at
+```
+
+Possible unique constraints depend on the final authentication method.
+
+---
+
+# 63. User vs Person
+
+The architecture intentionally separates:
 
 ```text
 users
 ```
 
-| Column | Type | Null |
-|---|---|---:|
-| id | BIGINT | No |
-| name | VARCHAR(200) | No |
-| email | VARCHAR(255) | Yes |
-| mobile | VARCHAR(20) | Yes |
-| password | VARCHAR(255) | No |
-| is_active | BOOLEAN | No |
-| last_login_at | TIMESTAMP | Yes |
-| remember_token | VARCHAR(100) | Yes |
-| created_at | TIMESTAMP | No |
-| updated_at | TIMESTAMP | No |
+from:
 
-At least one supported authentication identifier should be unique.
+```text
+persons
+```
 
-Final authentication policy is defined during implementation.
+Meaning:
+
+```text
+User
+=
+Authentication identity
+
+Person
+=
+Registry identity
+```
+
+Staff users do not require a Person record.
+
+Family Users normally require an approved User-Person link.
 
 ---
 
-# 41. Roles and Permissions
+# 64. user_person_links
+
+Purpose:
+
+Links an authenticated User account to a registry Person.
+
+This supports Family Portal authorization without coupling authentication identity directly to Person.
+
+Recommended columns:
+
+| Column | Type | Null | Constraint |
+|---|---|---:|---|
+| id | BIGINT | No | PK |
+| user_id | BIGINT | No | FK users |
+| person_id | BIGINT | No | FK persons |
+| link_type | VARCHAR(30) | No | |
+| status | VARCHAR(30) | No | |
+| verified_by | BIGINT | Yes | FK users |
+| verified_at | TIMESTAMP | Yes | |
+| activated_at | TIMESTAMP | Yes | |
+| ended_at | TIMESTAMP | Yes | |
+| end_reason | VARCHAR(255) | Yes | |
+| created_at | TIMESTAMP | No | |
+| updated_at | TIMESTAMP | No | |
+
+---
+
+# 65. User-Person Link Types
+
+Initial V1:
+
+```text
+SELF
+```
+
+Future possibilities:
+
+```text
+GUARDIAN
+AUTHORIZED_REPRESENTATIVE
+```
+
+must not be enabled until business rules are approved.
+
+---
+
+# 66. User-Person Link Status
+
+Recommended:
+
+```text
+PENDING_VERIFICATION
+VERIFIED
+ACTIVE
+SUSPENDED
+ENDED
+```
+
+---
+
+# 67. User-Person Uniqueness
+
+Baseline recommendation:
+
+```sql
+CREATE UNIQUE INDEX uq_active_user_person_link
+ON user_person_links (user_id, person_id)
+WHERE status IN ('VERIFIED', 'ACTIVE');
+```
+
+Application logic must prevent conflicting active identity links.
+
+Whether one User may eventually link to multiple Persons remains a pending decision.
+
+---
+
+# 68. Family Portal Scope Resolution
+
+Family Portal scope must be derived dynamically.
+
+Conceptually:
+
+```text
+Authenticated User
+      ↓
+Active User-Person Link
+      ↓
+Person
+      ↓
+Active Family Membership
+      ↓
+Family
+```
+
+Do not rely on:
+
+```text
+users.family_id
+```
+
+as canonical Family authorization.
+
+---
+
+# 69. change_request_types
+
+Purpose:
+
+Defines supported Family Portal update request categories.
+
+Recommended columns:
+
+```text
+id BIGINT PK
+
+code VARCHAR(50) UNIQUE
+
+name_ar VARCHAR(150)
+name_en VARCHAR(150)
+
+description TEXT NULL
+
+risk_level VARCHAR(20) NULL
+
+requires_document BOOLEAN DEFAULT FALSE
+
+is_active BOOLEAN DEFAULT TRUE
+sort_order INTEGER DEFAULT 0
+
+created_at
+updated_at
+```
+
+---
+
+# 70. Initial Change Request Types
+
+Recommended seed codes:
+
+```text
+CONTACT_UPDATE
+RESIDENCE_UPDATE
+PERSON_CORRECTION
+ADD_FAMILY_MEMBER
+MEMBERSHIP_CHANGE
+HOUSEHOLD_HEAD_CHANGE
+BIRTH_REPORT
+DEATH_REPORT
+MARRIAGE_UPDATE
+DOCUMENT_UPDATE
+OTHER
+```
+
+Allowed payload fields remain code/domain-defined in V1.
+
+---
+
+# 71. change_requests
+
+Purpose:
+
+Stores proposed Family/User changes before they are applied to canonical registry data.
+
+Recommended columns:
+
+| Column | Type | Null | Constraint |
+|---|---|---:|---|
+| id | BIGINT | No | PK |
+| request_code | VARCHAR(30) | No | UNIQUE |
+| family_id | BIGINT | No | FK families |
+| person_id | BIGINT | Yes | FK persons |
+| change_request_type_id | BIGINT | No | FK change_request_types |
+| status | VARCHAR(30) | No | |
+| risk_level | VARCHAR(20) | Yes | |
+| submitted_data | JSONB | No | |
+| reason | TEXT | Yes | |
+| notes | TEXT | Yes | |
+| submitted_by | BIGINT | No | FK users |
+| submitted_at | TIMESTAMP | Yes | |
+| reviewed_by | BIGINT | Yes | FK users |
+| reviewed_at | TIMESTAMP | Yes | |
+| review_notes | TEXT | Yes | |
+| approved_by | BIGINT | Yes | FK users |
+| approved_at | TIMESTAMP | Yes | |
+| rejected_by | BIGINT | Yes | FK users |
+| rejected_at | TIMESTAMP | Yes | |
+| rejection_reason | TEXT | Yes | |
+| applied_by | BIGINT | Yes | FK users |
+| applied_at | TIMESTAMP | Yes | |
+| created_at | TIMESTAMP | No | |
+| updated_at | TIMESTAMP | No | |
+
+---
+
+# 72. Change Request Code
+
+Recommended format:
+
+```text
+CRQ-000001
+```
+
+Constraint:
+
+```sql
+UNIQUE (request_code)
+```
+
+---
+
+# 73. Change Request Status
+
+Approved baseline:
+
+```text
+DRAFT
+SUBMITTED
+UNDER_REVIEW
+RETURNED_FOR_CLARIFICATION
+RESUBMITTED
+APPROVED
+REJECTED
+APPLIED
+```
+
+Current state:
+
+```text
+change_requests.status
+```
+
+Historical transitions:
+
+```text
+workflow_events
+```
+
+---
+
+# 74. Change Request Proposed Data
+
+`submitted_data` uses:
+
+```text
+JSONB
+```
+
+Example:
+
+```json
+{
+    "mobile": "0560000000"
+}
+```
+
+The JSON payload is not canonical registry storage.
+
+It represents:
+
+```text
+Proposed Data
+```
+
+Each Change Request Type must define allowed payload fields through application/domain validation.
+
+---
+
+# 75. JSONB Rule
+
+Do not use:
+
+```text
+change_requests.submitted_data
+```
+
+as a replacement for normalized domain tables.
+
+Example:
+
+Approved residence data ultimately belongs in:
+
+```text
+family_residences
+```
+
+not permanently only in:
+
+```text
+submitted_data
+```
+
+---
+
+# 76. Change Request Indexes
+
+Recommended:
+
+```sql
+CREATE INDEX idx_change_requests_family
+ON change_requests (family_id);
+```
+
+```sql
+CREATE INDEX idx_change_requests_person
+ON change_requests (person_id);
+```
+
+```sql
+CREATE INDEX idx_change_requests_type
+ON change_requests (change_request_type_id);
+```
+
+```sql
+CREATE INDEX idx_change_requests_status
+ON change_requests (status);
+```
+
+```sql
+CREATE INDEX idx_change_requests_submitted_by
+ON change_requests (submitted_by);
+```
+
+```sql
+CREATE INDEX idx_change_requests_submitted_at
+ON change_requests (submitted_at);
+```
+
+Operational queue index may later use:
+
+```text
+(status, created_at)
+```
+
+or:
+
+```text
+(status, submitted_at)
+```
+
+based on query patterns.
+
+---
+
+# 77. Change Request Workflow
+
+Conceptually:
+
+```text
+DRAFT
+  ↓
+SUBMITTED
+  ↓
+UNDER_REVIEW
+  ├── RETURNED_FOR_CLARIFICATION
+  │       ↓
+  │   RESUBMITTED
+  │       ↓
+  │   UNDER_REVIEW
+  │
+  ├── REJECTED
+  │
+  └── APPROVED
+          ↓
+       APPLIED
+```
+
+The exact transition implementation is defined in:
+
+```text
+05-WORKFLOWS.md
+```
+
+---
+
+# 78. Change Request APPROVED vs APPLIED
+
+These states are deliberately separate.
+
+```text
+APPROVED
+```
+
+means business authorization has been granted.
+
+```text
+APPLIED
+```
+
+means the canonical registry operation completed successfully.
+
+---
+
+# 79. Change Request Application
+
+Approved Change Requests must be executed through normal domain actions.
+
+Examples:
+
+```text
+CONTACT_UPDATE
+→ UpdatePersonContactAction
+
+RESIDENCE_UPDATE
+→ ChangeFamilyResidenceAction
+
+HOUSEHOLD_HEAD_CHANGE
+→ ChangeHouseholdHeadAction
+
+DEATH_REPORT
+→ RecordPersonDeathAction
+
+ADD_FAMILY_MEMBER
+→ CreateOrLinkFamilyMemberAction
+```
+
+Do not directly apply arbitrary JSON fields to Eloquent models.
+
+Prohibited:
+
+```php
+$person->update($changeRequest->submitted_data);
+```
+
+The request type must map to a controlled domain operation.
+
+---
+
+# 80. Change Request Application Transaction
+
+Application must be transactional.
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock Change Request
+
+Confirm status = APPROVED
+
+Revalidate current registry state
+
+Execute domain operation
+
+Write audit log
+
+Write workflow event
+
+Set:
+status = APPLIED
+applied_by
+applied_at
+
+COMMIT
+```
+
+Failure:
+
+```text
+ROLLBACK
+```
+
+The request must not be marked `APPLIED`.
+
+---
+
+# 81. Change Request Concurrency
+
+Recommended application pattern:
+
+```text
+SELECT ... FOR UPDATE
+```
+
+or Laravel equivalent:
+
+```php
+lockForUpdate()
+```
+
+for critical application flows.
+
+This prevents concurrent double application.
+
+---
+
+# 82. Change Request Idempotency
+
+Application logic must check:
+
+```text
+status === APPROVED
+```
+
+before execution.
+
+If:
+
+```text
+status === APPLIED
+```
+
+the domain operation must not execute again.
+
+---
+
+# 83. Supporting Documents
+
+Change Request documents use:
+
+```text
+documents.change_request_id
+```
+
+Examples:
+
+```text
+Birth Certificate
+Death Certificate
+Marriage Certificate
+Residence Evidence
+```
+
+They remain unverified until staff verification.
+
+---
+
+# 84. notifications
+
+Recommended V1 implementation:
+
+Use Laravel's standard database notification infrastructure where practical.
+
+Conceptual table:
+
+```text
+notifications
+```
+
+Laravel commonly provides:
+
+```text
+id UUID
+type VARCHAR
+notifiable_type VARCHAR
+notifiable_id BIGINT
+data TEXT/JSON
+read_at TIMESTAMP NULL
+created_at
+updated_at
+```
+
+This avoids creating a separate notification architecture unless additional domain requirements emerge.
+
+---
+
+# 85. Notification Data
+
+Notification payload should contain only the minimum necessary information.
+
+Example:
+
+```json
+{
+    "event": "CHANGE_REQUEST_APPROVED",
+    "request_code": "CRQ-000101"
+}
+```
+
+Avoid storing unnecessary:
+
+```text
+National IDs
+Health Details
+Confidential Notes
+```
+
+inside notification payloads.
+
+---
+
+# 86. Family User Notifications
+
+Potential events:
+
+```text
+CHANGE_REQUEST_SUBMITTED
+CHANGE_REQUEST_UNDER_REVIEW
+CHANGE_REQUEST_RETURNED
+CHANGE_REQUEST_RESUBMITTED
+CHANGE_REQUEST_APPROVED
+CHANGE_REQUEST_REJECTED
+CHANGE_REQUEST_APPLIED
+
+ACCOUNT_ACTIVATED
+ACCOUNT_SUSPENDED
+```
+
+---
+
+# 87. Roles and Permissions
 
 Recommended Laravel package:
 
@@ -1586,7 +2176,7 @@ Recommended Laravel package:
 spatie/laravel-permission
 ```
 
-Expected tables include:
+Standard tables:
 
 ```text
 roles
@@ -1596,7 +2186,7 @@ model_has_permissions
 role_has_permissions
 ```
 
-Detailed authorization design belongs in:
+The exact permission matrix is defined in:
 
 ```text
 06-PERMISSIONS.md
@@ -1604,177 +2194,186 @@ Detailed authorization design belongs in:
 
 ---
 
-# 42. audit_logs
+# 88. FAMILY_USER Role
 
-Recommended package:
+`FAMILY_USER` is an authorization role.
 
-```text
-spatie/laravel-activitylog
-```
-
-or an equivalent audit implementation.
-
-Logical fields:
+It does not replace:
 
 ```text
-id
-actor_id
-event
-entity_type
-entity_id
-old_values JSONB
-new_values JSONB
-ip_address
-user_agent
-created_at
+user_person_links
+family_memberships
 ```
 
-PostgreSQL:
+A valid role alone does not establish Family scope.
+
+Required authorization concept:
 
 ```text
-JSONB
+Role
++
+Active User-Person Link
++
+Current Membership
++
+Resource Policy
 ```
-
-is preferred for structured before/after values.
-
-Audit records should be append-only for normal application users.
 
 ---
 
-# 43. Reference Table Standard
+# 89. Audit Logs
 
-Most lookup tables should follow:
+Recommended logical fields:
 
 ```text
 id BIGINT PK
-code VARCHAR UNIQUE
-name_ar VARCHAR
-name_en VARCHAR
-description TEXT NULL
-is_active BOOLEAN DEFAULT TRUE
-sort_order INTEGER DEFAULT 0
+
+actor_id BIGINT NULL FK users
+
+event VARCHAR(100)
+
+entity_type VARCHAR(150)
+entity_id BIGINT
+
+old_values JSONB NULL
+new_values JSONB NULL
+
+metadata JSONB NULL
+
+ip_address VARCHAR(45) NULL
+user_agent TEXT NULL
+
 created_at TIMESTAMP
-updated_at TIMESTAMP
 ```
 
-This applies where appropriate to:
+The physical schema may be aligned with the selected Laravel activity/audit package.
+
+---
+
+# 90. Audit vs Workflow
 
 ```text
-relationship_types
-marital_statuses
-governorates
-localities
-housing_types
-tenure_types
-housing_condition_types
-health_condition_types
-disability_types
-education_levels
-education_statuses
-employment_statuses
-employment_sectors
-document_types
-need_types
-assistance_types
-note_types
-assessment_types
-form_types
+workflow_events
+```
+
+answers:
+
+```text
+How did this business process move through states?
+```
+
+`audit_logs` answers:
+
+```text
+What system/data change occurred?
+```
+
+Example Change Request application may create:
+
+```text
+Workflow Event:
+APPROVED → APPLIED
+```
+
+and:
+
+```text
+Audit Log:
+persons.mobile changed
 ```
 
 ---
 
-# 44. Foreign Key Delete Strategy
+# 91. Audit Immutability
 
-Deletion behavior must be deliberate.
-
-## Core Identity
+Normal application roles must not have:
 
 ```text
-families
-persons
+audit.update
+audit.delete
 ```
 
-Use:
+Audit data is append-only.
 
-```text
-RESTRICT / NO ACTION
-```
+---
 
-for historical dependent records.
-
-Do NOT cascade-delete an entire person's history.
-
-## Reference Tables
+# 92. Delete Strategy
 
 Use:
 
 ```text
 RESTRICT
+NO ACTION
 ```
 
-when values are already referenced.
+for core historical relationships where deletion could destroy registry integrity.
 
-Deactivate reference values instead of deleting them.
-
-## Historical Records
-
-For:
-
-```text
-assessments
-form_submissions
-workflow_events
-assistance_records
-case_notes
-documents
-audit_logs
-```
-
-avoid destructive cascade behavior.
-
----
-
-# 45. Soft Deletes
-
-Recommended for:
+Avoid destructive cascade deletes for:
 
 ```text
 families
 persons
-```
-
-Potentially:
-
-```text
-documents
-```
-
-depending on retention requirements.
-
-Not recommended for:
-
-```text
+family_memberships
+assessments
+form_submissions
 workflow_events
+change_requests
+documents
+family_needs
+assistance_records
+case_notes
 audit_logs
 ```
 
-because these represent append-only historical records.
-
-Soft deletion must not replace proper business statuses.
+Reference values should normally be deactivated rather than deleted.
 
 ---
 
-# 46. Timestamps
+# 93. Historical Tables
 
-Application timestamps should use timezone-aware handling.
+The following are historical/append-oriented:
 
-Laravel/PostgreSQL implementation should consistently store application timestamps in a defined timezone strategy, preferably UTC internally.
+```text
+family_memberships
+family_residences
+assessments
+form_submissions
+workflow_events
+change_requests
+assistance_records
+person_notes
+case_notes
+audit_logs
+user_person_links
+```
 
-Display conversion belongs to the application layer.
+The exact mutability varies by entity, but history must not be silently destroyed.
 
 ---
 
-# 47. Monetary Fields
+# 94. Derived Data
+
+Do not create canonical columns such as:
+
+```text
+persons.age
+
+families.family_size
+
+families.children_count
+
+families.disabled_count
+
+families.chronic_count
+
+families.pending_requests_count
+```
+
+These values should be derived from source records.
+
+---
+
+# 95. Money Types
 
 Use:
 
@@ -1782,21 +2381,24 @@ Use:
 NUMERIC
 ```
 
-not floating-point types for money.
-
 Example:
 
 ```text
 NUMERIC(12,2)
 ```
 
-Currency must be explicit when monetary values can use different currencies.
+Never use:
+
+```text
+FLOAT
+DOUBLE
+```
+
+for monetary values.
 
 ---
 
-# 48. Phone Numbers
-
-Phone numbers must be stored as text.
+# 96. Phone Types
 
 Use:
 
@@ -1804,187 +2406,151 @@ Use:
 VARCHAR
 ```
 
-not numeric types.
-
-Reason:
-
-```text
-+
-leading zero
-country code
-formatting
-```
-
-may be significant.
-
-Canonical normalization rules will be implemented at application level.
+Phone numbers are identifiers/contact strings, not numeric quantities.
 
 ---
 
-# 49. National ID Storage
+# 97. Reference Table Pattern
 
-National IDs must use:
-
-```text
-VARCHAR
-```
-
-not numeric types.
-
-Index:
+Recommended:
 
 ```text
-INDEX national_id
-```
+id BIGINT PK
 
-A final uniqueness strategy will be approved after confirming identity rules and legacy-data behavior.
+code VARCHAR(50) UNIQUE
+
+name_ar VARCHAR(150)
+name_en VARCHAR(150)
+
+description TEXT NULL
+
+is_active BOOLEAN DEFAULT TRUE
+
+sort_order INTEGER DEFAULT 0
+
+created_at
+updated_at
+```
 
 ---
 
-# 50. Sensitive Field Encryption
+# 98. Reference Tables
 
-Candidate fields for application-level encryption include:
+V1 includes:
+
+```text
+relationship_types
+marital_statuses
+
+governorates
+localities
+
+housing_types
+tenure_types
+housing_condition_types
+
+health_condition_types
+disability_types
+
+education_levels
+education_statuses
+
+employment_statuses
+employment_sectors
+
+assessment_types
+form_types
+
+document_types
+
+need_types
+assistance_types
+
+note_types
+
+change_request_types
+```
+
+---
+
+# 99. Sensitive Data Classification
+
+Restricted data includes:
+
+```text
+National ID
+Health
+Disability
+Identity Documents
+Medical Documents
+Confidential Notes
+Sensitive Change Request Payloads
+```
+
+Database design must support application-level authorization and masking.
+
+---
+
+# 100. Encryption Candidates
+
+Potential application-level encrypted fields include:
 
 ```text
 national_id
-sensitive document identifiers
-selected confidential information
+document_number
+selected confidential note content
+selected sensitive Change Request fields
 ```
 
-However, encryption strategy must consider search requirements.
+However, searchable encrypted fields require careful design.
 
-For searchable sensitive fields, a pattern such as:
+Potential pattern:
 
 ```text
 encrypted value
 +
-search hash
+normalized search hash
 ```
 
-may be evaluated.
+Final decision remains pending.
 
-Example conceptual design:
+---
+
+# 101. National ID Search Hash
+
+If encryption is adopted, possible architecture:
 
 ```text
 national_id_encrypted
 national_id_hash
+national_id_last4
 ```
 
-This decision must be finalized during the security implementation phase before production data is loaded.
+where:
+
+```text
+national_id_hash
+=
+HMAC(normalized_national_id)
+```
+
+rather than a plain unsalted general-purpose hash.
+
+This must be finalized before production identity data migration.
 
 ---
 
-# 51. Search Strategy
+# 102. Search Indexes
 
-Initial indexed search fields:
+Recommended initial indexes:
 
 ```text
 families.family_code
+
 persons.person_code
 persons.national_id
 persons.full_name
 persons.mobile
-```
-
-PostgreSQL search capabilities may later be extended with:
-
-```text
-pg_trgm
-```
-
-for fuzzy name search.
-
-Example future extension:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-```
-
-Then:
-
-```text
-GIN / GiST trigram index
-```
-
-may support duplicate detection and name search.
-
-This optimization should be introduced only when required.
-
----
-
-# 52. Duplicate Detection Data
-
-Duplicate detection logic primarily belongs in the application layer.
-
-The database provides indexed canonical fields such as:
-
-```text
-national_id
-full_name
-birth_date
-gender
-mobile
-```
-
-The system MUST NOT enforce automatic Person merging at database level.
-
----
-
-# 53. Derived Data
-
-Do NOT create canonical columns such as:
-
-```text
-age
-family_size
-children_count
-male_count
-female_count
-disabled_count
-chronic_disease_count
-```
-
-These should be queried/calculated.
-
-If performance later requires cached aggregates, they must remain derived data.
-
----
-
-# 54. Assessment Snapshot Consideration
-
-Some Person and Family attributes are time-sensitive.
-
-Examples:
-
-```text
-pregnancy
-breastfeeding
-employment
-residence
-needs
-displacement
-```
-
-V1 maintains current domain records plus assessment history.
-
-Where historical reporting requires the exact state at assessment time, snapshot tables or assessment-linked observations may be introduced.
-
-This must be considered before building advanced longitudinal reporting.
-
----
-
-# 55. Database Indexing Strategy
-
-Indexes should support actual query patterns.
-
-Priority indexes include:
-
-```text
-family_code
-person_code
-national_id
-full_name
-mobile
 
 family_memberships.family_id
 family_memberships.person_id
@@ -1992,328 +2558,729 @@ family_memberships.person_id
 family_residences.family_id
 
 assessments.family_id
-assessments.status
-assessments.assessment_date
 
 form_submissions.family_id
 form_submissions.status
 
-workflow_events.workflowable_type + workflowable_id
+change_requests.request_code
+change_requests.family_id
+change_requests.person_id
+change_requests.status
 
-family_needs.family_id
-family_needs.status
-
-assistance_records.family_id
-assistance_records.received_at
-```
-
-Avoid indexing every column without demonstrated need.
-
----
-
-# 56. Composite Indexes
-
-Potential composite indexes include:
-
-```text
-family_memberships
-(family_id, is_active)
-
-assessments
-(family_id, assessment_date)
-
-form_submissions
-(family_id, status)
-
-workflow_events
-(workflowable_type, workflowable_id)
-
-family_needs
-(family_id, status)
-
-assistance_records
-(family_id, received_at)
-```
-
-Final indexes should be verified using production query patterns.
-
----
-
-# 57. Unique Constraints
-
-V1 requires at minimum:
-
-```text
-families.family_code
-persons.person_code
-relationship_types.code
-marital_statuses.code
-assessment_types.code
-form_types.code
-```
-
-and other reference-table codes.
-
-Partial unique indexes enforce:
-
-```text
-One active household membership per person
-One active household head per family
-One current residence per family
+documents.family_id
+documents.person_id
+documents.change_request_id
 ```
 
 ---
 
-# 58. Check Constraints
+# 103. Name Search
 
-Recommended PostgreSQL checks include:
+Initial implementation may use standard PostgreSQL text search/indexing.
 
-### Person Relationship
+If fuzzy Arabic/English name search becomes important, consider:
 
-```sql
-CHECK (person_id <> related_person_id)
+```text
+pg_trgm
 ```
 
-### Membership Dates
+with appropriate indexes.
 
-```sql
-CHECK (
-    ended_at IS NULL
-    OR started_at IS NULL
-    OR ended_at >= started_at
-)
-```
-
-### Residence Dates
-
-```sql
-CHECK (
-    to_date IS NULL
-    OR from_date IS NULL
-    OR to_date >= from_date
-)
-```
-
-### Document Owner
-
-```sql
-CHECK (
-    family_id IS NOT NULL
-    OR person_id IS NOT NULL
-)
-```
-
-Additional constraints should be introduced where they improve integrity without preventing valid operational exceptions.
+This is not required for the first migration set.
 
 ---
 
-# 59. Null vs Unknown
+# 104. Assessment Snapshots
 
-Database `NULL` generally means:
+Some information is time-sensitive.
 
-```text
-Not recorded / unknown
-```
-
-It should not automatically mean:
+Examples:
 
 ```text
-No
+Pregnancy
+Breastfeeding
+Employment
+Residence
+Needs
 ```
 
-For example:
+Current tables may represent canonical/current state plus history.
 
-```text
-has_income = NULL
-```
+If exact point-in-time longitudinal reporting is required, assessment-linked observation/snapshot tables may be introduced.
 
-may mean:
-
-```text
-Not assessed
-```
-
-while:
-
-```text
-has_income = FALSE
-```
-
-means:
-
-```text
-Assessed and no income reported
-```
-
-This distinction must be preserved where operationally important.
+Do not duplicate all registry tables prematurely.
 
 ---
 
-# 60. ERD — Core
+# 105. ERD — Registry Core
 
 ```text
-┌─────────────────┐
-│    families     │
-└────────┬────────┘
-         │ 1
-         │
-         │ N
-┌────────▼──────────────┐
-│ family_memberships   │
-└────────┬──────────────┘
-         │ N
-         │
-         │ 1
-┌────────▼────────┐
-│     persons     │
-└────────┬────────┘
-         │
-         ├────────────── person_relationships
-         │
-         ├────────────── person_health_profiles
-         │
-         ├────────────── person_health_conditions
-         │
-         ├────────────── person_disabilities
-         │
-         ├────────────── person_education
-         │
-         ├────────────── person_employment
-         │
-         ├────────────── person_notes
-         │
-         └────────────── documents
-
-
 families
    │
-   ├────────────── family_residences
+   ├──< family_memberships >── persons
+   │                               │
+   │                               ├── person_health_profiles
+   │                               ├── person_health_conditions
+   │                               ├── person_disabilities
+   │                               ├── person_education
+   │                               ├── person_employment
+   │                               ├── person_notes
+   │                               └── documents
    │
-   ├────────────── assessments
-   │                    │
-   │                    └──── form_submissions
-   │                              │
-   │                              └──── workflow_events
+   ├── family_residences
+   ├── assessments
+   ├── form_submissions
+   ├── family_needs
+   ├── assistance_records
+   ├── case_notes
+   ├── documents
+   └── change_requests
+```
+
+---
+
+# 106. ERD — Person Relationships
+
+```text
+persons
    │
-   ├────────────── family_needs
-   │                    │
-   │                    ├──── workflow_events
-   │                    └──── assistance_records
-   │
-   ├────────────── case_notes
-   └────────────── documents
+   └──< person_relationships >── persons
 ```
-
-Note:
-
-`workflow_events` uses a polymorphic relationship and may therefore reference multiple workflow-controlled entities rather than having a direct foreign key to only one table.
 
 ---
 
-# 61. ERD — Identity Model
+# 107. ERD — Family Portal
 
 ```text
-                ┌───────────────┐
-                │   families    │
-                └───────┬───────┘
-                        │
-                        │ 1:N
-                        ▼
-              ┌─────────────────────┐
-              │ family_memberships  │
-              └──────────┬──────────┘
-                         │
-                         │ N:1
-                         ▼
-                   ┌───────────┐
-                   │  persons  │
-                   └─────┬─────┘
-                         │
-                         │ 1:N
-                         ▼
-              ┌──────────────────────┐
-              │ person_relationships │
-              └──────────────────────┘
+users
+  │
+  └──< user_person_links >── persons
+                              │
+                              └── family_memberships
+                                      │
+                                      └── families
+                                              │
+                                              └── change_requests
 ```
 
-This model allows Person identity to survive household changes.
+This is the authorization path for Family scope.
 
 ---
 
-# 62. Example — Person Moves Household
-
-Initial state:
+# 108. ERD — Change Requests
 
 ```text
-PER-000100
-    ↓
-FAM-000020
-2025-01-01 → 2026-06-30
+change_request_types
+        │
+        └──< change_requests
+                  │
+                  ├── family
+                  ├── optional person
+                  ├── submitted_by user
+                  ├── reviewer
+                  ├── approver
+                  ├── applier
+                  │
+                  ├──< documents
+                  │
+                  └──< workflow_events
 ```
-
-Membership:
-
-```text
-family_id: 20
-person_id: 100
-started_at: 2025-01-01
-ended_at: 2026-06-30
-is_active: false
-```
-
-New membership:
-
-```text
-family_id: 85
-person_id: 100
-started_at: 2026-07-01
-ended_at: NULL
-is_active: true
-```
-
-The Person remains:
-
-```text
-PER-000100
-```
-
-No duplicate Person is created.
 
 ---
 
-# 63. Example — Household Head Change
+# 109. ERD — Workflow
 
-Before:
-
-```text
-FAM-000510
-
-PER-001001
-is_household_head = true
-
-PER-001002
-is_household_head = false
-```
-
-After:
+Conceptually:
 
 ```text
-PER-001001
-is_household_head = false
-
-PER-001002
-is_household_head = true
+form_submissions ─┐
+assessments      ─┤
+family_needs     ─┼──< workflow_events
+change_requests  ─┘
 ```
 
-Membership history and audit logs preserve the change.
+This is polymorphic.
 
-The operation should execute transactionally to prevent a Family from temporarily ending in an inconsistent household-head state.
+There is no direct relational FK from:
+
+```text
+workflowable_id
+```
+
+to every target table.
+
+Referential validity is enforced by application/domain logic.
 
 ---
 
-# 64. Laravel Migration Order
+# 110. ERD — Documents
 
-Recommended migration sequence:
+```text
+document_types
+      │
+      └──< documents
+               │
+               ├── Family
+               ├── Person
+               └── Change Request
+```
+
+---
+
+# 111. Laravel Model Relationships — Family
+
+Conceptual:
+
+```php
+class Family extends Model
+{
+    public function memberships()
+    {
+        return $this->hasMany(FamilyMembership::class);
+    }
+
+    public function residences()
+    {
+        return $this->hasMany(FamilyResidence::class);
+    }
+
+    public function assessments()
+    {
+        return $this->hasMany(Assessment::class);
+    }
+
+    public function formSubmissions()
+    {
+        return $this->hasMany(FormSubmission::class);
+    }
+
+    public function needs()
+    {
+        return $this->hasMany(FamilyNeed::class);
+    }
+
+    public function assistanceRecords()
+    {
+        return $this->hasMany(AssistanceRecord::class);
+    }
+
+    public function changeRequests()
+    {
+        return $this->hasMany(ChangeRequest::class);
+    }
+}
+```
+
+---
+
+# 112. Laravel Model Relationships — Person
+
+Conceptual:
+
+```php
+class Person extends Model
+{
+    public function memberships()
+    {
+        return $this->hasMany(FamilyMembership::class);
+    }
+
+    public function userLinks()
+    {
+        return $this->hasMany(UserPersonLink::class);
+    }
+
+    public function changeRequests()
+    {
+        return $this->hasMany(ChangeRequest::class);
+    }
+
+    public function healthProfile()
+    {
+        return $this->hasOne(PersonHealthProfile::class);
+    }
+
+    public function healthConditions()
+    {
+        return $this->hasMany(PersonHealthCondition::class);
+    }
+
+    public function disabilities()
+    {
+        return $this->hasMany(PersonDisability::class);
+    }
+
+    public function educationRecords()
+    {
+        return $this->hasMany(PersonEducation::class);
+    }
+
+    public function employmentRecords()
+    {
+        return $this->hasMany(PersonEmployment::class);
+    }
+}
+```
+
+---
+
+# 113. Laravel Model Relationships — User
+
+Conceptual:
+
+```php
+class User extends Authenticatable
+{
+    public function personLinks()
+    {
+        return $this->hasMany(UserPersonLink::class);
+    }
+
+    public function submittedChangeRequests()
+    {
+        return $this->hasMany(
+            ChangeRequest::class,
+            'submitted_by'
+        );
+    }
+}
+```
+
+Roles and permissions are provided by Spatie Permission.
+
+---
+
+# 114. Laravel Model Relationships — UserPersonLink
+
+```php
+class UserPersonLink extends Model
+{
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function person()
+    {
+        return $this->belongsTo(Person::class);
+    }
+}
+```
+
+---
+
+# 115. Laravel Model Relationships — ChangeRequest
+
+Conceptual:
+
+```php
+class ChangeRequest extends Model
+{
+    protected $casts = [
+        'submitted_data' => 'array',
+        'submitted_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'applied_at' => 'datetime',
+    ];
+
+    public function family()
+    {
+        return $this->belongsTo(Family::class);
+    }
+
+    public function person()
+    {
+        return $this->belongsTo(Person::class);
+    }
+
+    public function type()
+    {
+        return $this->belongsTo(ChangeRequestType::class);
+    }
+
+    public function submitter()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    public function workflowEvents()
+    {
+        return $this->morphMany(
+            WorkflowEvent::class,
+            'workflowable'
+        );
+    }
+}
+```
+
+---
+
+# 116. Laravel Domain Actions
+
+Complex operations should not live directly inside:
+
+```text
+Controllers
+Filament Resources
+Livewire Components
+API Controllers
+```
+
+Recommended action/service classes include:
+
+```text
+CreateFamilyAction
+
+CreatePersonAction
+
+AddFamilyMemberAction
+
+TransferFamilyMemberAction
+
+ChangeHouseholdHeadAction
+
+ChangeFamilyResidenceAction
+
+RecordPersonDeathAction
+
+SubmitFormAction
+
+VerifyFormAction
+
+ApproveFormAction
+
+SubmitChangeRequestAction
+
+ReturnChangeRequestAction
+
+ApproveChangeRequestAction
+
+RejectChangeRequestAction
+
+ApplyChangeRequestAction
+
+CreateOrLinkFamilyMemberAction
+```
+
+---
+
+# 117. Shared Domain Operations
+
+Staff Portal and Family Portal workflows must ultimately use the same domain operations.
+
+Example:
+
+```text
+Staff directly performs approved Head change
+```
+
+and:
+
+```text
+Approved Family Change Request
+```
+
+should both ultimately invoke:
+
+```text
+ChangeHouseholdHeadAction
+```
+
+This prevents duplicated business logic.
+
+---
+
+# 118. Transaction Boundaries
+
+Transactions are required for operations such as:
+
+```text
+Create Family + Head + Membership
+
+Change Household Head
+
+Transfer Person between Families
+
+Change Current Residence
+
+Record Death with dependent changes
+
+Apply Change Request
+
+Create Assistance with linked updates
+
+Workflow transition + workflow_events insert
+```
+
+---
+
+# 119. Create Family Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Create Family
+
+Create or identify Person
+
+Create Family Membership
+
+Assign Household Head
+
+Create initial Residence if available
+
+Create Audit entries
+
+COMMIT
+```
+
+---
+
+# 120. Household Head Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock Family relevant memberships
+
+Validate current Head
+
+Validate proposed Head
+
+Clear previous Head flag
+
+Set new Head flag
+
+Record Audit
+
+Reevaluate Family Portal authorization
+
+COMMIT
+```
+
+---
+
+# 121. Person Transfer Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock active Person membership
+
+Validate target Family
+
+Close old membership
+
+Create new membership
+
+Review Household Head implications
+
+Review Family Portal authorization
+
+Record Audit
+
+COMMIT
+```
+
+---
+
+# 122. Residence Change Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock current Family residence
+
+Close previous current residence
+
+Create new current residence
+
+Record Audit
+
+COMMIT
+```
+
+---
+
+# 123. Record Death Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock Person
+
+Validate death information
+
+Update:
+life_status = DECEASED
+
+Set death_date if known
+
+Record Audit
+
+If Person is Household Head:
+    trigger/record Head review requirement
+
+Review active Family Portal authorization
+
+COMMIT
+```
+
+The exact Head-review workflow is defined separately.
+
+---
+
+# 124. Apply Change Request Transaction
+
+Conceptually:
+
+```text
+BEGIN
+
+Lock Change Request
+
+Validate status = APPROVED
+
+Validate submitter/family/request integrity
+
+Revalidate current canonical registry state
+
+Execute mapped domain action
+
+Write domain audit records
+
+Write:
+workflow_event APPROVED → APPLIED
+
+Set:
+status = APPLIED
+applied_by
+applied_at
+
+COMMIT
+```
+
+If any step fails:
+
+```text
+ROLLBACK
+```
+
+---
+
+# 125. Workflow Transition Transaction
+
+Every controlled workflow transition should update:
+
+```text
+Current entity status
++
+workflow_events
+```
+
+inside the same database transaction.
+
+This prevents:
+
+```text
+Status changed
+but
+history missing
+```
+
+or the reverse.
+
+---
+
+# 126. Concurrency Guards
+
+Critical operations should use appropriate:
+
+```text
+Row locking
+Unique constraints
+Transactions
+Optimistic locking where appropriate
+```
+
+Examples:
+
+```text
+Household Head Change
+Person Transfer
+Change Request Application
+Duplicate-sensitive Person Creation
+Current Residence Change
+```
+
+---
+
+# 127. Optimistic Concurrency
+
+For selected forms/edit screens, an application-level version or `updated_at` comparison may prevent overwriting another user's changes.
+
+Example:
+
+```text
+Record loaded at T1
+Another user updates at T2
+Original user submits at T3
+```
+
+The system should detect stale data where overwriting would be unsafe.
+
+---
+
+# 128. Change Request Stale Data
+
+Approval does not guarantee that the underlying registry remains unchanged until application.
+
+Therefore:
+
+```text
+ApplyChangeRequestAction
+```
+
+must revalidate the current registry.
+
+Example:
+
+```text
+Request proposes Person as Household Head
+```
+
+but before application:
+
+```text
+Person membership ended
+```
+
+Application must fail safely rather than violate invariants.
+
+---
+
+# 129. Migration Strategy
+
+Migrations should be small and ordered according to dependencies.
+
+Recommended order:
 
 ```text
 01 users
@@ -2321,301 +3288,927 @@ Recommended migration sequence:
 02 reference tables
 
 03 families
+
 04 persons
 
 05 family_memberships
+
 06 person_relationships
 
 07 family_residences
 
 08 person_health_profiles
+
 09 person_health_conditions
+
 10 person_disabilities
 
 11 person_education
+
 12 person_employment
 
 13 assessments
+
 14 form_submissions
+
 15 workflow_events
 
-16 documents
+16 change_request_types
 
-17 family_needs
-18 assistance_records
+17 change_requests
 
-19 person_notes
-20 case_notes
+18 documents
 
-21 roles / permissions
-22 audit infrastructure
+19 family_needs
 
-23 indexes / specialized constraints
-```
+20 assistance_records
 
-Exact Laravel timestamps will determine actual execution order.
+21 person_notes
 
----
+22 case_notes
 
-# 65. Laravel Model Relationships
+23 user_person_links
 
-Expected conceptual relationships:
+24 notifications
 
-```text
-Family
-  hasMany Memberships
-  hasMany Persons through Memberships
-  hasMany Residences
-  hasMany Assessments
-  hasMany Needs
-  hasMany AssistanceRecords
-  hasMany CaseNotes
-  hasMany Documents
-```
+25 roles / permissions
 
-```text
-Person
-  hasMany Memberships
-  hasMany Relationships
-  hasOne HealthProfile
-  hasMany HealthConditions
-  hasMany Disabilities
-  hasMany EducationRecords
-  hasMany EmploymentRecords
-  hasMany Notes
-  hasMany Documents
-```
+26 audit infrastructure
 
-```text
-Assessment
-  belongsTo Family
-  belongsTo Collector
-  belongsTo Reviewer
-  hasMany FormSubmissions
-  morphMany WorkflowEvents
-```
-
-```text
-FormSubmission
-  belongsTo Family
-  belongsTo Assessment
-  belongsTo FormType
-  morphMany WorkflowEvents
-```
-
-```text
-FamilyNeed
-  belongsTo Family
-  belongsTo Person optionally
-  belongsTo Assessment optionally
-  hasMany AssistanceRecords
-  morphMany WorkflowEvents
-```
-
-```text
-WorkflowEvent
-  morphTo Workflowable
-  belongsTo User through performed_by
+27 indexes / specialized constraints
 ```
 
 ---
 
-# 66. Transaction Boundaries
+# 130. Migration Dependency Note
 
-Operations involving multiple dependent records should use database transactions.
+`workflow_events` is polymorphic.
+
+Therefore it does not require physical foreign keys to:
+
+```text
+form_submissions
+assessments
+family_needs
+change_requests
+```
+
+and may be created before some of those tables.
+
+`documents.change_request_id`, however, requires:
+
+```text
+change_requests
+```
+
+to exist first.
+
+---
+
+# 131. Users Migration
+
+If Laravel's default users migration already exists, modify/extend it carefully rather than creating incompatible duplicate structures.
+
+Possible additions:
+
+```text
+mobile
+mobile_verified_at
+is_active
+last_login_at
+```
+
+---
+
+# 132. Reference Data Seeders
+
+Seed only approved reference data.
 
 Examples:
 
 ```text
-Create Family
-+
-Create Household Head
-+
-Create Initial Membership
+Relationship Types
+Marital Statuses
+Assessment Types
+Form Types
+Document Types
+Need Types
+Change Request Types
+Roles
+Permissions
 ```
 
-must either all succeed or all fail.
-
-Likewise:
-
-```text
-Change Household Head
-```
-
-should be atomic.
-
-And:
-
-```text
-Move Person Between Families
-```
-
-should be atomic.
-
-Workflow transitions that update the entity state and create a corresponding `workflow_events` record should also execute transactionally.
-
-Example:
-
-```text
-Update form_submissions.status
-+
-Insert workflow_events
-```
-
-must either both succeed or both fail.
+Seeders should be idempotent.
 
 ---
 
-# 67. Concurrency
+# 133. No Assumed Reference Data
 
-Critical updates should guard against race conditions.
+If a paper-form label is unclear:
+
+```text
+Do not invent production seed values.
+```
+
+Keep the item:
+
+```text
+PENDING VERIFICATION
+```
+
+until approved.
+
+---
+
+# 134. Role Seeder
+
+Initial roles may include:
+
+```text
+SUPER_ADMIN
+ADMINISTRATOR
+DATA_ENTRY
+REVIEWER
+SOCIAL_WORKER
+REPORTS_VIEWER
+FAMILY_USER
+```
+
+Exact permissions are defined in:
+
+```text
+06-PERMISSIONS.md
+```
+
+---
+
+# 135. Permission Seeder
+
+Permissions should use stable machine-readable codes.
 
 Examples:
 
 ```text
-Two users assigning different household heads simultaneously.
+families.view
+families.create
+families.update
+families.archive
+
+persons.view
+persons.create
+persons.update
+
+change_requests.create
+change_requests.view
+change_requests.review
+change_requests.approve
+change_requests.reject
+change_requests.apply
+
+documents.upload
+documents.verify
+
+audit.view
 ```
 
-or:
+Do not hard-code role names throughout domain logic.
+
+Prefer:
 
 ```text
-Two users moving the same Person between families.
+Permission checks
+Policies
+Domain authorization
 ```
-
-or:
-
-```text
-Two reviewers attempting to verify/return the same submission.
-```
-
-Database constraints plus application transactions should protect these operations.
-
-Optimistic concurrency using:
-
-```text
-updated_at
-```
-
-or an explicit:
-
-```text
-version
-```
-
-field may be introduced for critical records.
 
 ---
 
-# 68. Data Seeding
+# 136. Family Portal Authorization Query
 
-Seeders should initially provide:
+Conceptually, Family scope resolution may use:
 
-```text
-relationship_types
-marital_statuses
-housing_types
-tenure_types
-housing_condition_types
-health_condition_types
-disability_types
-education_levels
-education_statuses
-employment_statuses
-employment_sectors
-document_types
-need_types
-assistance_types
-note_types
-assessment_types
-form_types
-roles
-permissions
+```sql
+SELECT f.*
+FROM families f
+JOIN family_memberships fm
+    ON fm.family_id = f.id
+JOIN persons p
+    ON p.id = fm.person_id
+JOIN user_person_links upl
+    ON upl.person_id = p.id
+WHERE upl.user_id = ?
+  AND upl.status = 'ACTIVE'
+  AND fm.is_active = TRUE;
 ```
 
-Only approved lookup values should be treated as production seed data.
+Additional policy rules may require:
+
+```text
+fm.is_household_head = TRUE
+```
+
+for V1.
+
+This must be implemented through authorization/domain services rather than copied throughout controllers.
 
 ---
 
-# 69. Development Data
+# 137. Family Portal Scope Service
 
-Development environments may use factories and seeders containing fictional data.
-
-Development data MUST NOT contain real family information.
-
-Example:
+Recommended application abstraction:
 
 ```text
-FAM-000001
-Test Family
-
-PER-000001
-Test Person
+FamilyAccessService
 ```
 
-or generated fictional records.
+or equivalent.
+
+Responsibilities:
+
+```text
+Resolve User → Person
+Resolve Person → Active Membership
+Resolve authorized Family scope
+Check Household Head policy
+Check sensitive member scope
+```
+
+This prevents inconsistent authorization queries.
 
 ---
 
-# 70. Backup Requirements
+# 138. Change Request Payload Validation
 
-Production architecture must support:
+Recommended implementation:
 
 ```text
-Database backup
-Document backup
-Restore testing
-Retention policy
-Access control
+ChangeRequestType
+      ↓
+Dedicated Validator / DTO
 ```
 
-Backups containing personal data are sensitive and require protection equivalent to production data.
+Examples:
+
+```text
+ContactUpdateData
+
+ResidenceUpdateData
+
+PersonCorrectionData
+
+AddFamilyMemberData
+
+HouseholdHeadChangeData
+
+DeathReportData
+```
+
+Avoid one unrestricted generic JSON validator.
 
 ---
 
-# 71. Database Access
+# 139. Change Request Action Mapping
 
-Production database credentials:
-
-- MUST NOT be committed to Git.
-- MUST be stored in environment configuration.
-- SHOULD use least-privilege database accounts.
-
-Example:
+Recommended architecture:
 
 ```text
-.env
+CONTACT_UPDATE
+→ ApplyContactUpdateAction
+
+RESIDENCE_UPDATE
+→ ChangeFamilyResidenceAction
+
+PERSON_CORRECTION
+→ ApplyPersonCorrectionAction
+
+ADD_FAMILY_MEMBER
+→ CreateOrLinkFamilyMemberAction
+
+HOUSEHOLD_HEAD_CHANGE
+→ ChangeHouseholdHeadAction
+
+DEATH_REPORT
+→ RecordPersonDeathAction
 ```
 
-must remain ignored by Git.
+Mapping should be explicit.
 
 ---
 
-# 72. Laravel Environment
+# 140. File Upload Architecture
 
-Example development configuration:
+Recommended:
 
-```env
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=famboook
-DB_USERNAME=famboook_app
-DB_PASSWORD=
+```text
+Laravel Storage
++
+Private disk
 ```
 
-Actual credentials must never be committed.
+Metadata remains in:
+
+```text
+documents
+```
+
+Physical file names should be generated by the system.
+
+Do not trust uploaded filenames as storage paths.
+
+---
+
+# 141. File Download Architecture
+
+Recommended:
+
+```text
+Authenticated request
+      ↓
+Policy check
+      ↓
+Document authorization
+      ↓
+Stream file
+```
+
+or a short-lived signed private-storage URL where supported.
+
+Never expose permanent public document URLs.
+
+---
+
+# 142. Backup Strategy
+
+Production database backups must be:
+
+```text
+Automated
+Encrypted where possible
+Access-controlled
+Tested for restoration
+Retained according to policy
+```
+
+Sensitive file storage must have a corresponding backup/recovery strategy.
+
+---
+
+# 143. Development Data
 
 Use:
 
 ```text
-.env.example
+Factories
+Seeders
+Synthetic data
 ```
 
-for non-secret configuration examples.
+Never copy real Family Registry records into Git.
 
 ---
 
-# 73. Database Naming
+# 144. Test Data
+
+Automated tests should cover:
+
+```text
+Family creation
+
+Person creation
+
+Duplicate National ID detection
+
+Membership transfer
+
+Household Head change
+
+Current Residence uniqueness
+
+Death recording
+
+Family User account link
+
+Family scope resolution
+
+Unauthorized Family access
+
+Change Request submission
+
+Change Request return
+
+Change Request approval
+
+Change Request rejection
+
+Change Request application
+
+Double application prevention
+
+Supporting document authorization
+
+Sensitive field restrictions
+```
+
+---
+
+# 145. Database Testing
+
+Important constraints should have direct tests.
+
+Examples:
+
+```text
+Cannot create two active memberships for one Person.
+
+Cannot create two active Heads for one Family.
+
+Cannot create two current residences for one Family.
+
+Cannot relate Person to self.
+
+Cannot duplicate family_code.
+
+Cannot duplicate person_code.
+
+Cannot duplicate request_code.
+
+Cannot apply Change Request twice.
+```
+
+---
+
+# 146. Security Testing
+
+Family Portal tests must include object-level authorization.
+
+Example:
+
+```text
+Family User A
+→ authorized Family 510
+```
+
+Attempt:
+
+```text
+GET /family-portal/families/511
+```
+
+Expected:
+
+```text
+403
+```
+
+or appropriate non-disclosing response.
+
+---
+
+# 147. Data Masking
+
+Masking should occur before sensitive values reach unauthorized UI/API responses.
+
+Do not rely on CSS/JavaScript to hide values already delivered to the client.
+
+Example:
+
+```text
+National ID
+```
+
+must be transformed server-side according to permission.
+
+---
+
+# 148. API Serialization
+
+Family Portal and Staff APIs should use:
+
+```text
+API Resources
+DTOs
+Transformers
+```
+
+rather than blindly serializing complete Eloquent models.
+
+This is especially important for:
+
+```text
+persons
+documents
+change_requests
+health data
+case notes
+```
+
+---
+
+# 149. Mass Assignment
+
+Sensitive models must not accept unrestricted request payloads.
+
+Avoid patterns equivalent to:
+
+```php
+$model->update($request->all());
+```
+
+especially for:
+
+```text
+Person
+FamilyMembership
+ChangeRequest
+Document
+UserPersonLink
+```
+
+Use validated DTOs/actions.
+
+---
+
+# 150. Change Request JSON Security
+
+`submitted_data` may contain sensitive proposed data.
+
+Therefore:
+
+```text
+Do not expose it generically.
+
+Do not log it indiscriminately.
+
+Do not include it in notifications.
+
+Do not include it in exception messages unnecessarily.
+
+Authorize access by request type and role.
+```
+
+---
+
+# 151. Database Foreign Key Strategy
+
+Core FK behavior should generally favor:
+
+```text
+RESTRICT
+NO ACTION
+```
+
+over destructive cascades.
+
+Example:
+
+Deleting a Family must not cascade-delete:
+
+```text
+Persons
+Membership History
+Assessments
+Change Requests
+Documents
+Assistance
+```
+
+---
+
+# 152. Nullable Foreign Keys
+
+Use nullable foreign keys where the business relationship is genuinely optional.
+
+Examples:
+
+```text
+change_requests.person_id
+
+documents.person_id
+
+documents.change_request_id
+
+family_needs.person_id
+
+assistance_records.need_id
+```
+
+Do not use nullable merely to avoid modeling decisions.
+
+---
+
+# 153. Metadata JSONB
+
+JSONB is acceptable for:
+
+```text
+Workflow metadata
+Audit old/new values
+Change Request proposed payload
+Technical metadata
+```
+
+JSONB should not replace core normalized registry relationships.
+
+---
+
+# 154. Status Columns
+
+Status values should be represented consistently.
+
+Possible implementation:
+
+```text
+VARCHAR
++
+PHP Enum
+```
+
+This provides:
+
+```text
+Readable database values
+Domain type safety
+Migration flexibility
+```
+
+Examples:
+
+```text
+FamilyStatus
+PersonLifeStatus
+FormSubmissionStatus
+ChangeRequestStatus
+UserPersonLinkStatus
+```
+
+---
+
+# 155. Laravel Enums
+
+Recommended examples:
+
+```php
+enum ChangeRequestStatus: string
+{
+    case Draft = 'DRAFT';
+    case Submitted = 'SUBMITTED';
+    case UnderReview = 'UNDER_REVIEW';
+    case ReturnedForClarification = 'RETURNED_FOR_CLARIFICATION';
+    case Resubmitted = 'RESUBMITTED';
+    case Approved = 'APPROVED';
+    case Rejected = 'REJECTED';
+    case Applied = 'APPLIED';
+}
+```
+
+Enums must remain synchronized with database/business rules.
+
+---
+
+# 156. Change Request Application Failure
+
+V1 database does not require a dedicated:
+
+```text
+APPLICATION_FAILED
+```
+
+state yet.
+
+Initial strategy:
+
+```text
+If application fails:
+transaction rolls back
+request remains APPROVED
+failure is logged/audited
+authorized retry may occur
+```
+
+This avoids marking a request applied when canonical data was not committed.
+
+If operational queues require explicit failure tracking, `APPLICATION_FAILED` may be introduced in Workflow V1.1 before implementation.
+
+---
+
+# 157. Notification Read State
+
+Laravel notifications provide:
+
+```text
+read_at
+```
+
+A notification may be marked read without changing the underlying Change Request state.
+
+---
+
+# 158. Notification Delivery Failure
+
+External delivery failure must not alter the business workflow.
+
+Example:
+
+```text
+Change Request APPROVED
++
+SMS failed
+```
+
+The request remains:
+
+```text
+APPROVED
+```
+
+Notification delivery is a secondary process.
+
+---
+
+# 159. Family User Deactivation
+
+Deactivating:
+
+```text
+users.is_active
+```
+
+blocks authentication/access but does not delete:
+
+```text
+Person
+Membership
+Change Requests
+Audit
+```
+
+---
+
+# 160. User-Person Link End
+
+When authorization ends:
+
+```text
+status = ENDED
+ended_at = timestamp
+end_reason = ...
+```
+
+Do not delete the historical link.
+
+---
+
+# 161. Household Head Access Review
+
+When Household Head changes, the transaction/domain workflow must trigger or perform review of:
+
+```text
+Previous Head Family User access
+New Head eligibility
+Existing active User-Person links
+```
+
+The exact automated/manual process belongs in Workflow Architecture.
+
+---
+
+# 162. Death Access Review
+
+When a Family User-linked Person becomes deceased:
+
+```text
+Family Portal access must be suspended/ended according to policy.
+```
+
+The Person and User history remain preserved.
+
+---
+
+# 163. Audit of Sensitive Access
+
+At minimum, audit:
+
+```text
+Sensitive exports
+Sensitive document downloads
+National ID changes
+Health changes
+User-Person link activation
+User-Person link termination
+Change Request application
+```
+
+Whether every sensitive read is logged is a pending security/performance decision.
+
+---
+
+# 164. Reporting Architecture
+
+Reports should query canonical tables.
+
+Examples:
+
+```text
+families
+persons
+family_memberships
+family_residences
+person_health_conditions
+person_disabilities
+family_needs
+assistance_records
+```
+
+Pending Change Requests should only appear in reports specifically designed for pending/proposed data.
+
+---
+
+# 165. Dashboard Counts
+
+Operational dashboards may calculate:
+
+```text
+Total Active Families
+Total Active Persons
+Pending Form Reviews
+Pending Change Requests
+Returned Requests
+Approved Awaiting Application
+Active Needs
+Recent Assistance
+```
+
+These are derived values.
+
+---
+
+# 166. Performance Strategy
+
+Start with:
+
+```text
+Correct normalization
+Essential indexes
+Efficient Eloquent queries
+Pagination
+Eager loading
+```
+
+Only introduce:
+
+```text
+Materialized views
+Caching
+Denormalized counters
+Search engines
+```
+
+after measured performance requirements justify them.
+
+---
+
+# 167. Query Pagination
+
+Large lists must be paginated.
+
+Examples:
+
+```text
+Persons
+Families
+Change Requests
+Audit Logs
+Workflow Events
+Assistance
+```
+
+Avoid loading entire registry tables into application memory.
+
+---
+
+# 168. N+1 Prevention
+
+Laravel queries should use appropriate:
+
+```text
+with()
+load()
+withCount()
+```
+
+where relationships are displayed.
+
+This is particularly important for:
+
+```text
+Family Profile
+Person Profile
+Change Request Review
+```
+
+---
+
+# 169. Database Naming Conventions
 
 Use:
 
@@ -2623,352 +4216,711 @@ Use:
 snake_case
 ```
 
-Tables:
+Table names:
+
+```text
+plural
+```
+
+Examples:
 
 ```text
 family_memberships
-person_health_conditions
-assistance_records
-workflow_events
-```
-
-Columns:
-
-```text
-family_id
-created_at
-is_active
+change_requests
+user_person_links
 ```
 
 Foreign keys:
 
 ```text
-<entity>_id
+singular_entity_id
 ```
 
-Boolean fields:
+Examples:
 
 ```text
-is_*
-has_*
-requires_*
-uses_*
-```
-
-Dates:
-
-```text
-*_date
-```
-
-Timestamps:
-
-```text
-*_at
-```
-
-Polymorphic fields:
-
-```text
-workflowable_type
-workflowable_id
+family_id
+person_id
+submitted_by
 ```
 
 ---
 
-# 74. Database Anti-Patterns
+# 170. Business Identifier Naming
 
-The following designs are prohibited unless a later architecture decision explicitly changes them.
+Use:
 
-## Do Not
+```text
+family_code
+person_code
+assessment_code
+request_code
+```
+
+Do not use ambiguous:
+
+```text
+code
+number
+reference
+```
+
+when a domain-specific name is clearer.
+
+---
+
+# 171. Anti-Patterns
+
+Do not create:
 
 ```text
 child1_name
 child2_name
 child3_name
-```
 
-## Do Not
-
-```text
 wife1_id
 wife2_id
-wife3_id
+
+condition1
+condition2
+
+family_member_1
+
+current_age
+
+family_size editable column
+
+persons.family_id as canonical membership
+
+comma-separated health conditions
+
+comma-separated disabilities
+
+public document URLs
+
+raw Family Portal CRUD over Person
+
+automatic duplicate merging
+
+unrestricted submitted_data mass assignment
 ```
 
-## Do Not
+---
 
-store comma-separated conditions:
+# 172. Example — Person Moves Family
+
+Before:
 
 ```text
-"diabetes,hypertension,kidney"
+PER-001825
+→ active membership
+→ FAM-000510
 ```
 
-## Do Not
-
-use National ID as Person primary key.
-
-## Do Not
-
-use Family Code as Family primary key.
-
-## Do Not
-
-hard-delete a Person merely because they leave a household.
-
-## Do Not
-
-store age as the canonical value.
-
-## Do Not
-
-store manually maintained family-member counts.
-
-## Do Not
-
-store sensitive uploaded documents in public web directories.
-
-## Do Not
-
-store only the latest workflow status without preserving important transition history.
-
-## Do Not
-
-allow users to manually overwrite workflow history.
-
----
-
-# 75. Pending Database Decisions
-
-The following must be finalized before production deployment.
-
-### PDD-001 — National ID Strategy
-
-Finalize:
+After transfer:
 
 ```text
-Uniqueness
-Normalization
-Encryption
-Search hash
-Exceptional duplicate handling
+PER-001825
+→ old membership FAM-000510 = inactive
+→ new membership FAM-000800 = active
 ```
 
----
-
-### PDD-002 — Approved Lookup Values
-
-Finalize lookup values from the approved operational source/form.
-
----
-
-### PDD-003 — Time-Sensitive Health Data
-
-Determine whether:
+Person Code remains:
 
 ```text
-pregnancy
-breastfeeding
+PER-001825
 ```
-
-remain in the current health profile only or also require assessment-linked historical observations.
 
 ---
 
-### PDD-004 — Retention Policy
+# 173. Example — Household Head Change
 
-Define retention and archival rules for:
+Before:
 
 ```text
-Forms
-Documents
-Workflow events
-Audit logs
-Exports
-Archived records
-Backups
+FAM-000510
+
+PER-001825
+is_household_head = true
+
+PER-001900
+is_household_head = false
 ```
 
----
-
-### PDD-005 — Confidential Note Encryption
-
-Determine whether confidential notes require field-level encryption in addition to authorization controls.
-
----
-
-### PDD-006 — Backup Policy
-
-Finalize:
+After:
 
 ```text
-Frequency
-Retention
-Encryption
-Storage
-Restore testing
-Access
+PER-001825
+is_household_head = false
+
+PER-001900
+is_household_head = true
 ```
+
+No Person is recreated.
 
 ---
 
-### PDD-007 — Advanced Search
-
-Determine whether V1 requires:
+# 174. Example — Family User
 
 ```text
-pg_trgm
-GIN indexes
-Fuzzy Arabic name matching
+users.id = 40
+
+user_person_links:
+user_id = 40
+person_id = 1825
+status = ACTIVE
+
+family_memberships:
+person_id = 1825
+family_id = 510
+is_active = TRUE
+is_household_head = TRUE
 ```
 
-or whether indexed standard search is sufficient initially.
-
----
-
-### PDD-008 — Membership Type
-
-Determine whether `family_memberships` requires an explicit:
+Result:
 
 ```text
-membership_type
+User 40
+→ may receive approved Family Portal scope for FAM-000510
 ```
 
-in addition to:
+subject to permission policy.
+
+---
+
+# 175. Example — Contact Change Request
 
 ```text
-relationship_type_id
+CRQ-000101
+
+family_id:
+510
+
+person_id:
+1825
+
+type:
+CONTACT_UPDATE
+
+submitted_data:
+{
+    "mobile": "0560000000"
+}
+
+status:
+SUBMITTED
 ```
 
-for future household models.
-
----
-
-### PDD-009 — Workflow Polymorphic Type Storage
-
-Before implementation, define a stable morph map for workflow-controlled entities.
-
-Recommended conceptual aliases:
+Canonical:
 
 ```text
-form_submission
-assessment
-family_need
+persons.mobile
 ```
 
-rather than storing full PHP class names in `workflowable_type`.
-
-This avoids coupling persistent database data to PHP namespaces.
+remains unchanged until the request is approved and applied.
 
 ---
 
-### PDD-010 — Duplicate Merge Tool
+# 176. Example — Applied Contact Request
 
-Determine whether V1 requires a full database-backed Person merge process or only duplicate review and administrator resolution.
+Before:
+
+```text
+persons.mobile = 0590000000
+
+CRQ-000101 = APPROVED
+```
+
+Application:
+
+```text
+UpdatePersonContactAction
+```
+
+After successful transaction:
+
+```text
+persons.mobile = 0560000000
+
+CRQ-000101 = APPLIED
+```
+
+Workflow event:
+
+```text
+APPROVED → APPLIED
+```
+
+Audit:
+
+```text
+0590000000 → 0560000000
+```
 
 ---
 
-# 76. Approved Database Decisions V1
+# 177. Example — Death Report
 
-The following architecture decisions are approved:
+Submitted:
+
+```text
+CRQ-000200
+type = DEATH_REPORT
+
+person_id = 1825
+
+submitted_data:
+{
+    "death_date": "2026-09-10"
+}
+```
+
+Before application:
+
+```text
+persons.life_status = ALIVE
+persons.death_date = NULL
+```
+
+After verified approval/application:
+
+```text
+persons.life_status = DECEASED
+persons.death_date = 2026-09-10
+```
+
+Person remains in registry.
+
+---
+
+# 178. Example — Add Member
+
+Request payload:
+
+```json
+{
+    "full_name": "Example Person",
+    "gender": "MALE",
+    "birth_date": "2026-01-01",
+    "relationship_type": "SON"
+}
+```
+
+Before canonical creation:
+
+```text
+Duplicate Detection
+```
+
+If existing Person found:
+
+```text
+Reuse Person
+```
+
+Otherwise:
+
+```text
+Create Person
+```
+
+Then:
+
+```text
+Create Family Membership
+```
+
+inside a controlled transaction.
+
+---
+
+# 179. Database Invariants
+
+```text
+DB-INV-001
+family_code is unique.
+
+DB-INV-002
+person_code is unique.
+
+DB-INV-003
+request_code is unique.
+
+DB-INV-004
+Person has at most one active Family membership in V1.
+
+DB-INV-005
+Family has at most one active Household Head.
+
+DB-INV-006
+Family has at most one current residence.
+
+DB-INV-007
+Person cannot relate to self.
+
+DB-INV-008
+Membership end date cannot precede start date.
+
+DB-INV-009
+Residence end date cannot precede start date.
+
+DB-INV-010
+Death Date cannot precede Birth Date.
+
+DB-INV-011
+Family membership is not stored canonically on persons.
+
+DB-INV-012
+Family User scope is not stored canonically as users.family_id.
+
+DB-INV-013
+Change Request submitted_data is not canonical registry data.
+
+DB-INV-014
+Workflow history is separate from current status.
+
+DB-INV-015
+Document upload does not imply verification.
+
+DB-INV-016
+Historical Person identity survives Family transfer.
+
+DB-INV-017
+Audit records are append-only for normal users.
+
+DB-INV-018
+Workflow events are append-only for normal users.
+```
+
+---
+
+# 180. Approved Database Decisions
 
 ### DB-ADR-001
 
-PostgreSQL is the primary relational database.
+PostgreSQL is the recommended database.
 
 ### DB-ADR-002
 
-Internal BIGINT primary keys are used for core tables.
+Internal identifiers use BIGINT primary keys.
 
 ### DB-ADR-003
 
-`family_code` and `person_code` are unique business identifiers.
+Business codes are separate from primary keys.
 
 ### DB-ADR-004
 
-Person identity is independent of Family identity.
+Family and Person identities are independent.
 
 ### DB-ADR-005
 
-`family_memberships` is the canonical relationship between Persons and Families.
+`family_memberships` is the canonical Family-Person relationship.
 
 ### DB-ADR-006
 
-Historical membership is preserved.
+Historical memberships are preserved.
 
 ### DB-ADR-007
 
-One Person normally has one active primary family membership.
+Partial unique indexes protect active membership and Household Head constraints.
 
 ### DB-ADR-008
 
-One Family normally has one active household head.
+Residence history is preserved.
 
 ### DB-ADR-009
 
-Residence history is represented using multiple records.
+National ID is stored as text.
 
 ### DB-ADR-010
 
-Health conditions and disabilities are repeatable relational records.
+Health and disability use normalized repeatable records.
 
 ### DB-ADR-011
 
-Needs and Assistance use separate tables.
+Assessments are separate from canonical identity.
 
 ### DB-ADR-012
 
-Assessments and Form Submissions are separate from permanent Family records.
+Needs and Assistance are separate tables.
 
 ### DB-ADR-013
 
-Core identity/history records are protected against destructive cascading deletes.
+Workflow events are stored separately from current status.
 
 ### DB-ADR-014
 
-Reference data uses stable codes.
+Workflow events use a polymorphic architecture.
 
 ### DB-ADR-015
 
-Derived statistics are not canonical database columns.
+Documents use private storage.
 
 ### DB-ADR-016
 
-Critical multi-record operations use transactions.
+Core historical relationships avoid destructive cascades.
 
 ### DB-ADR-017
 
-Sensitive documents use private storage.
+Derived statistics are not canonical columns.
 
 ### DB-ADR-018
 
-Audit history is append-oriented and protected from normal modification.
+Complex business operations use transactions.
 
 ### DB-ADR-019
 
-`workflow_events` preserves workflow state-transition history.
+`persons.death_date` is supported as an optional canonical field.
 
 ### DB-ADR-020
 
-Current workflow state remains on the workflow-controlled business entity for efficient access.
+Authentication Users and registry Persons are separate entities.
 
 ### DB-ADR-021
 
-Workflow history is append-only for normal application users.
+Family Portal identity linking uses `user_person_links`.
 
 ### DB-ADR-022
 
-Workflow state changes and their corresponding workflow events should be written atomically.
+Family Portal Family scope is derived from User-Person link and active Family Membership.
 
 ### DB-ADR-023
 
-Polymorphic workflow relationships should use stable morph aliases rather than PHP class names.
+Family Users do not modify canonical registry tables directly.
+
+### DB-ADR-024
+
+Family-submitted changes are stored in `change_requests`.
+
+### DB-ADR-025
+
+Change Request proposed data uses JSONB with type-specific validation.
+
+### DB-ADR-026
+
+JSONB does not replace normalized canonical registry tables.
+
+### DB-ADR-027
+
+Change Request `APPROVED` and `APPLIED` are distinct states.
+
+### DB-ADR-028
+
+Change Request application uses controlled domain actions.
+
+### DB-ADR-029
+
+Change Request application is transactional and idempotent.
+
+### DB-ADR-030
+
+Change Requests participate in `workflow_events`.
+
+### DB-ADR-031
+
+Documents may be linked to Change Requests.
+
+### DB-ADR-032
+
+Laravel database notifications are the initial Family User notification implementation.
+
+### DB-ADR-033
+
+Spatie Laravel Permission is the recommended RBAC implementation.
+
+### DB-ADR-034
+
+Family Portal APIs must use explicit authorized serialization rather than unrestricted model serialization.
 
 ---
 
-# 77. Documentation Synchronization
+# 181. Pending Database Decisions
 
-The database implementation MUST remain consistent with:
+### PDB-001 — National ID Security
+
+Finalize:
+
+```text
+Plain indexed National ID
+Encrypted National ID
+Search HMAC
+Last-four representation
+```
+
+before production identity data is loaded.
+
+---
+
+### PDB-002 — National ID Uniqueness
+
+Confirm whether National ID may be enforced as database unique after handling:
+
+```text
+Missing IDs
+Exceptional cases
+Historical duplicate cleanup
+```
+
+---
+
+### PDB-003 — Final Reference Values
+
+Approve production values for all lookup tables.
+
+---
+
+### PDB-004 — Pregnancy/Breastfeeding History
+
+Determine whether dedicated assessment observation tables are required.
+
+---
+
+### PDB-005 — Marriage History
+
+Determine whether Person Relationships + Marital Status are sufficient or whether a dedicated marriage/life-event table is required.
+
+---
+
+### PDB-006 — Family User Cardinality
+
+Determine whether one User may link to multiple Persons and whether one Family may have multiple Family Users in V1.
+
+---
+
+### PDB-007 — Household Head Requirement
+
+Confirm whether Family Portal access in V1 requires:
+
+```text
+is_household_head = TRUE
+```
+
+or supports approved representatives.
+
+---
+
+### PDB-008 — User Authentication Identifier
+
+Finalize whether Family Users authenticate primarily by:
+
+```text
+Mobile
+Email
+Username
+Combination
+```
+
+---
+
+### PDB-009 — User-Person Link Uniqueness
+
+Finalize whether:
+
+```text
+one active User
+→ one active Person link
+```
+
+must be database-enforced.
+
+---
+
+### PDB-010 — Change Request Application Failure
+
+Determine whether operational requirements justify adding:
+
+```text
+APPLICATION_FAILED
+```
+
+to Change Request status.
+
+Initial recommendation:
+
+```text
+Remain APPROVED
++
+record failure
++
+allow controlled retry
+```
+
+---
+
+### PDB-011 — Change Request Payload Encryption
+
+Determine whether selected sensitive `submitted_data` payloads require field-level encryption beyond database/storage encryption.
+
+---
+
+### PDB-012 — Supporting Document Promotion
+
+Determine whether a verified Change Request document can be promoted/relinked to canonical Person/Family document context.
+
+---
+
+### PDB-013 — Notification Channels
+
+Database notification is approved as baseline.
+
+Determine whether V1 additionally requires:
+
+```text
+SMS
+Email
+Other channel
+```
+
+---
+
+### PDB-014 — Sensitive Read Audit
+
+Determine whether all sensitive record views must be audited or only critical actions such as:
+
+```text
+Download
+Export
+Change
+```
+
+---
+
+### PDB-015 — Assessment Snapshots
+
+Determine the exact longitudinal reporting requirements before adding snapshot tables.
+
+---
+
+### PDB-016 — PostgreSQL Trigram Search
+
+Introduce:
+
+```text
+pg_trgm
+```
+
+only if required by measured Arabic/name-search needs.
+
+---
+
+### PDB-017 — Backup Retention
+
+Define:
+
+```text
+Backup frequency
+Retention
+Encryption
+Off-site strategy
+Restore testing
+```
+
+---
+
+# 182. Implementation Preconditions
+
+Do not begin production migrations until these documents are synchronized:
 
 ```text
 01-PRODUCT.md
@@ -2976,102 +4928,230 @@ The database implementation MUST remain consistent with:
 03-BUSINESS-RULES.md
 04-DATABASE.md
 05-WORKFLOWS.md
+06-PERMISSIONS.md
+07-ROADMAP.md
 ```
 
-If implementation requires a structural change, documentation must be updated intentionally rather than allowing code and documentation to diverge.
-
-The precedence for implementation-specific database structure is:
+Critical unresolved decisions must either:
 
 ```text
-Product Intent
-      ↓
-Data Definitions
-      ↓
-Business Rules
-      ↓
-Database Architecture
-      ↓
-Workflow Requirements
-      ↓
-Permissions
-      ↓
-Implementation
+Be resolved
 ```
 
-Where a later approved architecture decision intentionally refines an earlier document, the affected earlier document should be updated or clearly marked as superseded for that specific decision.
+or:
+
+```text
+Be explicitly deferred without blocking V1 implementation
+```
 
 ---
 
-# 78. Implementation Readiness Checklist
+# 183. Implementation Sequence
 
-Before generating production Laravel migrations, confirm:
+After documentation approval:
 
 ```text
-[ ] Product V1 approved
-[ ] Data Dictionary approved
-[ ] Business Rules approved
-[ ] Database Architecture approved
-[ ] Workflows approved
-[ ] Permissions approved
-[ ] Lookup vocabularies reviewed
-[ ] National ID strategy confirmed
-[ ] Sensitive-data strategy confirmed
-[ ] Workflow morph aliases confirmed
-[ ] Backup/security baseline defined
+Laravel Project Setup
+        ↓
+PostgreSQL Connection
+        ↓
+Authentication
+        ↓
+Reference Migrations
+        ↓
+Registry Core Migrations
+        ↓
+Family Membership
+        ↓
+Residence
+        ↓
+Health / Education / Employment
+        ↓
+Assessments
+        ↓
+Workflow Infrastructure
+        ↓
+Change Requests
+        ↓
+Documents
+        ↓
+Needs / Assistance
+        ↓
+Family User Identity Links
+        ↓
+RBAC
+        ↓
+Audit
+        ↓
+Staff Portal
+        ↓
+Family Portal
+        ↓
+Testing
 ```
-
-Migrations may be prototyped before every production decision is finalized, but production data MUST NOT be loaded until critical identity, security, and retention decisions are resolved.
 
 ---
 
-# 79. Document Status
+# 184. Migration Development Rule
+
+Before each migration:
+
+```text
+Check Data Dictionary
+Check Business Rule
+Check Database Architecture
+```
+
+Do not generate database fields merely because they appear convenient in a UI.
+
+---
+
+# 185. Schema Review Rule
+
+Every schema change must answer:
+
+```text
+What business concept does this field represent?
+
+Is it canonical or derived?
+
+Is it current state or historical data?
+
+Is it sensitive?
+
+Does it require audit?
+
+Does it require workflow?
+
+Does it require Family Portal visibility rules?
+
+Can it be normalized?
+
+What happens when it changes?
+```
+
+---
+
+# 186. Documentation Synchronization
+
+The next documents must now align with Database V1.1.
+
+`05-WORKFLOWS.md` must define:
+
+```text
+Family User Activation
+User-Person Verification
+Family Access Review
+Change Request Workflow
+Application Retry/Failure
+Death Report
+Birth Report
+Add Member
+Household Head Change
+Membership Change
+Residence Update
+Contact Update
+```
+
+`06-PERMISSIONS.md` must define:
+
+```text
+FAMILY_USER
+Family Scope
+Self Scope
+Sensitive Fields
+Change Request permissions
+Documents
+Notifications
+Approval
+Application
+User-Person link administration
+```
+
+`07-ROADMAP.md` must include:
+
+```text
+Family Portal
+Change Request Engine
+Family User Authentication
+Self-Service Testing
+Security Testing
+```
+
+---
+
+# 187. Document Status
 
 ```text
 Project: Famboook
 Document: Database Architecture
 Version: 1.1
 Status: APPROVED
-Database: PostgreSQL
 Date: 2026-09-22
+Database: PostgreSQL
+Backend: Laravel
 ```
 
 ---
 
-# 80. Change Log
+# 188. Change Log
 
 | Version | Date | Status | Description |
 |---|---|---|---|
-| 1.0 | 2026-09-22 | Approved | Initial PostgreSQL database architecture |
-| 1.1 | 2026-09-22 | Approved | Added workflow_events architecture, workflow indexes, migration ordering, workflow relationships, transaction rules, and synchronization with 05-WORKFLOWS.md |
+| 1.0 | 2026-09-22 | Approved | Initial normalized PostgreSQL database architecture including canonical Family Membership and workflow history |
+| 1.1 | 2026-09-22 | Approved | Added death_date, Family Portal identity architecture, user_person_links, Change Requests, supporting document integration, workflow integration, notifications, Family scope resolution, application transactions, and self-service security architecture |
 
 ---
 
-# 81. Next Step
+# 189. Next Step
 
-Current documentation status:
+Documentation synchronization:
 
 ```text
-01-PRODUCT.md                 APPROVED
-02-DATA-DICTIONARY.md         APPROVED
-03-BUSINESS-RULES.md          APPROVED
-04-DATABASE.md                APPROVED — v1.1
-05-WORKFLOWS.md               APPROVED
-06-PERMISSIONS.md             NEXT
+01-PRODUCT.md                 UPDATED — v1.1
+02-DATA-DICTIONARY.md         UPDATED — v1.1
+03-BUSINESS-RULES.md          UPDATED — v1.1
+04-DATABASE.md                UPDATED — v1.1
+        ↓
+05-WORKFLOWS.md               NEXT
+        ↓
+06-PERMISSIONS.md
+        ↓
 07-ROADMAP.md
 ```
 
-The next document must define:
+The next document must define exactly how the new architecture moves through states:
 
 ```text
-WHO
-   ↓
-CAN PERFORM WHICH ACTION
-   ↓
-ON WHICH ENTITY
-   ↓
-AT WHICH WORKFLOW STATE
-   ↓
-WITH ACCESS TO WHICH FIELDS
+Family User Account Activation
+
+User-Person Verification
+
+Change Request:
+DRAFT
+→ SUBMITTED
+→ UNDER_REVIEW
+→ RETURNED / RESUBMITTED
+→ APPROVED / REJECTED
+→ APPLIED
+
+Application Failure / Retry
+
+Birth Report
+
+Death Report
+
+Add Family Member
+
+Membership Change
+
+Household Head Change
+
+Residence Update
+
+Contact Update
+
+Family Portal Access Re-Evaluation
 ```
 
-before production implementation begins.
+before implementation begins.
