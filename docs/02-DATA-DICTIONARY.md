@@ -2,9 +2,9 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-23  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -687,6 +687,34 @@ OTHER
 ```
 
 Reference values must be centrally managed.
+
+## V1 Operational Baseline
+
+Adopted 2026-09-23 as the seeded V1 values (`RelationshipTypeSeeder`):
+
+| code | name | sort_order |
+|---|---|---:|
+| HEAD | رب الأسرة | 1 |
+| SPOUSE | زوج/زوجة | 2 |
+| SON | ابن | 3 |
+| DAUGHTER | ابنة | 4 |
+| FATHER | أب | 5 |
+| MOTHER | أم | 6 |
+| OTHER | أخرى | 99 |
+
+Rules:
+
+- `SPOUSE` is the only canonical spouse code. No `HUSBAND`/`WIFE` codes are stored.
+  The UI may show زوج or زوجة based on the Person's gender. This is presentation only;
+  the stored value is always `SPOUSE`.
+- `HEAD` is assigned only to the household-head membership (for example, at Family
+  registration). It cannot be chosen when adding a family member.
+- Memberships created before relationship types existed may have a NULL
+  relationship. The system must not guess a value for them; they display as "غير محدد".
+
+This baseline is operational, not final. PDD-005 stays open for future
+review, which may add, rename or deactivate values. Values are deactivated,
+never deleted, once memberships use them.
 
 ---
 
@@ -2665,6 +2693,7 @@ Whether marriage history requires a dedicated marriage entity.
 
 PDD-005
 Final relationship-type reference values.
+(V1 operational baseline adopted 2026-09-23, see §15; final taxonomy still open for review.)
 
 PDD-006
 Final residence geographic hierarchy.
@@ -2843,9 +2872,9 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2
+Version: 1.2.1
 Status: APPROVED
-Date: 2026-09-22
+Date: 2026-09-23
 ```
 
 ---
@@ -2857,6 +2886,7 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.1 | 2026-09-23 | Approved | Adopted V1 operational relationship-type baseline (§15). Single canonical SPOUSE code; PDD-005 remains open for final taxonomy review |
 
 ---
 

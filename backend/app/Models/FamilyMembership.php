@@ -44,4 +44,9 @@ class FamilyMembership extends Model
     {
         return $this->belongsTo(Person::class);
     }
+
+    public function relationshipType(): BelongsTo
+    {
+        return $this->belongsTo(RelationshipType::class);
+    }
 }

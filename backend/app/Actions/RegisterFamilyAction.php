@@ -7,6 +7,7 @@ use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
+use App\Models\RelationshipType;
 use App\Support\BusinessIdentifier;
 use Illuminate\Support\Facades\DB;
 
@@ -87,6 +88,11 @@ class RegisterFamilyAction
             $membership = FamilyMembership::create([
                 'family_id' => $family->id,
                 'person_id' => $person->id,
+                // Household head carries the canonical HEAD relationship
+                // type (docs/02-DATA-DICTIONARY.md §15). Falls back to
+                // null gracefully if relationship_types hasn't been
+                // seeded yet, rather than failing family registration.
+                'relationship_type_id' => RelationshipType::where('code', 'HEAD')->value('id'),
                 'is_household_head' => true,
                 'started_at' => $data['registration_date'],
                 'is_active' => true,
@@ -116,6 +122,8 @@ class RegisterFamilyAction
 
             return $family->fresh([
                 'householdHeadMembership.person',
+                'memberships.person',
+                'memberships.relationshipType',
                 'currentResidence',
             ]);
         });

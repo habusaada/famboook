@@ -28,6 +28,7 @@ class AddFamilyMemberAction
      *     birth_date: string,
      *     mobile?: string|null,
      *     alternate_mobile?: string|null,
+     *     relationship_type_id: int,
      * }  $data  Already-validated payload (see AddFamilyMemberRequest).
      */
     public function handle(Family $family, array $data, ?int $actingUserId): FamilyMembership
@@ -53,9 +54,7 @@ class AddFamilyMemberAction
             $membership = FamilyMembership::create([
                 'family_id' => $family->id,
                 'person_id' => $person->id,
-                // relationship_type_id intentionally omitted: reference
-                // data (relationship_types) is out of scope for this
-                // slice. Column exists and is nullable; left unset.
+                'relationship_type_id' => $data['relationship_type_id'],
                 'is_household_head' => false,
                 'started_at' => now()->toDateString(),
                 'is_active' => true,
@@ -63,7 +62,7 @@ class AddFamilyMemberAction
                 'updated_by' => $actingUserId,
             ]);
 
-            return $membership->load('person');
+            return $membership->load(['person', 'relationshipType']);
         });
     }
 }

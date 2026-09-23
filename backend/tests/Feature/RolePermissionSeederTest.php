@@ -109,6 +109,9 @@ class RolePermissionSeederTest extends TestCase
         $this->assertTrue($dataEntry->hasPermissionTo('family.update'));
         $this->assertTrue($dataEntry->hasPermissionTo('family.create'));
         $this->assertTrue($dataEntry->hasPermissionTo('person.create'));
+
+        // View Reference Data ✓ (docs/06 §56, §140, AUTH-ADR-045).
+        $this->assertTrue($dataEntry->hasPermissionTo('reference-data.view'));
     }
 
     public function test_data_entry_cannot_approve_or_apply_change_requests(): void
@@ -233,6 +236,9 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($administrator->hasPermissionTo('permission.assign'));
         $this->assertFalse($administrator->hasPermissionTo('system-admin.access'));
         $this->assertFalse($administrator->hasPermissionTo('user.suspend'));
+
+        // View Reference Data ✓ (docs/06 §56, §140, AUTH-ADR-045).
+        $this->assertTrue($administrator->hasPermissionTo('reference-data.view'));
     }
 
     public function test_super_admin_receives_newly_documented_permissions_but_not_unresolved_sensitive_permissions(): void

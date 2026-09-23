@@ -4,13 +4,14 @@
 // isn't exposed until field-level authorization exists.
 
 import type { Gender } from "@/lib/types/api/family";
+import type { RelationshipType } from "@/lib/types/api/reference";
 
 export type LifeStatus = "ALIVE" | "DECEASED" | "UNKNOWN";
 
 export interface PersonFamilyMembership {
   family_code: string;
   is_household_head: boolean;
-  relationship_type_id: number | null;
+  relationship_type: RelationshipType | null;
   started_at: string | null;
 }
 

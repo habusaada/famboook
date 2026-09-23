@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { AddMemberDialog } from "@/components/families/add-member-dialog";
 import { calculateAge } from "@/lib/utils/date";
+import { relationshipLabel } from "@/lib/utils/relationship";
 import type { FamilyDetail } from "@/lib/types/api/family";
 
 export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
@@ -41,6 +42,7 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
           <TableHeader>
             <TableRow>
               <TableHead>الاسم الكامل</TableHead>
+              <TableHead>صلة القرابة</TableHead>
               <TableHead>الجنس</TableHead>
               <TableHead>تاريخ الميلاد</TableHead>
               <TableHead>العمر</TableHead>
@@ -61,6 +63,9 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
                     )}
                     <span>{member.full_name}</span>
                   </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {relationshipLabel(member.relationship_type, member.gender)}
                 </TableCell>
                 <TableCell>
                   {member.gender === "MALE" ? "ذكر" : "أنثى"}

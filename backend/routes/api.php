@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\PersonController;
+use App\Http\Controllers\Api\V1\ReferenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -29,4 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::patch('/people/{person}', [PersonController::class, 'update'])
         ->middleware('can:person.update');
+
+    Route::get('/reference/relationship-types', [ReferenceController::class, 'relationshipTypes'])
+        ->middleware('can:reference-data.view');
 });

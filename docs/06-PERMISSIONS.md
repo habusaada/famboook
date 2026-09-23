@@ -2,9 +2,9 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-23  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -1285,6 +1285,31 @@ reference-data.deactivate
 ```
 
 Reference data should generally be deactivated rather than destructively deleted when already used.
+
+## V1 Role Assignment
+
+Approved 2026-09-23 (Family Relationships slice, AUTH-ADR-045):
+
+```text
+reference-data.view
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+
+reference-data.create
+reference-data.update
+reference-data.deactivate
+  SUPER_ADMIN
+```
+
+`reference-data.view` grants read access to active reference values only
+(for example, the relationship-type options in Add Family Member). It exposes
+no personal or sensitive data. Roles that create or edit canonical records
+need it to select valid coded values.
+
+Other roles (REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER, FAMILY_USER) do not
+receive it by default in V1. A later decision can grant it when one of those
+roles gets a workflow that selects reference values.
 
 ---
 
@@ -2897,6 +2922,9 @@ Family Portal authorization is reevaluated after relevant canonical changes.
 
 ### AUTH-ADR-044
 View access does not automatically grant drill-down, export, or sensitive-field access.
+
+### AUTH-ADR-045
+`reference-data.view` is granted to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY in V1 (see §56). Reference-data create/update/deactivate remain SUPER_ADMIN-only.
 ```
 
 ---
@@ -3020,6 +3048,7 @@ This is a baseline, not a substitute for explicit permissions.
 | Update Canonical Family | ✓ | ✓ | Draft/limited | Policy | Limited | — | — |
 | View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
 | Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
+| View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
 | Record Official Death | Permission | Permission | — | Policy | — | — | — |
 | Change Household Head | Permission | Permission | — | Policy | — | — | Request only |
 | Transfer Membership | Permission | Permission | — | Policy | — | — | Request only |
@@ -3218,9 +3247,9 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2
+Version: 1.2.1
 Status: APPROVED
-Date: 2026-09-22
+Date: 2026-09-23
 ```
 
 ---
@@ -3232,3 +3261,4 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.1 | 2026-09-23 | Approved | Added V1 role assignment for `reference-data.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §56, the "View Reference Data" row in §140, and AUTH-ADR-045 |

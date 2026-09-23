@@ -6,7 +6,9 @@ use App\Actions\AddFamilyMemberAction;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
+use App\Models\RelationshipType;
 use App\Models\User;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +18,7 @@ class AddFamilyMemberTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function validPayload(): array
+    private function validPayload(?int $relationshipTypeId = null): array
     {
         return [
             'full_name' => 'أحمد محمد الشريف',
@@ -24,12 +26,19 @@ class AddFamilyMemberTest extends TestCase
             'gender' => 'MALE',
             'birth_date' => '2008-01-10',
             'mobile' => null,
+            'relationship_type_id' => $relationshipTypeId ?? $this->relationshipTypeId('SON'),
         ];
+    }
+
+    private function relationshipTypeId(string $code): ?int
+    {
+        return RelationshipType::where('code', $code)->value('id');
     }
 
     private function authorizedUser(string $role = 'SUPER_ADMIN'): User
     {
         $this->seed(RolePermissionSeeder::class);
+        $this->seed(RelationshipTypeSeeder::class);
         $user = User::factory()->create();
         $user->assignRole($role);
 
@@ -62,7 +71,8 @@ class AddFamilyMemberTest extends TestCase
         $response->assertJsonPath('data.full_name', 'أحمد محمد الشريف');
         $response->assertJsonPath('data.is_household_head', false);
         $response->assertJsonPath('data.is_active', true);
-        $response->assertJsonPath('data.relationship_type_id', null);
+        $response->assertJsonPath('data.relationship_type.code', 'SON');
+        $response->assertJsonPath('data.relationship_type.name', 'ابن');
 
         $personCode = $response->json('data.person_code');
         $this->assertMatchesRegularExpression('/^PER-\d{6}$/', $personCode);
@@ -109,6 +119,7 @@ class AddFamilyMemberTest extends TestCase
 
     public function test_adding_a_member_is_transactional_and_rolls_back_on_failure(): void
     {
+        $this->seed(RelationshipTypeSeeder::class);
         [$family] = $this->familyWithHousehold();
         $personCountBefore = Person::count();
         $membershipCountBefore = FamilyMembership::count();
@@ -151,11 +162,12 @@ class AddFamilyMemberTest extends TestCase
         );
 
         $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['full_name', 'gender', 'birth_date']);
+        $response->assertJsonValidationErrors(['full_name', 'gender', 'birth_date', 'relationship_type_id']);
     }
 
     public function test_unauthenticated_user_cannot_add_a_family_member(): void
     {
+        $this->seed(RelationshipTypeSeeder::class);
         [$family] = $this->familyWithHousehold();
 
         $response = $this->postJson(
@@ -169,6 +181,7 @@ class AddFamilyMemberTest extends TestCase
     public function test_user_without_permission_cannot_add_a_family_member(): void
     {
         $this->seed(RolePermissionSeeder::class);
+        $this->seed(RelationshipTypeSeeder::class);
         $user = User::factory()->create();
         $user->assignRole('REPORTS_VIEWER');
         [$family] = $this->familyWithHousehold();
@@ -200,5 +213,85 @@ class AddFamilyMemberTest extends TestCase
             'person_id' => $person->id,
             'is_active' => true,
         ]);
+    }
+
+    public function test_relationship_type_is_persisted_on_the_membership(): void
+    {
+        $user = $this->authorizedUser();
+        [$family] = $this->familyWithHousehold();
+        $daughterId = $this->relationshipTypeId('DAUGHTER');
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/v1/families/{$family->family_code}/members",
+            $this->validPayload($daughterId)
+        );
+
+        $response->assertCreated();
+        $personCode = $response->json('data.person_code');
+        $person = Person::where('person_code', $personCode)->first();
+        $membership = FamilyMembership::where('person_id', $person->id)->first();
+
+        $this->assertSame($daughterId, $membership->relationship_type_id);
+    }
+
+    public function test_adding_a_member_with_nonexistent_relationship_type_is_rejected(): void
+    {
+        $user = $this->authorizedUser();
+        [$family] = $this->familyWithHousehold();
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/v1/families/{$family->family_code}/members",
+            $this->validPayload(999999)
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['relationship_type_id']);
+    }
+
+    public function test_adding_a_member_with_inactive_relationship_type_is_rejected(): void
+    {
+        $user = $this->authorizedUser();
+        [$family] = $this->familyWithHousehold();
+
+        $inactive = RelationshipType::where('code', 'OTHER')->first();
+        $inactive->update(['is_active' => false]);
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/v1/families/{$family->family_code}/members",
+            $this->validPayload($inactive->id)
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['relationship_type_id']);
+    }
+
+    public function test_adding_a_member_with_head_relationship_type_is_rejected(): void
+    {
+        $user = $this->authorizedUser();
+        [$family] = $this->familyWithHousehold();
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/v1/families/{$family->family_code}/members",
+            $this->validPayload($this->relationshipTypeId('HEAD'))
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['relationship_type_id']);
+    }
+
+    public function test_adding_a_member_without_relationship_type_is_rejected(): void
+    {
+        $user = $this->authorizedUser();
+        [$family] = $this->familyWithHousehold();
+        $payload = $this->validPayload();
+        unset($payload['relationship_type_id']);
+
+        $response = $this->actingAs($user)->postJson(
+            "/api/v1/families/{$family->family_code}/members",
+            $payload
+        );
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['relationship_type_id']);
     }
 }

@@ -4,6 +4,8 @@
 // §7) — ACTIVE/INACTIVE/ARCHIVED. Review/workflow status is a separate,
 // not-yet-implemented concept and must not be conflated with this field.
 
+import type { RelationshipType } from "@/lib/types/api/reference";
+
 export type FamilyLifecycleStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 export type Gender = "MALE" | "FEMALE";
@@ -30,9 +32,9 @@ export interface FamilyMemberDetail {
   birth_date: string | null;
   is_household_head: boolean;
   is_active: boolean;
-  // Always null until reference data (relationship_types) is
-  // implemented — do not render a relationship label from this.
-  relationship_type_id: number | null;
+  // Null for legacy memberships created before relationship types
+  // existed — render "غير محدد", never guess a label.
+  relationship_type: RelationshipType | null;
 }
 
 export interface FamilyDetail {
@@ -122,4 +124,5 @@ export interface AddFamilyMemberPayload {
   birth_date: string;
   mobile?: string | null;
   alternate_mobile?: string | null;
+  relationship_type_id: number;
 }

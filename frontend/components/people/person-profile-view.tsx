@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EditPersonDialog } from "@/components/people/edit-person-dialog";
 import { usePerson } from "@/lib/api/people";
 import { ApiError } from "@/lib/api/client";
+import { relationshipLabel } from "@/lib/utils/relationship";
 import { calculateAge } from "@/lib/utils/date";
 
 function InfoRow({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
@@ -129,7 +130,7 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
             {membership && (
               <span className="flex items-center gap-1.5">
                 <User className="size-3.5" />
-                {membership.is_household_head ? "رب الأسرة" : "فرد من الأسرة"}
+                {relationshipLabel(membership.relationship_type, person.gender)}
                 {" — "}
                 <Link
                   href={`/families/${membership.family_code}`}

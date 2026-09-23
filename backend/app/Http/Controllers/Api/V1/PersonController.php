@@ -9,9 +9,11 @@ use App\Models\Person;
 
 class PersonController extends Controller
 {
+    private const MEMBERSHIP_RELATIONS = ['activeMembership.family', 'activeMembership.relationshipType'];
+
     public function show(Person $person): PersonResource
     {
-        $person->load('activeMembership.family');
+        $person->load(self::MEMBERSHIP_RELATIONS);
 
         return new PersonResource($person);
     }
@@ -22,6 +24,6 @@ class PersonController extends Controller
         $person->updated_by = $request->user()?->id;
         $person->save();
 
-        return new PersonResource($person->fresh('activeMembership.family'));
+        return new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS));
     }
 }

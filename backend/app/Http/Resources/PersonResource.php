@@ -31,7 +31,11 @@ class PersonResource extends JsonResource
             'family_membership' => $this->when($membership, fn () => [
                 'family_code' => $membership->family->family_code,
                 'is_household_head' => $membership->is_household_head,
-                'relationship_type_id' => $membership->relationship_type_id,
+                'relationship_type' => $membership->relationshipType ? [
+                    'id' => $membership->relationshipType->id,
+                    'code' => $membership->relationshipType->code,
+                    'name' => $membership->relationshipType->name,
+                ] : null,
                 'started_at' => $membership->started_at?->toDateString(),
             ]),
         ];

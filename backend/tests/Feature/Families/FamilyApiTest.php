@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Families;
 
+use App\Actions\AddFamilyMemberAction;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
+use App\Models\RelationshipType;
 use App\Models\User;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -114,6 +117,7 @@ class FamilyApiTest extends TestCase
                         'birth_date',
                         'is_household_head',
                         'is_active',
+                        'relationship_type',
                     ],
                 ],
             ],
@@ -140,5 +144,35 @@ class FamilyApiTest extends TestCase
         $response = $this->getJson("/api/v1/families/{$family->family_code}");
 
         $response->assertStatus(401);
+    }
+
+    public function test_family_detail_returns_relationship_label_for_added_member(): void
+    {
+        $this->seed(RelationshipTypeSeeder::class);
+        $user = $this->authorizedUser();
+        $family = $this->createFamilyWithHead();
+        $sonId = RelationshipType::where('code', 'SON')->value('id');
+
+        (new AddFamilyMemberAction)->handle($family, [
+            'full_name' => 'يوسف خالد النجار',
+            'gender' => 'MALE',
+            'birth_date' => '2015-05-01',
+            'relationship_type_id' => $sonId,
+        ], null);
+
+        $response = $this->actingAs($user)->getJson("/api/v1/families/{$family->family_code}");
+
+        $response->assertOk();
+        $newMember = collect($response->json('data.members'))
+            ->firstWhere('full_name', 'يوسف خالد النجار');
+
+        $this->assertNotNull($newMember);
+        $this->assertSame('SON', $newMember['relationship_type']['code']);
+        $this->assertSame('ابن', $newMember['relationship_type']['name']);
+
+        // Legacy head membership (created via factory, not seeded/backfilled
+        // in this test) still returns a null relationship_type, not a guess.
+        $head = collect($response->json('data.members'))->firstWhere('is_household_head', true);
+        $this->assertNull($head['relationship_type']);
     }
 }

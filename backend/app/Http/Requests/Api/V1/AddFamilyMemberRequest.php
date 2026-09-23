@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\Gender;
+use App\Models\RelationshipType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,6 +24,19 @@ class AddFamilyMemberRequest extends FormRequest
             'birth_date' => ['required', 'date', 'before_or_equal:today'],
             'mobile' => ['nullable', 'string', 'max:50'],
             'alternate_mobile' => ['nullable', 'string', 'max:50'],
+            // Required: this endpoint never creates a household head, so
+            // the HEAD relationship type is explicitly rejected below —
+            // assigning it here would contradict is_household_head=false.
+            'relationship_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('relationship_types', 'id')->where('is_active', true),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (RelationshipType::where('id', $value)->where('code', 'HEAD')->exists()) {
+                        $fail('لا يمكن اختيار "رب الأسرة" عند إضافة فرد جديد.');
+                    }
+                },
+            ],
         ];
     }
 }

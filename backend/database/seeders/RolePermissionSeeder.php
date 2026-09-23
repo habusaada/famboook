@@ -343,6 +343,8 @@ class RolePermissionSeeder extends Seeder
             'export.basic',
             // Export Sensitive: Permission
             'export.sensitive',
+            // View Reference Data ✓ (§56 V1 Role Assignment, AUTH-ADR-045)
+            'reference-data.view',
         ],
         'DATA_ENTRY' => [
             // Create Family ✓
@@ -355,6 +357,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
+            // View Reference Data ✓ (§56 V1 Role Assignment, AUTH-ADR-045)
+            'reference-data.view',
         ],
         'REVIEWER' => [
             // Review Change Request ✓

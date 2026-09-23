@@ -56,13 +56,45 @@ class PersonApiTest extends TestCase
                 'alternate_mobile',
                 'life_status',
                 'is_active',
-                'family_membership' => ['family_code', 'is_household_head', 'started_at'],
+                'family_membership' => ['family_code', 'is_household_head', 'relationship_type', 'started_at'],
             ],
         ]);
         $response->assertJsonPath('data.full_name', 'خالد يوسف النجار');
         $response->assertJsonPath('data.family_membership.family_code', $family->family_code);
         $response->assertJsonPath('data.family_membership.is_household_head', true);
         $response->assertJsonMissingPath('data.national_id');
+    }
+
+    public function test_person_response_includes_relationship_type_when_present(): void
+    {
+        $this->seed(\Database\Seeders\RelationshipTypeSeeder::class);
+        $user = $this->authorizedUser();
+
+        $family = Family::factory()->create();
+        $person = Person::factory()->create(['full_name' => 'سارة أحمد']);
+        $daughterId = \App\Models\RelationshipType::where('code', 'DAUGHTER')->value('id');
+        FamilyMembership::factory()->create([
+            'family_id' => $family->id,
+            'person_id' => $person->id,
+            'relationship_type_id' => $daughterId,
+        ]);
+
+        $response = $this->actingAs($user)->getJson("/api/v1/people/{$person->person_code}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.family_membership.relationship_type.code', 'DAUGHTER');
+        $response->assertJsonPath('data.family_membership.relationship_type.name', 'ابنة');
+    }
+
+    public function test_person_response_relationship_type_is_null_for_legacy_membership(): void
+    {
+        $user = $this->authorizedUser();
+        [$person] = $this->personWithMembership(); // no relationship_type_id set
+
+        $response = $this->actingAs($user)->getJson("/api/v1/people/{$person->person_code}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.family_membership.relationship_type', null);
     }
 
     public function test_person_detail_returns_404_for_unknown_person_code(): void

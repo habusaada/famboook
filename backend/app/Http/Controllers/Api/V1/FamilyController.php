@@ -45,7 +45,7 @@ class FamilyController extends Controller
 
     public function show(Family $family): FamilyDetailResource
     {
-        $family->load(['memberships.person', 'currentResidence']);
+        $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence']);
 
         return new FamilyDetailResource($family);
     }
