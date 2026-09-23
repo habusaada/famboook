@@ -16,14 +16,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddMemberDialog } from "@/components/families/add-member-dialog";
-import { calculateAge } from "@/lib/mock-data/families";
-import {
-  memberStatusLabels,
-  relationshipLabels,
-  type Family,
-} from "@/lib/types/family";
+import { calculateAge } from "@/lib/utils/date";
+import type { FamilyDetail } from "@/lib/types/api/family";
 
-export function FamilyMembersTable({ family }: { family: Family }) {
+export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
   return (
     <Card size="sm">
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
@@ -40,7 +36,6 @@ export function FamilyMembersTable({ family }: { family: Family }) {
           <TableHeader>
             <TableRow>
               <TableHead>الاسم الكامل</TableHead>
-              <TableHead>صلة القرابة</TableHead>
               <TableHead>الجنس</TableHead>
               <TableHead>تاريخ الميلاد</TableHead>
               <TableHead>العمر</TableHead>
@@ -49,32 +44,27 @@ export function FamilyMembersTable({ family }: { family: Family }) {
           </TableHeader>
           <TableBody>
             {family.members.map((member) => (
-              <TableRow key={member.personCode}>
+              <TableRow key={member.person_code}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
-                    {member.isHouseholdHead && (
+                    {member.is_household_head && (
                       <Crown className="size-4 shrink-0 text-primary" />
                     )}
-                    <span>{member.fullName}</span>
+                    <span>{member.full_name}</span>
                   </div>
                 </TableCell>
-                <TableCell>{relationshipLabels[member.relationship]}</TableCell>
                 <TableCell>
                   {member.gender === "MALE" ? "ذكر" : "أنثى"}
                 </TableCell>
                 <TableCell className="tabular-nums" dir="ltr">
-                  {member.birthDate}
+                  {member.birth_date ?? "—"}
                 </TableCell>
                 <TableCell className="tabular-nums">
-                  {calculateAge(member.birthDate)}
+                  {member.birth_date ? calculateAge(member.birth_date) : "—"}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={
-                      member.status === "ACTIVE" ? "default" : "outline"
-                    }
-                  >
-                    {memberStatusLabels[member.status]}
+                  <Badge variant={member.is_active ? "default" : "outline"}>
+                    {member.is_active ? "نشط" : "غير نشط"}
                   </Badge>
                 </TableCell>
               </TableRow>

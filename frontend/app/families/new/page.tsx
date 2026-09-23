@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,8 +24,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useRegisterFamily } from "@/lib/api/families";
+import { ApiError } from "@/lib/api/client";
 import {
+  apiFieldToFormField,
   familyRegistrationSchema,
+  toRegisterFamilyPayload,
   type FamilyRegistrationValues,
 } from "@/lib/schemas/family-registration";
 
@@ -59,14 +63,14 @@ function FieldLabel({
 
 export default function NewFamilyPage() {
   const router = useRouter();
-  const [savedState, setSavedState] = useState<"draft" | "submitted" | null>(
-    null
-  );
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const registerFamily = useRegisterFamily();
 
   const {
     register,
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<FamilyRegistrationValues>({
     resolver: zodResolver(familyRegistrationSchema),
@@ -76,15 +80,43 @@ export default function NewFamilyPage() {
     },
   });
 
-  function onSaveDraft(values: FamilyRegistrationValues) {
-    // No backend connection yet — this is a visual mock only.
-    console.log("Save draft (mock):", values);
-    setSavedState("draft");
-  }
-
   function onSubmitFamily(values: FamilyRegistrationValues) {
-    console.log("Register family (mock):", values);
-    setSavedState("submitted");
+    setSubmitError(null);
+
+    registerFamily.mutate(toRegisterFamilyPayload(values), {
+      onSuccess: (response) => {
+        router.push(`/families/${response.data.family_code}`);
+      },
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 422) {
+          const validationErrors = error.validationErrors;
+          if (validationErrors) {
+            for (const [apiField, messages] of Object.entries(validationErrors)) {
+              const formField = apiFieldToFormField[apiField];
+              if (formField && messages[0]) {
+                setError(formField, { type: "server", message: messages[0] });
+              }
+            }
+          }
+          setSubmitError(
+            error.message422 ?? "توجد أخطاء في البيانات المُدخلة، الرجاء مراجعتها."
+          );
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 401) {
+          setSubmitError("انتهت الجلسة أو لم يتم تسجيل الدخول.");
+          return;
+        }
+
+        if (error instanceof ApiError && error.status === 403) {
+          setSubmitError("لا تملك صلاحية تسجيل أسرة جديدة.");
+          return;
+        }
+
+        setSubmitError("تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.");
+      },
+    });
   }
 
   return (
@@ -108,16 +140,11 @@ export default function NewFamilyPage() {
       </div>
 
       <div className="mx-auto w-full max-w-3xl">
-        {savedState && (
-          <Alert className="mb-5">
-            <CheckCircle2 className="size-4" />
-            <AlertTitle>
-              {savedState === "draft" ? "تم حفظ المسودة" : "تم إرسال البيانات"}
-            </AlertTitle>
-            <AlertDescription>
-              هذه معاينة مرئية فقط — لا يوجد اتصال بالخادم بعد، ولم يتم حفظ أي
-              بيانات فعلياً.
-            </AlertDescription>
+        {submitError && (
+          <Alert variant="destructive" className="mb-5">
+            <AlertCircle className="size-4" />
+            <AlertTitle>تعذّر إتمام التسجيل</AlertTitle>
+            <AlertDescription>{submitError}</AlertDescription>
           </Alert>
         )}
 
@@ -322,7 +349,7 @@ export default function NewFamilyPage() {
       </div>
 
       <div className="sticky bottom-0 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-background/80 md:-mx-5 md:px-5">
-        <div className="mx-auto flex max-w-3xl flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="mx-auto flex max-w-3xl flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:items-center">
           <Button
             type="button"
             variant="outline"
@@ -333,12 +360,19 @@ export default function NewFamilyPage() {
           <Button
             type="button"
             variant="secondary"
-            onClick={handleSubmit(onSaveDraft)}
+            disabled
+            title="حفظ المسودات غير متاح بعد — سيُضاف لاحقًا"
+            className="gap-1.5"
           >
-            حفظ كمسودة
+            <Clock className="size-3.5" />
+            حفظ كمسودة (قريبًا)
           </Button>
-          <Button type="button" onClick={handleSubmit(onSubmitFamily)}>
-            حفظ ومتابعة
+          <Button
+            type="button"
+            onClick={handleSubmit(onSubmitFamily)}
+            disabled={registerFamily.isPending}
+          >
+            {registerFamily.isPending ? "جارٍ الحفظ..." : "حفظ ومتابعة"}
           </Button>
         </div>
       </div>

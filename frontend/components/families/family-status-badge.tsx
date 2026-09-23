@@ -1,21 +1,21 @@
 import { Badge } from "@/components/ui/badge";
-import {
-  familyStatusLabels,
-  type FamilyStatus,
-} from "@/lib/types/family";
+import type { FamilyLifecycleStatus } from "@/lib/types/api/family";
 
-const statusVariant: Record<
-  FamilyStatus,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  APPROVED: "default",
-  PENDING_REVIEW: "secondary",
-  NEEDS_COMPLETION: "destructive",
-  INACTIVE: "outline",
+const statusLabels: Record<FamilyLifecycleStatus, string> = {
+  ACTIVE: "نشطة",
+  INACTIVE: "غير نشطة",
+  ARCHIVED: "مؤرشفة",
 };
 
-export function FamilyStatusBadge({ status }: { status: FamilyStatus }) {
-  return (
-    <Badge variant={statusVariant[status]}>{familyStatusLabels[status]}</Badge>
-  );
+const statusVariant: Record<
+  FamilyLifecycleStatus,
+  "default" | "secondary" | "outline"
+> = {
+  ACTIVE: "default",
+  INACTIVE: "secondary",
+  ARCHIVED: "outline",
+};
+
+export function FamilyStatusBadge({ status }: { status: FamilyLifecycleStatus }) {
+  return <Badge variant={statusVariant[status]}>{statusLabels[status]}</Badge>;
 }

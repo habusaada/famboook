@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ArrowRight,
   CalendarDays,
   Clock,
   MapPin,
   MoreVertical,
+  SearchX,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,18 +19,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
 import { FamilyOverview } from "@/components/families/family-overview";
 import { FamilyMembersTable } from "@/components/families/family-members-table";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
-import {
-  getFamilyMemberCount,
-  getFemaleCount,
-  getHouseholdHead,
-  getMaleCount,
-} from "@/lib/mock-data/families";
-import type { Family } from "@/lib/types/family";
+import { useFamily } from "@/lib/api/families";
+import { ApiError } from "@/lib/api/client";
 
 const secondaryTabs = [
   { value: "residence", label: "السكن" },
@@ -54,9 +53,71 @@ function MetaItem({
   );
 }
 
-export function FamilyProfileView({ family }: { family: Family }) {
+export function FamilyProfileView({ familyCode }: { familyCode: string }) {
   const router = useRouter();
-  const head = getHouseholdHead(family);
+  const { data, isLoading, isError, error } = useFamily(familyCode);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <Card size="sm">
+          <CardContent className="flex flex-col gap-3">
+            <Skeleton className="h-8 w-40" />
+            <Skeleton className="h-4 w-64" />
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} size="sm">
+              <CardHeader className="pb-1">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="mt-2 h-7 w-12" />
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    const notFound = error instanceof ApiError && error.status === 404;
+
+    return (
+      <div className="flex flex-col gap-5">
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-fit gap-1.5 ps-2 text-muted-foreground"
+          onClick={() => router.push("/families")}
+        >
+          <ArrowRight className="size-4" />
+          سجل العائلات
+        </Button>
+
+        {notFound ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-16 text-center">
+            <SearchX className="size-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              لم يتم العثور على أسرة بهذا الرقم
+            </p>
+          </div>
+        ) : (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertTitle>تعذّر تحميل بيانات الأسرة</AlertTitle>
+            <AlertDescription>
+              {error instanceof Error
+                ? error.message
+                : "حدث خطأ غير متوقع أثناء الاتصال بالخادم."}
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+    );
+  }
+
+  const family = data!.data;
 
   return (
     <div className="flex flex-col gap-5">
@@ -85,23 +146,40 @@ export function FamilyProfileView({ family }: { family: Family }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <h2 dir="ltr" className="text-end text-xl font-semibold tracking-tight">
-              {family.familyCode}
+              {family.family_code}
             </h2>
             <FamilyStatusBadge status={family.status} />
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-            <MetaItem icon={User}>{head?.fullName ?? "غير محدد"}</MetaItem>
-            <MetaItem icon={MapPin}>
-              {family.residence.city}، {family.residence.governorate}
-              {family.residence.displacementStatus
-                ? ` — ${family.residence.displacementStatus}`
-                : ""}
+            <MetaItem icon={User}>
+              {family.members.find((m) => m.is_household_head)?.full_name ??
+                "غير محدد"}
             </MetaItem>
-            <MetaItem icon={CalendarDays}>
-              تاريخ التسجيل: <span dir="ltr">{family.registrationDate}</span>
-            </MetaItem>
-            <MetaItem icon={Clock}>آخر تحديث: {family.updatedAt}</MetaItem>
+            {family.residence && (
+              <MetaItem icon={MapPin}>
+                {family.residence.city}، {family.residence.governorate}
+                {family.residence.displacement_status
+                  ? ` — ${family.residence.displacement_status}`
+                  : ""}
+              </MetaItem>
+            )}
+            {family.registration_date && (
+              <MetaItem icon={CalendarDays}>
+                تاريخ التسجيل: <span dir="ltr">{family.registration_date}</span>
+              </MetaItem>
+            )}
+            {family.updated_at && (
+              <MetaItem icon={Clock}>
+                آخر تحديث:{" "}
+                <span dir="ltr">
+                  {new Date(family.updated_at).toLocaleString("ar", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </MetaItem>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -111,7 +189,7 @@ export function FamilyProfileView({ family }: { family: Family }) {
           <CardHeader className="pb-1">
             <CardDescription>عدد أفراد الأسرة</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums">
-              {getFamilyMemberCount(family)}
+              {family.member_count}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -119,7 +197,7 @@ export function FamilyProfileView({ family }: { family: Family }) {
           <CardHeader className="pb-1">
             <CardDescription>الذكور</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums">
-              {getMaleCount(family)}
+              {family.male_count}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -127,7 +205,7 @@ export function FamilyProfileView({ family }: { family: Family }) {
           <CardHeader className="pb-1">
             <CardDescription>الإناث</CardDescription>
             <CardTitle className="text-2xl font-semibold tabular-nums">
-              {getFemaleCount(family)}
+              {family.female_count}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -135,7 +213,7 @@ export function FamilyProfileView({ family }: { family: Family }) {
           <CardHeader className="pb-1">
             <CardDescription>موقع الإقامة الحالي</CardDescription>
             <CardTitle className="text-base font-semibold">
-              {family.residence.city}
+              {family.residence?.city ?? "—"}
             </CardTitle>
           </CardHeader>
         </Card>

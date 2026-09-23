@@ -5,8 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getHouseholdHead } from "@/lib/mock-data/families";
-import { relationshipLabels, type Family } from "@/lib/types/family";
+import type { FamilyDetail } from "@/lib/types/api/family";
 
 const registrationSourceLabels: Record<string, string> = {
   PAPER_FORM: "نموذج ورقي",
@@ -34,8 +33,8 @@ function InfoRow({
   );
 }
 
-export function FamilyOverview({ family }: { family: Family }) {
-  const head = getHouseholdHead(family);
+export function FamilyOverview({ family }: { family: FamilyDetail }) {
+  const head = family.members.find((m) => m.is_household_head);
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -45,26 +44,38 @@ export function FamilyOverview({ family }: { family: Family }) {
           <CardDescription>بيانات تسجيل الأسرة في السجل</CardDescription>
         </CardHeader>
         <CardContent>
-          <InfoRow
-            label="تاريخ التسجيل"
-            value={family.registrationDate}
-            ltr
-          />
-          <InfoRow
-            label="مصدر التسجيل"
-            value={
-              registrationSourceLabels[family.registrationSource] ??
-              family.registrationSource
-            }
-          />
-          {family.paperFormNo && (
+          {family.registration_date && (
             <InfoRow
-              label="رقم النموذج الورقي"
-              value={family.paperFormNo}
+              label="تاريخ التسجيل"
+              value={family.registration_date}
               ltr
             />
           )}
-          <InfoRow label="آخر تحديث" value={family.updatedAt} />
+          {family.registration_source && (
+            <InfoRow
+              label="مصدر التسجيل"
+              value={
+                registrationSourceLabels[family.registration_source] ??
+                family.registration_source
+              }
+            />
+          )}
+          {family.paper_form_no && (
+            <InfoRow
+              label="رقم النموذج الورقي"
+              value={family.paper_form_no}
+              ltr
+            />
+          )}
+          {family.updated_at && (
+            <InfoRow
+              label="آخر تحديث"
+              value={new Date(family.updated_at).toLocaleString("ar", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -76,17 +87,15 @@ export function FamilyOverview({ family }: { family: Family }) {
         <CardContent>
           {head ? (
             <>
-              <InfoRow label="الاسم الكامل" value={head.fullName} />
-              <InfoRow label="رقم الفرد" value={head.personCode} ltr />
-              <InfoRow
-                label="صلة القرابة"
-                value={relationshipLabels[head.relationship]}
-              />
+              <InfoRow label="الاسم الكامل" value={head.full_name} />
+              <InfoRow label="رقم الفرد" value={head.person_code} ltr />
               <InfoRow
                 label="الجنس"
                 value={head.gender === "MALE" ? "ذكر" : "أنثى"}
               />
-              <InfoRow label="تاريخ الميلاد" value={head.birthDate} ltr />
+              {head.birth_date && (
+                <InfoRow label="تاريخ الميلاد" value={head.birth_date} ltr />
+              )}
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -102,16 +111,24 @@ export function FamilyOverview({ family }: { family: Family }) {
           <CardDescription>موقع إقامة الأسرة</CardDescription>
         </CardHeader>
         <CardContent>
-          <InfoRow label="المحافظة" value={family.residence.governorate} />
-          <InfoRow label="المدينة" value={family.residence.city} />
-          {family.residence.area && (
-            <InfoRow label="المنطقة" value={family.residence.area} />
-          )}
-          {family.residence.displacementStatus && (
-            <InfoRow
-              label="حالة النزوح"
-              value={family.residence.displacementStatus}
-            />
+          {family.residence ? (
+            <>
+              <InfoRow label="المحافظة" value={family.residence.governorate} />
+              <InfoRow label="المدينة" value={family.residence.city} />
+              {family.residence.area && (
+                <InfoRow label="المنطقة" value={family.residence.area} />
+              )}
+              {family.residence.displacement_status && (
+                <InfoRow
+                  label="حالة النزوح"
+                  value={family.residence.displacement_status}
+                />
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              لا يوجد سكن حالي مسجّل
+            </p>
           )}
         </CardContent>
       </Card>
