@@ -6,7 +6,7 @@
 // approved application origins." No production domains are configured here.
 return [
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'dev-login', 'dev-logout'],
 
     'allowed_methods' => ['*'],
 

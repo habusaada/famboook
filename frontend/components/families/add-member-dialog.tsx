@@ -75,6 +75,11 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
           return;
         }
 
+        if (error instanceof ApiError && error.status === 401) {
+          setSubmitError("انتهت جلسة الدخول. يرجى تسجيل الدخول مجددًا.");
+          return;
+        }
+
         if (error instanceof ApiError && error.status === 403) {
           setSubmitError("لا تملك صلاحية إضافة فرد لهذه الأسرة.");
           return;
