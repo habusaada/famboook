@@ -2,7 +2,7 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.2.1  
+**Version:** 1.2.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-23  
 **Project:** Famboook — Family Registry & Case Management System
@@ -303,6 +303,7 @@ life_status
 death_date
 mobile
 alternate_mobile
+alternate_mobile_owner_relation
 notes
 is_active
 created_by
@@ -463,6 +464,19 @@ Sensitive personal data.
 ### alternate_mobile
 
 Optional alternative contact number.
+
+---
+
+### alternate_mobile_owner_relation
+
+Optional short text naming who owns the alternate mobile and how they are
+related (paper form: "صاحب الرقم البديل / صلته", e.g. "أحمد محمد – أخ").
+
+Descriptive contact metadata only. It never creates a Person, a Family
+Membership or a Person Relationship, and is never used for entity matching.
+
+It only makes sense with `alternate_mobile`: it is rejected without one and
+cleared when `alternate_mobile` is removed.
 
 ---
 
@@ -794,9 +808,11 @@ city
 area
 neighborhood
 address_text
+original_residence_text
 latitude
 longitude
 displacement_status
+displacement_location_text
 started_at
 ended_at
 is_current
@@ -809,6 +825,39 @@ updated_at
 ```
 
 Exact geographic fields may evolve based on operational requirements.
+
+## Displacement Fields (V1)
+
+Adopted 2026-09-23 from the paper form. Displacement is Family residence
+data, not household-head Person data, even though the paper form prints it
+in the head's section.
+
+### original_residence_text
+
+"مكان السكن الأصلي": the Family's residence **before displacement**. It is
+not the head's birthplace. Optional, short free text (e.g. "بني سهيلا – خانيونس").
+
+### displacement_status
+
+"هل الأسرة نازحة حاليًا؟". V1 values:
+
+```text
+DISPLACED
+NOT_DISPLACED
+```
+
+Nullable. `NULL` means the status was not collected (for example, records
+created before this field existed). It must not be read or back-filled as
+`NOT_DISPLACED`.
+
+### displacement_location_text
+
+"مكان النزوح الحالي". Optional short free text (e.g. "مواصي خانيونس").
+It may be set only when `displacement_status = DISPLACED`; otherwise it is
+`NULL`.
+
+V1 uses free text for both location fields. There are no governorate/city
+reference data for them; see PDD-006 for the geographic hierarchy.
 
 ---
 
@@ -2751,6 +2800,15 @@ Exact data model for multiple mobile/contact methods if required.
 
 PDD-024
 Exact geographic coordinate usage and privacy rules.
+
+PDD-025
+Researcher / collection metadata schema.
+Approved direction (2026-09-23), not yet implemented:
+- researcher name comes from the authenticated User's profile;
+- researcher branch/area comes from the User's profile;
+- collection date is recorded by the system as part of the collection
+  process, not typed repeatedly.
+Final User Profile schema and field names are still open.
 ```
 
 ---
@@ -2872,7 +2930,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.1
+Version: 1.2.2
 Status: APPROVED
 Date: 2026-09-23
 ```
@@ -2886,6 +2944,7 @@ Date: 2026-09-23
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.2 | 2026-09-23 | Approved | Added residence displacement fields (§19: `original_residence_text`, `displacement_status` V1 values, `displacement_location_text`), `persons.alternate_mobile_owner_relation` (§9-10) and PDD-025 (researcher/collection metadata direction) |
 | 1.2.1 | 2026-09-23 | Approved | Adopted V1 operational relationship-type baseline (§15). Single canonical SPOUSE code; PDD-005 remains open for final taxonomy review |
 
 ---

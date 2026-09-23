@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\DisplacementStatus;
 use App\Enums\LifeStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
@@ -36,6 +37,7 @@ class RegisterFamilyAction
      *         birth_date: string,
      *         mobile?: string|null,
      *         alternate_mobile?: string|null,
+     *         alternate_mobile_owner_relation?: string|null,
      *     },
      *     residence: array{
      *         governorate: string,
@@ -43,7 +45,9 @@ class RegisterFamilyAction
      *         area?: string|null,
      *         neighborhood?: string|null,
      *         address_text?: string|null,
+     *         original_residence_text?: string|null,
      *         displacement_status?: string|null,
+     *         displacement_location_text?: string|null,
      *         residence_type?: string|null,
      *         latitude?: float|null,
      *         longitude?: float|null,
@@ -80,6 +84,7 @@ class RegisterFamilyAction
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $head['mobile'] ?? null,
                 'alternate_mobile' => $head['alternate_mobile'] ?? null,
+                'alternate_mobile_owner_relation' => $head['alternate_mobile_owner_relation'] ?? null,
                 'is_active' => true,
                 'created_by' => $actingUserId,
                 'updated_by' => $actingUserId,
@@ -101,6 +106,7 @@ class RegisterFamilyAction
             ]);
 
             $residence = $data['residence'];
+            $isDisplaced = ($residence['displacement_status'] ?? null) === DisplacementStatus::DISPLACED->value;
             FamilyResidence::create([
                 'family_id' => $family->id,
                 'residence_type' => $residence['residence_type'] ?? null,
@@ -109,9 +115,14 @@ class RegisterFamilyAction
                 'area' => $residence['area'] ?? null,
                 'neighborhood' => $residence['neighborhood'] ?? null,
                 'address_text' => $residence['address_text'] ?? null,
+                'original_residence_text' => $residence['original_residence_text'] ?? null,
                 'latitude' => $residence['latitude'] ?? null,
                 'longitude' => $residence['longitude'] ?? null,
                 'displacement_status' => $residence['displacement_status'] ?? null,
+                // A displacement location only exists for a displaced family.
+                'displacement_location_text' => $isDisplaced
+                    ? ($residence['displacement_location_text'] ?? null)
+                    : null,
                 'started_at' => $data['registration_date'],
                 'is_current' => true,
                 'created_by' => $actingUserId,

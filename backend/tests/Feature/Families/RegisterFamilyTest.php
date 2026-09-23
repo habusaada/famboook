@@ -36,7 +36,7 @@ class RegisterFamilyTest extends TestCase
                 'city' => 'الزرقاء',
                 'area' => 'حي النصر',
                 'address_text' => 'شارع الملك حسين',
-                'displacement_status' => 'مقيم',
+                'displacement_status' => 'NOT_DISPLACED',
             ],
         ];
     }

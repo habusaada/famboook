@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { FamilyDetail } from "@/lib/types/api/family";
+import { displacementStatusLabel } from "@/lib/utils/displacement";
 
 const registrationSourceLabels: Record<string, string> = {
   PAPER_FORM: "نموذج ورقي",
@@ -14,7 +15,7 @@ const registrationSourceLabels: Record<string, string> = {
   VERIFIED_SOURCE: "مصدر موثّق",
 };
 
-function InfoRow({
+export function InfoRow({
   label,
   value,
   ltr,
@@ -121,7 +122,7 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
               {family.residence.displacement_status && (
                 <InfoRow
                   label="حالة النزوح"
-                  value={family.residence.displacement_status}
+                  value={displacementStatusLabel(family.residence.displacement_status)}
                 />
               )}
             </>

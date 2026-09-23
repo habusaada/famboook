@@ -10,6 +10,7 @@ import type {
   PaginatedResponse,
   RegisterFamilyPayload,
   ResourceResponse,
+  UpdateFamilyResidencePayload,
 } from "@/lib/types/api/family";
 
 export function useFamilies() {
@@ -50,6 +51,22 @@ export function useAddFamilyMember(familyCode: string) {
     mutationFn: (payload: AddFamilyMemberPayload) =>
       apiClient.post<ResourceResponse<FamilyMemberDetail>>(
         `/api/v1/families/${encodeURIComponent(familyCode)}/members`,
+        payload
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families", familyCode] });
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+    },
+  });
+}
+
+export function useUpdateFamilyResidence(familyCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateFamilyResidencePayload) =>
+      apiClient.patch<ResourceResponse<FamilyDetail>>(
+        `/api/v1/families/${encodeURIComponent(familyCode)}/residence`,
         payload
       ),
     onSuccess: () => {

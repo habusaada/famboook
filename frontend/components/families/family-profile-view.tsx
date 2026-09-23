@@ -25,12 +25,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
 import { FamilyOverview } from "@/components/families/family-overview";
 import { FamilyMembersTable } from "@/components/families/family-members-table";
+import { FamilyResidenceTab } from "@/components/families/family-residence-tab";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
+import { displacementStatusLabel } from "@/lib/utils/displacement";
 
 const secondaryTabs = [
-  { value: "residence", label: "السكن" },
   { value: "assessments", label: "التقييمات" },
   { value: "needs", label: "الاحتياجات" },
   { value: "assistance", label: "المساعدات" },
@@ -160,7 +161,7 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
               <MetaItem icon={MapPin}>
                 {family.residence.city}، {family.residence.governorate}
                 {family.residence.displacement_status
-                  ? ` — ${family.residence.displacement_status}`
+                  ? ` — ${displacementStatusLabel(family.residence.displacement_status)}`
                   : ""}
               </MetaItem>
             )}
@@ -223,6 +224,7 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
         <TabsList variant="line" className="w-full justify-start border-b">
           <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger value="members">أفراد الأسرة</TabsTrigger>
+          <TabsTrigger value="residence">السكن</TabsTrigger>
           {secondaryTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
@@ -236,6 +238,10 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
 
         <TabsContent value="members" className="mt-4">
           <FamilyMembersTable family={family} />
+        </TabsContent>
+
+        <TabsContent value="residence" className="mt-4">
+          <FamilyResidenceTab family={family} />
         </TabsContent>
 
         {secondaryTabs.map((tab) => (

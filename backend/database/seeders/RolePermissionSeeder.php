@@ -255,6 +255,8 @@ class RolePermissionSeeder extends Seeder
             'family.view',
             'family.create',
             'family.update',
+            // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
+            'residence.update',
             // View/Create Person ✓
             'person.view',
             'person.create',
@@ -320,6 +322,8 @@ class RolePermissionSeeder extends Seeder
             'family.view',
             'family.create',
             'family.update',
+            // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
+            'residence.update',
             // View/Create Person ✓
             'person.view',
             'person.create',
@@ -357,6 +361,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
+            // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
+            'residence.update',
             // View Reference Data ✓ (§56 V1 Role Assignment, AUTH-ADR-045)
             'reference-data.view',
         ],
@@ -379,6 +385,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
+            // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
+            'residence.update',
         ],
         'REPORTS_VIEWER' => [
             // View Executive Dashboard ✓

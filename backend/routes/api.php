@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
+use App\Http\Controllers\Api\V1\FamilyResidenceController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/families/{family}', [FamilyController::class, 'show'])
         ->middleware('can:family.view');
+
+    Route::patch('/families/{family}/residence', [FamilyResidenceController::class, 'update'])
+        ->middleware('can:residence.update');
 
     Route::post('/families/{family}/members', [FamilyMemberController::class, 'store'])
         ->middleware('can:person.create');

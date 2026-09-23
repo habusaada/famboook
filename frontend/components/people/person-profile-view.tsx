@@ -190,6 +190,12 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
                 ltr
               />
             )}
+            {person.alternate_mobile && person.alternate_mobile_owner_relation && (
+              <InfoRow
+                label="صاحب الرقم البديل / صلته"
+                value={person.alternate_mobile_owner_relation}
+              />
+            )}
           </CardContent>
         </Card>
       </div>

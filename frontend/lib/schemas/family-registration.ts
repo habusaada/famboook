@@ -21,12 +21,19 @@ export const familyRegistrationSchema = z.object({
   headGender: z.enum(["MALE", "FEMALE"]),
   headBirthDate: z.string().min(1, "تاريخ الميلاد مطلوب"),
   headMobile: z.string().optional(),
+  headAlternateMobile: z.string().optional(),
+  headAlternateMobileOwnerRelation: z.string().optional(),
 
   governorate: z.string().min(1, "المحافظة مطلوبة"),
   city: z.string().min(1, "المدينة مطلوبة"),
   area: z.string().optional(),
+  neighborhood: z.string().optional(),
   addressText: z.string().optional(),
-  displacementStatus: z.string().optional(),
+  // Residence before displacement (not birthplace).
+  originalResidenceText: z.string().optional(),
+  // Unanswered = not collected (null), never silently "NO".
+  isDisplaced: z.enum(["YES", "NO"]).optional(),
+  displacementLocationText: z.string().optional(),
 });
 
 export type FamilyRegistrationValues = z.infer<typeof familyRegistrationSchema>;
@@ -49,13 +56,30 @@ export function toRegisterFamilyPayload(
       gender: values.headGender,
       birth_date: values.headBirthDate,
       mobile: values.headMobile || null,
+      alternate_mobile: values.headAlternateMobile || null,
+      // Only meaningful alongside an alternate number.
+      alternate_mobile_owner_relation: values.headAlternateMobile
+        ? values.headAlternateMobileOwnerRelation || null
+        : null,
     },
     residence: {
       governorate: values.governorate,
       city: values.city,
       area: values.area || null,
+      neighborhood: values.neighborhood || null,
       address_text: values.addressText || null,
-      displacement_status: values.displacementStatus || null,
+      original_residence_text: values.originalResidenceText || null,
+      displacement_status:
+        values.isDisplaced === "YES"
+          ? "DISPLACED"
+          : values.isDisplaced === "NO"
+            ? "NOT_DISPLACED"
+            : null,
+      // A displacement location only exists for a displaced family.
+      displacement_location_text:
+        values.isDisplaced === "YES"
+          ? values.displacementLocationText || null
+          : null,
     },
   };
 }
@@ -72,9 +96,14 @@ export const apiFieldToFormField: Record<string, keyof FamilyRegistrationValues>
   "household_head.gender": "headGender",
   "household_head.birth_date": "headBirthDate",
   "household_head.mobile": "headMobile",
+  "household_head.alternate_mobile": "headAlternateMobile",
+  "household_head.alternate_mobile_owner_relation": "headAlternateMobileOwnerRelation",
   "residence.governorate": "governorate",
   "residence.city": "city",
   "residence.area": "area",
+  "residence.neighborhood": "neighborhood",
   "residence.address_text": "addressText",
-  "residence.displacement_status": "displacementStatus",
+  "residence.original_residence_text": "originalResidenceText",
+  "residence.displacement_status": "isDisplaced",
+  "residence.displacement_location_text": "displacementLocationText",
 };

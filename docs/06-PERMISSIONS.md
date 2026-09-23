@@ -2,7 +2,7 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2.1  
+**Version:** 1.2.2  
 **Status:** Approved  
 **Last Updated:** 2026-09-23  
 **Project:** Famboook — Family Registry & Case Management System
@@ -1051,6 +1051,29 @@ residence.change
 
 residence.view-history
 ```
+
+## V1 Role Assignment
+
+Approved 2026-09-23 (Edit Family Residence slice, AUTH-ADR-046):
+
+```text
+residence.update
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+  SOCIAL_WORKER
+```
+
+These are the roles the §140 matrix already lets "Update Canonical Family".
+The residence is part of the canonical Family record.
+
+`residence.update` covers **data correction** of the current residence in
+place (docs/03 §56): address fields, original residence and displacement
+status/location. It does not create, end or delete residence records.
+
+`residence.change` covers a **real-world move** (end the current residence,
+create a new one, preserve history). It stays unassigned until that
+operation is built.
 
 ---
 
@@ -2925,6 +2948,9 @@ View access does not automatically grant drill-down, export, or sensitive-field 
 
 ### AUTH-ADR-045
 `reference-data.view` is granted to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY in V1 (see §56). Reference-data create/update/deactivate remain SUPER_ADMIN-only.
+
+### AUTH-ADR-046
+`residence.update` (in-place correction of the current residence) is granted to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER in V1, mirroring "Update Canonical Family" (see §46). `residence.change` (moves with history) remains unassigned.
 ```
 
 ---
@@ -3049,6 +3075,7 @@ This is a baseline, not a substitute for explicit permissions.
 | View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
 | Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
 | View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
+| Correct Current Residence | ✓ | ✓ | Draft/limited | — | Limited | — | — |
 | Record Official Death | Permission | Permission | — | Policy | — | — | — |
 | Change Household Head | Permission | Permission | — | Policy | — | — | Request only |
 | Transfer Membership | Permission | Permission | — | Policy | — | — | Request only |
@@ -3247,7 +3274,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.1
+Version: 1.2.2
 Status: APPROVED
 Date: 2026-09-23
 ```
@@ -3261,4 +3288,5 @@ Date: 2026-09-23
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.2 | 2026-09-23 | Approved | Added V1 role assignment for `residence.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) in §46, the "Correct Current Residence" row in §140, and AUTH-ADR-046 |
 | 1.2.1 | 2026-09-23 | Approved | Added V1 role assignment for `reference-data.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §56, the "View Reference Data" row in §140, and AUTH-ADR-045 |

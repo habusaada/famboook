@@ -288,7 +288,8 @@ class RolePermissionSeederTest extends TestCase
         // SUPER_ADMIN holds far fewer than the full 123-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        $this->assertSame(42, $superAdmin->getAllPermissions()->count());
+        // 43 = previous 42 + residence.update (docs/06 §46, AUTH-ADR-046).
+        $this->assertSame(43, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -368,5 +369,25 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($familyUser->hasPermissionTo('audit.view'));
         $this->assertFalse($familyUser->hasPermissionTo('health.view'));
         $this->assertFalse($familyUser->hasPermissionTo('confidential-note.view'));
+    }
+
+    public function test_residence_update_is_granted_to_roles_that_update_canonical_family(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §46 V1 Role Assignment, AUTH-ADR-046: residence.update
+        // mirrors family.update. residence.change (moves) stays unassigned.
+        foreach (['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY', 'SOCIAL_WORKER'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            $this->assertTrue($user->hasPermissionTo('residence.update'), $role);
+            $this->assertFalse($user->hasPermissionTo('residence.change'), $role);
+        }
+
+        foreach (['REVIEWER', 'REPORTS_VIEWER', 'FAMILY_USER'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            $this->assertFalse($user->hasPermissionTo('residence.update'), $role);
+        }
     }
 }

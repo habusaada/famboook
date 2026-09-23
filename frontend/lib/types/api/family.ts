@@ -10,6 +10,10 @@ export type FamilyLifecycleStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 export type Gender = "MALE" | "FEMALE";
 
+// docs/02-DATA-DICTIONARY.md §19. null = not collected (legacy records),
+// which is NOT the same as NOT_DISPLACED.
+export type DisplacementStatus = "DISPLACED" | "NOT_DISPLACED";
+
 export type RegistrationSource =
   | "PAPER_FORM"
   | "MANUAL_ENTRY"
@@ -51,7 +55,12 @@ export interface FamilyDetail {
     area: string | null;
     neighborhood: string | null;
     address_text: string | null;
-    displacement_status: string | null;
+    residence_type: string | null;
+    started_at: string | null;
+    // Family residence BEFORE displacement — not a birthplace.
+    original_residence_text: string | null;
+    displacement_status: DisplacementStatus | null;
+    displacement_location_text: string | null;
   } | null;
   member_count: number;
   male_count: number;
@@ -101,6 +110,7 @@ export interface RegisterFamilyPayload {
     birth_date: string;
     mobile?: string | null;
     alternate_mobile?: string | null;
+    alternate_mobile_owner_relation?: string | null;
   };
   residence: {
     governorate: string;
@@ -108,11 +118,27 @@ export interface RegisterFamilyPayload {
     area?: string | null;
     neighborhood?: string | null;
     address_text?: string | null;
-    displacement_status?: string | null;
+    original_residence_text?: string | null;
+    displacement_status?: DisplacementStatus | null;
+    displacement_location_text?: string | null;
     residence_type?: string | null;
     latitude?: number | null;
     longitude?: number | null;
   };
+}
+
+// Partial payload for PATCH /api/v1/families/{family}/residence
+// (backend/app/Http/Requests/Api/V1/UpdateFamilyResidenceRequest.php).
+// Only the fields sent are changed.
+export interface UpdateFamilyResidencePayload {
+  governorate?: string;
+  city?: string;
+  area?: string | null;
+  neighborhood?: string | null;
+  address_text?: string | null;
+  original_residence_text?: string | null;
+  displacement_status?: DisplacementStatus | null;
+  displacement_location_text?: string | null;
 }
 
 // Canonical payload for POST /api/v1/families/{family}/members

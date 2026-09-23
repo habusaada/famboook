@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ export default function NewFamilyPage() {
     control,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<FamilyRegistrationValues>({
     resolver: zodResolver(familyRegistrationSchema),
@@ -79,6 +80,11 @@ export default function NewFamilyPage() {
       headGender: "MALE",
     },
   });
+
+  const hasAlternateMobile = Boolean(
+    useWatch({ control, name: "headAlternateMobile" })?.trim()
+  );
+  const isDisplaced = useWatch({ control, name: "isDisplaced" }) === "YES";
 
   function onSubmitFamily(values: FamilyRegistrationValues) {
     setSubmitError(null);
@@ -287,13 +293,45 @@ export default function NewFamilyPage() {
                   {...register("headMobile")}
                 />
               </div>
+
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel htmlFor="headAlternateMobile" optional>
+                  رقم الجوال البديل
+                </FieldLabel>
+                <Input
+                  id="headAlternateMobile"
+                  dir="ltr"
+                  className="text-end"
+                  {...register("headAlternateMobile")}
+                />
+              </div>
+
+              {hasAlternateMobile && (
+                <div className="flex flex-col gap-1.5">
+                  <FieldLabel htmlFor="headAlternateMobileOwnerRelation" optional>
+                    صاحب الرقم البديل / صلته
+                  </FieldLabel>
+                  <Input
+                    id="headAlternateMobileOwnerRelation"
+                    placeholder="مثال: أحمد محمد – أخ"
+                    {...register("headAlternateMobileOwnerRelation")}
+                  />
+                  {errors.headAlternateMobileOwnerRelation && (
+                    <p className="text-xs text-destructive">
+                      {errors.headAlternateMobileOwnerRelation.message}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>السكن الحالي</CardTitle>
-              <CardDescription>موقع إقامة الأسرة الحالي</CardDescription>
+              <CardTitle>السكن والنزوح</CardTitle>
+              <CardDescription>
+                موقع إقامة الأسرة الحالي، والسكن الأصلي قبل النزوح
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
@@ -324,13 +362,10 @@ export default function NewFamilyPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="displacementStatus" optional>
-                  حالة النزوح
+                <FieldLabel htmlFor="neighborhood" optional>
+                  الحي
                 </FieldLabel>
-                <Input
-                  id="displacementStatus"
-                  {...register("displacementStatus")}
-                />
+                <Input id="neighborhood" {...register("neighborhood")} />
               </div>
 
               <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -343,6 +378,75 @@ export default function NewFamilyPage() {
                   {...register("addressText")}
                 />
               </div>
+
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <FieldLabel htmlFor="originalResidenceText" optional>
+                  مكان السكن الأصلي قبل النزوح
+                </FieldLabel>
+                <Input
+                  id="originalResidenceText"
+                  placeholder="مثال: بني سهيلا – خانيونس"
+                  {...register("originalResidenceText")}
+                />
+                {errors.originalResidenceText && (
+                  <p className="text-xs text-destructive">
+                    {errors.originalResidenceText.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel htmlFor="isDisplaced" optional>
+                  هل الأسرة نازحة حاليًا؟
+                </FieldLabel>
+                <Controller
+                  control={control}
+                  name="isDisplaced"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Not displaced → no displacement location.
+                        if (value !== "YES") {
+                          setValue("displacementLocationText", "");
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="isDisplaced">
+                        <SelectValue placeholder="اختر" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="YES">نعم</SelectItem>
+                        <SelectItem value="NO">لا</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.isDisplaced && (
+                  <p className="text-xs text-destructive">
+                    {errors.isDisplaced.message}
+                  </p>
+                )}
+              </div>
+
+              {isDisplaced && (
+                <div className="flex flex-col gap-1.5">
+                  <FieldLabel htmlFor="displacementLocationText" optional>
+                    مكان النزوح الحالي
+                  </FieldLabel>
+                  <Input
+                    id="displacementLocationText"
+                    placeholder="مثال: مواصي خانيونس"
+                    {...register("displacementLocationText")}
+                  />
+                  {errors.displacementLocationText && (
+                    <p className="text-xs text-destructive">
+                      {errors.displacementLocationText.message}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </form>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\DisplacementStatus;
 use App\Enums\Gender;
 use App\Enums\RegistrationSource;
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,6 +31,12 @@ class RegisterFamilyRequest extends FormRequest
             'household_head.birth_date' => ['required', 'date', 'before_or_equal:today'],
             'household_head.mobile' => ['nullable', 'string', 'max:50'],
             'household_head.alternate_mobile' => ['nullable', 'string', 'max:50'],
+            // Descriptive only ("أحمد محمد – أخ"); meaningless without the
+            // alternate number it describes.
+            'household_head.alternate_mobile_owner_relation' => [
+                'nullable', 'string', 'max:255',
+                'prohibited_if:household_head.alternate_mobile,null',
+            ],
 
             'residence' => ['required', 'array'],
             'residence.governorate' => ['required', 'string', 'max:255'],
@@ -37,7 +44,16 @@ class RegisterFamilyRequest extends FormRequest
             'residence.area' => ['nullable', 'string', 'max:255'],
             'residence.neighborhood' => ['nullable', 'string', 'max:255'],
             'residence.address_text' => ['nullable', 'string'],
-            'residence.displacement_status' => ['nullable', 'string', 'max:255'],
+            // Residence BEFORE displacement (not birthplace), short free text.
+            'residence.original_residence_text' => ['nullable', 'string', 'max:255'],
+            // Nullable: NULL = not collected, distinct from NOT_DISPLACED.
+            'residence.displacement_status' => ['nullable', Rule::enum(DisplacementStatus::class)],
+            // Optional even when displaced (the paper form doesn't require
+            // it); rejected otherwise rather than silently stored.
+            'residence.displacement_location_text' => [
+                'nullable', 'string', 'max:255',
+                'prohibited_unless:residence.displacement_status,'.DisplacementStatus::DISPLACED->value,
+            ],
             'residence.residence_type' => ['nullable', 'string', 'max:255'],
             'residence.latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'residence.longitude' => ['nullable', 'numeric', 'between:-180,180'],

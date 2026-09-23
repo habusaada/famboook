@@ -26,11 +26,23 @@ class Person extends Model
         'death_date',
         'mobile',
         'alternate_mobile',
+        'alternate_mobile_owner_relation',
         'notes',
         'is_active',
         'created_by',
         'updated_by',
     ];
+
+    protected static function booted(): void
+    {
+        // The owner/relation describes the alternate mobile; it has no
+        // meaning once that number is removed, whichever route removes it.
+        static::saving(function (Person $person) {
+            if (blank($person->alternate_mobile)) {
+                $person->alternate_mobile_owner_relation = null;
+            }
+        });
+    }
 
     protected function casts(): array
     {

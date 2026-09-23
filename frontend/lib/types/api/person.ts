@@ -22,6 +22,8 @@ export interface PersonDetail {
   birth_date: string | null;
   mobile: string | null;
   alternate_mobile: string | null;
+  // Descriptive only (e.g. "أحمد محمد – أخ") — never a linked Person.
+  alternate_mobile_owner_relation: string | null;
   life_status: LifeStatus;
   is_active: boolean;
   family_membership?: PersonFamilyMembership;

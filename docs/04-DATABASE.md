@@ -2,9 +2,9 @@
 ## Database Architecture
 
 **Document:** `04-DATABASE.md`  
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-23  
 **Project:** Famboook — Family Registry & Case Management System  
 **Database:** PostgreSQL 16+  
 **Backend:** Laravel 12
@@ -373,6 +373,7 @@ death_date DATE NULL
 mobile VARCHAR NULL
 
 alternate_mobile VARCHAR NULL
+alternate_mobile_owner_relation VARCHAR NULL
 
 notes TEXT NULL
 
@@ -655,11 +656,13 @@ city VARCHAR NULL
 area VARCHAR NULL
 neighborhood VARCHAR NULL
 address_text TEXT NULL
+original_residence_text VARCHAR NULL
 
 latitude NUMERIC NULL
 longitude NUMERIC NULL
 
 displacement_status VARCHAR NULL
+displacement_location_text VARCHAR NULL
 
 started_at DATE NULL
 ended_at DATE NULL
@@ -675,6 +678,20 @@ updated_by BIGINT NULL FK users.id
 created_at
 updated_at
 ```
+
+---
+
+Displacement constraints (V1, see docs/02 §19):
+
+```sql
+CHECK (displacement_status IS NULL
+       OR displacement_status IN ('DISPLACED', 'NOT_DISPLACED'));
+
+CHECK (displacement_location_text IS NULL
+       OR displacement_status = 'DISPLACED');
+```
+
+`displacement_status` stays nullable: `NULL` = not collected.
 
 ---
 
@@ -3023,10 +3040,10 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2
+Version: 1.2.1
 Status: APPROVED
 Database: PostgreSQL 16+
-Date: 2026-09-22
+Date: 2026-09-23
 ```
 
 ---
@@ -3038,6 +3055,7 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.1 | 2026-09-23 | Approved | Added `persons.alternate_mobile_owner_relation`, `family_residences.original_residence_text` / `displacement_location_text` and displacement CHECK constraints (§24) |
 
 ---
 

@@ -26,6 +26,7 @@ class PersonResource extends JsonResource
             'birth_date' => $this->birth_date?->toDateString(),
             'mobile' => $this->mobile,
             'alternate_mobile' => $this->alternate_mobile,
+            'alternate_mobile_owner_relation' => $this->alternate_mobile_owner_relation,
             'life_status' => $this->life_status,
             'is_active' => $this->is_active,
             'family_membership' => $this->when($membership, fn () => [

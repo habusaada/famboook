@@ -29,7 +29,12 @@ class FamilyDetailResource extends JsonResource
                 'area' => $this->currentResidence->area,
                 'neighborhood' => $this->currentResidence->neighborhood,
                 'address_text' => $this->currentResidence->address_text,
+                'residence_type' => $this->currentResidence->residence_type,
+                'started_at' => $this->currentResidence->started_at?->toDateString(),
+                'original_residence_text' => $this->currentResidence->original_residence_text,
+                // null = not collected (legacy), distinct from NOT_DISPLACED.
                 'displacement_status' => $this->currentResidence->displacement_status,
+                'displacement_location_text' => $this->currentResidence->displacement_location_text,
             ]),
             'member_count' => $members->count(),
             'male_count' => $members->filter(
