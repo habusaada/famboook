@@ -13,6 +13,7 @@ class FamilyMembership extends Model
     protected $fillable = [
         'family_id',
         'person_id',
+        'relationship_type_id',
         'is_household_head',
         'paper_sequence_no',
         'started_at',

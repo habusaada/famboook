@@ -258,6 +258,10 @@ class RolePermissionSeederTest extends TestCase
         $this->assertTrue($superAdmin->hasPermissionTo('system-admin.access'));
         $this->assertTrue($superAdmin->hasPermissionTo('audit.view'));
 
+        // person.update: added for the Family Members Management slice
+        // (no matrix row; explicitly reported, SUPER_ADMIN-only grant).
+        $this->assertTrue($superAdmin->hasPermissionTo('person.update'));
+
         // SUPER_ADMIN does NOT receive a blanket grant: unresolved sensitive
         // and group-level permissions remain unassigned even for this role.
         $this->assertFalse($superAdmin->hasPermissionTo('health.view'));
@@ -278,7 +282,7 @@ class RolePermissionSeederTest extends TestCase
         // SUPER_ADMIN holds far fewer than the full 123-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        $this->assertSame(41, $superAdmin->getAllPermissions()->count());
+        $this->assertSame(42, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void

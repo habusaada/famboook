@@ -7,6 +7,7 @@ use App\Enums\LifeStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Person extends Model
@@ -45,5 +46,15 @@ class Person extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(FamilyMembership::class);
+    }
+
+    public function activeMembership(): HasOne
+    {
+        return $this->hasOne(FamilyMembership::class)->where('is_active', true);
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'person_code';
     }
 }

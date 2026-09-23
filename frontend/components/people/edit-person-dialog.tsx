@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, UserPlus } from "lucide-react";
+import { AlertCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,19 +24,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAddFamilyMember } from "@/lib/api/families";
+import { useUpdatePerson } from "@/lib/api/people";
 import { ApiError } from "@/lib/api/client";
 import {
-  addFamilyMemberSchema,
-  memberApiFieldToFormField,
-  toAddFamilyMemberPayload,
-  type AddFamilyMemberValues,
-} from "@/lib/schemas/add-family-member";
+  editPersonSchema,
+  personApiFieldToFormField,
+  toUpdatePersonPayload,
+  type EditPersonValues,
+} from "@/lib/schemas/edit-person";
+import type { PersonDetail } from "@/lib/types/api/person";
 
-export function AddMemberDialog({ familyCode }: { familyCode: string }) {
+export function EditPersonDialog({ person }: { person: PersonDetail }) {
   const [open, setOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const addMember = useAddFamilyMember(familyCode);
+  const updatePerson = useUpdatePerson(person.person_code);
 
   const {
     register,
@@ -45,25 +46,42 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
     reset,
     setError,
     formState: { errors },
-  } = useForm<AddFamilyMemberValues>({
-    resolver: zodResolver(addFamilyMemberSchema),
-    defaultValues: { gender: "MALE" },
+  } = useForm<EditPersonValues>({
+    resolver: zodResolver(editPersonSchema),
+    defaultValues: {
+      fullName: person.full_name,
+      gender: person.gender,
+      birthDate: person.birth_date ?? "",
+      mobile: person.mobile ?? "",
+      alternateMobile: person.alternate_mobile ?? "",
+    },
   });
 
-  function onSubmit(values: AddFamilyMemberValues) {
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      reset({
+        fullName: person.full_name,
+        gender: person.gender,
+        birthDate: person.birth_date ?? "",
+        mobile: person.mobile ?? "",
+        alternateMobile: person.alternate_mobile ?? "",
+      });
+      setSubmitError(null);
+    }
+  }
+
+  function onSubmit(values: EditPersonValues) {
     setSubmitError(null);
 
-    addMember.mutate(toAddFamilyMemberPayload(values), {
-      onSuccess: () => {
-        reset();
-        setOpen(false);
-      },
+    updatePerson.mutate(toUpdatePersonPayload(values), {
+      onSuccess: () => setOpen(false),
       onError: (error) => {
         if (error instanceof ApiError && error.status === 422) {
           const validationErrors = error.validationErrors;
           if (validationErrors) {
             for (const [apiField, messages] of Object.entries(validationErrors)) {
-              const formField = memberApiFieldToFormField[apiField];
+              const formField = personApiFieldToFormField[apiField];
               if (formField && messages[0]) {
                 setError(formField, { type: "server", message: messages[0] });
               }
@@ -76,7 +94,7 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
         }
 
         if (error instanceof ApiError && error.status === 403) {
-          setSubmitError("لا تملك صلاحية إضافة فرد لهذه الأسرة.");
+          setSubmitError("لا تملك صلاحية تعديل بيانات هذا الشخص.");
           return;
         }
 
@@ -86,46 +104,38 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          reset();
-          setSubmitError(null);
-        }
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <UserPlus className="size-4" />
-          إضافة فرد
+        <Button variant="outline" size="sm">
+          <Pencil className="size-4" />
+          تعديل
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>إضافة فرد إلى الأسرة</DialogTitle>
+          <DialogTitle>تعديل بيانات الشخص</DialogTitle>
           <DialogDescription>
-            أدخل البيانات الأساسية للفرد الجديد.
+            تعديل البيانات الأساسية فقط. لا يشمل تغيير رب الأسرة أو نقل
+            العضوية.
           </DialogDescription>
         </DialogHeader>
 
         {submitError && (
           <Alert variant="destructive">
             <AlertCircle className="size-4" />
-            <AlertTitle>تعذّر إضافة الفرد</AlertTitle>
+            <AlertTitle>تعذّر حفظ التعديلات</AlertTitle>
             <AlertDescription>{submitError}</AlertDescription>
           </Alert>
         )}
 
         <form
-          id="add-member-form"
+          id="edit-person-form"
           onSubmit={handleSubmit(onSubmit)}
           className="flex flex-col gap-4"
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="member-fullName">الاسم الكامل</Label>
-            <Input id="member-fullName" {...register("fullName")} />
+            <Label htmlFor="edit-fullName">الاسم الكامل</Label>
+            <Input id="edit-fullName" {...register("fullName")} />
             {errors.fullName && (
               <p className="text-xs text-destructive">
                 {errors.fullName.message}
@@ -135,13 +145,13 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="member-gender">الجنس</Label>
+              <Label htmlFor="edit-gender">الجنس</Label>
               <Controller
                 control={control}
                 name="gender"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="member-gender">
+                    <SelectTrigger id="edit-gender">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -154,9 +164,9 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="member-birthDate">تاريخ الميلاد</Label>
+              <Label htmlFor="edit-birthDate">تاريخ الميلاد</Label>
               <Input
-                id="member-birthDate"
+                id="edit-birthDate"
                 type="date"
                 dir="ltr"
                 className="text-end"
@@ -171,46 +181,36 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="member-nationalId">
-              رقم الهوية الوطنية{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                (اختياري)
-              </span>
-            </Label>
+            <Label htmlFor="edit-mobile">رقم الجوال</Label>
             <Input
-              id="member-nationalId"
-              dir="ltr"
-              className="text-end"
-              {...register("nationalId")}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="member-mobile">
-              رقم الجوال{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                (اختياري)
-              </span>
-            </Label>
-            <Input
-              id="member-mobile"
+              id="edit-mobile"
               dir="ltr"
               className="text-end"
               {...register("mobile")}
             />
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-alternateMobile">رقم جوال بديل</Label>
+            <Input
+              id="edit-alternateMobile"
+              dir="ltr"
+              className="text-end"
+              {...register("alternateMobile")}
+            />
+          </div>
         </form>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setOpen(false)}
-          >
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             إلغاء
           </Button>
-          <Button type="submit" form="add-member-form" disabled={addMember.isPending}>
-            {addMember.isPending ? "جارٍ الإضافة..." : "إضافة"}
+          <Button
+            type="submit"
+            form="edit-person-form"
+            disabled={updatePerson.isPending}
+          >
+            {updatePerson.isPending ? "جارٍ الحفظ..." : "حفظ التعديلات"}
           </Button>
         </DialogFooter>
       </DialogContent>

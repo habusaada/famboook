@@ -30,6 +30,9 @@ export interface FamilyMemberDetail {
   birth_date: string | null;
   is_household_head: boolean;
   is_active: boolean;
+  // Always null until reference data (relationship_types) is
+  // implemented — do not render a relationship label from this.
+  relationship_type_id: number | null;
 }
 
 export interface FamilyDetail {
@@ -108,4 +111,15 @@ export interface RegisterFamilyPayload {
     latitude?: number | null;
     longitude?: number | null;
   };
+}
+
+// Canonical payload for POST /api/v1/families/{family}/members
+// (backend/app/Http/Requests/Api/V1/AddFamilyMemberRequest.php).
+export interface AddFamilyMemberPayload {
+  full_name: string;
+  national_id?: string | null;
+  gender: Gender;
+  birth_date: string;
+  mobile?: string | null;
+  alternate_mobile?: string | null;
 }

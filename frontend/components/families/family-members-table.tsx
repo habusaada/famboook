@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Crown } from "lucide-react";
 import {
   Card,
@@ -20,6 +23,8 @@ import { calculateAge } from "@/lib/utils/date";
 import type { FamilyDetail } from "@/lib/types/api/family";
 
 export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
+  const router = useRouter();
+
   return (
     <Card size="sm">
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
@@ -29,7 +34,7 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
             {family.members.length} فرد مسجّل ضمن الأسرة
           </CardDescription>
         </div>
-        <AddMemberDialog />
+        <AddMemberDialog familyCode={family.family_code} />
       </CardHeader>
       <CardContent className="overflow-x-auto p-0">
         <Table>
@@ -44,7 +49,11 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
           </TableHeader>
           <TableBody>
             {family.members.map((member) => (
-              <TableRow key={member.person_code}>
+              <TableRow
+                key={member.person_code}
+                className="cursor-pointer"
+                onClick={() => router.push(`/people/${member.person_code}`)}
+              >
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     {member.is_household_head && (

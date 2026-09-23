@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type {
+  AddFamilyMemberPayload,
   FamilyDetail,
+  FamilyMemberDetail,
   FamilySummary,
   PaginatedResponse,
   RegisterFamilyPayload,
@@ -36,6 +38,22 @@ export function useRegisterFamily() {
     mutationFn: (payload: RegisterFamilyPayload) =>
       apiClient.post<ResourceResponse<FamilyDetail>>("/api/v1/families", payload),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+    },
+  });
+}
+
+export function useAddFamilyMember(familyCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: AddFamilyMemberPayload) =>
+      apiClient.post<ResourceResponse<FamilyMemberDetail>>(
+        `/api/v1/families/${encodeURIComponent(familyCode)}/members`,
+        payload
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families", familyCode] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
   });
