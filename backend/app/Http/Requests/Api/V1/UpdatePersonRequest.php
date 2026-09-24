@@ -4,8 +4,10 @@ namespace App\Http\Requests\Api\V1;
 
 use App\Enums\Gender;
 use App\Models\Person;
+use App\Support\HealthRecordRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Basic Person field edits only. Does not accept life_status,
@@ -38,7 +40,22 @@ class UpdatePersonRequest extends FormRequest
         return [
             'full_name' => ['sometimes', 'required', 'string', 'max:255'],
             'national_id' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'gender' => ['sometimes', Rule::enum(Gender::class)],
+            'gender' => [
+                'sometimes',
+                Rule::enum(Gender::class),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $gender = Gender::tryFrom((string) $value);
+                    if ($gender === null) {
+                        return;
+                    }
+
+                    try {
+                        HealthRecordRules::assertGenderChangeAllowed($this->route('person'), $gender);
+                    } catch (ValidationException $e) {
+                        $fail($e->errors()['gender'][0]);
+                    }
+                },
+            ],
             'birth_date' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'mobile' => ['sometimes', 'nullable', 'string', 'max:50'],
             'alternate_mobile' => ['sometimes', 'nullable', 'string', 'max:50'],

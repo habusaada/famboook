@@ -2,9 +2,9 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.2.2  
+**Version:** 1.2.4  
 **Status:** Approved  
-**Last Updated:** 2026-09-23  
+**Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -899,62 +899,110 @@ Health data is classified as restricted.
 
 ---
 
-# 22. Health Condition
+# 22. Person Health Record
+
+Approved 2026-09-24 (Health & Special-Needs Records V1). This replaces the
+earlier separate `person_health_conditions` and `person_disabilities`
+proposals. DB-ADR-015 still holds: health data uses repeatable relational
+records.
 
 ## Entity
 
 ```text
-person_health_conditions
+person_health_records
 ```
 
-Fields may include:
+Health information belongs to **Persons**, not Families. The `families` and
+`persons` tables carry no health booleans or counts.
+
+Fields:
 
 ```text
 id
+uuid                      public identifier used by the API
 person_id
-condition_type_id
-condition_name
-diagnosis_status
-notes
-is_active
-started_at
-ended_at
+type                      DISABILITY | CHRONIC_DISEASE | PREGNANCY | BREASTFEEDING
+disability_type_id        DISABILITY only (required)
+condition_name            CHRONIC_DISEASE only (required, short free text)
+details                   optional notes
+started_at                optional
+ended_at                  NULL = active
 created_by
 updated_by
 created_at
 updated_at
 ```
 
-A Person may have multiple conditions.
+Type rules:
+
+| Type | Required | Must be NULL | Person |
+|---|---|---|---|
+| DISABILITY | disability_type_id | condition_name | any |
+| CHRONIC_DISEASE | condition_name | disability_type_id | any |
+| PREGNANCY | — | disability_type_id, condition_name | FEMALE only (no minimum age in V1) |
+| BREASTFEEDING | — | disability_type_id, condition_name | FEMALE only (no minimum age in V1) |
+
+A record is **active** while `ended_at` is NULL. Records of every type are
+closed (never deleted), so history is kept. Exact start dates are not
+required when the source (paper form) does not provide them.
+
+While a Person has an active PREGNANCY or BREASTFEEDING record, their gender
+cannot be corrected away from FEMALE (docs/03 §36).
+
+V1 does not include severity, diagnosis status, condition taxonomy,
+medications, clinical coding or attachments. PDD-007 and PDD-008 stay open.
+
+`person_health_profiles` (§21) remains documented but is not implemented in V1.
+
+## Disability Types
+
+Reference data (`disability_types`), same shape and conventions as
+`relationship_types` (§15). V1 operational baseline:
+
+| code | name |
+|---|---|
+| MOTOR | حركية |
+| VISUAL | بصرية |
+| HEARING | سمعية |
+| SPEECH_COMMUNICATION | نطق / تواصل |
+| INTELLECTUAL | ذهنية / عقلية |
+| MULTIPLE | متعددة |
+| OTHER | أخرى |
+
+New records may only use active types. A deactivated type stays on the
+records that already use it.
+
+## Derived Health Indicators
+
+The family health indicators are **derived on read and never stored**:
+
+| Indicator | Derivation |
+|---|---|
+| ذوو الإعاقة | DISTINCT persons with an active DISABILITY record |
+| الأمراض المزمنة | DISTINCT persons with an active CHRONIC_DISEASE record (two diseases = one person) |
+| الحوامل | persons with an active PREGNANCY record |
+| المرضعات | persons with an active BREASTFEEDING record |
+| أطفال دون سنتين | persons who have not reached their 2nd birthday on the reference date |
+| مواليد آخر 12 شهرًا | persons born within the 12 months before the reference date (the 1st birthday itself excluded) |
+
+- Only persons with an **active** membership in the Family count. Deceased
+  persons are excluded from the indicators, but their records stay
+  visible as history.
+- The last two indicators come from `persons.birth_date` only. A missing
+  birth date never counts. There are no records for "under two" or
+  "recent birth".
+- **Reference date:** the Staff App uses **today**. When collection metadata
+  exists (PDD-025), a historical paper-form evaluation may use the form's
+  **collection date** instead. The derivation stays the same; only the
+  reference date changes.
 
 ---
 
 # 23. Disability
 
-## Entity
-
-```text
-person_disabilities
-```
-
-Fields may include:
-
-```text
-id
-person_id
-disability_type_id
-severity
-notes
-is_active
-started_at
-ended_at
-created_by
-updated_by
-created_at
-updated_at
-```
-
-A Person may have multiple disability records.
+Superseded in V1 by §22. Disabilities are `person_health_records` with
+`type = DISABILITY` and a `disability_type_id` from the `disability_types`
+reference data. A Person may still have multiple disability records.
 
 ---
 
@@ -2749,9 +2797,11 @@ Final residence geographic hierarchy.
 
 PDD-007
 Exact health condition taxonomy.
+(V1 uses free-text chronic disease names, see §22.)
 
 PDD-008
 Exact disability taxonomy.
+(V1 operational disability-type baseline adopted 2026-09-24, see §22.)
 
 PDD-009
 Exact education reference structure.
@@ -2930,9 +2980,9 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.2
+Version: 1.2.4
 Status: APPROVED
-Date: 2026-09-23
+Date: 2026-09-24
 ```
 
 ---
@@ -2944,6 +2994,8 @@ Date: 2026-09-23
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.4 | 2026-09-24 | Approved | §22: all health record types closable, gender integrity with active pregnancy/breastfeeding, deceased records kept as history, no minimum maternal age in V1 |
+| 1.2.3 | 2026-09-24 | Approved | Health & Special-Needs Records V1: unified person-based `person_health_records` (§22) replacing the separate health-condition/disability proposals, `disability_types` V1 baseline, derived family health indicators (today vs future collection date) |
 | 1.2.2 | 2026-09-23 | Approved | Added residence displacement fields (§19: `original_residence_text`, `displacement_status` V1 values, `displacement_location_text`), `persons.alternate_mobile_owner_relation` (§9-10) and PDD-025 (researcher/collection metadata direction) |
 | 1.2.1 | 2026-09-23 | Approved | Adopted V1 operational relationship-type baseline (§15). Single canonical SPOUSE code; PDD-005 remains open for final taxonomy review |
 

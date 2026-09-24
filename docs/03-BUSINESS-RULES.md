@@ -2,7 +2,7 @@
 ## Business Rules
 
 **Document:** `03-BUSINESS-RULES.md`  
-**Version:** 1.2.1  
+**Version:** 1.2.3  
 **Status:** Approved  
 **Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System
@@ -617,6 +617,41 @@ Disability information is restricted sensitive data.
 A Person may have multiple disability records.
 
 Access requires explicit authorization.
+
+## Health & Special-Needs Records (V1)
+
+Approved 2026-09-24. See docs/02 §22 for the model.
+
+- Health records belong to **Persons**. Four V1 types: DISABILITY,
+  CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING.
+- PREGNANCY and BREASTFEEDING are recorded for FEMALE persons only. V1 has
+  **no minimum-age rule** (the source paper form defines none).
+- **Gender integrity:** a Person with an **active** PREGNANCY or
+  BREASTFEEDING record cannot have their gender corrected away from FEMALE
+  (HTTP 422). The record is never closed or changed automatically. Close
+  it first, then the correction can proceed.
+- A record can only be added for an **active** member of the Family it is
+  added through.
+- There are no duplicate **active** records:
+  - one per disability type per Person;
+  - one per chronic disease name per Person, compared after trimming,
+    case folding and simple Arabic normalization (أ/إ/آ→ا, ى→ي, ة→ه,
+    diacritics removed; not medical matching);
+  - at most one active PREGNANCY and one active BREASTFEEDING per Person.
+- **Correction:** the type-specific field, details and start date can be
+  corrected. The Person and the type cannot change.
+- **Close, not delete:** records of **all four types** can be closed by
+  setting `ended_at` (today by default; never in the future or before
+  `started_at`). Closing ends pregnancy/breastfeeding, and marks a
+  disability or chronic disease record as no longer current. Closed records
+  keep the history. V1 has no hard delete.
+- **Deceased persons:** their health records stay visible to authorized
+  viewers as history and are never closed or deleted automatically. They
+  are excluded from the current family health indicators.
+- Family health indicators are derived, never stored. Children under 2 and
+  births in the last 12 months come from `birth_date`. The Staff App uses
+  today as the reference date; a future historical form evaluation may use
+  the collection date.
 
 ---
 
@@ -2390,7 +2425,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.1
+Version: 1.2.3
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2404,4 +2439,6 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.3 | 2026-09-24 | Approved | §36 V1 health decisions: all record types closable (never deleted), active pregnancy/breastfeeding blocks gender correction away from FEMALE, deceased records stay historical but are excluded from current indicators, no minimum pregnancy/breastfeeding age |
+| 1.2.2 | 2026-09-24 | Approved | Added §36 "Health & Special-Needs Records (V1)": person-based types, FEMALE-only maternal records, duplicate-active rules, close-not-delete, derived indicators |
 | 1.2.1 | 2026-09-24 | Approved | Added §56 "Registration Date Independence": correcting `families.registration_date` does not cascade to membership or residence `started_at` |

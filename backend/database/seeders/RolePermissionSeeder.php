@@ -98,17 +98,13 @@ class RolePermissionSeeder extends Seeder
         'residence.change',
         'residence.view-history',
 
-        // §40 Health Permissions
-        'health.view',
-        'health.create',
-        'health.update',
-        'health.delete',
-
-        // §41 Disability Permissions
-        'disability.view',
-        'disability.create',
-        'disability.update',
-        'disability.delete',
+        // §40 Health Record Permissions (replaces the former health.* /
+        // disability.* names — one permission family for the unified,
+        // person-based health record; no delete in V1).
+        'health-record.view',
+        'health-record.create',
+        'health-record.update',
+        'health-record.close',
 
         // §42 Confidential Notes
         'case-note.view',
@@ -262,6 +258,11 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
+            'health-record.view',
+            'health-record.create',
+            'health-record.update',
+            'health-record.close',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -325,6 +326,11 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
+            'health-record.view',
+            'health-record.create',
+            'health-record.update',
+            'health-record.close',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -355,6 +361,11 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
+            'health-record.view',
+            'health-record.create',
+            'health-record.update',
+            'health-record.close',
             // View Family: Scope (grant + Data Scope constraint)
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)
@@ -377,12 +388,16 @@ class RolePermissionSeeder extends Seeder
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)
             'person.view',
+            // Health Records: view only (§40 V1 Role Assignment, AUTH-ADR-048)
+            'health-record.view',
         ],
         'SOCIAL_WORKER' => [
             // View Family: Scope (grant + Data Scope constraint)
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)
             'person.view',
+            // Health Records: view only (§40 V1 Role Assignment, AUTH-ADR-048)
+            'health-record.view',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)

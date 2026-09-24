@@ -2,7 +2,7 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2.3  
+**Version:** 1.2.4  
 **Status:** Approved  
 **Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System
@@ -920,19 +920,45 @@ must not automatically expose full National ID.
 
 ---
 
-# 40. Health Permissions
+# 40. Health Record Permissions
 
-Recommended:
+Approved 2026-09-24 (AUTH-ADR-048). These replace the former `health.*` and
+`disability.*` names, which were never assigned. They cover all V1 person
+health records (disability, chronic disease, pregnancy, breastfeeding;
+docs/02 §22):
 
 ```text
-health.view
+health-record.view
 
-health.create
+health-record.create
 
-health.update
+health-record.update     correct an existing record
 
-health.delete
+health-record.close      end an active record (sets ended_at)
 ```
+
+There is no delete permission. V1 has no hard delete of health records.
+
+## V1 Role Assignment
+
+```text
+health-record.view / .create / .update / .close
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+
+health-record.view only
+  REVIEWER
+  SOCIAL_WORKER
+
+no person-level health-record access
+  REPORTS_VIEWER   (may later receive aggregate-only reporting)
+  FAMILY_USER      (no health access in V1)
+```
+
+Health access never comes from `person.view` or `person.update`. Health data
+is returned only by the health-record endpoints, never by the generic family,
+person or search responses. It never includes the National ID.
 
 Family Portal health visibility is controlled separately.
 
@@ -940,17 +966,8 @@ Family Portal health visibility is controlled separately.
 
 # 41. Disability Permissions
 
-Recommended:
-
-```text
-disability.view
-
-disability.create
-
-disability.update
-
-disability.delete
-```
+Superseded in V1 by §40. Disability records are health records, governed by
+`health-record.*`.
 
 ---
 
@@ -2979,6 +2996,9 @@ View access does not automatically grant drill-down, export, or sensitive-field 
 
 ### AUTH-ADR-047
 `person.update` (basic Person data correction) is granted to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY in V1 (see §44). It never authorizes National ID viewing or editing, which require the separate, still-unassigned `person.national-id.*` permissions (§39).
+
+### AUTH-ADR-048
+Person health records are governed by `health-record.view/create/update/close` (§40), which replace the unassigned `health.*` / `disability.*` names. View: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER. Create/update/close: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY. REPORTS_VIEWER and FAMILY_USER have no person-level health access. There is no delete permission.
 ```
 
 ---
@@ -3103,6 +3123,8 @@ This is a baseline, not a substitute for explicit permissions.
 | View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
 | Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
 | Correct Basic Person Data | ✓ | ✓ | ✓ | — | — | — | — |
+| View Health Records | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Create/Correct/Close Health Records | ✓ | ✓ | ✓ | — | — | — | — |
 | View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
 | Correct Current Residence | ✓ | ✓ | Draft/limited | — | Limited | — | — |
 | Record Official Death | Permission | Permission | — | Policy | — | — | — |
@@ -3303,7 +3325,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.3
+Version: 1.2.4
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3317,6 +3339,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.4 | 2026-09-24 | Approved | Replaced `health.*` / `disability.*` with `health-record.view/create/update/close` (§40-41), health rows in §140, AUTH-ADR-048 |
 | 1.2.3 | 2026-09-24 | Approved | Added V1 role assignment for `person.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §44, the "Correct Basic Person Data" row in §140, and AUTH-ADR-047. National ID permissions unchanged |
 | 1.2.2 | 2026-09-23 | Approved | Added V1 role assignment for `residence.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) in §46, the "Correct Current Residence" row in §140, and AUTH-ADR-046 |
 | 1.2.1 | 2026-09-23 | Approved | Added V1 role assignment for `reference-data.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §56, the "View Reference Data" row in §140, and AUTH-ADR-045 |

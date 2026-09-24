@@ -59,10 +59,12 @@ export function EditDialogFooter({
   formId,
   isPending,
   onCancel,
+  submitLabel = "حفظ التعديلات",
 }: {
   formId: string;
   isPending: boolean;
   onCancel: () => void;
+  submitLabel?: string;
 }) {
   return (
     <DialogFooter>
@@ -70,7 +72,7 @@ export function EditDialogFooter({
         إلغاء
       </Button>
       <Button type="submit" form={formId} disabled={isPending}>
-        {isPending ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+        {isPending ? "جارٍ الحفظ..." : submitLabel}
       </Button>
     </DialogFooter>
   );

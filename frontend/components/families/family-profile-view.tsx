@@ -26,6 +26,7 @@ import { FamilyStatusBadge } from "@/components/families/family-status-badge";
 import { FamilyOverview } from "@/components/families/family-overview";
 import { FamilyMembersTable } from "@/components/families/family-members-table";
 import { FamilyResidenceTab } from "@/components/families/family-residence-tab";
+import { FamilyHealthTab } from "@/components/families/family-health-tab";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
@@ -225,6 +226,7 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
           <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger value="members">أفراد الأسرة</TabsTrigger>
           <TabsTrigger value="residence">السكن</TabsTrigger>
+          <TabsTrigger value="health">الحالة الصحية</TabsTrigger>
           {secondaryTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
@@ -242,6 +244,10 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
 
         <TabsContent value="residence" className="mt-4">
           <FamilyResidenceTab family={family} />
+        </TabsContent>
+
+        <TabsContent value="health" className="mt-4">
+          <FamilyHealthTab family={family} />
         </TabsContent>
 
         {secondaryTabs.map((tab) => (

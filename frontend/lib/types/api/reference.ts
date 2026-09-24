@@ -5,3 +5,10 @@ export interface RelationshipType {
   code: string;
   name: string;
 }
+
+// Type mirroring backend/app/Http/Resources/DisabilityTypeResource.php.
+export interface DisabilityType {
+  id: number;
+  code: string;
+  name: string;
+}

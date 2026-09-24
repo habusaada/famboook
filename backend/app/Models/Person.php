@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Gender;
 use App\Enums\LifeStatus;
+use App\Support\HealthRecordRules;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,12 @@ class Person extends Model
             if (blank($person->alternate_mobile)) {
                 $person->alternate_mobile_owner_relation = null;
             }
+
+            // Defense in depth for any write path (UpdatePersonRequest
+            // reports the same rule as a field error first).
+            if ($person->exists && $person->isDirty('gender') && $person->gender instanceof Gender) {
+                HealthRecordRules::assertGenderChangeAllowed($person, $person->gender);
+            }
         });
     }
 
@@ -58,6 +65,11 @@ class Person extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(FamilyMembership::class);
+    }
+
+    public function healthRecords(): HasMany
+    {
+        return $this->hasMany(PersonHealthRecord::class);
     }
 
     public function activeMembership(): HasOne

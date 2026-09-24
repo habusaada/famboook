@@ -49,8 +49,8 @@ class RolePermissionSeederTest extends TestCase
             'person.record-death',
             'family-membership.transfer',
             'residence.change',
-            'health.view',
-            'disability.view',
+            'health-record.view',
+            'health-record.close',
             'confidential-note.view',
             'assessment.approve',
             'need.close',
@@ -169,9 +169,11 @@ class RolePermissionSeederTest extends TestCase
         $socialWorker = User::factory()->create();
         $socialWorker->assignRole('SOCIAL_WORKER');
 
-        $this->assertFalse($socialWorker->hasPermissionTo('health.view'));
-        $this->assertFalse($socialWorker->hasPermissionTo('health.create'));
-        $this->assertFalse($socialWorker->hasPermissionTo('disability.view'));
+        // Health records: view only (docs/06 §40, AUTH-ADR-048).
+        $this->assertTrue($socialWorker->hasPermissionTo('health-record.view'));
+        $this->assertFalse($socialWorker->hasPermissionTo('health-record.create'));
+        $this->assertFalse($socialWorker->hasPermissionTo('health-record.update'));
+        $this->assertFalse($socialWorker->hasPermissionTo('health-record.close'));
         $this->assertFalse($socialWorker->hasPermissionTo('case-note.view'));
         $this->assertFalse($socialWorker->hasPermissionTo('confidential-note.view'));
         $this->assertFalse($socialWorker->hasPermissionTo('assessment.view'));
@@ -269,8 +271,6 @@ class RolePermissionSeederTest extends TestCase
 
         // SUPER_ADMIN does NOT receive a blanket grant: unresolved sensitive
         // and group-level permissions remain unassigned even for this role.
-        $this->assertFalse($superAdmin->hasPermissionTo('health.view'));
-        $this->assertFalse($superAdmin->hasPermissionTo('disability.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('confidential-note.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('person.national-id.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('assessment.approve'));
@@ -284,11 +284,12 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('workflow-history.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('audit.view-sensitive'));
 
-        // SUPER_ADMIN holds far fewer than the full 123-permission catalog,
+        // SUPER_ADMIN holds far fewer than the full 119-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 43 = previous 42 + residence.update (docs/06 §46, AUTH-ADR-046).
-        $this->assertSame(43, $superAdmin->getAllPermissions()->count());
+        // 47 = 42 + residence.update (AUTH-ADR-046)
+        //      + health-record.view/create/update/close (AUTH-ADR-048).
+        $this->assertSame(47, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -366,7 +367,7 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($familyUser->hasPermissionTo('user.suspend'));
         $this->assertFalse($familyUser->hasPermissionTo('system-admin.access'));
         $this->assertFalse($familyUser->hasPermissionTo('audit.view'));
-        $this->assertFalse($familyUser->hasPermissionTo('health.view'));
+        $this->assertFalse($familyUser->hasPermissionTo('health-record.view'));
         $this->assertFalse($familyUser->hasPermissionTo('confidential-note.view'));
     }
 
@@ -420,6 +421,41 @@ class RolePermissionSeederTest extends TestCase
             foreach (['person.national-id.view', 'person.national-id.view-masked', 'person.national-id.update'] as $permission) {
                 $this->assertFalse($user->hasPermissionTo($permission), "{$role} / {$permission}");
             }
+        }
+    }
+
+    public function test_health_record_permissions_follow_approved_matrix(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §40 V1 Role Assignment, AUTH-ADR-048.
+        $all = ['health-record.view', 'health-record.create', 'health-record.update', 'health-record.close'];
+        $expected = [
+            'SUPER_ADMIN' => $all,
+            'ADMINISTRATOR' => $all,
+            'DATA_ENTRY' => $all,
+            'REVIEWER' => ['health-record.view'],
+            'SOCIAL_WORKER' => ['health-record.view'],
+            'REPORTS_VIEWER' => [],
+            'FAMILY_USER' => [],
+        ];
+
+        foreach ($expected as $role => $granted) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            foreach ($all as $permission) {
+                $this->assertSame(
+                    in_array($permission, $granted, true),
+                    $user->hasPermissionTo($permission),
+                    "{$role} / {$permission}"
+                );
+            }
+        }
+
+        // The former health.* / disability.* names are gone from the catalog,
+        // and person permissions never imply health access.
+        foreach (['health.view', 'health.delete', 'disability.view', 'disability.delete'] as $old) {
+            $this->assertFalse(Permission::where('name', $old)->exists(), $old);
         }
     }
 }

@@ -2,9 +2,9 @@
 ## Database Architecture
 
 **Document:** `04-DATABASE.md`  
-**Version:** 1.2.1  
+**Version:** 1.2.2  
 **Status:** Approved  
-**Last Updated:** 2026-09-23  
+**Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System  
 **Database:** PostgreSQL 16+  
 **Backend:** Laravel 12
@@ -147,8 +147,8 @@ Registry
 Person Information
 ├── marital_statuses
 ├── person_health_profiles
-├── person_health_conditions
-├── person_disabilities
+├── person_health_records
+├── disability_types
 ├── person_education
 └── person_employment
 
@@ -730,58 +730,77 @@ Exact fields remain subject to health-domain requirements.
 
 ---
 
-# 27. Health Conditions
+# 27. Person Health Records
+
+Approved 2026-09-24 (see docs/02 §22). This replaces the separate
+`person_health_conditions` / `person_disabilities` proposals.
 
 ```text
-person_health_conditions
+person_health_records
 ```
 
-Recommended:
-
 ```text
-id
-person_id
-condition_type_id
-condition_name
-diagnosis_status
-started_at
-ended_at
-is_active
-notes
-created_by
-updated_by
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE             public API identifier
+person_id BIGINT NOT NULL FK persons.id (RESTRICT)
+type VARCHAR NOT NULL                 DISABILITY | CHRONIC_DISEASE | PREGNANCY | BREASTFEEDING
+disability_type_id BIGINT NULL FK disability_types.id (RESTRICT)
+condition_name VARCHAR NULL
+details TEXT NULL
+started_at DATE NULL
+ended_at DATE NULL                    NULL = active
+created_by BIGINT NULL FK users.id
+updated_by BIGINT NULL FK users.id
 created_at
 updated_at
 ```
 
-Multiple records per Person are allowed.
+Multiple records per Person are allowed. There is no hard delete in V1:
+records are closed by setting `ended_at`.
+
+Duplicate-active guards (partial unique indexes):
+
+```sql
+CREATE UNIQUE INDEX uq_health_active_maternal
+ON person_health_records (person_id, type)
+WHERE ended_at IS NULL AND type IN ('PREGNANCY', 'BREASTFEEDING');
+
+CREATE UNIQUE INDEX uq_health_active_disability
+ON person_health_records (person_id, disability_type_id)
+WHERE ended_at IS NULL AND type = 'DISABILITY';
+
+CREATE UNIQUE INDEX uq_health_active_chronic
+ON person_health_records (person_id, lower(condition_name))
+WHERE ended_at IS NULL AND type = 'CHRONIC_DISEASE';
+```
+
+PostgreSQL CHECK constraints:
+
+- `chk_health_record_type`: `type` is one of the four values.
+- `chk_health_record_shape`: DISABILITY has a `disability_type_id` and no
+  `condition_name`; CHRONIC_DISEASE has a `condition_name` and no
+  `disability_type_id`; PREGNANCY/BREASTFEEDING have neither.
+- `chk_health_record_dates`: `ended_at` is not before `started_at`.
+
+The application enforces the rules the database cannot:
+
+- pregnancy/breastfeeding are FEMALE-only;
+- the Person must be an active member of the Family (on create);
+- chronic-disease duplicates are compared after Arabic normalization.
+
+Family health indicators are derived, not stored (docs/02 §22).
 
 ---
 
-# 28. Disabilities
+# 28. Disability Types
 
 ```text
-person_disabilities
+disability_types
 ```
 
-Recommended:
-
-```text
-id
-person_id
-disability_type_id
-severity
-started_at
-ended_at
-is_active
-notes
-created_by
-updated_by
-created_at
-updated_at
-```
-
-Multiple records per Person are allowed.
+Same shape as `relationship_types` (§18): `code` (unique), `name`,
+`description`, `is_active`, `sort_order`, timestamps. V1 values are listed in
+docs/02 §22. Types are deactivated, never deleted, once used.
 
 ---
 
@@ -2264,9 +2283,9 @@ Initial order:
 
 08 person_health_profiles
 
-09 person_health_conditions
+09 disability_types
 
-10 person_disabilities
+10 person_health_records
 
 11 person_education
 
@@ -2828,6 +2847,7 @@ Whether marriage history requires a dedicated table.
 
 PDB-009
 Final health/disability reference tables.
+(V1: `disability_types` only, see §28. A condition taxonomy is still open.)
 
 PDB-010
 Final Assessment/form schema strategy.
@@ -2912,8 +2932,7 @@ families
 persons
   ├── person_relationships
   ├── person_health_profiles
-  ├── person_health_conditions
-  ├── person_disabilities
+  ├── person_health_records
   ├── person_education
   ├── person_employment
   ├── person_notes
@@ -3040,10 +3059,10 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.1
+Version: 1.2.2
 Status: APPROVED
 Database: PostgreSQL 16+
-Date: 2026-09-23
+Date: 2026-09-24
 ```
 
 ---
@@ -3055,6 +3074,7 @@ Date: 2026-09-23
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.2 | 2026-09-24 | Approved | Replaced the proposed `person_health_conditions` / `person_disabilities` with `person_health_records` (§27) and added `disability_types` (§28), with partial unique indexes and CHECK constraints |
 | 1.2.1 | 2026-09-23 | Approved | Added `persons.alternate_mobile_owner_relation`, `family_residences.original_residence_text` / `displacement_location_text` and displacement CHECK constraints (§24) |
 
 ---

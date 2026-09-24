@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DisabilityTypeResource;
 use App\Http\Resources\RelationshipTypeResource;
+use App\Models\DisabilityType;
 use App\Models\RelationshipType;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -16,5 +18,14 @@ class ReferenceController extends Controller
             ->get();
 
         return RelationshipTypeResource::collection($types);
+    }
+
+    public function disabilityTypes(): AnonymousResourceCollection
+    {
+        $types = DisabilityType::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        return DisabilityTypeResource::collection($types);
     }
 }
