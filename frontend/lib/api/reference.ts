@@ -4,10 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type {
   AssessmentDomain,
+  AssistanceCategory,
   DisabilityType,
   NeedCategory,
   RelationshipType,
 } from "@/lib/types/api/reference";
+
+// Active categories only (selectable for new Assistances).
+export function useAssistanceCategories() {
+  return useQuery({
+    queryKey: ["reference", "assistance-categories"],
+    queryFn: () =>
+      apiClient.get<{ data: AssistanceCategory[] }>("/api/v1/reference/assistance-categories"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Active categories only (selectable for new Needs).
 export function useNeedCategories() {

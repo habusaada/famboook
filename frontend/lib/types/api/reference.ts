@@ -24,6 +24,14 @@ export interface NeedCategory {
   sort_order: number;
 }
 
+// Type mirroring backend/app/Http/Resources/AssistanceCategoryResource.php.
+export interface AssistanceCategory {
+  code: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
 // Type mirroring backend/app/Http/Resources/DisabilityTypeResource.php.
 export interface DisabilityType {
   id: number;

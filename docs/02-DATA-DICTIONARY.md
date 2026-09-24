@@ -1506,7 +1506,122 @@ updated_at
 
 Assistance does not automatically imply that a Need has been resolved.
 
+**V1-A note (2026-09-24):** `assistance_records` remains the future
+**delivery** record (Assistance V1-B). It is not implemented yet. V1-A
+adds the program, planned items and nominations below (§36a–§36c).
+
+```text
+NEED         what a family/person needs                       (family_needs)
+ASSISTANCE   a defined program/campaign that can provide support (assistances)
+NOMINATION   a family/person selected as a POTENTIAL beneficiary (assistance_beneficiaries)
+DELIVERY     what was actually received                        (assistance_records — V1-B)
+```
+
+A nomination is never proof that assistance was received.
+
 ---
+
+# 36a. Assistance (Program / Campaign)
+
+Approved 2026-09-24 (Assistance V1-A, docs/03 §47a).
+
+## Entity
+
+```text
+assistances
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier |
+| `title` | yes | Program name (max 150), e.g. "حزمة إيواء طارئة" |
+| `assistance_category_id` | yes | Assistance Category (§36b) — what it is for |
+| `assistance_type` | yes | `IN_KIND` مساعدة عينية, `CASH` مساعدة نقدية, `SERVICE` خدمة — how it is provided |
+| `provider_name` | yes | Free text (max 150). No provider/organization management in V1-A |
+| `target_beneficiaries` | no | Planned target (positive integer). Nominee/approved/delivered counts are always derived, never stored |
+| `start_date`, `end_date` | no | Planned period (`end_date >= start_date`); not delivery dates |
+| `description` | no | Free text |
+| `status` | yes | `DRAFT` مسودة, `OPEN` مفتوحة, `COMPLETED` مكتملة, `CANCELLED` ملغاة |
+| `targeting_criteria` | no | Validated criteria snapshot (§36d); never preview results |
+| `opened_at`, `opened_by` | no | When/by whom DRAFT → OPEN happened |
+| `created_by`, `updated_by`, timestamps | — | |
+
+V1-A uses only DRAFT → OPEN; COMPLETED/CANCELLED exist for the schema and
+are reached in V1-B.
+
+## Assistance Items
+
+```text
+assistance_items
+```
+
+One or more planned items per Assistance, per beneficiary:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `item_name` | yes | e.g. "فرشة", "مساعدة نقدية", "جلسة علاج طبيعي" |
+| `quantity_per_beneficiary` | no | > 0, up to 2 decimals |
+| `unit` | no | Free text (max 30) |
+| `unit_value` | no | > 0, up to 2 decimals |
+| `currency` | with `unit_value` | `ILS`, `USD`, `JOD`, `EUR` — required iff `unit_value` is set. Not reference data |
+| `sort_order` | yes | Display order |
+
+Items are a planned definition only: never stock, inventory or delivered
+quantities.
+
+---
+
+# 36b. Assistance Categories
+
+```text
+assistance_categories
+```
+
+Reference data (`code`, `name`, `description`, `is_active`,
+`sort_order`), technically independent of `need_categories` although the
+V1 taxonomy is the same 14 codes: SHELTER المأوى والسكن, FOOD الغذاء,
+WATER المياه, HYGIENE النظافة والصرف الصحي, HEALTHCARE الرعاية الصحية,
+MEDICATION الأدوية, ASSISTIVE_DEVICE الأجهزة والمستلزمات المساعدة,
+EDUCATION التعليم, CASH المساعدة النقدية, CLOTHING الملابس, CHILDCARE
+احتياجات الأطفال, PROTECTION الحماية, LIVELIHOOD سبل العيش, OTHER أخرى.
+Deactivated, never deleted; the seeder never reactivates one. No
+administration UI in V1-A.
+
+---
+
+# 36c. Assistance Beneficiary (V1-A: Nominee)
+
+```text
+assistance_beneficiaries
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier |
+| `assistance_id` | yes | The Assistance |
+| `family_id` | yes | The nominated family (always set) |
+| `person_id` | no | NULL = family-level nominee; set = person-level nominee (active member when nominated) |
+| `source_need_id` | NEED only | The OPEN Need the nomination came from |
+| `nomination_source` | yes | `TARGETING`, `MANUAL`, `NEED` — stored at nomination, never inferred |
+| `targeting_criteria` | no | Criteria snapshot for TARGETING nominations (not a match result) |
+| `status` | yes | V1-A: `NOMINATED` (مرشح) or `REMOVED` (history-preserving withdrawal) |
+| `nominated_at`, `nominated_by` | yes | When/by whom |
+| `removed_at`, `removed_by` | no | Set when REMOVED |
+
+V1-B will add `APPROVED`, `REJECTED`, `NOT_DELIVERED` on the same rows.
+`DELIVERED` is never a nominee status: delivery is a separate record.
+
+---
+
+# 36d. Targeting Criteria (V1-A)
+
+Flat, explicitly approved keys (all optional): `min_family_members`,
+`max_family_members`, `displacement_status`, `displacement_location_text`,
+`has_child_under_two`, `min_children_under_two`, `has_pregnant_member`,
+`has_breastfeeding_member`, `has_member_with_disability`,
+`has_member_with_chronic_disease`, `need_category_code`,
+`need_priorities[]`, `assessment_domain_code`, `assessment_ratings[]`.
+Semantics: docs/03 §47b.
 
 # 37. Person Note
 
@@ -2124,9 +2239,9 @@ holds no previous/new values.
 | `family_id` | yes | The Family whose timeline this belongs to |
 | `actor_user_id` | no | Authenticated application user who performed the operation. Not the field researcher. NULL reserved for future system/import operations |
 | `event_type` | yes | Canonical event code (see docs/03 §97a) |
-| `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment` or `need` |
+| `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment`, `need` or `assistance_nominee` |
 | `subject_id` | no | Internal id of the subject record |
-| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment and Need events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities) |
+| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment, Need and nomination events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities) |
 | `created_at` | yes | When the operation happened |
 
 There is no `updated_at`: entries are never modified.
@@ -3205,7 +3320,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.7
+Version: 1.2.8
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3219,6 +3334,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.8 | 2026-09-24 | Approved | Assistance V1-A: Need/Assistance/Nomination/Delivery distinction, §36a `assistances` + items, §36b `assistance_categories`, §36c `assistance_beneficiaries` (nominees), §36d targeting criteria keys; `assistance_nominee` activity subject |
 | 1.2.7 | 2026-09-24 | Approved | Needs Management V1: §34 V1 `family_needs` fields, §34a `need_categories` (14 V1 categories), §35 V1 statuses OPEN/FULFILLED/CLOSED, `need` activity subject in §61a |
 | 1.2.6 | 2026-09-24 | Approved | Quick Multi-Domain Family Assessment V1: §27 V1 implementation fields, §27a `assessment_domains` (8 V1 domains), §27b `assessment_results` and rating scale (absence = not assessed), `assessment` activity subject in §61a |
 | 1.2.5 | 2026-09-24 | Approved | Added §61a "Family Activity" (Family Activity Log V1): fields, allow-listed metadata, actor ≠ researcher, no backfill; PDD-025 note |

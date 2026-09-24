@@ -12,6 +12,8 @@ import {
   HeartOff,
   MapPin,
   Tent,
+  UserCheck,
+  UserMinus,
   UserPen,
   UserPlus,
   type LucideIcon,
@@ -39,6 +41,8 @@ export const familyActivityPresentation: Record<
   NEED_UPDATED: { label: "تم تعديل احتياج", icon: HandHeart },
   NEED_FULFILLED: { label: "تمت تلبية احتياج", icon: CircleCheckBig },
   NEED_CLOSED: { label: "تم إغلاق احتياج", icon: CircleX },
+  ASSISTANCE_NOMINEE_ADDED: { label: "تم الترشيح لمساعدة", icon: UserCheck },
+  ASSISTANCE_NOMINEE_REMOVED: { label: "تمت إزالة الترشيح من مساعدة", icon: UserMinus },
 };
 
 export function formatActivityTime(iso: string): string {

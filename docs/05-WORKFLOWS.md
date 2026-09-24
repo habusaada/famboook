@@ -860,6 +860,33 @@ Audit
 Optionally Review Need Status
 ```
 
+The baseline above describes recording a **delivery** (Assistance V1-B).
+
+## V1-A: Program, Targeting and Nomination
+
+Approved 2026-09-24 (docs/03 §47a–§47c):
+
+```text
+Create Assistance (DRAFT, items)
+      ↓
+Edit definition / items / targeting criteria
+      ↓
+Open (DRAFT → OPEN, ≥ 1 item)
+      ↓
+Preview targeting (read-only, explicit)
+      ↓
+Human selection → Nominate (TARGETING / MANUAL / NEED)
+      ↓
+Optionally remove a NOMINATED candidate (history kept)
+```
+
+Domain Actions: `CreateAssistanceAction`, `UpdateAssistanceAction`,
+`OpenAssistanceAction`, `NominateFromTargetingAction`,
+`NominateManuallyAction`, `NominateFromNeedsAction`,
+`RemoveNomineeAction`. Approval, rejection, delivery and completion/
+cancellation belong to V1-B. Nominating from a Need never changes the
+Need.
+
 ---
 
 # 41. Document Workflow
@@ -2889,7 +2916,7 @@ PostgreSQL persists workflow state and history.
 ```text
 Project: Famboook
 Document: Workflows & State Transitions
-Version: 1.2.2
+Version: 1.2.3
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2905,3 +2932,4 @@ Date: 2026-09-24
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative workflow layer, clarified Next.js/Filament workflow boundaries, added semantic API actions, after-commit notifications, retry-safe background processing, queue derivation and expanded workflow testing/invariants |
 | 1.2.1 | 2026-09-24 | Approved | §35: V1 family assessment workflow DRAFT → COMPLETED only |
 | 1.2.2 | 2026-09-24 | Approved | §37: V1 Need workflow OPEN → FULFILLED / CLOSED |
+| 1.2.3 | 2026-09-24 | Approved | §40: Assistance V1-A workflow (definition, opening, targeting preview, nomination) |

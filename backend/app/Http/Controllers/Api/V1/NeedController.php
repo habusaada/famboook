@@ -108,7 +108,7 @@ class NeedController extends Controller
     }
 
     /**
-     * Simple V1 filters (status, priority, category, target) and the
+     * Simple V1 filters (status, priority, category, target, family) and the
      * default order: OPEN first, then URGENT → LOW, then newest.
      */
     private function filtered(Request $request, Builder $query): Builder
@@ -118,6 +118,7 @@ class NeedController extends Controller
             'priority' => ['sometimes', Rule::enum(NeedPriority::class)],
             'category' => ['sometimes', 'string', 'max:50'],
             'target' => ['sometimes', Rule::in(['family', 'person'])],
+            'family' => ['sometimes', 'string', 'max:50'],
         ]);
 
         return $query
@@ -127,6 +128,7 @@ class NeedController extends Controller
             ->when($filters['category'] ?? null, fn ($q, $code) => $q->whereHas('category', fn ($c) => $c->where('code', $code)))
             ->when(($filters['target'] ?? null) === 'family', fn ($q) => $q->whereNull('person_id'))
             ->when(($filters['target'] ?? null) === 'person', fn ($q) => $q->whereNotNull('person_id'))
+            ->when($filters['family'] ?? null, fn ($q, $code) => $q->whereHas('family', fn ($f) => $f->where('family_code', $code)))
             ->orderByRaw("CASE WHEN status = 'OPEN' THEN 0 ELSE 1 END")
             ->orderByRaw(NeedPriority::orderSql())
             ->orderByDesc('created_at')

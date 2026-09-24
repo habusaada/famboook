@@ -22,7 +22,7 @@ export const navItems: NavItem[] = [
   { href: "/people", label: "الأشخاص", icon: User },
   { href: "/assessments", label: "التقييمات", icon: ClipboardList },
   { href: "/needs", label: "الاحتياجات", icon: HeartHandshake },
-  { href: "/assistance", label: "المساعدات", icon: HandHeart },
+  { href: "/assistances", label: "المساعدات", icon: HandHeart },
   { href: "/reports", label: "التقارير", icon: BarChart3 },
   { href: "/administration", label: "الإدارة", icon: Settings },
 ];

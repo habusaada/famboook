@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\FamilyActivityType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FamilyActivityResource;
+use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
 use App\Models\FamilyNeed;
 use App\Models\PersonHealthRecord;
@@ -49,11 +50,20 @@ class FamilyActivityController extends Controller
                     array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::needCases()),
                 ),
             )
+            // And nomination events behind assistance.view.
+            ->when(
+                ! $request->user()->can('assistance.view'),
+                fn ($q) => $q->whereNotIn(
+                    'event_type',
+                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::assistanceCases()),
+                ),
+            )
             ->with([
                 'actor:id,name',
                 'subject' => fn (MorphTo $morph) => $morph->morphWith([
                     PersonHealthRecord::class => ['person'],
                     FamilyNeed::class => ['person'],
+                    AssistanceBeneficiary::class => ['person', 'assistance:id,title'],
                 ]),
             ])
             ->latest('created_at')

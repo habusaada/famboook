@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AssessmentDomainResource;
+use App\Http\Resources\AssistanceCategoryResource;
 use App\Http\Resources\DisabilityTypeResource;
 use App\Http\Resources\NeedCategoryResource;
 use App\Http\Resources\RelationshipTypeResource;
 use App\Models\AssessmentDomain;
+use App\Models\AssistanceCategory;
 use App\Models\DisabilityType;
 use App\Models\NeedCategory;
 use App\Models\RelationshipType;
@@ -63,5 +65,20 @@ class ReferenceController extends Controller
             ->get();
 
         return NeedCategoryResource::collection($categories);
+    }
+
+    /**
+     * Active categories only — the values selectable for new Assistances.
+     * Allowed with reference-data.view or assistance.view (docs/06 §50).
+     */
+    public function assistanceCategories(Request $request): AnonymousResourceCollection
+    {
+        abort_unless($request->user()->canAny(['reference-data.view', 'assistance.view']), 403);
+
+        $categories = AssistanceCategory::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        return AssistanceCategoryResource::collection($categories);
     }
 }

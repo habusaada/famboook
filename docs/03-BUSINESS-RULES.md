@@ -909,6 +909,127 @@ Need closure requires explicit workflow/business logic.
 
 ---
 
+# 47a. Assistance V1-A — Program Definition
+
+Approved 2026-09-24.
+
+```text
+NEED         what a family/person needs                       (family_needs)
+ASSISTANCE   a defined program/campaign that can provide support (assistances)
+NOMINATION   a family/person selected as a POTENTIAL beneficiary (assistance_beneficiaries)
+DELIVERY     what was actually received                        (assistance_records — V1-B)
+```
+
+V1-A implements ASSISTANCE, TARGETING and NOMINATION. Approval,
+rejection, delivery and distribution execution are **V1-B**. A
+nomination is never proof that assistance was received.
+
+- An Assistance has a title, an **Assistance Category** (what it is for),
+  an **Assistance Type** (`IN_KIND`, `CASH`, `SERVICE` — how it is
+  provided; independent of the category), a free-text **provider name**,
+  an optional planned **target count** and **planned period**
+  (`end_date >= start_date`; not delivery dates) and a description.
+- It has one or more planned **items** per beneficiary (quantity, unit,
+  optional value + currency ILS/USD/JOD/EUR; currency required iff a value
+  is given). Items are never stock or delivered amounts.
+- **Lifecycle V1-A:** created as `DRAFT`; `DRAFT → OPEN` requires at least
+  one item. DRAFT: everything editable (metadata, items, targeting
+  criteria). OPEN: nominees can be managed; only description, target
+  count and dates stay editable (409 otherwise). COMPLETED/CANCELLED are
+  reserved for V1-B. No deletion.
+- Nominee/approved/delivered counts are derived, never stored.
+
+---
+
+# 47b. Assistance Targeting (V1-A)
+
+- Targeting is **family-oriented** and uses only the approved criteria
+  (docs/02 §36d). There is no rules engine and no nested AND/OR groups.
+- **All supplied criteria combine with AND.** Within a multi-value
+  criterion (need priorities, assessment ratings) any value matches (OR).
+  Empty criteria = no filter; the Staff App still only previews on an
+  explicit request.
+- **Population:** ACTIVE, non-deleted families. "Members" are persons
+  with an ACTIVE membership who are not DECEASED (same population as the
+  health indicators, §36).
+- **Family size:** count of those members (`min`/`max`, `max >= min`).
+- **Displacement:** the current residence's `displacement_status`;
+  location = case-insensitive "contains" match on
+  `displacement_location_text` (no GIS).
+- **Children under two:** members whose birth date is ≤ today and after
+  today − 2 years (the Health indicator rule); `min_children_under_two`
+  requires at least N. `false` = no such child.
+- **Pregnancy / breastfeeding / disability / chronic disease:** an ACTIVE
+  health record of that type on a member. `true` = at least one; `false`
+  = none.
+- **Open Need:** at least one OPEN Need of the category (if given) with
+  one of the priorities (if given). Resolved Needs never qualify.
+- **Assessment:** for the given domain, the family's **most recent
+  COMPLETED assessment that rated that domain** (latest `assessment_date`,
+  then latest `completed_at`, then highest id); its rating must be one of
+  the given ratings (any rating if none given). DRAFT assessments are
+  never used. A later assessment that did not rate the domain does not
+  hide an earlier result for it.
+- **Preview** is derived on every request and **never stored** (no match
+  flags, no results). It writes no activity. It returns only safe summary
+  fields and minimal indicators for the criteria used (e.g. "يوجد حامل",
+  children-under-two count, matching open-need category/priority, matching
+  assessment domain/rating/date) — never disease names, disability
+  details, pregnancy notes, health details, National IDs, phone numbers,
+  assessment notes or need descriptions.
+- **Snapshot:** the validated criteria used for a targeting nomination are
+  stored on the Assistance (`targeting_criteria`) and on each TARGETING
+  nominee. While DRAFT the criteria can also be saved directly.
+- **Human selection is required.** Families are never nominated
+  automatically; there is no "nominate all matches".
+
+---
+
+# 47c. Assistance Nomination (V1-A)
+
+- A nominee is a family (family-level) or one person of that family
+  (person-level). Nominations require an OPEN Assistance.
+- **Sources** (stored, never inferred): `TARGETING` (selected rows of the
+  preview; family-level; each selected family is re-checked against the
+  submitted criteria server-side, and a non-matching selection rejects the
+  whole request), `MANUAL` (family or an ACTIVE member found by family
+  code, person code or name — National IDs are not searchable in V1-A),
+  `NEED` (from OPEN Needs: family-level or person-level following the
+  Need; `source_need_id` stored; the Need is **not** changed, fulfilled or
+  closed and no delivery is created).
+- **Duplicates:** within one Assistance a family-level nominee and a given
+  person can each be nominated at most once (partial unique indexes on
+  current rows). A family-level nomination and a person-level nomination
+  of a member of that family may coexist. The same family/person may be
+  nominated in different Assistances. Bulk nominations (targeting, needs)
+  skip existing nominees and report `created` / `skipped_duplicates`;
+  manual duplicates are rejected.
+- Nominations **persist** when family data later changes; they are never
+  removed automatically because a family no longer matches.
+- **Removal (V1-A):** while the Assistance is OPEN, a `NOMINATED` row can
+  be withdrawn. It is history-preserving: status `REMOVED` with
+  `removed_at`/`removed_by`; the row stays readable and the target may be
+  nominated again as a new row. Only NOMINATED rows can be removed, so
+  V1-B approval/delivery states will be protected.
+- **Activity:** `ASSISTANCE_NOMINEE_ADDED` / `ASSISTANCE_NOMINEE_REMOVED`
+  on the nominated family's timeline (§97a). Program-level definition and
+  opening are not family events (tracked by `created_by`, `updated_by`,
+  `opened_at`, `opened_by`).
+- **Privacy:** nominee responses show family code, household-head name,
+  person code/name and, for NEED nominations, the need's title, category,
+  priority and status — never its description, and never National IDs,
+  phone numbers or health/assessment content. Assistance data is not
+  included in Family, Person or Need responses and is not available to
+  REPORTS_VIEWER or FAMILY_USER in V1-A.
+
+Out of scope for V1-A: approval, rejection, delivery, distribution,
+delivered quantities/value/dates, inventory, partial fulfilment,
+automatic Need closure, automatic nomination, scoring/ranking/eligibility
+scores, rules engine, provider or currency management, reports, exports,
+signatures, attachments, Family Portal and Filament management.
+
+---
+
 # 48. Assistance Eligibility
 
 Famboook must not automatically infer aid eligibility solely from stored data unless a separately approved eligibility engine is introduced.
@@ -1697,7 +1818,16 @@ NEED_CREATED            new Need (§46a)
 NEED_UPDATED            open Need edited with changes
 NEED_FULFILLED          Need resolved as fulfilled
 NEED_CLOSED             Need closed with a reason
+ASSISTANCE_NOMINEE_ADDED    family/person nominated for an Assistance (§47c)
+ASSISTANCE_NOMINEE_REMOVED  nomination withdrawn (history kept)
 ```
+
+Nomination events are recorded on the nominated family's timeline with no
+metadata: never targeting criteria, matching reasons, health conditions,
+pregnancy, disability details, need descriptions or assessment content.
+The Assistance title and nominated person are resolved at read time. They
+are shown only to holders of `assistance.view`. Targeting previews and
+program-level edits create no family activity.
 
 Need events carry no metadata: never the description, closure reason,
 quantity, person medical information or assessment content. The Need
@@ -2654,7 +2784,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.6
+Version: 1.2.7
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2668,6 +2798,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.7 | 2026-09-24 | Approved | Added §47a–§47c "Assistance V1-A" (program definition, targeting semantics, nomination) and nomination events in §97a |
 | 1.2.6 | 2026-09-24 | Approved | Added §46a "Needs Management (V1)" and the NEED_* events in §97a |
 | 1.2.5 | 2026-09-24 | Approved | Added §40a "Quick Multi-Domain Family Assessment (V1)" and the ASSESSMENT_* events in §97a |
 | 1.2.4 | 2026-09-24 | Approved | Added §97a "Family Activity Log (V1)" and the §54 V1 decision that the paper-form review/signature section is not implemented literally |

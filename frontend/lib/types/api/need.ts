@@ -57,6 +57,8 @@ export interface NeedFilters {
   priority?: NeedPriority;
   category?: string;
   target?: "family" | "person";
+  // Exact family code (global queue only).
+  family?: string;
 }
 
 export interface NeedPayload {

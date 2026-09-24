@@ -185,7 +185,9 @@ class RolePermissionSeederTest extends TestCase
         // need.cancel stays unassigned.
         $this->assertTrue($socialWorker->hasPermissionTo('need.view'));
         $this->assertFalse($socialWorker->hasPermissionTo('need.cancel'));
-        $this->assertFalse($socialWorker->hasPermissionTo('assistance.view'));
+        // Assistance V1-A: view + nominate only (AUTH-ADR-052).
+        $this->assertTrue($socialWorker->hasPermissionTo('assistance.view'));
+        $this->assertFalse($socialWorker->hasPermissionTo('assistance.create'));
     }
 
     public function test_reports_viewer_can_view_family_person_dashboard_and_export_basic(): void
@@ -291,15 +293,16 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('workflow-history.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('audit.view-sensitive'));
 
-        // SUPER_ADMIN holds far fewer than the full 120-permission catalog,
+        // SUPER_ADMIN holds far fewer than the full 122-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 56 = 42 + residence.update (AUTH-ADR-046)
+        // 61 = 42 + residence.update (AUTH-ADR-046)
         //      + health-record.view/create/update/close (AUTH-ADR-048)
         //      + activity-log.view (AUTH-ADR-049)
         //      + assessment.view/create/update/complete (AUTH-ADR-050)
-        //      + need.view/create/update/close (AUTH-ADR-051).
-        $this->assertSame(56, $superAdmin->getAllPermissions()->count());
+        //      + need.view/create/update/close (AUTH-ADR-051)
+        //      + assistance.view/create/update/open/nominate (AUTH-ADR-052).
+        $this->assertSame(61, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -570,5 +573,38 @@ class RolePermissionSeederTest extends TestCase
         // No overlapping resolve permission and no delete permission in V1.
         $this->assertFalse(Permission::where('name', 'need.resolve')->exists());
         $this->assertFalse(Permission::where('name', 'need.delete')->exists());
+    }
+
+    public function test_assistance_permissions_follow_approved_matrix(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §50 V1-A Role Assignment, AUTH-ADR-052.
+        $all = ['assistance.view', 'assistance.create', 'assistance.update', 'assistance.open', 'assistance.nominate'];
+        $expected = [
+            'SUPER_ADMIN' => $all,
+            'ADMINISTRATOR' => $all,
+            'DATA_ENTRY' => ['assistance.view', 'assistance.create', 'assistance.update', 'assistance.nominate'],
+            'REVIEWER' => ['assistance.view'],
+            'SOCIAL_WORKER' => ['assistance.view', 'assistance.nominate'],
+            'REPORTS_VIEWER' => [],
+            'FAMILY_USER' => [],
+        ];
+
+        foreach ($expected as $role => $granted) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            foreach ($all as $permission) {
+                $this->assertSame(
+                    in_array($permission, $granted, true),
+                    $user->hasPermissionTo($permission),
+                    "{$role} / {$permission}"
+                );
+            }
+            // Delivery corrections belong to V1-B.
+            $this->assertFalse($user->hasPermissionTo('assistance.reverse'), "{$role} / assistance.reverse");
+        }
+
+        $this->assertFalse(Permission::where('name', 'assistance.delete')->exists());
     }
 }

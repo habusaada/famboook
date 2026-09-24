@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AssessmentController;
+use App\Http\Controllers\Api\V1\AssistanceController;
+use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
@@ -100,6 +102,49 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/needs/{need}/close', [NeedController::class, 'close'])
         ->middleware('can:need.close');
+
+    // Assistance V1-A (docs/06 §50): program definition, targeting and
+    // nomination. No delete endpoints; approval/delivery belong to V1-B.
+    Route::get('/assistances', [AssistanceController::class, 'index'])
+        ->middleware('can:assistance.view');
+
+    Route::post('/assistances', [AssistanceController::class, 'store'])
+        ->middleware('can:assistance.create');
+
+    Route::get('/assistances/{assistance}', [AssistanceController::class, 'show'])
+        ->middleware('can:assistance.view');
+
+    Route::patch('/assistances/{assistance}', [AssistanceController::class, 'update'])
+        ->middleware('can:assistance.update');
+
+    Route::post('/assistances/{assistance}/open', [AssistanceController::class, 'open'])
+        ->middleware('can:assistance.open');
+
+    // Read-only preview: persists nothing.
+    Route::post('/assistances/{assistance}/targeting-preview', [AssistanceNomineeController::class, 'preview'])
+        ->middleware('can:assistance.nominate');
+
+    Route::get('/assistances/{assistance}/nominees', [AssistanceNomineeController::class, 'index'])
+        ->middleware('can:assistance.view');
+
+    Route::get('/assistances/{assistance}/nominee-candidates', [AssistanceNomineeController::class, 'candidates'])
+        ->middleware('can:assistance.nominate');
+
+    Route::post('/assistances/{assistance}/nominees/manual', [AssistanceNomineeController::class, 'manual'])
+        ->middleware('can:assistance.nominate');
+
+    Route::post('/assistances/{assistance}/nominees/from-needs', [AssistanceNomineeController::class, 'fromNeeds'])
+        ->middleware('can:assistance.nominate');
+
+    Route::post('/assistances/{assistance}/nominees/from-targeting', [AssistanceNomineeController::class, 'fromTargeting'])
+        ->middleware('can:assistance.nominate');
+
+    // History-preserving withdrawal (status REMOVED), not a DELETE.
+    Route::post('/assistances/{assistance}/nominees/{nominee}/remove', [AssistanceNomineeController::class, 'remove'])
+        ->middleware('can:assistance.nominate');
+
+    // reference-data.view OR assistance.view (checked in the controller).
+    Route::get('/reference/assistance-categories', [ReferenceController::class, 'assistanceCategories']);
 
     // reference-data.view OR need.view (checked in the controller).
     Route::get('/reference/need-categories', [ReferenceController::class, 'needCategories']);

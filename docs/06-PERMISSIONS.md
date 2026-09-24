@@ -1254,10 +1254,46 @@ assistance.create
 
 assistance.update
 
+assistance.open
+
+assistance.nominate
+
 assistance.reverse
 ```
 
 Deletion of Assistance should generally be avoided if it represents an actual historical event.
+
+## V1-A Role Assignment
+
+Approved 2026-09-24 (Assistance V1-A, AUTH-ADR-052).
+
+`assistance.open` (DRAFT → OPEN) and `assistance.nominate` (targeting
+preview, candidate search, all nominations and nominee removal) were
+added: the catalog had no equivalent, and nominating must be grantable
+without the right to edit program definitions. `assistance.reverse`
+remains for V1-B delivery corrections and is unassigned.
+
+```text
+assistance.view       SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER, REVIEWER
+assistance.create     SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY
+assistance.update     SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY
+assistance.open       SUPER_ADMIN, ADMINISTRATOR
+assistance.nominate   SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER
+```
+
+- SOCIAL_WORKER: view, targeting preview and nomination; no definition
+  editing.
+- DATA_ENTRY: definitions and nomination; opening a program is left to
+  administrators.
+- REVIEWER: view only (including nominees).
+- REPORTS_VIEWER and FAMILY_USER: no Assistance access in V1-A.
+- No assistance delete permission.
+- `GET /reference/assistance-categories` accepts `reference-data.view` or
+  `assistance.view`.
+- Nomination Activity Log events require `assistance.view` in addition to
+  `activity-log.view`.
+- Targeting evaluates sensitive data server-side; the preview exposes only
+  minimal indicators (docs/03 §47b).
 
 ---
 
@@ -3113,6 +3149,9 @@ Family assessments V1 (§47): `assessment.view` for SUPER_ADMIN, ADMINISTRATOR, 
 
 ### AUTH-ADR-051
 Needs V1 (§49): `need.view` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER; `need.create/update/close` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER. `need.close` authorizes both fulfil and close; `need.cancel` stays unassigned and no `need.resolve` is added. REPORTS_VIEWER and FAMILY_USER have no Need access in V1. No delete permission exists. The need-category reference endpoint accepts `reference-data.view` or `need.view`.
+
+### AUTH-ADR-052
+Assistance V1-A (§50) adds `assistance.open` and `assistance.nominate` (no equivalent existed; nominating must be separable from editing definitions). View: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER, REVIEWER. Create/update: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY. Open: SUPER_ADMIN, ADMINISTRATOR. Nominate (incl. targeting preview and removal): SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER. `assistance.reverse` stays unassigned for V1-B. REPORTS_VIEWER and FAMILY_USER have no access. No delete permission.
 ```
 
 ---
@@ -3251,6 +3290,10 @@ This is a baseline, not a substitute for explicit permissions.
 | View Needs (V1) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | Create/Update/Fulfil/Close Needs (V1) | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | Assistance | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| View Assistance Programs & Nominees (V1-A) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Create/Update Assistance Definition (V1-A) | ✓ | ✓ | ✓ | — | — | — | — |
+| Open Assistance (V1-A) | ✓ | ✓ | — | — | — | — | — |
+| Targeting Preview & Nomination (V1-A) | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | Review Change Request | Permission | ✓ | — | ✓ | Policy | — | — |
 | Approve Change Request | Permission | Permission | — | Permission | Policy | — | — |
 | Apply Change Request | Permission | Permission | — | Permission | Policy | — | — |
@@ -3444,7 +3487,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.7
+Version: 1.2.8
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3458,6 +3501,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.8 | 2026-09-24 | Approved | §50: added `assistance.open` / `assistance.nominate` and the V1-A role assignment, V1-A rows in §140, AUTH-ADR-052 |
 | 1.2.7 | 2026-09-24 | Approved | §49 V1 Role Assignment for `need.view/create/update/close` (`need.close` covers fulfil and close), V1 Need rows in §140, AUTH-ADR-051 |
 | 1.2.6 | 2026-09-24 | Approved | §47 V1 Role Assignment for `assessment.view/create/update/complete`, V1 assessment rows in §140, AUTH-ADR-050 |
 | 1.2.5 | 2026-09-24 | Approved | Added `activity-log.view` (§57a) with V1 role assignment, the "View Family Activity Log" row in §140, and AUTH-ADR-049 |

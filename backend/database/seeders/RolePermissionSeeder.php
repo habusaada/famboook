@@ -23,7 +23,7 @@ use Spatie\Permission\PermissionRegistrar;
  * NOT given a baseline grant, since no example in the document shows a role
  * routinely holding a permission whose only qualifier is "Policy".
  *
- * Capability-group rows (Assistance, Manage Users/Roles,
+ * Capability-group rows (Manage Users/Roles,
  * System Settings, etc.) that summarize multiple catalog permissions under
  * one matrix cell are deliberately left unassigned at the granular level:
  * the group-level intent may be clear, but which specific sub-permissions
@@ -32,7 +32,8 @@ use Spatie\Permission\PermissionRegistrar;
  * resolved to granular V1 grants by AUTH-ADR-050 (§47); assessment.review/
  * verify/approve remain unassigned. The Needs row was resolved by
  * AUTH-ADR-051 (§49): need.close governs both fulfil and close in V1;
- * need.cancel remains unassigned.
+ * need.cancel remains unassigned. The Assistance row was resolved for
+ * V1-A by AUTH-ADR-052 (§50); assistance.reverse remains unassigned.
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -143,10 +144,13 @@ class RolePermissionSeeder extends Seeder
         'need.close',
         'need.cancel',
 
-        // §50 Assistance Permissions
+        // §50 Assistance Permissions (open/nominate added for V1-A,
+        // AUTH-ADR-052; reverse stays for V1-B delivery corrections)
         'assistance.view',
         'assistance.create',
         'assistance.update',
+        'assistance.open',
+        'assistance.nominate',
         'assistance.reverse',
 
         // §51 Document Permissions
@@ -283,6 +287,12 @@ class RolePermissionSeeder extends Seeder
             'need.create',
             'need.update',
             'need.close',
+            // Assistance V1-A (§50 V1-A Role Assignment, AUTH-ADR-052)
+            'assistance.view',
+            'assistance.create',
+            'assistance.update',
+            'assistance.open',
+            'assistance.nominate',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -363,6 +373,12 @@ class RolePermissionSeeder extends Seeder
             'need.create',
             'need.update',
             'need.close',
+            // Assistance V1-A (§50 V1-A Role Assignment, AUTH-ADR-052)
+            'assistance.view',
+            'assistance.create',
+            'assistance.update',
+            'assistance.open',
+            'assistance.nominate',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -414,6 +430,11 @@ class RolePermissionSeeder extends Seeder
             'need.create',
             'need.update',
             'need.close',
+            // Assistance V1-A (§50 V1-A Role Assignment, AUTH-ADR-052)
+            'assistance.view',
+            'assistance.create',
+            'assistance.update',
+            'assistance.nominate',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
@@ -440,6 +461,8 @@ class RolePermissionSeeder extends Seeder
             'assessment.view',
             // Needs: view only (§49 V1 Role Assignment, AUTH-ADR-051)
             'need.view',
+            // Assistance V1-A: view only (§50 V1-A Role Assignment, AUTH-ADR-052)
+            'assistance.view',
         ],
         'SOCIAL_WORKER' => [
             // View Family: Scope (grant + Data Scope constraint)
@@ -460,6 +483,9 @@ class RolePermissionSeeder extends Seeder
             'need.create',
             'need.update',
             'need.close',
+            // Assistance V1-A (§50 V1-A Role Assignment, AUTH-ADR-052)
+            'assistance.view',
+            'assistance.nominate',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)

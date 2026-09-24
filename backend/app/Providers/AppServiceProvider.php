@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Assessment;
+use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
 use App\Models\FamilyNeed;
 use App\Models\FamilyResidence;
@@ -36,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
             'health_record' => PersonHealthRecord::class,
             'assessment' => Assessment::class,
             'need' => FamilyNeed::class,
+            'assistance_nominee' => AssistanceBeneficiary::class,
         ]);
     }
 }

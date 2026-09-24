@@ -1521,6 +1521,113 @@ created_at
 updated_at
 ```
 
+`assistance_records` is the future **delivery** record (Assistance V1-B)
+and is not implemented yet.
+
+---
+
+# 48a. Assistances (V1-A)
+
+Approved 2026-09-24 (docs/03 §47a).
+
+```text
+assistances
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE                 public API identifier / route key
+title VARCHAR(150) NOT NULL
+assistance_category_id BIGINT NOT NULL FK assistance_categories.id (RESTRICT)
+assistance_type VARCHAR NOT NULL          IN_KIND | CASH | SERVICE
+provider_name VARCHAR(150) NOT NULL
+target_beneficiaries INTEGER NULL         > 0
+start_date DATE NULL
+end_date DATE NULL                        >= start_date
+description TEXT NULL
+status VARCHAR NOT NULL                   DRAFT | OPEN | COMPLETED | CANCELLED
+targeting_criteria JSON NULL              validated criteria snapshot
+opened_at TIMESTAMP NULL
+opened_by BIGINT NULL FK users.id (SET NULL)
+created_by / updated_by BIGINT NULL FK users.id (SET NULL)
+created_at, updated_at
+INDEX (status, created_at)
+
+assistance_items
+id BIGINT PK
+assistance_id BIGINT NOT NULL FK assistances.id (CASCADE)
+item_name VARCHAR(150) NOT NULL
+quantity_per_beneficiary DECIMAL(12,2) NULL  > 0
+unit VARCHAR(30) NULL
+unit_value DECIMAL(12,2) NULL                > 0
+currency VARCHAR(3) NULL                     ILS | USD | JOD | EUR, iff unit_value
+sort_order INTEGER NOT NULL
+created_at, updated_at
+```
+
+PostgreSQL CHECK constraints enforce the status/type values, the date
+order, the positive target and the item value/currency rules. Items are
+replaced as a set while DRAFT and locked once OPEN. The Assistance model
+refuses deletion.
+
+---
+
+# 48b. Assistance Categories
+
+```text
+assistance_categories   (id, code UNIQUE, name, description, is_active, sort_order, timestamps)
+```
+
+Same shape as the other reference tables; 14 V1 codes seeded idempotently
+(docs/02 §36b); never reactivates a deactivated one.
+
+---
+
+# 48c. Assistance Beneficiaries (V1-A: nominees)
+
+```text
+assistance_beneficiaries
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE
+assistance_id BIGINT NOT NULL FK assistances.id (RESTRICT)
+family_id BIGINT NOT NULL FK families.id (RESTRICT)
+person_id BIGINT NULL FK persons.id (RESTRICT)          NULL = family-level
+source_need_id BIGINT NULL FK family_needs.id (RESTRICT)
+nomination_source VARCHAR NOT NULL                     TARGETING | MANUAL | NEED
+targeting_criteria JSON NULL                           TARGETING snapshot
+status VARCHAR NOT NULL                                NOMINATED | REMOVED (V1-B: APPROVED, REJECTED, NOT_DELIVERED)
+nominated_at TIMESTAMP NOT NULL
+nominated_by BIGINT NULL FK users.id (SET NULL)
+removed_at TIMESTAMP NULL
+removed_by BIGINT NULL FK users.id (SET NULL)
+created_at, updated_at
+
+UNIQUE (assistance_id, family_id) WHERE person_id IS NULL AND status <> 'REMOVED'
+UNIQUE (assistance_id, person_id) WHERE person_id IS NOT NULL AND status <> 'REMOVED'
+CHECK source values; (status = 'NOMINATED') ⇔ removed_at IS NULL;
+      (nomination_source = 'NEED') ⇔ source_need_id IS NOT NULL      (PostgreSQL)
+```
+
+Rows are never deleted (the model refuses); removal sets REMOVED.
+
+API (`/api/v1`):
+
+```text
+GET   /assistances                                   assistance.view      filters status, category, type
+POST  /assistances                                   assistance.create    DRAFT with items
+GET   /assistances/{uuid}                            assistance.view
+PATCH /assistances/{uuid}                            assistance.update    DRAFT: all; OPEN: description/target/dates
+POST  /assistances/{uuid}/open                       assistance.open      DRAFT → OPEN (≥ 1 item)
+POST  /assistances/{uuid}/targeting-preview          assistance.nominate  read-only, paginated
+GET   /assistances/{uuid}/nominees                   assistance.view      include_removed; derived summary
+GET   /assistances/{uuid}/nominee-candidates         assistance.nominate  search by family/person code or name
+POST  /assistances/{uuid}/nominees/manual            assistance.nominate
+POST  /assistances/{uuid}/nominees/from-needs        assistance.nominate
+POST  /assistances/{uuid}/nominees/from-targeting    assistance.nominate
+POST  /assistances/{uuid}/nominees/{uuid}/remove     assistance.nominate  history-preserving
+GET   /reference/assistance-categories               reference-data.view OR assistance.view
+```
+
+No DELETE endpoints. The global Needs queue (`GET /needs`) also accepts
+an exact `family` code filter (used when nominating from Needs).
+
 ---
 
 # 49. Person Notes
@@ -1819,7 +1926,7 @@ uuid UUID NOT NULL UNIQUE             public API identifier
 family_id BIGINT NOT NULL FK families.id (RESTRICT)
 actor_user_id BIGINT NULL FK users.id (SET NULL)
 event_type VARCHAR NOT NULL
-subject_type VARCHAR NULL             morph map: family | person | residence | health_record | assessment | need
+subject_type VARCHAR NULL             morph map: family | person | residence | health_record | assessment | need | assistance_nominee
 subject_id BIGINT NULL
 metadata JSON NULL                    allow-listed keys only
 created_at TIMESTAMP NOT NULL
@@ -3252,7 +3359,7 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.5
+Version: 1.2.6
 Status: APPROVED
 Database: PostgreSQL 16+
 Date: 2026-09-24
@@ -3267,6 +3374,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.6 | 2026-09-24 | Approved | Assistance V1-A: `assistances`, `assistance_items` (§48a), `assistance_categories` (§48b), `assistance_beneficiaries` (§48c) and API; `assistance_nominee` activity subject |
 | 1.2.5 | 2026-09-24 | Approved | Added the V1 `family_needs` implementation (§47) and `need_categories` (§47a); `need` activity subject (§59a) |
 | 1.2.4 | 2026-09-24 | Approved | Added the V1 `assessments` / `assessment_results` implementation (§31) and `assessment_domains` (§31a); `assessment` activity subject (§59a) |
 | 1.2.3 | 2026-09-24 | Approved | Added `family_activities` (§59a, Family Activity Log V1): append-only, allow-listed metadata, transactional with Domain Actions, no backfill |
