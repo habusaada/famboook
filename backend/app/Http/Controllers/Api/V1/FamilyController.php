@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\RegisterFamilyAction;
+use App\Actions\UpdateFamilyAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\RegisterFamilyRequest;
+use App\Http\Requests\Api\V1\UpdateFamilyRequest;
 use App\Http\Resources\FamilyDetailResource;
 use App\Http\Resources\FamilySummaryResource;
 use App\Models\Family;
@@ -46,6 +48,13 @@ class FamilyController extends Controller
     public function show(Family $family): FamilyDetailResource
     {
         $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence']);
+
+        return new FamilyDetailResource($family);
+    }
+
+    public function update(UpdateFamilyRequest $request, Family $family, UpdateFamilyAction $action): FamilyDetailResource
+    {
+        $family = $action->handle($family, $request->validated(), $request->user()?->id);
 
         return new FamilyDetailResource($family);
     }

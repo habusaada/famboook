@@ -23,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/families/{family}', [FamilyController::class, 'show'])
         ->middleware('can:family.view');
 
+    Route::patch('/families/{family}', [FamilyController::class, 'update'])
+        ->middleware('can:family.update');
+
     Route::patch('/families/{family}/residence', [FamilyResidenceController::class, 'update'])
         ->middleware('can:residence.update');
 

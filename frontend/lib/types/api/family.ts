@@ -127,6 +127,15 @@ export interface RegisterFamilyPayload {
   };
 }
 
+// Partial payload for PATCH /api/v1/families/{family}
+// (backend/app/Http/Requests/Api/V1/UpdateFamilyRequest.php). Basic
+// registration metadata only; code, status and head are not editable.
+export interface UpdateFamilyPayload {
+  registration_date?: string;
+  paper_form_no?: string | null;
+  notes?: string | null;
+}
+
 // Partial payload for PATCH /api/v1/families/{family}/residence
 // (backend/app/Http/Requests/Api/V1/UpdateFamilyResidenceRequest.php).
 // Only the fields sent are changed.

@@ -260,11 +260,7 @@ class RolePermissionSeeder extends Seeder
             // View/Create Person ✓
             'person.view',
             'person.create',
-            // person.update: no matrix row exists for this capability
-            // (see the RBAC review, 2026-09-22). Granted to SUPER_ADMIN
-            // only, as a minimal, explicitly-reported addition so the
-            // basic Person-edit endpoint (Family Members Management
-            // slice) is usable — not derived from the documented matrix.
+            // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
@@ -327,6 +323,8 @@ class RolePermissionSeeder extends Seeder
             // View/Create Person ✓
             'person.view',
             'person.create',
+            // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
+            'person.update',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -355,6 +353,8 @@ class RolePermissionSeeder extends Seeder
             'family.create',
             // Create Person ✓
             'person.create',
+            // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
+            'person.update',
             // View Family: Scope (grant + Data Scope constraint)
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)

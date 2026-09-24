@@ -264,8 +264,7 @@ class RolePermissionSeederTest extends TestCase
         $this->assertTrue($superAdmin->hasPermissionTo('system-admin.access'));
         $this->assertTrue($superAdmin->hasPermissionTo('audit.view'));
 
-        // person.update: added for the Family Members Management slice
-        // (no matrix row; explicitly reported, SUPER_ADMIN-only grant).
+        // Correct Basic Person Data (docs/06 §44, AUTH-ADR-047).
         $this->assertTrue($superAdmin->hasPermissionTo('person.update'));
 
         // SUPER_ADMIN does NOT receive a blanket grant: unresolved sensitive
@@ -388,6 +387,39 @@ class RolePermissionSeederTest extends TestCase
             $user = User::factory()->create();
             $user->assignRole($role);
             $this->assertFalse($user->hasPermissionTo('residence.update'), $role);
+        }
+    }
+
+    public function test_person_update_is_granted_only_to_approved_roles(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §44 V1 Role Assignment, AUTH-ADR-047.
+        foreach (['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            $this->assertTrue($user->hasPermissionTo('person.update'), $role);
+        }
+
+        foreach (['REVIEWER', 'SOCIAL_WORKER', 'REPORTS_VIEWER', 'FAMILY_USER'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            $this->assertFalse($user->hasPermissionTo('person.update'), $role);
+        }
+    }
+
+    public function test_person_update_does_not_carry_national_id_permissions(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // National ID stays behind its own, still-unassigned permissions
+        // (docs/06 §39); person.update never implies them.
+        foreach (['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY', 'REVIEWER', 'SOCIAL_WORKER', 'REPORTS_VIEWER', 'FAMILY_USER'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            foreach (['person.national-id.view', 'person.national-id.view-masked', 'person.national-id.update'] as $permission) {
+                $this->assertFalse($user->hasPermissionTo($permission), "{$role} / {$permission}");
+            }
         }
     }
 }

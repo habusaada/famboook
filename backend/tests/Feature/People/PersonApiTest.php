@@ -206,7 +206,7 @@ class PersonApiTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $user = User::factory()->create();
-        $user->assignRole('DATA_ENTRY'); // has person.create but not person.update
+        $user->assignRole('SOCIAL_WORKER'); // has person.view but not person.update (docs/06 §44)
         [$person] = $this->personWithMembership();
 
         $response = $this->actingAs($user)->patchJson("/api/v1/people/{$person->person_code}", [

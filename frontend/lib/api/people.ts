@@ -28,6 +28,9 @@ export function useUpdatePerson(personCode: string) {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["people", personCode] });
+      // Person data (e.g. the household head's name) also appears in
+      // family views; ["families"] prefix-matches every family query.
+      queryClient.invalidateQueries({ queryKey: ["families"] });
     },
   });
 }

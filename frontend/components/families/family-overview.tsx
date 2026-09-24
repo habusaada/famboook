@@ -1,12 +1,19 @@
+"use client";
+
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EditFamilyRegistrationDialog } from "@/components/families/edit-family-registration-dialog";
+import { EditPersonDialog } from "@/components/people/edit-person-dialog";
+import { usePerson } from "@/lib/api/people";
 import type { FamilyDetail } from "@/lib/types/api/family";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
+import { lifeStatusLabel } from "@/lib/utils/life-status";
 
 const registrationSourceLabels: Record<string, string> = {
   PAPER_FORM: "نموذج ورقي",
@@ -36,6 +43,10 @@ export function InfoRow({
 
 export function FamilyOverview({ family }: { family: FamilyDetail }) {
   const head = family.members.find((m) => m.is_household_head);
+  // The head is a Person: contact details, life status and the edit
+  // dialog come from the existing Person endpoint.
+  const { data: headPersonData } = usePerson(head?.person_code ?? "");
+  const headPerson = headPersonData?.data;
 
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -43,6 +54,9 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
         <CardHeader>
           <CardTitle>معلومات التسجيل</CardTitle>
           <CardDescription>بيانات تسجيل الأسرة في السجل</CardDescription>
+          <CardAction>
+            <EditFamilyRegistrationDialog family={family} />
+          </CardAction>
         </CardHeader>
         <CardContent>
           {family.registration_date && (
@@ -84,6 +98,15 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
         <CardHeader>
           <CardTitle>رب الأسرة</CardTitle>
           <CardDescription>الشخص المسؤول عن الأسرة حالياً</CardDescription>
+          {headPerson && (
+            <CardAction>
+              <EditPersonDialog
+                person={headPerson}
+                title="تعديل بيانات رب الأسرة"
+                description="تصحيح البيانات الأساسية لرب الأسرة الحالي. لا يغيّر من هو رب الأسرة ولا عضوية الأسرة."
+              />
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
           {head ? (
@@ -96,6 +119,23 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
               />
               {head.birth_date && (
                 <InfoRow label="تاريخ الميلاد" value={head.birth_date} ltr />
+              )}
+              {headPerson && (
+                <>
+                  <InfoRow label="الحالة" value={lifeStatusLabel(headPerson.life_status)} />
+                  {headPerson.mobile && (
+                    <InfoRow label="الجوال الأساسي" value={headPerson.mobile} ltr />
+                  )}
+                  {headPerson.alternate_mobile && (
+                    <InfoRow label="الجوال البديل" value={headPerson.alternate_mobile} ltr />
+                  )}
+                  {headPerson.alternate_mobile && headPerson.alternate_mobile_owner_relation && (
+                    <InfoRow
+                      label="صاحب الرقم البديل / صلته"
+                      value={headPerson.alternate_mobile_owner_relation}
+                    />
+                  )}
+                </>
               )}
             </>
           ) : (

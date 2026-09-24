@@ -41,4 +41,5 @@ export interface UpdatePersonPayload {
   birth_date?: string | null;
   mobile?: string | null;
   alternate_mobile?: string | null;
+  alternate_mobile_owner_relation?: string | null;
 }

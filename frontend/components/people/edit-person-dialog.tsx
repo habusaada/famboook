@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Pencil } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,14 +14,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  EditDialogFooter,
+  EditTrigger,
+  FieldError,
+  FieldLabel,
+  SaveError,
+} from "@/components/shared/edit-dialog-parts";
 import { useUpdatePerson } from "@/lib/api/people";
-import { ApiError } from "@/lib/api/client";
+import { useGuardedSave } from "@/lib/hooks/use-guarded-save";
 import {
   editPersonSchema,
   personApiFieldToFormField,
@@ -33,124 +33,97 @@ import {
   type EditPersonValues,
 } from "@/lib/schemas/edit-person";
 import type { PersonDetail } from "@/lib/types/api/person";
+import { lifeStatusLabel } from "@/lib/utils/life-status";
 
-export function EditPersonDialog({ person }: { person: PersonDetail }) {
-  const [open, setOpen] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const updatePerson = useUpdatePerson(person.person_code);
+function formValues(person: PersonDetail): EditPersonValues {
+  return {
+    fullName: person.full_name,
+    gender: person.gender,
+    birthDate: person.birth_date ?? "",
+    mobile: person.mobile ?? "",
+    alternateMobile: person.alternate_mobile ?? "",
+    alternateMobileOwnerRelation: person.alternate_mobile_owner_relation ?? "",
+  };
+}
 
+/**
+ * Basic Person correction through PATCH /api/v1/people/{person}. Used on
+ * the Person Profile and, for the current household head, on the Family
+ * Profile — it never changes who the head is or any membership.
+ *
+ * Not editable here, by design:
+ * - National ID: needs person.national-id.update (docs/06 §39), which no
+ *   role holds yet, and the API does not expose it — so it isn't shown.
+ * - Life status: recording death is a controlled operation (docs/03 §30,
+ *   §16), so it is shown read-only.
+ */
+export function EditPersonDialog({
+  person,
+  title = "تعديل بيانات الشخص",
+  description = "تعديل البيانات الأساسية فقط. لا يشمل تغيير رب الأسرة أو نقل العضوية.",
+}: {
+  person: PersonDetail;
+  title?: string;
+  description?: string;
+}) {
   const {
     register,
     control,
     handleSubmit,
     reset,
+    setValue,
     setError,
     formState: { errors },
   } = useForm<EditPersonValues>({
     resolver: zodResolver(editPersonSchema),
-    defaultValues: {
-      fullName: person.full_name,
-      gender: person.gender,
-      birthDate: person.birth_date ?? "",
-      mobile: person.mobile ?? "",
-      alternateMobile: person.alternate_mobile ?? "",
-    },
+    defaultValues: formValues(person),
   });
-
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (next) {
-      reset({
-        fullName: person.full_name,
-        gender: person.gender,
-        birthDate: person.birth_date ?? "",
-        mobile: person.mobile ?? "",
-        alternateMobile: person.alternate_mobile ?? "",
-      });
-      setSubmitError(null);
-    }
-  }
-
-  function onSubmit(values: EditPersonValues) {
-    setSubmitError(null);
-
-    updatePerson.mutate(toUpdatePersonPayload(values), {
-      onSuccess: () => setOpen(false),
-      onError: (error) => {
-        if (error instanceof ApiError && error.status === 422) {
-          const validationErrors = error.validationErrors;
-          if (validationErrors) {
-            for (const [apiField, messages] of Object.entries(validationErrors)) {
-              const formField = personApiFieldToFormField[apiField];
-              if (formField && messages[0]) {
-                setError(formField, { type: "server", message: messages[0] });
-              }
-            }
-          }
-          setSubmitError(
-            error.message422 ?? "توجد أخطاء في البيانات المُدخلة."
-          );
-          return;
-        }
-
-        if (error instanceof ApiError && error.status === 401) {
-          setSubmitError("انتهت جلسة الدخول. يرجى تسجيل الدخول مجددًا.");
-          return;
-        }
-
-        if (error instanceof ApiError && error.status === 403) {
-          setSubmitError("لا تملك صلاحية تعديل بيانات هذا الشخص.");
-          return;
-        }
-
-        setSubmitError("تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.");
-      },
-    });
-  }
+  const flow = useGuardedSave({
+    mutation: useUpdatePerson(person.person_code),
+    apiFieldToFormField: personApiFieldToFormField,
+    setError,
+    statusMessages: { 403: "لا تملك صلاحية تعديل بيانات هذا الشخص." },
+  });
+  const hasAlternateMobile = Boolean(
+    useWatch({ control, name: "alternateMobile" })?.trim()
+  );
+  const formId = `edit-person-form-${person.person_code}`;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Pencil className="size-4" />
-          تعديل
-        </Button>
-      </DialogTrigger>
+    <Dialog
+      open={flow.open}
+      onOpenChange={(next) => {
+        // Always start from the current saved data.
+        if (next) reset(formValues(person));
+        flow.setOpen(next);
+      }}
+    >
+      <EditTrigger />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>تعديل بيانات الشخص</DialogTitle>
-          <DialogDescription>
-            تعديل البيانات الأساسية فقط. لا يشمل تغيير رب الأسرة أو نقل
-            العضوية.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {submitError && (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" />
-            <AlertTitle>تعذّر حفظ التعديلات</AlertTitle>
-            <AlertDescription>{submitError}</AlertDescription>
-          </Alert>
-        )}
+        <SaveError message={flow.submitError} />
 
         <form
-          id="edit-person-form"
-          onSubmit={handleSubmit(onSubmit)}
+          id={formId}
+          onSubmit={(e) => {
+            e.preventDefault();
+            flow.submit(handleSubmit, toUpdatePersonPayload);
+          }}
           className="flex flex-col gap-4"
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-fullName">الاسم الكامل</Label>
+            <FieldLabel htmlFor="edit-fullName">الاسم الرباعي</FieldLabel>
             <Input id="edit-fullName" {...register("fullName")} />
-            {errors.fullName && (
-              <p className="text-xs text-destructive">
-                {errors.fullName.message}
-              </p>
-            )}
+            <FieldError message={errors.fullName?.message} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-gender">الجنس</Label>
+              <FieldLabel htmlFor="edit-gender">الجنس</FieldLabel>
               <Controller
                 control={control}
                 name="gender"
@@ -169,7 +142,7 @@ export function EditPersonDialog({ person }: { person: PersonDetail }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-birthDate">تاريخ الميلاد</Label>
+              <FieldLabel htmlFor="edit-birthDate">تاريخ الميلاد</FieldLabel>
               <Input
                 id="edit-birthDate"
                 type="date"
@@ -177,47 +150,79 @@ export function EditPersonDialog({ person }: { person: PersonDetail }) {
                 className="text-end"
                 {...register("birthDate")}
               />
-              {errors.birthDate && (
-                <p className="text-xs text-destructive">
-                  {errors.birthDate.message}
-                </p>
-              )}
+              <FieldError message={errors.birthDate?.message} />
             </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-mobile">رقم الجوال</Label>
+            <FieldLabel htmlFor="edit-lifeStatus">الحالة</FieldLabel>
+            <Input
+              id="edit-lifeStatus"
+              value={lifeStatusLabel(person.life_status)}
+              readOnly
+              disabled
+            />
+            <p className="text-xs text-muted-foreground">
+              تغيير الحالة (تسجيل الوفاة) إجراء مستقل يتطلب مراجعة، ولا يتم من هذه
+              النافذة.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor="edit-mobile" optional>
+              الجوال الأساسي
+            </FieldLabel>
             <Input
               id="edit-mobile"
               dir="ltr"
               className="text-end"
               {...register("mobile")}
             />
+            <FieldError message={errors.mobile?.message} />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-alternateMobile">رقم جوال بديل</Label>
-            <Input
-              id="edit-alternateMobile"
-              dir="ltr"
-              className="text-end"
-              {...register("alternateMobile")}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="edit-alternateMobile" optional>
+                الجوال البديل
+              </FieldLabel>
+              <Input
+                id="edit-alternateMobile"
+                dir="ltr"
+                className="text-end"
+                {...register("alternateMobile", {
+                  onChange: (e) => {
+                    // No alternate number → no owner/relation to describe.
+                    if (!String(e.target.value).trim()) {
+                      setValue("alternateMobileOwnerRelation", "");
+                    }
+                  },
+                })}
+              />
+              <FieldError message={errors.alternateMobile?.message} />
+            </div>
+
+            {hasAlternateMobile && (
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel htmlFor="edit-alternateMobileOwnerRelation" optional>
+                  صاحب الرقم البديل / صلته
+                </FieldLabel>
+                <Input
+                  id="edit-alternateMobileOwnerRelation"
+                  placeholder="مثال: أحمد محمد – أخ"
+                  {...register("alternateMobileOwnerRelation")}
+                />
+                <FieldError message={errors.alternateMobileOwnerRelation?.message} />
+              </div>
+            )}
           </div>
         </form>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-            إلغاء
-          </Button>
-          <Button
-            type="submit"
-            form="edit-person-form"
-            disabled={updatePerson.isPending}
-          >
-            {updatePerson.isPending ? "جارٍ الحفظ..." : "حفظ التعديلات"}
-          </Button>
-        </DialogFooter>
+        <EditDialogFooter
+          formId={formId}
+          isPending={flow.isPending}
+          onCancel={() => flow.setOpen(false)}
+        />
       </DialogContent>
     </Dialog>
   );

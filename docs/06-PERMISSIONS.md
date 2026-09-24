@@ -2,9 +2,9 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2.2  
+**Version:** 1.2.3  
 **Status:** Approved  
-**Last Updated:** 2026-09-23  
+**Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -1015,6 +1015,31 @@ person.record-death
 
 person.correct
 ```
+
+## V1 Role Assignment
+
+Approved 2026-09-24 (AUTH-ADR-047):
+
+```text
+person.update
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+```
+
+`person.update` covers ordinary correction of basic Person data, including
+the current household head's basic information: name, gender, birth date,
+mobile, alternate mobile and its owner/relation.
+
+It does **not** grant:
+
+- National ID viewing or editing. These need the dedicated
+  `person.national-id.*` permissions (§39), which stay unassigned.
+- Life status or death recording. These need `person.record-death` and the
+  controlled death operation (§96; docs/03 §30).
+- Household-head or membership changes (§97, §98).
+
+REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER do not receive it.
 
 ---
 
@@ -2951,6 +2976,9 @@ View access does not automatically grant drill-down, export, or sensitive-field 
 
 ### AUTH-ADR-046
 `residence.update` (in-place correction of the current residence) is granted to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER in V1, mirroring "Update Canonical Family" (see §46). `residence.change` (moves with history) remains unassigned.
+
+### AUTH-ADR-047
+`person.update` (basic Person data correction) is granted to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY in V1 (see §44). It never authorizes National ID viewing or editing, which require the separate, still-unassigned `person.national-id.*` permissions (§39).
 ```
 
 ---
@@ -3074,6 +3102,7 @@ This is a baseline, not a substitute for explicit permissions.
 | Update Canonical Family | ✓ | ✓ | Draft/limited | Policy | Limited | — | — |
 | View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
 | Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
+| Correct Basic Person Data | ✓ | ✓ | ✓ | — | — | — | — |
 | View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
 | Correct Current Residence | ✓ | ✓ | Draft/limited | — | Limited | — | — |
 | Record Official Death | Permission | Permission | — | Policy | — | — | — |
@@ -3274,9 +3303,9 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.2
+Version: 1.2.3
 Status: APPROVED
-Date: 2026-09-23
+Date: 2026-09-24
 ```
 
 ---
@@ -3288,5 +3317,6 @@ Date: 2026-09-23
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.3 | 2026-09-24 | Approved | Added V1 role assignment for `person.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §44, the "Correct Basic Person Data" row in §140, and AUTH-ADR-047. National ID permissions unchanged |
 | 1.2.2 | 2026-09-23 | Approved | Added V1 role assignment for `residence.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) in §46, the "Correct Current Residence" row in §140, and AUTH-ADR-046 |
 | 1.2.1 | 2026-09-23 | Approved | Added V1 role assignment for `reference-data.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §56, the "View Reference Data" row in §140, and AUTH-ADR-045 |

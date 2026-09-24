@@ -2,9 +2,9 @@
 ## Business Rules
 
 **Document:** `03-BUSINESS-RULES.md`  
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-24  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -880,6 +880,23 @@ Family moved
 Corrections may change erroneous canonical information.
 
 Real-world changes should preserve prior historical state where appropriate.
+
+## Registration Date Independence
+
+Approved 2026-09-24.
+
+`families.registration_date`, `family_memberships.started_at` and
+`family_residences.started_at` record separate business facts. Registration
+may copy the registration date into the other two as initial values.
+
+After that, correcting `families.registration_date` must **not** change:
+
+```text
+family_memberships.started_at
+family_residences.started_at
+```
+
+There is no cascade in either direction.
 
 ---
 
@@ -2373,9 +2390,9 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2
+Version: 1.2.1
 Status: APPROVED
-Date: 2026-09-22
+Date: 2026-09-24
 ```
 
 ---
@@ -2387,3 +2404,4 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.1 | 2026-09-24 | Approved | Added §56 "Registration Date Independence": correcting `families.registration_date` does not cascade to membership or residence `started_at` |
