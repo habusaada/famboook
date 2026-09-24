@@ -794,6 +794,24 @@ Alternative terminal state:
 CANCELLED
 ```
 
+## V1: Needs Management
+
+Approved 2026-09-24 (docs/03 §46a). V1 uses only:
+
+```text
+CREATE → OPEN → FULFILLED
+              → CLOSED (reason required)
+```
+
+- `CreateNeedAction` (always OPEN), `UpdateNeedAction` (OPEN only),
+  `FulfillNeedAction`, `CloseNeedAction` — explicit operations, no generic
+  status change.
+- FULFILLED and CLOSED are terminal and read-only in V1; no reopening.
+- IN_PROGRESS and partial fulfilment are deferred to Assistance.
+- Needs are never created automatically from an Assessment; a Need may
+  cite a completed Assessment of the same family as its source.
+- Fulfilling a Need does not create Assistance (§39).
+
 ---
 
 # 38. Need Creation
@@ -2871,9 +2889,9 @@ PostgreSQL persists workflow state and history.
 ```text
 Project: Famboook
 Document: Workflows & State Transitions
-Version: 1.2
+Version: 1.2.2
 Status: APPROVED
-Date: 2026-09-22
+Date: 2026-09-24
 ```
 
 ---
@@ -2886,3 +2904,4 @@ Date: 2026-09-22
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal identity lifecycle, Change Request workflow, application rules, concurrency, idempotency, queues and Family self-service workflows |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative workflow layer, clarified Next.js/Filament workflow boundaries, added semantic API actions, after-commit notifications, retry-safe background processing, queue derivation and expanded workflow testing/invariants |
 | 1.2.1 | 2026-09-24 | Approved | §35: V1 family assessment workflow DRAFT → COMPLETED only |
+| 1.2.2 | 2026-09-24 | Approved | §37: V1 Need workflow OPEN → FULFILLED / CLOSED |

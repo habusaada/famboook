@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
 use App\Http\Controllers\Api\V1\HealthRecordController;
+use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use Illuminate\Support\Facades\Route;
@@ -76,11 +77,38 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/assessments/{assessment}/complete', [AssessmentController::class, 'complete'])
         ->middleware('can:assessment.complete');
 
+    // Needs (docs/06 §49): need.* only. No delete endpoint and no generic
+    // status PATCH: resolution happens only through fulfill/close, both
+    // governed by need.close in V1.
+    Route::get('/needs', [NeedController::class, 'index'])
+        ->middleware('can:need.view');
+
+    Route::get('/families/{family}/needs', [NeedController::class, 'familyIndex'])
+        ->middleware('can:need.view');
+
+    Route::post('/families/{family}/needs', [NeedController::class, 'store'])
+        ->middleware('can:need.create');
+
+    Route::get('/needs/{need}', [NeedController::class, 'show'])
+        ->middleware('can:need.view');
+
+    Route::patch('/needs/{need}', [NeedController::class, 'update'])
+        ->middleware('can:need.update');
+
+    Route::post('/needs/{need}/fulfill', [NeedController::class, 'fulfill'])
+        ->middleware('can:need.close');
+
+    Route::post('/needs/{need}/close', [NeedController::class, 'close'])
+        ->middleware('can:need.close');
+
+    // reference-data.view OR need.view (checked in the controller).
+    Route::get('/reference/need-categories', [ReferenceController::class, 'needCategories']);
+
     // reference-data.view OR assessment.view (checked in the controller):
     // everyone who may read assessments needs the domain vocabulary.
     Route::get('/reference/assessment-domains', [ReferenceController::class, 'assessmentDomains']);
 
-    Route::get('/reference/disability-types',[ReferenceController::class, 'disabilityTypes'])
+    Route::get('/reference/disability-types', [ReferenceController::class, 'disabilityTypes'])
         ->middleware('can:reference-data.view');
 
     Route::get('/reference/relationship-types', [ReferenceController::class, 'relationshipTypes'])

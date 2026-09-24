@@ -1405,6 +1405,81 @@ created_at
 updated_at
 ```
 
+## V1 Implementation (2026-09-24)
+
+Needs Management (docs/03 §46a):
+
+```text
+family_needs
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE               public API identifier / route key
+family_id BIGINT NOT NULL FK families.id (RESTRICT)
+person_id BIGINT NULL FK persons.id (RESTRICT)          NULL = family-level
+source_assessment_id BIGINT NULL FK assessments.id (RESTRICT)
+need_category_id BIGINT NOT NULL FK need_categories.id (RESTRICT)
+title VARCHAR(150) NOT NULL
+description TEXT NULL
+priority VARCHAR NOT NULL               LOW | MEDIUM | HIGH | URGENT
+quantity DECIMAL(12,2) NULL
+unit VARCHAR(30) NULL
+status VARCHAR NOT NULL                 OPEN | FULFILLED | CLOSED
+resolved_at TIMESTAMP NULL
+resolved_by BIGINT NULL FK users.id (SET NULL)
+closure_reason TEXT NULL
+created_by BIGINT NULL FK users.id (SET NULL)
+updated_by BIGINT NULL FK users.id (SET NULL)
+created_at, updated_at
+
+INDEX (family_id, status)
+INDEX (status, priority, created_at)
+CHECK status / priority values                                  (PostgreSQL)
+CHECK (quantity IS NULL OR quantity > 0) AND (unit IS NULL OR quantity IS NOT NULL)
+CHECK OPEN: resolved_at, resolved_by, closure_reason all NULL;
+      FULFILLED: resolved_at NOT NULL, closure_reason NULL;
+      CLOSED: resolved_at NOT NULL, closure_reason NOT NULL
+```
+
+- The model refuses to update a resolved Need or to delete any Need.
+- Same-family person/assessment rules are enforced by the Domain Actions
+  (`CreateNeedAction`, `UpdateNeedAction`, `FulfillNeedAction`,
+  `CloseNeedAction`).
+
+API (`/api/v1`):
+
+```text
+GET   /families/{family}/needs          need.view    filters status, priority, category, target=family|person; derived summary
+POST  /families/{family}/needs          need.create  creates OPEN
+GET   /needs                            need.view    cross-family work queue, same filters
+GET   /needs/{uuid}                     need.view
+PATCH /needs/{uuid}                     need.update  OPEN only (409 otherwise); status/resolution fields prohibited
+POST  /needs/{uuid}/fulfill             need.close   OPEN → FULFILLED
+POST  /needs/{uuid}/close               need.close   OPEN → CLOSED, closure_reason required
+GET   /reference/need-categories        reference-data.view OR need.view; active only
+```
+
+Default order: OPEN first, then URGENT → HIGH → MEDIUM → LOW, then newest
+`created_at`. Paginated (per_page 20, max 50). Payload identifiers:
+`person_code`, `source_assessment_id` (assessment UUID), `category_code`.
+No DELETE endpoint.
+
+---
+
+# 47a. Need Categories
+
+```text
+need_categories
+id BIGINT PK
+code VARCHAR UNIQUE NOT NULL
+name VARCHAR NOT NULL
+description TEXT NULL
+is_active BOOLEAN NOT NULL DEFAULT TRUE
+sort_order INTEGER NOT NULL DEFAULT 0
+created_at, updated_at
+```
+
+Same shape as the other reference tables. Seeded idempotently with the
+14 V1 categories (docs/02 §34a); never reactivates a deactivated one.
+
 ---
 
 # 48. Assistance Records
@@ -1744,7 +1819,7 @@ uuid UUID NOT NULL UNIQUE             public API identifier
 family_id BIGINT NOT NULL FK families.id (RESTRICT)
 actor_user_id BIGINT NULL FK users.id (SET NULL)
 event_type VARCHAR NOT NULL
-subject_type VARCHAR NULL             morph map: family | person | residence | health_record | assessment
+subject_type VARCHAR NULL             morph map: family | person | residence | health_record | assessment | need
 subject_id BIGINT NULL
 metadata JSON NULL                    allow-listed keys only
 created_at TIMESTAMP NOT NULL
@@ -3177,7 +3252,7 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.4
+Version: 1.2.5
 Status: APPROVED
 Database: PostgreSQL 16+
 Date: 2026-09-24
@@ -3192,6 +3267,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.5 | 2026-09-24 | Approved | Added the V1 `family_needs` implementation (§47) and `need_categories` (§47a); `need` activity subject (§59a) |
 | 1.2.4 | 2026-09-24 | Approved | Added the V1 `assessments` / `assessment_results` implementation (§31) and `assessment_domains` (§31a); `assessment` activity subject (§59a) |
 | 1.2.3 | 2026-09-24 | Approved | Added `family_activities` (§59a, Family Activity Log V1): append-only, allow-listed metadata, transactional with Domain Actions, no backfill |
 | 1.2.2 | 2026-09-24 | Approved | Replaced the proposed `person_health_conditions` / `person_disabilities` with `person_health_records` (§27) and added `disability_types` (§28), with partial unique indexes and CHECK constraints |

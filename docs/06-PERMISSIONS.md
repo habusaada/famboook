@@ -1213,6 +1213,34 @@ need.close
 need.cancel
 ```
 
+## V1 Role Assignment
+
+Approved 2026-09-24 (Needs Management V1, AUTH-ADR-051):
+
+```text
+need.view
+  SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER
+
+need.create / need.update / need.close
+  SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER
+```
+
+- **`need.close` governs both resolution operations** in V1 — marking a
+  Need FULFILLED and CLOSING it with a reason. No separate `need.resolve`
+  permission is introduced, to avoid overlapping the canonical catalog.
+- `need.cancel` remains unassigned (V1 has no separate cancelled state;
+  CLOSED covers it).
+- REVIEWER has view only. REPORTS_VIEWER receives no family-level Need
+  detail in V1. FAMILY_USER has no Needs access in V1 (see §124).
+- There is no Need delete permission.
+- `family.update` is **not** a substitute for any Need permission.
+- `GET /reference/need-categories` accepts `reference-data.view` **or**
+  `need.view`.
+- Need Activity Log events are shown only to holders of `need.view`.
+- Choosing an Assessment as a Need's source uses the assessment list and
+  therefore also requires `assessment.view`; the Need response exposes only
+  the source's id, date and status.
+
 ---
 
 # 50. Assistance Permissions
@@ -3082,6 +3110,9 @@ Person health records are governed by `health-record.view/create/update/close` (
 
 ### AUTH-ADR-050
 Family assessments V1 (§47): `assessment.view` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER; `assessment.create/update/complete` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER. REPORTS_VIEWER and FAMILY_USER have no assessment access in V1. `assessment.review/verify/approve` remain unassigned; no delete permission exists. The assessment-domain reference endpoint accepts `reference-data.view` or `assessment.view`.
+
+### AUTH-ADR-051
+Needs V1 (§49): `need.view` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER; `need.create/update/close` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER. `need.close` authorizes both fulfil and close; `need.cancel` stays unassigned and no `need.resolve` is added. REPORTS_VIEWER and FAMILY_USER have no Need access in V1. No delete permission exists. The need-category reference endpoint accepts `reference-data.view` or `need.view`.
 ```
 
 ---
@@ -3217,6 +3248,8 @@ This is a baseline, not a substitute for explicit permissions.
 | View Family Assessments (V1) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | Create/Update/Complete Family Assessments (V1) | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | Needs | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| View Needs (V1) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Create/Update/Fulfil/Close Needs (V1) | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | Assistance | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
 | Review Change Request | Permission | ✓ | — | ✓ | Policy | — | — |
 | Approve Change Request | Permission | Permission | — | Permission | Policy | — | — |
@@ -3411,7 +3444,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.6
+Version: 1.2.7
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3425,6 +3458,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.7 | 2026-09-24 | Approved | §49 V1 Role Assignment for `need.view/create/update/close` (`need.close` covers fulfil and close), V1 Need rows in §140, AUTH-ADR-051 |
 | 1.2.6 | 2026-09-24 | Approved | §47 V1 Role Assignment for `assessment.view/create/update/complete`, V1 assessment rows in §140, AUTH-ADR-050 |
 | 1.2.5 | 2026-09-24 | Approved | Added `activity-log.view` (§57a) with V1 role assignment, the "View Family Activity Log" row in §140, and AUTH-ADR-049 |
 | 1.2.4 | 2026-09-24 | Approved | Replaced `health.*` / `disability.*` with `health-record.view/create/update/close` (§40-41), health rows in §140, AUTH-ADR-048 |

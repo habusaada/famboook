@@ -18,7 +18,11 @@ export type FamilyActivityType =
   | "HEALTH_RECORD_CLOSED"
   | "ASSESSMENT_CREATED"
   | "ASSESSMENT_UPDATED"
-  | "ASSESSMENT_COMPLETED";
+  | "ASSESSMENT_COMPLETED"
+  | "NEED_CREATED"
+  | "NEED_UPDATED"
+  | "NEED_FULFILLED"
+  | "NEED_CLOSED";
 
 export interface FamilyActivity {
   // Public UUID (the database id is never exposed).
@@ -29,8 +33,10 @@ export interface FamilyActivity {
   // the field researcher. Null for future system/import operations.
   actor: { name: string } | null;
   subject: {
-    type: "family" | "person" | "residence" | "health_record" | "assessment" | null;
+    type: "family" | "person" | "residence" | "health_record" | "assessment" | "need" | null;
     person: { person_code: string; full_name: string } | null;
+    // Need title, resolved at read time from the current record.
+    title: string | null;
   };
   // Allow-listed keys only: the broad health category, never details.
   // Assessment events carry no metadata (no ratings, no notes).

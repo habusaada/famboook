@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Assessment;
 use App\Models\Family;
+use App\Models\FamilyNeed;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
@@ -34,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
             'residence' => FamilyResidence::class,
             'health_record' => PersonHealthRecord::class,
             'assessment' => Assessment::class,
+            'need' => FamilyNeed::class,
         ]);
     }
 }

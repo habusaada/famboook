@@ -18,6 +18,10 @@ enum FamilyActivityType: string
     case ASSESSMENT_CREATED = 'ASSESSMENT_CREATED';
     case ASSESSMENT_UPDATED = 'ASSESSMENT_UPDATED';
     case ASSESSMENT_COMPLETED = 'ASSESSMENT_COMPLETED';
+    case NEED_CREATED = 'NEED_CREATED';
+    case NEED_UPDATED = 'NEED_UPDATED';
+    case NEED_FULFILLED = 'NEED_FULFILLED';
+    case NEED_CLOSED = 'NEED_CLOSED';
 
     /** @return list<self> */
     public static function healthCases(): array
@@ -29,5 +33,11 @@ enum FamilyActivityType: string
     public static function assessmentCases(): array
     {
         return [self::ASSESSMENT_CREATED, self::ASSESSMENT_UPDATED, self::ASSESSMENT_COMPLETED];
+    }
+
+    /** @return list<self> */
+    public static function needCases(): array
+    {
+        return [self::NEED_CREATED, self::NEED_UPDATED, self::NEED_FULFILLED, self::NEED_CLOSED];
     }
 }

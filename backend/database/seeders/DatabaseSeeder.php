@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RelationshipTypeSeeder::class);
         $this->call(DisabilityTypeSeeder::class);
         $this->call(AssessmentDomainSeeder::class);
+        $this->call(NeedCategorySeeder::class);
 
         // User::factory(10)->create();
 

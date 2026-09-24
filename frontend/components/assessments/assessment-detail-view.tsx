@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, Clock, Pencil, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarDays, CheckCircle2, Clock, HeartHandshake, Pencil, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,9 @@ import {
   BackToAssessments,
   ConfirmCompleteDialog,
 } from "@/components/assessments/assessment-shared";
+import { NeedFormDialog } from "@/components/needs/need-form-dialog";
 import { useAssessment, useCompleteAssessment } from "@/lib/api/assessments";
+import { useFamilyNeeds } from "@/lib/api/needs";
 import { ApiError } from "@/lib/api/client";
 import { useAssessmentDomains } from "@/lib/api/reference";
 import type { Assessment } from "@/lib/types/api/assessment";
@@ -89,6 +92,32 @@ function CompleteAction({ familyCode, assessment }: { familyCode: string; assess
   );
 }
 
+/**
+ * Opens Need creation with this COMPLETED assessment preselected as the
+ * source. Nothing is generated automatically: the user picks the category
+ * and describes each concrete need.
+ */
+function CreateNeedFromAssessment({ familyCode, assessmentId }: { familyCode: string; assessmentId: string }) {
+  const router = useRouter();
+  // Only used for the need.create ability hint.
+  const needs = useFamilyNeeds(familyCode);
+  if (!needs.data?.pages[0]?.abilities.create) return null;
+
+  return (
+    <NeedFormDialog
+      familyCode={familyCode}
+      sourceAssessmentId={assessmentId}
+      onSaved={(response) => router.push(`/needs/${response.data.id}`)}
+      trigger={
+        <Button variant="outline" size="sm">
+          <HeartHandshake className="size-4" />
+          إنشاء احتياج
+        </Button>
+      }
+    />
+  );
+}
+
 export function AssessmentDetailView({
   familyCode,
   assessmentId,
@@ -140,6 +169,9 @@ export function AssessmentDetailView({
               </h2>
               <AssessmentStatusBadge status={assessment.status} />
             </div>
+            {assessment.status === "COMPLETED" && (
+              <CreateNeedFromAssessment familyCode={code} assessmentId={assessment.id} />
+            )}
             {(abilities.update || abilities.complete) && (
               <div className="flex flex-wrap items-center gap-2">
                 {abilities.update && (

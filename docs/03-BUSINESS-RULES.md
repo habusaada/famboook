@@ -835,6 +835,70 @@ Need creation does not guarantee assistance.
 
 ---
 
+# 46a. Needs Management (V1)
+
+Approved 2026-09-24.
+
+A Need is a **concrete** need identified for a whole Family or for one
+of its members (docs/02 §34).
+
+- A Need **always belongs to a Family**, which remains its primary
+  container.
+- **Target:** no person = family-level need; a person = person-specific
+  need. A newly chosen person must currently be an **active member of the
+  same family**. An open Need keeps its existing target even if that
+  member later leaves the family.
+- **Optional Assessment source:** a Need can be created directly, or cite
+  a **COMPLETED** Assessment of the **same family** as its source.
+  Assessment and Need are different concepts: one domain rating may lead
+  to several Needs, or none. **Needs are never generated automatically
+  from Assessment results**, and categories are never inferred from
+  assessment domains.
+- **Category:** from `need_categories` (docs/02 §34a). A deactivated
+  category cannot be selected for a new Need or newly assigned; existing
+  Needs keep it.
+- **Priority:** `LOW`, `MEDIUM` (default), `HIGH`, `URGENT` — operational
+  prioritization, not assessment severity.
+- **Quantity/unit:** optional requested quantity (> 0, up to 2 decimals)
+  and free-text unit; a unit requires a quantity. Quantities are not used
+  to calculate fulfilment.
+- **Lifecycle:** created `OPEN` only (clients cannot create or set a
+  resolved state). Then `OPEN → FULFILLED` or `OPEN → CLOSED`, each through
+  its own explicit operation. No reopening and no FULFILLED ↔ CLOSED in V1;
+  if the same need arises again, a **new** Need is created.
+- **Resolution fields:** OPEN has no `resolved_at`, `resolved_by` or
+  `closure_reason`. FULFILLED records `resolved_at` and `resolved_by`, with
+  no closure reason. CLOSED records `resolved_at`, `resolved_by` **and a
+  required `closure_reason`** (free text; no reason categories in V1).
+  `resolved_by` is always the authenticated user, never client input.
+- **Immutability:** a FULFILLED or CLOSED Need is historical and
+  read-only (API: 409). Repeated resolution fails safely without new
+  activity.
+- **No deletion** of Needs in V1.
+- **Fulfilment does not create Assistance.** Assistance is deferred; when
+  implemented, the Need–Assistance relationship will be added explicitly
+  (§47).
+- **Privacy:** descriptions and closure reasons may be sensitive. Need
+  responses include only safe identity (family code and household-head
+  name, the target's code and name, the source assessment's id/date/
+  status) — never National IDs, phone numbers, health-record details or
+  assessment notes/results. Need data is not included in generic Family,
+  Person or Assessment responses and is not available to REPORTS_VIEWER or
+  FAMILY_USER in V1.
+- Every write is transactional and records its Activity Log event in the
+  same transaction (§97a).
+- **Global work queue:** the Staff App `/needs` page lists Needs across
+  families (OPEN by default; filters: status, priority, category, target).
+
+Out of scope for V1: Assistance, distributions, aid packages, delivered
+quantities, partial fulfilment, automatic Assessment-to-Need generation,
+scoring, approval, reopening, deletion, attachments, referrals, service
+providers, beneficiaries outside the family, reports/charts, exports,
+Family Portal access, Filament Needs management, category administration
+and units reference data.
+
+---
+
 # 47. Assistance
 
 Assistance represents support actually recorded/provided.
@@ -1629,7 +1693,16 @@ HEALTH_RECORD_CLOSED
 ASSESSMENT_CREATED      new draft assessment (§40a)
 ASSESSMENT_UPDATED      draft assessment saved with changes
 ASSESSMENT_COMPLETED    assessment completed
+NEED_CREATED            new Need (§46a)
+NEED_UPDATED            open Need edited with changes
+NEED_FULFILLED          Need resolved as fulfilled
+NEED_CLOSED             Need closed with a reason
 ```
+
+Need events carry no metadata: never the description, closure reason,
+quantity, person medical information or assessment content. The Need
+title and target person are resolved at read time from the current
+record. Need events are shown only to holders of `need.view`.
 
 Assessment events are recorded once per operation, never per domain
 rating, and carry no metadata (no ratings, no notes). They are shown only
@@ -2581,7 +2654,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.5
+Version: 1.2.6
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2595,6 +2668,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.6 | 2026-09-24 | Approved | Added §46a "Needs Management (V1)" and the NEED_* events in §97a |
 | 1.2.5 | 2026-09-24 | Approved | Added §40a "Quick Multi-Domain Family Assessment (V1)" and the ASSESSMENT_* events in §97a |
 | 1.2.4 | 2026-09-24 | Approved | Added §97a "Family Activity Log (V1)" and the §54 V1 decision that the paper-form review/signature section is not implemented literally |
 | 1.2.3 | 2026-09-24 | Approved | §36 V1 health decisions: all record types closable (never deleted), active pregnancy/breastfeeding blocks gender correction away from FEMALE, deceased records stay historical but are excluded from current indicators, no minimum pregnancy/breastfeeding age |

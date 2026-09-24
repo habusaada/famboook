@@ -59,6 +59,11 @@ class Family extends Model
         return $this->hasMany(Assessment::class);
     }
 
+    public function needs(): HasMany
+    {
+        return $this->hasMany(FamilyNeed::class);
+    }
+
     public function householdHeadMembership(): HasOne
     {
         return $this->hasOne(FamilyMembership::class)

@@ -5,8 +5,18 @@ import { apiClient } from "@/lib/api/client";
 import type {
   AssessmentDomain,
   DisabilityType,
+  NeedCategory,
   RelationshipType,
 } from "@/lib/types/api/reference";
+
+// Active categories only (selectable for new Needs).
+export function useNeedCategories() {
+  return useQuery({
+    queryKey: ["reference", "need-categories"],
+    queryFn: () => apiClient.get<{ data: NeedCategory[] }>("/api/v1/reference/need-categories"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 // Active domains only (selectable for new results).
 export function useAssessmentDomains() {

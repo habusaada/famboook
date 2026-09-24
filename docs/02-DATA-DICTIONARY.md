@@ -1380,6 +1380,77 @@ updated_at
 
 `person_id` may be NULL for Family-level Needs.
 
+## V1 Implementation — Needs Management
+
+Approved 2026-09-24 (docs/03 §46a). Table `family_needs`:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier |
+| `family_id` | yes | The Family the Need belongs to (always the primary container) |
+| `person_id` | no | Targeted member. NULL = family-level need. A new target must be an active member of the same family |
+| `source_assessment_id` | no | Optional source: a COMPLETED Assessment of the same family |
+| `need_category_id` | yes | Need Category (§34a); replaces the proposed `need_type_id` |
+| `title` | yes | Short concrete need, max 150 chars (e.g. "كرسي متحرك") |
+| `description` | no | Free-text notes (sensitive) |
+| `priority` | yes | `LOW`, `MEDIUM` (default), `HIGH`, `URGENT` |
+| `quantity` | no | Requested quantity, > 0, up to 2 decimals |
+| `unit` | no | Free-text unit (max 30), only with a quantity. No units reference data in V1 |
+| `status` | yes | `OPEN`, `FULFILLED`, `CLOSED` |
+| `resolved_at` | no | Set when FULFILLED/CLOSED |
+| `resolved_by` | no | Authenticated user who resolved it |
+| `closure_reason` | no | Required for CLOSED, NULL otherwise |
+| `created_by`, `updated_by` | — | Authenticated users |
+| `created_at`, `updated_at` | yes | System timestamps |
+
+Priority is operational prioritization and is deliberately **not** the
+Assessment rating scale (no `CRITICAL`).
+
+Priority presentation: `LOW` منخفضة, `MEDIUM` متوسطة, `HIGH` مرتفعة,
+`URGENT` عاجلة.
+
+Quantity is the requested quantity only; delivered quantities and
+fulfilment calculation belong to the future Assistance domain.
+
+Not implemented in V1: `identified_at`/`identified_by` (use `created_*`),
+`source` string (replaced by the optional `source_assessment_id`),
+`closed_at`/`closed_by` (named `resolved_*`), `notes` (named
+`description`).
+
+---
+
+# 34a. Need Categories
+
+Approved 2026-09-24 (V1).
+
+```text
+need_categories
+```
+
+Reference data with the same shape as `assessment_domains`
+(`code`, `name`, `description`, `is_active`, `sort_order`); used instead of
+the proposed `need_types`. Deactivated, never deleted; the seeder never
+reactivates a deactivated category. A deactivated category cannot be
+chosen for a new Need (or newly assigned to an open one) but stays
+readable on existing Needs. No category administration UI in V1.
+
+| Code | Arabic |
+|---|---|
+| `SHELTER` | المأوى والسكن |
+| `FOOD` | الغذاء |
+| `WATER` | المياه |
+| `HYGIENE` | النظافة والصرف الصحي |
+| `HEALTHCARE` | الرعاية الصحية |
+| `MEDICATION` | الأدوية |
+| `ASSISTIVE_DEVICE` | الأجهزة والمستلزمات المساعدة |
+| `EDUCATION` | التعليم |
+| `CASH` | المساعدة النقدية |
+| `CLOTHING` | الملابس |
+| `CHILDCARE` | احتياجات الأطفال |
+| `PROTECTION` | الحماية |
+| `LIVELIHOOD` | سبل العيش |
+| `OTHER` | أخرى |
+
 ---
 
 # 35. Need Status
@@ -1395,6 +1466,12 @@ CANCELLED
 ```
 
 Exact workflow is defined in `05-WORKFLOWS.md`.
+
+**V1 (2026-09-24):** only `OPEN` (مفتوح), `FULFILLED` (تمت تلبيته) and
+`CLOSED` (مغلق) are used. `FULFILLED` corresponds to MET; `CLOSED` covers
+"no longer active for another reason" (including what CANCELLED
+described). `IN_PROGRESS` and partial fulfilment are deferred to
+Assistance tracking.
 
 ---
 
@@ -2047,9 +2124,9 @@ holds no previous/new values.
 | `family_id` | yes | The Family whose timeline this belongs to |
 | `actor_user_id` | no | Authenticated application user who performed the operation. Not the field researcher. NULL reserved for future system/import operations |
 | `event_type` | yes | Canonical event code (see docs/03 §97a) |
-| `subject_type` | no | `family`, `person`, `residence`, `health_record` or `assessment` |
+| `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment` or `need` |
 | `subject_id` | no | Internal id of the subject record |
-| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment events carry no metadata (no ratings, no notes) |
+| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment and Need events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities) |
 | `created_at` | yes | When the operation happened |
 
 There is no `updated_at`: entries are never modified.
@@ -3128,7 +3205,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.6
+Version: 1.2.7
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3142,6 +3219,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.7 | 2026-09-24 | Approved | Needs Management V1: §34 V1 `family_needs` fields, §34a `need_categories` (14 V1 categories), §35 V1 statuses OPEN/FULFILLED/CLOSED, `need` activity subject in §61a |
 | 1.2.6 | 2026-09-24 | Approved | Quick Multi-Domain Family Assessment V1: §27 V1 implementation fields, §27a `assessment_domains` (8 V1 domains), §27b `assessment_results` and rating scale (absence = not assessed), `assessment` activity subject in §61a |
 | 1.2.5 | 2026-09-24 | Approved | Added §61a "Family Activity" (Family Activity Log V1): fields, allow-listed metadata, actor ≠ researcher, no backfill; PDD-025 note |
 | 1.2.4 | 2026-09-24 | Approved | §22: all health record types closable, gender integrity with active pregnancy/breastfeeding, deceased records kept as history, no minimum maternal age in V1 |

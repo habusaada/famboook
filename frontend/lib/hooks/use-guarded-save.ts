@@ -24,12 +24,15 @@ export function useGuardedSave<TValues extends FieldValues, TPayload>({
   apiFieldToFormField,
   setError,
   statusMessages = {},
+  onSuccess,
 }: {
   mutation: UseMutationResult<unknown, Error, TPayload>;
   apiFieldToFormField: Record<string, Path<TValues>>;
   setError: UseFormSetError<TValues>;
   // Per-status Arabic messages, e.g. { 403: "لا تملك صلاحية ..." }.
   statusMessages?: Record<number, string>;
+  // Optional follow-up after a successful save (e.g. navigation).
+  onSuccess?: (data: unknown) => void;
 }) {
   const [open, setOpenState] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -42,7 +45,10 @@ export function useGuardedSave<TValues extends FieldValues, TPayload>({
       onSettled: () => {
         submitting.current = false;
       },
-      onSuccess: () => setOpenState(false),
+      onSuccess: (data) => {
+        setOpenState(false);
+        onSuccess?.(data);
+      },
       onError: (error) => {
         if (error instanceof ApiError && error.status === 422) {
           for (const [apiField, messages] of Object.entries(error.validationErrors ?? {})) {

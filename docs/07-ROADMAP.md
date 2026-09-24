@@ -1564,6 +1564,16 @@ Assistance history preserved
 Permissions tested
 ```
 
+## Progress
+
+2026-09-24: **Needs Management V1** delivered (docs/03 §46a): family- or
+person-targeted Needs with optional completed-Assessment source, 14 need
+categories, LOW–URGENT priority, OPEN → FULFILLED / CLOSED lifecycle,
+Activity Log integration, the Family Profile "الاحتياجات" tab and the
+cross-family `/needs` work queue. **Assistance remains open** for this
+phase: records, Need–Assistance linking, delivered quantities and partial
+fulfilment.
+
 ---
 
 # 27. Phase 15 — Documents & Case Notes
@@ -4543,9 +4553,9 @@ The result should feel like a coherent product, not a collection of CRUD pages.
 ```text
 Project: Famboook
 Document: Implementation Roadmap
-Version: 1.2
+Version: 1.2.2
 Status: APPROVED
-Date: 2026-09-22
+Date: 2026-09-24
 ```
 
 ---
@@ -4556,5 +4566,6 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.2 | 2026-09-24 | Approved | Phase 14 progress note: Needs Management V1 (Assistance deferred) |
 | 1.2.1 | 2026-09-24 | Approved | Phase 13 progress note: Quick Multi-Domain Family Assessment V1 |
 | 1.2 | 2026-09-22 | Approved | Replaced Filament-first operational architecture with API-first Laravel + custom Next.js Staff/Executive/Family applications, restricted Filament to System Administration, introduced frontend/design-system foundations, revised implementation phases, MVP strategy, deployment topology, security gates and vertical delivery approach |

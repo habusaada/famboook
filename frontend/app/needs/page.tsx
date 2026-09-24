@@ -1,5 +1,5 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder";
+import { NeedsQueue } from "@/components/needs/needs-queue";
 
 export default function NeedsPage() {
-  return <PagePlaceholder title="الاحتياجات" />;
+  return <NeedsQueue />;
 }

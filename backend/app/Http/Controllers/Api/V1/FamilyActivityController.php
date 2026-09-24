@@ -6,6 +6,7 @@ use App\Enums\FamilyActivityType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FamilyActivityResource;
 use App\Models\Family;
+use App\Models\FamilyNeed;
 use App\Models\PersonHealthRecord;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
@@ -40,10 +41,19 @@ class FamilyActivityController extends Controller
                     array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::assessmentCases()),
                 ),
             )
+            // And Need events behind need.view.
+            ->when(
+                ! $request->user()->can('need.view'),
+                fn ($q) => $q->whereNotIn(
+                    'event_type',
+                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::needCases()),
+                ),
+            )
             ->with([
                 'actor:id,name',
                 'subject' => fn (MorphTo $morph) => $morph->morphWith([
                     PersonHealthRecord::class => ['person'],
+                    FamilyNeed::class => ['person'],
                 ]),
             ])
             ->latest('created_at')

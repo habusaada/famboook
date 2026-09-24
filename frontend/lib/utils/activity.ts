@@ -2,7 +2,11 @@ import {
   ClipboardCheck,
   ClipboardList,
   ClipboardPen,
+  CircleCheckBig,
+  CircleX,
   FilePlus2,
+  HandHeart,
+  HeartHandshake,
   FilePen,
   HeartPulse,
   HeartOff,
@@ -31,6 +35,10 @@ export const familyActivityPresentation: Record<
   ASSESSMENT_CREATED: { label: "تم إنشاء تقييم للأسرة", icon: ClipboardList },
   ASSESSMENT_UPDATED: { label: "تم تعديل مسودة تقييم", icon: ClipboardPen },
   ASSESSMENT_COMPLETED: { label: "تم إكمال تقييم للأسرة", icon: ClipboardCheck },
+  NEED_CREATED: { label: "تمت إضافة احتياج", icon: HeartHandshake },
+  NEED_UPDATED: { label: "تم تعديل احتياج", icon: HandHeart },
+  NEED_FULFILLED: { label: "تمت تلبية احتياج", icon: CircleCheckBig },
+  NEED_CLOSED: { label: "تم إغلاق احتياج", icon: CircleX },
 };
 
 export function formatActivityTime(iso: string): string {

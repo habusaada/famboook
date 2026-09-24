@@ -16,6 +16,14 @@ export interface AssessmentDomain {
   sort_order: number;
 }
 
+// Type mirroring backend/app/Http/Resources/NeedCategoryResource.php.
+export interface NeedCategory {
+  code: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
 // Type mirroring backend/app/Http/Resources/DisabilityTypeResource.php.
 export interface DisabilityType {
   id: number;

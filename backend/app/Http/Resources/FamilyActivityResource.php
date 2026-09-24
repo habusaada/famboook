@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\FamilyNeed;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
 use Illuminate\Http\Request;
@@ -25,6 +26,8 @@ class FamilyActivityResource extends JsonResource
             'subject' => [
                 'type' => $this->subject_type,
                 'person' => $this->subjectPerson(),
+                // Need title, resolved at read time (never stored in the log).
+                'title' => $this->subject instanceof FamilyNeed ? $this->subject->title : null,
             ],
             'metadata' => $this->metadata ?? (object) [],
         ];
@@ -36,6 +39,7 @@ class FamilyActivityResource extends JsonResource
         $person = match (true) {
             $this->subject instanceof Person => $this->subject,
             $this->subject instanceof PersonHealthRecord => $this->subject->person,
+            $this->subject instanceof FamilyNeed => $this->subject->person,
             default => null,
         };
 
