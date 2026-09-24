@@ -32,6 +32,14 @@ class FamilyActivityController extends Controller
                     array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::healthCases()),
                 ),
             )
+            // Likewise, assessment events stay behind assessment.view.
+            ->when(
+                ! $request->user()->can('assessment.view'),
+                fn ($q) => $q->whereNotIn(
+                    'event_type',
+                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::assessmentCases()),
+                ),
+            )
             ->with([
                 'actor:id,name',
                 'subject' => fn (MorphTo $morph) => $morph->morphWith([

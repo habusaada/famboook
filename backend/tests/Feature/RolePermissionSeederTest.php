@@ -177,7 +177,10 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($socialWorker->hasPermissionTo('health-record.close'));
         $this->assertFalse($socialWorker->hasPermissionTo('case-note.view'));
         $this->assertFalse($socialWorker->hasPermissionTo('confidential-note.view'));
-        $this->assertFalse($socialWorker->hasPermissionTo('assessment.view'));
+        // Assessments are operational for SOCIAL_WORKER (AUTH-ADR-050),
+        // but review/verify/approve stay unassigned.
+        $this->assertTrue($socialWorker->hasPermissionTo('assessment.view'));
+        $this->assertFalse($socialWorker->hasPermissionTo('assessment.approve'));
         $this->assertFalse($socialWorker->hasPermissionTo('need.view'));
         $this->assertFalse($socialWorker->hasPermissionTo('assistance.view'));
     }
@@ -288,10 +291,11 @@ class RolePermissionSeederTest extends TestCase
         // SUPER_ADMIN holds far fewer than the full 120-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 48 = 42 + residence.update (AUTH-ADR-046)
+        // 52 = 42 + residence.update (AUTH-ADR-046)
         //      + health-record.view/create/update/close (AUTH-ADR-048)
-        //      + activity-log.view (AUTH-ADR-049).
-        $this->assertSame(48, $superAdmin->getAllPermissions()->count());
+        //      + activity-log.view (AUTH-ADR-049)
+        //      + assessment.view/create/update/complete (AUTH-ADR-050).
+        $this->assertSame(52, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -490,5 +494,42 @@ class RolePermissionSeederTest extends TestCase
         $dataEntry = User::factory()->create();
         $dataEntry->assignRole('DATA_ENTRY');
         $this->assertFalse($dataEntry->hasPermissionTo('audit.view'));
+    }
+
+    public function test_assessment_permissions_follow_approved_matrix(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §47 V1 Role Assignment, AUTH-ADR-050.
+        $all = ['assessment.view', 'assessment.create', 'assessment.update', 'assessment.complete'];
+        $expected = [
+            'SUPER_ADMIN' => $all,
+            'ADMINISTRATOR' => $all,
+            'DATA_ENTRY' => $all,
+            'REVIEWER' => ['assessment.view'],
+            'SOCIAL_WORKER' => $all,
+            'REPORTS_VIEWER' => [],
+            'FAMILY_USER' => [],
+        ];
+
+        foreach ($expected as $role => $granted) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            foreach ($all as $permission) {
+                $this->assertSame(
+                    in_array($permission, $granted, true),
+                    $user->hasPermissionTo($permission),
+                    "{$role} / {$permission}"
+                );
+            }
+
+            // Review/verify/approve are not part of the V1 lifecycle.
+            foreach (['assessment.review', 'assessment.verify', 'assessment.approve'] as $unassigned) {
+                $this->assertFalse($user->hasPermissionTo($unassigned), "{$role} / {$unassigned}");
+            }
+        }
+
+        // No assessment delete permission exists in V1.
+        $this->assertFalse(Permission::where('name', 'assessment.delete')->exists());
     }
 }

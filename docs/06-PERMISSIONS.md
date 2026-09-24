@@ -1139,6 +1139,38 @@ assessment.verify
 assessment.approve
 ```
 
+## V1 Role Assignment
+
+Approved 2026-09-24 (Quick Multi-Domain Family Assessment V1,
+AUTH-ADR-050):
+
+```text
+assessment.view
+  SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER
+
+assessment.create / assessment.update / assessment.complete
+  SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER
+```
+
+- SOCIAL_WORKER is an operational assessment role and performs family
+  assessments.
+- REVIEWER has view only.
+- REPORTS_VIEWER receives no family-level assessment detail in V1.
+- FAMILY_USER has no assessment access in V1 (no Family Portal
+  assessments).
+- `assessment.review`, `assessment.verify` and `assessment.approve` stay
+  unassigned: the V1 lifecycle is DRAFT → COMPLETED only.
+- There is no assessment delete permission.
+- `family.update` is **not** a substitute for any assessment permission.
+- Completing with a final draft payload requires both
+  `assessment.complete` and `assessment.update`.
+- `GET /reference/assessment-domains` accepts `reference-data.view` **or**
+  `assessment.view`, because roles that assess families (e.g.
+  SOCIAL_WORKER, REVIEWER) do not hold `reference-data.view`. This grants
+  no other reference data.
+- Assessment Activity Log events are shown only to holders of
+  `assessment.view` (in addition to `activity-log.view`).
+
 ---
 
 # 48. Form Permissions
@@ -3047,6 +3079,9 @@ Person health records are governed by `health-record.view/create/update/close` (
 
 ### AUTH-ADR-049
 `activity-log.view` (read-only, family-scoped Family Activity Log, §57a) is granted to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER in V1. It is distinct from `audit.view` and from the `*.view-history` permissions. No activity write permissions exist. Health events additionally require `health-record.view`. REPORTS_VIEWER and FAMILY_USER have no access in V1.
+
+### AUTH-ADR-050
+Family assessments V1 (§47): `assessment.view` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER; `assessment.create/update/complete` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER. REPORTS_VIEWER and FAMILY_USER have no assessment access in V1. `assessment.review/verify/approve` remain unassigned; no delete permission exists. The assessment-domain reference endpoint accepts `reference-data.view` or `assessment.view`.
 ```
 
 ---
@@ -3179,6 +3214,8 @@ This is a baseline, not a substitute for explicit permissions.
 | Change Household Head | Permission | Permission | — | Policy | — | — | Request only |
 | Transfer Membership | Permission | Permission | — | Policy | — | — | Request only |
 | Assessments | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
+| View Family Assessments (V1) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Create/Update/Complete Family Assessments (V1) | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | Needs | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
 | Assistance | ✓ | ✓ | Limited | Review | ✓ | Read/report | Policy |
 | Review Change Request | Permission | ✓ | — | ✓ | Policy | — | — |
@@ -3374,7 +3411,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.5
+Version: 1.2.6
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3388,6 +3425,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.6 | 2026-09-24 | Approved | §47 V1 Role Assignment for `assessment.view/create/update/complete`, V1 assessment rows in §140, AUTH-ADR-050 |
 | 1.2.5 | 2026-09-24 | Approved | Added `activity-log.view` (§57a) with V1 role assignment, the "View Family Activity Log" row in §140, and AUTH-ADR-049 |
 | 1.2.4 | 2026-09-24 | Approved | Replaced `health.*` / `disability.*` with `health-record.view/create/update/close` (§40-41), health rows in §140, AUTH-ADR-048 |
 | 1.2.3 | 2026-09-24 | Approved | Added V1 role assignment for `person.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §44, the "Correct Basic Person Data" row in §140, and AUTH-ADR-047. National ID permissions unchanged |

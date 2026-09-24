@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AssessmentController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
@@ -58,7 +59,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/families/{family}/activities', [FamilyActivityController::class, 'index'])
         ->middleware('can:activity-log.view');
 
-    Route::get('/reference/disability-types', [ReferenceController::class, 'disabilityTypes'])
+    // Family-level assessments (docs/06 §47): assessment.* only. No
+    // delete endpoint in V1; a COMPLETED assessment is never edited.
+    Route::get('/families/{family}/assessments', [AssessmentController::class, 'index'])
+        ->middleware('can:assessment.view');
+
+    Route::post('/families/{family}/assessments', [AssessmentController::class, 'store'])
+        ->middleware('can:assessment.create');
+
+    Route::get('/assessments/{assessment}', [AssessmentController::class, 'show'])
+        ->middleware('can:assessment.view');
+
+    Route::patch('/assessments/{assessment}', [AssessmentController::class, 'update'])
+        ->middleware('can:assessment.update');
+
+    Route::post('/assessments/{assessment}/complete', [AssessmentController::class, 'complete'])
+        ->middleware('can:assessment.complete');
+
+    // reference-data.view OR assessment.view (checked in the controller):
+    // everyone who may read assessments needs the domain vocabulary.
+    Route::get('/reference/assessment-domains', [ReferenceController::class, 'assessmentDomains']);
+
+    Route::get('/reference/disability-types',[ReferenceController::class, 'disabilityTypes'])
         ->middleware('can:reference-data.view');
 
     Route::get('/reference/relationship-types', [ReferenceController::class, 'relationshipTypes'])

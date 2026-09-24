@@ -1,4 +1,7 @@
 import {
+  ClipboardCheck,
+  ClipboardList,
+  ClipboardPen,
   FilePlus2,
   FilePen,
   HeartPulse,
@@ -25,6 +28,9 @@ export const familyActivityPresentation: Record<
   HEALTH_RECORD_CREATED: { label: "تمت إضافة حالة صحية", icon: HeartPulse },
   HEALTH_RECORD_UPDATED: { label: "تم تعديل حالة صحية", icon: HeartPulse },
   HEALTH_RECORD_CLOSED: { label: "تم إغلاق حالة صحية", icon: HeartOff },
+  ASSESSMENT_CREATED: { label: "تم إنشاء تقييم للأسرة", icon: ClipboardList },
+  ASSESSMENT_UPDATED: { label: "تم تعديل مسودة تقييم", icon: ClipboardPen },
+  ASSESSMENT_COMPLETED: { label: "تم إكمال تقييم للأسرة", icon: ClipboardCheck },
 };
 
 export function formatActivityTime(iso: string): string {

@@ -886,6 +886,87 @@ created_at
 updated_at
 ```
 
+## V1 Implementation (2026-09-24)
+
+Quick Multi-Domain Family Assessment (docs/03 §40a):
+
+```text
+assessments
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE             public API identifier / route key
+family_id BIGINT NOT NULL FK families.id (RESTRICT)
+assessment_date DATE NOT NULL         business date, not created_at
+status VARCHAR NOT NULL               DRAFT | COMPLETED
+general_notes TEXT NULL
+created_by BIGINT NULL FK users.id (SET NULL)
+updated_by BIGINT NULL FK users.id (SET NULL)
+completed_at TIMESTAMP NULL
+completed_by BIGINT NULL FK users.id (SET NULL)
+created_at, updated_at
+
+INDEX (family_id, assessment_date, created_at, id)
+CHECK status IN ('DRAFT', 'COMPLETED')                          (PostgreSQL)
+CHECK (DRAFT ∧ completed_at IS NULL) ∨ (COMPLETED ∧ completed_at IS NOT NULL)
+```
+
+There is deliberately **no** unique constraint on
+`(family_id, assessment_date)`.
+
+```text
+assessment_results
+id BIGINT PK
+assessment_id BIGINT NOT NULL FK assessments.id (RESTRICT)
+assessment_domain_id BIGINT NOT NULL FK assessment_domains.id (RESTRICT)
+rating VARCHAR NOT NULL               NONE | LOW | MEDIUM | HIGH | CRITICAL
+notes TEXT NULL
+created_at, updated_at
+
+UNIQUE (assessment_id, assessment_domain_id)
+CHECK rating IN (...)                                            (PostgreSQL)
+```
+
+- No `NOT_ASSESSED` value: a missing row means the domain was not assessed.
+- No stored scores or counts.
+- The models refuse to update a COMPLETED assessment, to create/change/
+  delete results of a COMPLETED assessment, and to delete any assessment.
+- Not implemented in V1: `assessment_code`, `assessment_type_id`,
+  `assigned_to`, `form_submissions`.
+
+API (`/api/v1`):
+
+```text
+GET   /families/{family}/assessments       assessment.view   newest assessment_date, then newest entry; paginated (per_page 20, max 50)
+POST  /families/{family}/assessments       assessment.create creates a DRAFT
+GET   /assessments/{uuid}                  assessment.view
+PATCH /assessments/{uuid}                  assessment.update DRAFT only (409 once COMPLETED)
+POST  /assessments/{uuid}/complete         assessment.complete (+ assessment.update if a final draft payload is sent)
+GET   /reference/assessment-domains        reference-data.view OR assessment.view; active domains only
+```
+
+Draft payload: `assessment_date`, `general_notes`, and `results` as
+`[{domain_code, rating, notes}]`. When `results` is sent it is the full
+result set, synchronized transactionally; duplicate domains are rejected.
+There is no delete endpoint.
+
+---
+
+# 31a. Assessment Domains
+
+```text
+assessment_domains
+id BIGINT PK
+code VARCHAR UNIQUE NOT NULL
+name VARCHAR NOT NULL
+description TEXT NULL
+is_active BOOLEAN NOT NULL DEFAULT TRUE
+sort_order INTEGER NOT NULL DEFAULT 0
+created_at, updated_at
+```
+
+Same shape as `relationship_types` (§18) and `disability_types` (§28).
+Seeded idempotently with the eight V1 domains (docs/02 §27a); the seeder
+never reactivates a deactivated domain.
+
 ---
 
 # 32. Form Submissions
@@ -1663,7 +1744,7 @@ uuid UUID NOT NULL UNIQUE             public API identifier
 family_id BIGINT NOT NULL FK families.id (RESTRICT)
 actor_user_id BIGINT NULL FK users.id (SET NULL)
 event_type VARCHAR NOT NULL
-subject_type VARCHAR NULL             morph map: family | person | residence | health_record
+subject_type VARCHAR NULL             morph map: family | person | residence | health_record | assessment
 subject_id BIGINT NULL
 metadata JSON NULL                    allow-listed keys only
 created_at TIMESTAMP NOT NULL
@@ -3096,7 +3177,7 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.3
+Version: 1.2.4
 Status: APPROVED
 Database: PostgreSQL 16+
 Date: 2026-09-24
@@ -3111,6 +3192,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.4 | 2026-09-24 | Approved | Added the V1 `assessments` / `assessment_results` implementation (§31) and `assessment_domains` (§31a); `assessment` activity subject (§59a) |
 | 1.2.3 | 2026-09-24 | Approved | Added `family_activities` (§59a, Family Activity Log V1): append-only, allow-listed metadata, transactional with Domain Actions, no backfill |
 | 1.2.2 | 2026-09-24 | Approved | Replaced the proposed `person_health_conditions` / `person_disabilities` with `person_health_records` (§27) and added `disability_types` (§28), with partial unique indexes and CHECK constraints |
 | 1.2.1 | 2026-09-23 | Approved | Added `persons.alternate_mobile_owner_relation`, `family_residences.original_residence_text` / `displacement_location_text` and displacement CHECK constraints (§24) |

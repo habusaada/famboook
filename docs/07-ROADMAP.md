@@ -1501,6 +1501,15 @@ Workflow controlled
 Source/date/actor traceable
 ```
 
+## Progress
+
+2026-09-24: **Quick Multi-Domain Family Assessment V1** delivered as the
+first increment (docs/03 §40a): family-level dated snapshots, eight
+reference assessment domains, five-level rating scale, DRAFT → COMPLETED
+lifecycle, Activity Log integration and the Family Profile "التقييمات"
+tab. Assessment Types, Form Submissions, versioned questionnaires, review
+workflow and the cross-family Assessment List remain open for this phase.
+
 ---
 
 # 26. Phase 14 — Needs & Assistance
@@ -4547,4 +4556,5 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.1 | 2026-09-24 | Approved | Phase 13 progress note: Quick Multi-Domain Family Assessment V1 |
 | 1.2 | 2026-09-22 | Approved | Replaced Filament-first operational architecture with API-first Laravel + custom Next.js Staff/Executive/Family applications, restricted Filament to System Administration, introduced frontend/design-system foundations, revised implementation phases, MVP strategy, deployment topology, security gates and vertical delivery approach |

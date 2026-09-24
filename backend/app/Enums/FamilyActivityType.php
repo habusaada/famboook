@@ -15,10 +15,19 @@ enum FamilyActivityType: string
     case HEALTH_RECORD_CREATED = 'HEALTH_RECORD_CREATED';
     case HEALTH_RECORD_UPDATED = 'HEALTH_RECORD_UPDATED';
     case HEALTH_RECORD_CLOSED = 'HEALTH_RECORD_CLOSED';
+    case ASSESSMENT_CREATED = 'ASSESSMENT_CREATED';
+    case ASSESSMENT_UPDATED = 'ASSESSMENT_UPDATED';
+    case ASSESSMENT_COMPLETED = 'ASSESSMENT_COMPLETED';
 
     /** @return list<self> */
     public static function healthCases(): array
     {
         return [self::HEALTH_RECORD_CREATED, self::HEALTH_RECORD_UPDATED, self::HEALTH_RECORD_CLOSED];
+    }
+
+    /** @return list<self> */
+    public static function assessmentCases(): array
+    {
+        return [self::ASSESSMENT_CREATED, self::ASSESSMENT_UPDATED, self::ASSESSMENT_COMPLETED];
     }
 }

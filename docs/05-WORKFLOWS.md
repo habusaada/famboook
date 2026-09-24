@@ -744,6 +744,24 @@ APPROVED
 
 Exact Assessment workflow may vary by Assessment Type.
 
+## V1: Quick Multi-Domain Family Assessment
+
+Approved 2026-09-24 (docs/03 §40a). The V1 family assessment uses only:
+
+```text
+CREATE → DRAFT → COMPLETED
+```
+
+- `CreateAssessmentAction` creates a DRAFT; `UpdateAssessmentAction`
+  saves draft changes; `CompleteAssessmentAction` completes it,
+  optionally saving a final draft payload in the same transaction.
+- COMPLETED is terminal and immutable in V1: no reopening, review,
+  verification or approval. IN_PROGRESS, UNDER_REVIEW, VERIFIED and
+  APPROVED remain part of the future baseline above and are not used.
+- Completion requires at least one assessed domain and no result on an
+  inactive domain.
+- Completion never creates Needs and never changes canonical data (§36).
+
 ---
 
 # 36. Assessment Independence
@@ -2867,3 +2885,4 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial workflow definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal identity lifecycle, Change Request workflow, application rules, concurrency, idempotency, queues and Family self-service workflows |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative workflow layer, clarified Next.js/Filament workflow boundaries, added semantic API actions, after-commit notifications, retry-safe background processing, queue derivation and expanded workflow testing/invariants |
+| 1.2.1 | 2026-09-24 | Approved | §35: V1 family assessment workflow DRAFT → COMPLETED only |

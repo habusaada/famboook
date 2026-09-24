@@ -707,6 +707,71 @@ It must not be inferred from `updated_at`.
 
 ---
 
+# 40a. Quick Multi-Domain Family Assessment (V1)
+
+Approved 2026-09-24.
+
+A V1 assessment is a **dated snapshot of a Family's situation** across
+selected assessment domains (docs/02 §26-27b):
+
+```text
+Family → Assessment → Assessment Results (one per assessed domain)
+```
+
+It is not a questionnaire, not a Need and not Assistance.
+
+Rules:
+
+- Assessments are **family-level** in V1. Person-level assessments are
+  out of scope.
+- Assessments are **repeatable historical snapshots**. A Family may have
+  many assessments over time and **more than one on the same date**.
+- `assessment_date` is the business date ("when was the family
+  assessed?"), may not be in the future, and is **not** `created_at`
+  ("when was it entered into Famboook?").
+- Lifecycle: `DRAFT → COMPLETED` only. No reopening, review, approval,
+  rejection or cancellation in V1.
+- A **DRAFT** may change its date and general notes and add, change or
+  remove domain results. Saving the draft with a result set replaces it:
+  an omitted domain becomes "not assessed".
+- A domain is either rated (`NONE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`)
+  or has **no result**. Absence of a result means "not assessed"; there
+  is no `NOT_ASSESSED` value.
+- **Completion** requires at least one assessed domain. Not all domains
+  are mandatory. Every stored result must reference an active domain and
+  hold a valid rating. Completion records `completed_at` and
+  `completed_by`.
+- A **COMPLETED** assessment is immutable: its date, notes and results
+  can no longer change, and it cannot return to DRAFT (API: 409). A change
+  in family circumstances results in a **new** assessment. There is no
+  correction/revision workflow in V1.
+- Assessments are never deleted in V1 (no delete endpoint).
+- **Deactivated domains:** not selectable and cannot be newly added to a
+  draft. Existing results using them stay readable, and completed
+  assessments are unchanged. A DRAFT that already holds a result for a
+  domain deactivated later keeps it (never silently deleted), but cannot
+  be completed until that result is removed or the domain is reactivated.
+- No family score, weighting or vulnerability index is computed or
+  stored. **Needs are not created automatically** from assessment
+  results.
+- Assessment results never overwrite canonical Family/Person data (§40).
+- **Privacy:** general and domain notes may contain sensitive family,
+  health or protection information. They are exposed only through the
+  assessment endpoints (`assessment.view`), never in generic Family or
+  Person responses, never in the Activity Log, and never to
+  REPORTS_VIEWER or FAMILY_USER in V1. Health-domain notes are not a
+  replacement for Person Health Records (§36).
+- Every write is transactional and records its Activity Log event in the
+  same transaction (§97a).
+
+Out of scope for V1: questionnaires/templates, scoring formulas,
+weighted scores, approval/rejection, reopening/revisions, person-level
+assessments, attachments, signatures, researcher/collection metadata,
+charts, reports, export, Family Portal access, Filament management and
+domain administration UI.
+
+---
+
 # 42. Form Submission
 
 A Form Submission belongs to an approved data-collection or assessment process.
@@ -1561,7 +1626,14 @@ DISPLACEMENT_UPDATED    displacement-field correction
 HEALTH_RECORD_CREATED
 HEALTH_RECORD_UPDATED
 HEALTH_RECORD_CLOSED
+ASSESSMENT_CREATED      new draft assessment (§40a)
+ASSESSMENT_UPDATED      draft assessment saved with changes
+ASSESSMENT_COMPLETED    assessment completed
 ```
+
+Assessment events are recorded once per operation, never per domain
+rating, and carry no metadata (no ratings, no notes). They are shown only
+to holders of `assessment.view`.
 
 Residence and displacement corrections share one Domain Action. The event
 follows which field group changed: address fields → RESIDENCE_UPDATED;
@@ -2509,7 +2581,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.4
+Version: 1.2.5
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2523,6 +2595,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.5 | 2026-09-24 | Approved | Added §40a "Quick Multi-Domain Family Assessment (V1)" and the ASSESSMENT_* events in §97a |
 | 1.2.4 | 2026-09-24 | Approved | Added §97a "Family Activity Log (V1)" and the §54 V1 decision that the paper-form review/signature section is not implemented literally |
 | 1.2.3 | 2026-09-24 | Approved | §36 V1 health decisions: all record types closable (never deleted), active pregnancy/breastfeeding blocks gender correction away from FEMALE, deceased records stay historical but are excluded from current indicators, no minimum pregnancy/breastfeeding age |
 | 1.2.2 | 2026-09-24 | Approved | Added §36 "Health & Special-Needs Records (V1)": person-based types, FEMALE-only maternal records, duplicate-active rules, close-not-delete, derived indicators |

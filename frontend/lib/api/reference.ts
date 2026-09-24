@@ -2,7 +2,21 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
-import type { DisabilityType, RelationshipType } from "@/lib/types/api/reference";
+import type {
+  AssessmentDomain,
+  DisabilityType,
+  RelationshipType,
+} from "@/lib/types/api/reference";
+
+// Active domains only (selectable for new results).
+export function useAssessmentDomains() {
+  return useQuery({
+    queryKey: ["reference", "assessment-domains"],
+    queryFn: () =>
+      apiClient.get<{ data: AssessmentDomain[] }>("/api/v1/reference/assessment-domains"),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useRelationshipTypes() {
   return useQuery({

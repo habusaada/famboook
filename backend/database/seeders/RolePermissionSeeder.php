@@ -23,12 +23,14 @@ use Spatie\Permission\PermissionRegistrar;
  * NOT given a baseline grant, since no example in the document shows a role
  * routinely holding a permission whose only qualifier is "Policy".
  *
- * Capability-group rows (Assessments/Needs/Assistance, Manage Users/Roles,
+ * Capability-group rows (Needs/Assistance, Manage Users/Roles,
  * System Settings, etc.) that summarize multiple catalog permissions under
  * one matrix cell are deliberately left unassigned at the granular level:
  * the group-level intent may be clear, but which specific sub-permissions
  * apply is not decidable from the text alone. See the RBAC review conducted
- * 2026-09-22 for the full per-permission reasoning.
+ * 2026-09-22 for the full per-permission reasoning. The Assessments row was
+ * resolved to granular V1 grants by AUTH-ADR-050 (§47); assessment.review/
+ * verify/approve remain unassigned.
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -269,6 +271,11 @@ class RolePermissionSeeder extends Seeder
             'health-record.close',
             // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
             'activity-log.view',
+            // Assessments (§47 V1 Role Assignment, AUTH-ADR-050)
+            'assessment.view',
+            'assessment.create',
+            'assessment.update',
+            'assessment.complete',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -339,6 +346,11 @@ class RolePermissionSeeder extends Seeder
             'health-record.close',
             // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
             'activity-log.view',
+            // Assessments (§47 V1 Role Assignment, AUTH-ADR-050)
+            'assessment.view',
+            'assessment.create',
+            'assessment.update',
+            'assessment.complete',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -380,6 +392,11 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
             'activity-log.view',
+            // Assessments (§47 V1 Role Assignment, AUTH-ADR-050)
+            'assessment.view',
+            'assessment.create',
+            'assessment.update',
+            'assessment.complete',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
@@ -402,6 +419,8 @@ class RolePermissionSeeder extends Seeder
             'health-record.view',
             // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
             'activity-log.view',
+            // Assessments: view only (§47 V1 Role Assignment, AUTH-ADR-050)
+            'assessment.view',
         ],
         'SOCIAL_WORKER' => [
             // View Family: Scope (grant + Data Scope constraint)
@@ -412,6 +431,11 @@ class RolePermissionSeeder extends Seeder
             'health-record.view',
             // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
             'activity-log.view',
+            // Assessments (§47 V1 Role Assignment, AUTH-ADR-050)
+            'assessment.view',
+            'assessment.create',
+            'assessment.update',
+            'assessment.complete',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)

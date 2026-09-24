@@ -1094,6 +1094,105 @@ created_at
 updated_at
 ```
 
+## V1 Implementation — Quick Multi-Domain Family Assessment
+
+Approved 2026-09-24 (docs/03 §40a). V1 implements the smallest clean
+subset of the fields above:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier (used instead of `assessment_code` in V1) |
+| `family_id` | yes | The assessed Family. V1 assessments are **family-level only** (no person-level assessments) |
+| `assessment_date` | yes | **Business date**: when the family was assessed. Not in the future. Distinct from `created_at` |
+| `status` | yes | `DRAFT` or `COMPLETED` (no other V1 values) |
+| `general_notes` | no | Free-text notes about the whole assessment (sensitive) |
+| `created_by` | no | Authenticated user who entered the assessment |
+| `updated_by` | no | Last user who saved the draft |
+| `completed_at` | no | Set on completion only |
+| `completed_by` | no | Authenticated user who completed it |
+| `created_at` | yes | When the assessment was **entered** into Famboook |
+| `updated_at` | yes | Last draft save |
+
+Not implemented in V1: `assessment_code`, `assessment_type_id`,
+`assigned_to`, form submissions, questionnaires/templates, scoring.
+
+A Family may have any number of assessments, including several on the
+same `assessment_date`; each is independently identifiable.
+
+---
+
+# 27a. Assessment Domains
+
+Approved 2026-09-24 (V1).
+
+## Entity
+
+```text
+assessment_domains
+```
+
+Reference data with the same shape as `relationship_types` /
+`disability_types` (`code`, `name`, `description`, `is_active`,
+`sort_order`). Deactivated, never deleted, once in use. Re-running the
+seeder never reactivates a deactivated domain.
+
+V1 baseline:
+
+| Code | Arabic |
+|---|---|
+| `SHELTER` | السكن والمأوى |
+| `FOOD` | الغذاء |
+| `WASH` | المياه والصرف الصحي والنظافة |
+| `HEALTH` | الصحة |
+| `EDUCATION` | التعليم |
+| `ECONOMIC` | الوضع الاقتصادي |
+| `PROTECTION` | الحماية |
+| `SPECIAL_NEEDS` | الاحتياجات الخاصة |
+
+There is no domain administration UI in V1.
+
+---
+
+# 27b. Assessment Result
+
+Approved 2026-09-24 (V1).
+
+## Entity
+
+```text
+assessment_results
+```
+
+The rating of one assessment domain within one Assessment. At most one
+result per `(assessment_id, assessment_domain_id)`.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `assessment_id` | yes | Parent Assessment |
+| `assessment_domain_id` | yes | Assessed domain |
+| `rating` | yes | `NONE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
+| `notes` | no | Domain notes (sensitive) |
+
+Rating presentation (Staff App):
+
+| Code | Arabic |
+|---|---|
+| `NONE` | لا يوجد احتياج |
+| `LOW` | منخفض |
+| `MEDIUM` | متوسط |
+| `HIGH` | مرتفع |
+| `CRITICAL` | حرج |
+
+**There is no `NOT_ASSESSED` rating.** The absence of a result for a
+domain means "لم يتم تقييم هذا المجال". "غير مقيّم" in the Staff App is UI
+state only and is never sent or stored.
+
+No family-level score, count or vulnerability index is stored; counts
+such as "assessed domains" are derived on read.
+
+Assessment health-domain notes belong to the Assessment and do not
+replace Person Health Records (§22).
+
 ---
 
 # 28. Form Submission
@@ -1948,9 +2047,9 @@ holds no previous/new values.
 | `family_id` | yes | The Family whose timeline this belongs to |
 | `actor_user_id` | no | Authenticated application user who performed the operation. Not the field researcher. NULL reserved for future system/import operations |
 | `event_type` | yes | Canonical event code (see docs/03 §97a) |
-| `subject_type` | no | `family`, `person`, `residence` or `health_record` |
+| `subject_type` | no | `family`, `person`, `residence`, `health_record` or `assessment` |
 | `subject_id` | no | Internal id of the subject record |
-| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING) |
+| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment events carry no metadata (no ratings, no notes) |
 | `created_at` | yes | When the operation happened |
 
 There is no `updated_at`: entries are never modified.
@@ -3029,7 +3128,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.5
+Version: 1.2.6
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3043,6 +3142,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.6 | 2026-09-24 | Approved | Quick Multi-Domain Family Assessment V1: §27 V1 implementation fields, §27a `assessment_domains` (8 V1 domains), §27b `assessment_results` and rating scale (absence = not assessed), `assessment` activity subject in §61a |
 | 1.2.5 | 2026-09-24 | Approved | Added §61a "Family Activity" (Family Activity Log V1): fields, allow-listed metadata, actor ≠ researcher, no backfill; PDD-025 note |
 | 1.2.4 | 2026-09-24 | Approved | §22: all health record types closable, gender integrity with active pregnancy/breastfeeding, deceased records kept as history, no minimum maternal age in V1 |
 | 1.2.3 | 2026-09-24 | Approved | Health & Special-Needs Records V1: unified person-based `person_health_records` (§22) replacing the separate health-condition/disability proposals, `disability_types` V1 baseline, derived family health indicators (today vs future collection date) |
