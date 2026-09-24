@@ -44,7 +44,10 @@ import {
   assistanceTypeLabels,
   CURRENCIES,
   currencyLabels,
+  executionModeLabels,
 } from "@/lib/utils/assistance";
+
+const EXECUTION_MODES = ["INTERNAL", "EXTERNAL"] as const;
 
 const STATUS_MESSAGES = {
   403: "لا تملك صلاحية إنشاء أو تعديل المساعدات.",
@@ -183,6 +186,33 @@ export function AssistanceFormDialog({
                   <Input id={`${formId}-provider`} placeholder="مثال: مبادرة مجتمعية" {...register("providerName")} />
                   <FieldError message={errors.providerName?.message} />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel htmlFor={`${formId}-mode`}>طريقة التنفيذ</FieldLabel>
+                <Controller
+                  control={control}
+                  name="executionMode"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id={`${formId}-mode`}>
+                        <SelectValue placeholder="اختر طريقة التنفيذ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXECUTION_MODES.map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {executionModeLabels[m]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  داخلي: الاعتماد والتحقق من الهوية والتسليم داخل Famboook. خارجي: إصدار كشف مستفيدين معتمدين لجهة أخرى
+                  تتولى التسليم. لا يمكن تغييرها بعد فتح المساعدة.
+                </p>
+                <FieldError message={errors.executionMode?.message} />
               </div>
             </>
           )}

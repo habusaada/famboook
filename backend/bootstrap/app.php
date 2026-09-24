@@ -16,5 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Typed National IDs (identity verification) must never be flashed
+        // back into a session or error context.
+        $exceptions->dontFlash([
+            'national_id',
+            'beneficiary_national_id',
+            'delegate_national_id',
+        ]);
     })->create();

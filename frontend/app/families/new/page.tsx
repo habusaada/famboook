@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowRight, Clock } from "lucide-react";
@@ -78,6 +79,7 @@ export default function NewFamilyPage() {
     defaultValues: {
       registrationSource: "MANUAL_ENTRY",
       headGender: "MALE",
+      headMaritalStatus: "UNKNOWN",
     },
   });
 
@@ -262,6 +264,17 @@ export default function NewFamilyPage() {
                         <SelectItem value="FEMALE">أنثى</SelectItem>
                       </SelectContent>
                     </Select>
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel htmlFor="headMaritalStatus">الحالة الاجتماعية</FieldLabel>
+                <Controller
+                  control={control}
+                  name="headMaritalStatus"
+                  render={({ field }) => (
+                    <MaritalStatusSelect id="headMaritalStatus" value={field.value} onChange={field.onChange} />
                   )}
                 />
               </div>

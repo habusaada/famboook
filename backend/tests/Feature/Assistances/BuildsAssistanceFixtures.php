@@ -150,6 +150,7 @@ trait BuildsAssistanceFixtures
             'title' => 'حزمة إيواء طارئة',
             'category_code' => 'SHELTER',
             'assistance_type' => 'IN_KIND',
+            'execution_mode' => 'INTERNAL',
             'provider_name' => 'مبادرة مجتمعية تجريبية',
             'target_beneficiaries' => 100,
             'start_date' => '2026-10-01',

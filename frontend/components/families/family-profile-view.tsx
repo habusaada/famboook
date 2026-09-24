@@ -30,19 +30,19 @@ import { FamilyHealthTab } from "@/components/families/family-health-tab";
 import { FamilyActivityTab } from "@/components/families/family-activity-tab";
 import { FamilyAssessmentsTab } from "@/components/families/family-assessments-tab";
 import { FamilyNeedsTab } from "@/components/families/family-needs-tab";
+import { FamilyAssistanceTab } from "@/components/families/family-assistance-tab";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
 
 const secondaryTabs = [
-  { value: "assistance", label: "المساعدات" },
   { value: "documents", label: "الوثائق" },
 ] as const;
 
 // Tabs that can be opened directly via ?tab= (e.g. returning from an
 // assessment screen).
-const LINKABLE_TABS = ["overview", "members", "residence", "health", "assessments", "needs", "history"];
+const LINKABLE_TABS = ["overview", "members", "residence", "health", "assessments", "needs", "assistance", "history"];
 
 function MetaItem({
   icon: Icon,
@@ -241,6 +241,7 @@ export function FamilyProfileView({
           <TabsTrigger value="health">الحالة الصحية</TabsTrigger>
           <TabsTrigger value="assessments">التقييمات</TabsTrigger>
           <TabsTrigger value="needs">الاحتياجات</TabsTrigger>
+          <TabsTrigger value="assistance">المساعدات</TabsTrigger>
           {secondaryTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
@@ -271,6 +272,10 @@ export function FamilyProfileView({
 
         <TabsContent value="needs" className="mt-4">
           <FamilyNeedsTab familyCode={family.family_code} />
+        </TabsContent>
+
+        <TabsContent value="assistance" className="mt-4">
+          <FamilyAssistanceTab familyCode={family.family_code} />
         </TabsContent>
 
         {secondaryTabs.map((tab) => (

@@ -7,6 +7,8 @@ use App\Enums\NominationSource;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
@@ -31,6 +33,14 @@ class AssistanceBeneficiary extends Model
         'nominated_by',
         'removed_at',
         'removed_by',
+        'approved_at',
+        'approved_by',
+        'rejected_at',
+        'rejected_by',
+        'rejection_reason',
+        'not_delivered_at',
+        'not_delivered_by',
+        'not_delivered_reason',
     ];
 
     protected static function booted(): void
@@ -48,6 +58,9 @@ class AssistanceBeneficiary extends Model
             'targeting_criteria' => 'array',
             'nominated_at' => 'datetime',
             'removed_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
+            'not_delivered_at' => 'datetime',
         ];
     }
 
@@ -80,6 +93,37 @@ class AssistanceBeneficiary extends Model
     public function sourceNeed(): BelongsTo
     {
         return $this->belongsTo(FamilyNeed::class, 'source_need_id');
+    }
+
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(AssistanceDelivery::class)->latest('delivered_at')->latest('id');
+    }
+
+    /** The current (non-reversed) delivery, if any. */
+    public function activeDelivery(): HasOne
+    {
+        return $this->hasOne(AssistanceDelivery::class)->whereNull('reversed_at');
+    }
+
+    public function listEntries(): HasMany
+    {
+        return $this->hasMany(AssistanceBeneficiaryListEntry::class);
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejecter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function notDeliveredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'not_delivered_by');
     }
 
     public function nominator(): BelongsTo

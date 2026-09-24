@@ -13,6 +13,7 @@ class FamilyMemberResource extends JsonResource
             'person_code' => $this->person->person_code,
             'full_name' => $this->person->full_name,
             'gender' => $this->person->gender,
+            'marital_status' => $this->person->marital_status,
             'birth_date' => $this->person->birth_date?->toDateString(),
             'is_household_head' => $this->is_household_head,
             'is_active' => $this->is_active,

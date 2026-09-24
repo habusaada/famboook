@@ -1584,6 +1584,17 @@ targeting, manual search and open Needs; history-preserving removal;
 rejection, delivery records, delivered quantities/values/dates,
 completion/cancellation and Need–delivery linking.
 
+2026-09-24: **Assistance V1-B** delivered (docs/03 §47d–§47i): execution
+mode INTERNAL/EXTERNAL; approval (single/bulk) and rejection; INTERNAL
+identity-verified full-package delivery (PERSONAL / DELEGATE by an
+unmarried son/daughter), NOT_DELIVERED and Reverse Delivery;
+`persons.marital_status`; EXTERNAL requested-field catalog, preview,
+immutable issued beneficiary lists with encrypted snapshots and XLSX;
+derived statistics per mode; completion; Family Profile "المساعدات".
+**Still open:** external execution-result entry/import, cancellation,
+partial delivery (not planned), Need–delivery linking beyond the source
+Need.
+
 ---
 
 # 27. Phase 15 — Documents & Case Notes
@@ -4563,7 +4574,7 @@ The result should feel like a coherent product, not a collection of CRUD pages.
 ```text
 Project: Famboook
 Document: Implementation Roadmap
-Version: 1.2.3
+Version: 1.2.4
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -4576,6 +4587,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.4 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-B (approval and execution) |
 | 1.2.3 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-A (program, targeting, nomination); V1-B deferred |
 | 1.2.2 | 2026-09-24 | Approved | Phase 14 progress note: Needs Management V1 (Assistance deferred) |
 | 1.2.1 | 2026-09-24 | Approved | Phase 13 progress note: Quick Multi-Domain Family Assessment V1 |

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ListChecks, Search, UserMinus, UserPlus, Users } from "lucide-react";
+import { Check, CheckCheck, ListChecks, Search, UserMinus, UserPlus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,8 +41,17 @@ import {
 } from "@/components/ui/table";
 import { FieldLabel, SaveError } from "@/components/shared/edit-dialog-parts";
 import { NominationSourceBadge } from "@/components/assistances/assistance-badges";
+import {
+  DeliveryDialog,
+  ExecutionState,
+  NotDeliveredDialog,
+  RejectNomineeDialog,
+  ReverseDeliveryDialog,
+} from "@/components/assistances/assistance-execution-actions";
 import { NeedPriorityBadge } from "@/components/needs/need-badges";
 import {
+  useApproveNominee,
+  useBulkApprove,
   useNominateFromNeeds,
   useNominateManually,
   useNomineeCandidates,
@@ -52,7 +61,7 @@ import {
 import { ApiError } from "@/lib/api/client";
 import { useNeedsQueue } from "@/lib/api/needs";
 import { useNeedCategories } from "@/lib/api/reference";
-import type { Assistance, Nominee, NomineeSummary } from "@/lib/types/api/assistance";
+import type { Assistance, AssistanceResponse, Nominee, NomineeSummary } from "@/lib/types/api/assistance";
 import type { NeedPriority } from "@/lib/types/api/need";
 import { formatDateTime } from "@/lib/utils/date";
 import { nomineeStatusLabels } from "@/lib/utils/assistance";
@@ -437,9 +446,54 @@ function RemoveNomineeButton({ assistance, nominee }: { assistance: Assistance; 
 
 // ---------------------------------------------------------------------------
 
-export function AssistanceNomineesTab({ assistance, canNominate }: { assistance: Assistance; canNominate: boolean }) {
+function BulkApproveButton({ assistance, selected, onDone }: { assistance: Assistance; selected: string[]; onDone: () => void }) {
+  const mutation = useBulkApprove(assistance.id);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        size="sm"
+        disabled={selected.length === 0 || mutation.isPending}
+        onClick={() =>
+          mutation.mutate(selected, {
+            onSuccess: () => {
+              setError(null);
+              onDone();
+            },
+            onError: (e) => setError(errorMessage(e, "تعذّر اعتماد المحددين.")),
+          })
+        }
+      >
+        <CheckCheck className="size-4" />
+        {mutation.isPending ? "جارٍ الاعتماد..." : `اعتماد المحدد (${selected.length})`}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </div>
+  );
+}
+
+function ApproveButton({ assistance, nominee }: { assistance: Assistance; nominee: Nominee }) {
+  const mutation = useApproveNominee(assistance.id);
+  return (
+    <Button variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate(nominee.id)}>
+      <Check className="size-4" />
+      اعتماد
+    </Button>
+  );
+}
+
+export function AssistanceNomineesTab({
+  assistance,
+  abilities,
+}: {
+  assistance: Assistance;
+  abilities: AssistanceResponse["abilities"];
+}) {
+  const canNominate = abilities.nominate;
   const [includeRemoved, setIncludeRemoved] = useState(false);
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const { data, isLoading, isError, error } = useNominees(assistance.id, includeRemoved, page);
 
   if (isError) {
@@ -451,6 +505,14 @@ export function AssistanceNomineesTab({ assistance, canNominate }: { assistance:
   }
 
   const nominees = data?.data ?? [];
+  const approvable = nominees.filter((n) => n.status === "NOMINATED");
+  const hasActions = canNominate || abilities.approve || abilities.deliver || abilities.reverse;
+  const toggle = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -474,10 +536,13 @@ export function AssistanceNomineesTab({ assistance, canNominate }: { assistance:
             المرشح مستفيد محتمل فقط — الترشيح ليس إثباتًا لاستلام المساعدة.
             {!canNominate && assistance.status === "DRAFT" && " افتح المساعدة لإضافة مرشحين."}
           </CardDescription>
-          {canNominate && (
-            <CardAction className="flex flex-wrap gap-2">
-              <ManualNomineeDialog assistance={assistance} />
-              <NeedsNomineeDialog assistance={assistance} />
+          {(canNominate || abilities.approve) && (
+            <CardAction className="flex flex-wrap items-start gap-2">
+              {abilities.approve && (
+                <BulkApproveButton assistance={assistance} selected={[...selected]} onDone={() => setSelected(new Set())} />
+              )}
+              {canNominate && <ManualNomineeDialog assistance={assistance} />}
+              {canNominate && <NeedsNomineeDialog assistance={assistance} />}
             </CardAction>
           )}
         </CardHeader>
@@ -507,6 +572,25 @@ export function AssistanceNomineesTab({ assistance, canNominate }: { assistance:
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {abilities.approve && (
+                      <TableHead className="w-0">
+                        <input
+                          type="checkbox"
+                          aria-label="تحديد المرشحين في هذه الصفحة"
+                          className="size-4 accent-primary"
+                          disabled={approvable.length === 0}
+                          checked={approvable.length > 0 && approvable.every((n) => selected.has(n.id))}
+                          onChange={(e) => {
+                            const next = new Set(selected);
+                            for (const n of approvable) {
+                              if (e.target.checked) next.add(n.id);
+                              else next.delete(n.id);
+                            }
+                            setSelected(next);
+                          }}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>المرشح</TableHead>
                     <TableHead>الأسرة</TableHead>
                     <TableHead>نوع الترشيح</TableHead>
@@ -515,12 +599,26 @@ export function AssistanceNomineesTab({ assistance, canNominate }: { assistance:
                     <TableHead>بواسطة</TableHead>
                     <TableHead>التاريخ</TableHead>
                     <TableHead>الحالة</TableHead>
-                    {canNominate && <TableHead className="w-0" />}
+                    <TableHead>{assistance.execution_mode === "EXTERNAL" ? "الكشوف" : "التسليم"}</TableHead>
+                    {hasActions && <TableHead className="w-0" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {nominees.map((n) => (
                     <TableRow key={n.id} data-nominee-id={n.id} className={n.status === "REMOVED" ? "opacity-60" : undefined}>
+                      {abilities.approve && (
+                        <TableCell>
+                          {n.status === "NOMINATED" && (
+                            <input
+                              type="checkbox"
+                              aria-label={`تحديد ${n.person?.full_name ?? n.family.family_code}`}
+                              className="size-4 accent-primary"
+                              checked={selected.has(n.id)}
+                              onChange={() => toggle(n.id)}
+                            />
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">
                         {n.person ? (
                           <Link href={`/people/${encodeURIComponent(n.person.person_code)}`} className="hover:underline">
@@ -552,11 +650,33 @@ export function AssistanceNomineesTab({ assistance, canNominate }: { assistance:
                       <TableCell>{n.nominated_by?.name ?? "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{formatDateTime(n.nominated_at)}</TableCell>
                       <TableCell>
-                        <Badge variant={n.status === "NOMINATED" ? "secondary" : "outline"}>{nomineeStatusLabels[n.status]}</Badge>
+                        <Badge variant={n.status === "APPROVED" ? "default" : n.status === "NOMINATED" ? "secondary" : "outline"}>
+                          {nomineeStatusLabels[n.status]}
+                        </Badge>
                       </TableCell>
-                      {canNominate && (
+                      <TableCell>
+                        <ExecutionState assistance={assistance} nominee={n} />
+                      </TableCell>
+                      {hasActions && (
                         <TableCell>
-                          {n.status === "NOMINATED" && <RemoveNomineeButton assistance={assistance} nominee={n} />}
+                          <div className="flex items-center justify-end gap-1">
+                            {abilities.approve && n.status === "NOMINATED" && (
+                              <>
+                                <ApproveButton assistance={assistance} nominee={n} />
+                                <RejectNomineeDialog assistance={assistance} nominee={n} />
+                              </>
+                            )}
+                            {abilities.deliver && n.status === "APPROVED" && !n.active_delivery && (
+                              <>
+                                <DeliveryDialog assistance={assistance} nominee={n} />
+                                <NotDeliveredDialog assistance={assistance} nominee={n} />
+                              </>
+                            )}
+                            {abilities.reverse && n.active_delivery && (
+                              <ReverseDeliveryDialog assistance={assistance} deliveryId={n.active_delivery.id} />
+                            )}
+                            {canNominate && n.status === "NOMINATED" && <RemoveNomineeButton assistance={assistance} nominee={n} />}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>

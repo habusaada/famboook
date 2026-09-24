@@ -3,6 +3,7 @@
 // resource's docblock) — do not add it here to match a UI wish; it
 // isn't exposed until field-level authorization exists.
 
+import type { MaritalStatus } from "@/lib/utils/marital-status";
 import type { Gender } from "@/lib/types/api/family";
 import type { RelationshipType } from "@/lib/types/api/reference";
 
@@ -19,6 +20,7 @@ export interface PersonDetail {
   person_code: string;
   full_name: string;
   gender: Gender;
+  marital_status: MaritalStatus;
   birth_date: string | null;
   mobile: string | null;
   alternate_mobile: string | null;
@@ -38,6 +40,7 @@ export interface UpdatePersonPayload {
   full_name?: string;
   national_id?: string | null;
   gender?: Gender;
+  marital_status?: MaritalStatus;
   birth_date?: string | null;
   mobile?: string | null;
   alternate_mobile?: string | null;

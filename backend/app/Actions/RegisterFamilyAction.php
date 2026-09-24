@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Enums\DisplacementStatus;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\MaritalStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
@@ -61,7 +62,11 @@ class RegisterFamilyAction
         return DB::transaction(function () use ($data, $actingUserId) {
             $familyId = BusinessIdentifier::nextId('families');
 
-            $family = Family::create([
+            // forceCreate, not create: `id` is deliberately not fillable, so
+            // create() would silently drop the id reserved above; the INSERT
+            // would then draw a second sequence value and the public code
+            // would no longer match the row id (and codes would skip).
+            $family = Family::forceCreate([
                 'id' => $familyId,
                 'family_code' => BusinessIdentifier::format('FAM', $familyId),
                 'status' => 'ACTIVE',
@@ -76,12 +81,14 @@ class RegisterFamilyAction
             $personId = BusinessIdentifier::nextId('persons');
 
             $head = $data['household_head'];
-            $person = Person::create([
+            // forceCreate keeps the reserved id (see above).
+            $person = Person::forceCreate([
                 'id' => $personId,
                 'person_code' => BusinessIdentifier::format('PER', $personId),
                 'full_name' => $head['full_name'],
                 'national_id' => $head['national_id'] ?? null,
                 'gender' => $head['gender'],
+                'marital_status' => $head['marital_status'] ?? MaritalStatus::UNKNOWN->value,
                 'birth_date' => $head['birth_date'],
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $head['mobile'] ?? null,

@@ -4,6 +4,7 @@ import type { UpdatePersonPayload } from "@/lib/types/api/person";
 export const editPersonSchema = z.object({
   fullName: z.string().min(2, "الاسم الكامل مطلوب"),
   gender: z.enum(["MALE", "FEMALE"]),
+  maritalStatus: z.enum(["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "UNKNOWN"]),
   birthDate: z.string().optional(),
   mobile: z.string().optional(),
   alternateMobile: z.string().optional(),
@@ -16,6 +17,7 @@ export function toUpdatePersonPayload(values: EditPersonValues): UpdatePersonPay
   return {
     full_name: values.fullName,
     gender: values.gender,
+    marital_status: values.maritalStatus,
     birth_date: values.birthDate || null,
     mobile: values.mobile || null,
     alternate_mobile: values.alternateMobile || null,
@@ -29,6 +31,7 @@ export function toUpdatePersonPayload(values: EditPersonValues): UpdatePersonPay
 export const personApiFieldToFormField: Record<string, keyof EditPersonValues> = {
   full_name: "fullName",
   gender: "gender",
+  marital_status: "maritalStatus",
   birth_date: "birthDate",
   mobile: "mobile",
   alternate_mobile: "alternateMobile",

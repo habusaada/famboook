@@ -18,6 +18,7 @@ class AssistanceResource extends JsonResource
             'title' => $this->title,
             'category' => new AssistanceCategoryResource($this->category),
             'assistance_type' => $this->assistance_type,
+            'execution_mode' => $this->execution_mode,
             'provider_name' => $this->provider_name,
             'target_beneficiaries' => $this->target_beneficiaries,
             'start_date' => $this->start_date?->toDateString(),
@@ -33,11 +34,15 @@ class AssistanceResource extends JsonResource
                 'currency' => $item->currency,
             ])),
             'targeting_criteria' => $this->targeting_criteria ?? (object) [],
+            // EXTERNAL requested columns (keys + labels only; never values).
+            'export_fields' => $this->export_fields ?? [],
             'created_by' => $this->creator ? ['name' => $this->creator->name] : null,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'opened_at' => $this->opened_at?->toIso8601String(),
             'opened_by' => $this->opener ? ['name' => $this->opener->name] : null,
+            'completed_at' => $this->completed_at?->toIso8601String(),
+            'completed_by' => $this->completer ? ['name' => $this->completer->name] : null,
         ];
     }
 

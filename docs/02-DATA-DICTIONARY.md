@@ -502,6 +502,20 @@ Life status is represented separately.
 
 ---
 
+## V1 Field: marital_status
+
+Approved 2026-09-24 (Assistance V1-B). `persons.marital_status`:
+`SINGLE` أعزب/عزباء, `MARRIED` متزوج/ة, `DIVORCED` مطلق/ة, `WIDOWED`
+أرمل/ة, `UNKNOWN` غير معروف (default). Existing persons were set to
+UNKNOWN; SINGLE is never inferred from age or relationship. Edited through
+the normal Person create/correct flows. Used by the delegated-receipt rule
+(only a SINGLE son/daughter may receive on behalf). V1 decision: stored as
+a fixed code set on `persons`, not yet as the `marital_statuses` reference
+entity described in §11 (which remains the target model; the V1 codes are
+chosen to map onto it one-to-one).
+
+---
+
 # 11. Marital Status
 
 ## Entity
@@ -1542,6 +1556,9 @@ assistances
 | `start_date`, `end_date` | no | Planned period (`end_date >= start_date`); not delivery dates |
 | `description` | no | Free text |
 | `status` | yes | `DRAFT` مسودة, `OPEN` مفتوحة, `COMPLETED` مكتملة, `CANCELLED` ملغاة |
+| `execution_mode` | yes | `INTERNAL` (approval, identity-verified delivery in Famboook) or `EXTERNAL` (approval and immutable beneficiary lists issued to another organization). Chosen while DRAFT; locked once OPEN. Existing V1-A rows were migrated to INTERNAL |
+| `export_fields` | no | EXTERNAL requested list columns (§36f) |
+| `completed_at`, `completed_by` | no | Set on OPEN → COMPLETED |
 | `targeting_criteria` | no | Validated criteria snapshot (§36d); never preview results |
 | `opened_at`, `opened_by` | no | When/by whom DRAFT → OPEN happened |
 | `created_by`, `updated_by`, timestamps | — | |
@@ -1608,8 +1625,80 @@ assistance_beneficiaries
 | `nominated_at`, `nominated_by` | yes | When/by whom |
 | `removed_at`, `removed_by` | no | Set when REMOVED |
 
-V1-B will add `APPROVED`, `REJECTED`, `NOT_DELIVERED` on the same rows.
-`DELIVERED` is never a nominee status: delivery is a separate record.
+**V1-B (implemented 2026-09-24):** `APPROVED` معتمد, `REJECTED` مرفوض,
+`NOT_DELIVERED` لم يُسلَّم were added on the same rows, with
+`approved_at/by`, `rejected_at/by`, `rejection_reason` (required),
+`not_delivered_at/by`, `not_delivered_reason` (required). Transitions:
+NOMINATED → APPROVED | REJECTED (both modes); APPROVED → NOT_DELIVERED
+(INTERNAL only). REJECTED and NOT_DELIVERED are terminal. `DELIVERED` is
+never a nominee status: delivery is a separate record (§36e); inclusion in
+an external list is derived from list entries (§36f).
+
+---
+
+# 36e. Assistance Delivery (V1-B, INTERNAL only)
+
+```text
+assistance_deliveries
+```
+
+| Field | Meaning |
+|---|---|
+| `uuid` | Public identifier |
+| `assistance_beneficiary_id` | The APPROVED beneficiary |
+| `receipt_mode` | `PERSONAL` (المستفيد شخصيًا) or `DELEGATE` (الاستلام بالنيابة) |
+| `original_beneficiary_person_id` | Nominated person, or current household head for a family-level beneficiary |
+| `recipient_person_id` | = original for PERSONAL; an unmarried son/daughter for DELEGATE |
+| `delivered_at`, `delivered_by` | When / which authenticated user recorded it |
+| `notes` | Optional |
+| `reversed_at`, `reversed_by`, `reversal_reason` | Set once by Reverse Delivery |
+
+One row means the **full planned package** was received (no delivery
+items, no partial delivery). **No National ID is stored.** At most one
+non-reversed delivery per beneficiary. Never deleted.
+
+---
+
+# 36f. Issued Beneficiary List (V1-B, EXTERNAL only)
+
+```text
+assistance_beneficiary_lists
+assistance_beneficiary_list_entries
+```
+
+List: `uuid`, `list_number` (ABL-000001), `recipient_organization`
+(defaults to the Assistance `provider_name`), `issued_at`, `issued_by`,
+`notes`, `configuration_snapshot` (ordered columns: `field_key`,
+`column_label`, `classification`), `contains_sensitive`, `row_count`.
+
+Entry: list, beneficiary, `row_number`, `snapshot_data` — the exact values
+issued, keyed by field. **Highly sensitive**, encrypted at rest, readable
+only through the authorized external-list endpoints. Lists and entries are
+immutable and never deleted; a correction is a new list.
+
+Requested export fields (`assistances.export_fields`, EXTERNAL only) are an
+ordered list of `{field_key, column_label, sort_order}` from this
+controlled catalog. They are independent of targeting criteria. A column
+label is presentation only and never changes a field's meaning.
+
+| Key | Class | Semantics (subject = nominated Person, or CURRENT household head for a family-level beneficiary) |
+|---|---|---|
+| `family_code` | STANDARD | Beneficiary family's code |
+| `person_code` | STANDARD | Subject person's code |
+| `beneficiary_name` | STANDARD | Subject person's full name |
+| `household_head_name` | STANDARD | Current household head's full name |
+| `national_id` | SENSITIVE | Subject person's National ID, as stored |
+| `date_of_birth` | STANDARD | Subject person's birth date (YYYY-MM-DD) |
+| `gender` | STANDARD | ذكر / أنثى |
+| `marital_status` | STANDARD | Subject person's marital status (Arabic label) |
+| `primary_mobile` | CONTACT | Subject person's mobile |
+| `alternate_mobile` | CONTACT | Subject person's alternate mobile |
+| `family_members_count` | STANDARD | Active, non-deceased members of the family |
+| `original_residence` | STANDARD | Current residence `original_residence_text` |
+| `displacement_status` | STANDARD | نازحة / غير نازحة (empty if never collected) |
+| `displacement_location` | STANDARD | Current residence `displacement_location_text` |
+| `children_under_2_count` | STANDARD | Active living members under two today (health-indicator rule) |
+| `has_disability` / `has_chronic_disease` / `has_pregnancy` / `has_breastfeeding` | SENSITIVE | نعم / لا — active record of that type: family-level = any active living member; person-level = that person only. Never the condition or details |
 
 ---
 
@@ -2239,7 +2328,7 @@ holds no previous/new values.
 | `family_id` | yes | The Family whose timeline this belongs to |
 | `actor_user_id` | no | Authenticated application user who performed the operation. Not the field researcher. NULL reserved for future system/import operations |
 | `event_type` | yes | Canonical event code (see docs/03 §97a) |
-| `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment`, `need` or `assistance_nominee` |
+| `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment`, `need` or `assistance_nominee` (also the subject of V1-B approval, delivery and listing events) |
 | `subject_id` | no | Internal id of the subject record |
 | `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment, Need and nomination events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities) |
 | `created_at` | yes | When the operation happened |
@@ -3320,7 +3409,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.8
+Version: 1.2.9
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3334,6 +3423,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.9 | 2026-09-24 | Approved | Assistance V1-B: `execution_mode`, beneficiary APPROVED/REJECTED/NOT_DELIVERED, §36e deliveries, §36f issued lists and the export field catalog; `persons.marital_status` (§10) |
 | 1.2.8 | 2026-09-24 | Approved | Assistance V1-A: Need/Assistance/Nomination/Delivery distinction, §36a `assistances` + items, §36b `assistance_categories`, §36c `assistance_beneficiaries` (nominees), §36d targeting criteria keys; `assistance_nominee` activity subject |
 | 1.2.7 | 2026-09-24 | Approved | Needs Management V1: §34 V1 `family_needs` fields, §34a `need_categories` (14 V1 categories), §35 V1 statuses OPEN/FULFILLED/CLOSED, `need` activity subject in §61a |
 | 1.2.6 | 2026-09-24 | Approved | Quick Multi-Domain Family Assessment V1: §27 V1 implementation fields, §27a `assessment_domains` (8 V1 domains), §27b `assessment_results` and rating scale (absence = not assessed), `assessment` activity subject in §61a |

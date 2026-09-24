@@ -880,7 +880,28 @@ Human selection → Nominate (TARGETING / MANUAL / NEED)
 Optionally remove a NOMINATED candidate (history kept)
 ```
 
-Domain Actions: `CreateAssistanceAction`, `UpdateAssistanceAction`,
+## V1-B: Approval and Execution
+
+```text
+NOMINATED ─┬─ approve (single/bulk) → APPROVED
+           └─ reject (reason)       → REJECTED (terminal)
+
+INTERNAL:  APPROVED ─ verify IDs → confirm → Delivery (full package)
+                    └─ not delivered (reason) → NOT_DELIVERED (terminal)
+           Delivery ─ reverse (reason, admin) → APPROVED awaiting again
+
+EXTERNAL:  APPROVED ─ preview → select → confirm → Issued List (immutable
+           snapshot; NOT a delivery) → corrected list = new list
+
+OPEN ─ complete (all resolved) → COMPLETED
+```
+
+Domain Actions: `ApproveBeneficiariesAction`, `RejectBeneficiaryAction`,
+`RecordDeliveryAction`, `MarkNotDeliveredAction`, `ReverseDeliveryAction`,
+`UpdateExportConfigurationAction`, `IssueBeneficiaryListAction`,
+`CompleteAssistanceAction` (docs/03 §47d–§47i).
+
+V1-A Domain Actions: `CreateAssistanceAction`, `UpdateAssistanceAction`,
 `OpenAssistanceAction`, `NominateFromTargetingAction`,
 `NominateManuallyAction`, `NominateFromNeedsAction`,
 `RemoveNomineeAction`. Approval, rejection, delivery and completion/
@@ -2916,7 +2937,7 @@ PostgreSQL persists workflow state and history.
 ```text
 Project: Famboook
 Document: Workflows & State Transitions
-Version: 1.2.3
+Version: 1.2.4
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2933,3 +2954,4 @@ Date: 2026-09-24
 | 1.2.1 | 2026-09-24 | Approved | §35: V1 family assessment workflow DRAFT → COMPLETED only |
 | 1.2.2 | 2026-09-24 | Approved | §37: V1 Need workflow OPEN → FULFILLED / CLOSED |
 | 1.2.3 | 2026-09-24 | Approved | §40: Assistance V1-A workflow (definition, opening, targeting preview, nomination) |
+| 1.2.4 | 2026-09-24 | Approved | §40: Assistance V1-B approval, INTERNAL delivery/reversal, EXTERNAL list issuance, completion |

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Gender;
 use App\Enums\LifeStatus;
+use App\Enums\MaritalStatus;
 use App\Support\HealthRecordRules;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,6 +23,7 @@ class Person extends Model
         'full_name',
         'national_id',
         'gender',
+        'marital_status',
         'birth_date',
         'life_status',
         'death_date',
@@ -55,6 +57,7 @@ class Person extends Model
     {
         return [
             'gender' => Gender::class,
+            'marital_status' => MaritalStatus::class,
             'life_status' => LifeStatus::class,
             'birth_date' => 'date',
             'death_date' => 'date',

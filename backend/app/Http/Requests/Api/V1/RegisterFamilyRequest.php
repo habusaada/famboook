@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use App\Enums\DisplacementStatus;
 use App\Enums\Gender;
+use App\Enums\MaritalStatus;
 use App\Enums\RegistrationSource;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -27,6 +28,8 @@ class RegisterFamilyRequest extends FormRequest
             'household_head.full_name' => ['required', 'string', 'max:255'],
             'household_head.national_id' => ['nullable', 'string', 'max:50'],
             'household_head.gender' => ['required', Rule::enum(Gender::class)],
+            // Optional; defaults to UNKNOWN (never inferred).
+            'household_head.marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
             // docs/03-BUSINESS-RULES.md §25: birth date must not be in the future.
             'household_head.birth_date' => ['required', 'date', 'before_or_equal:today'],
             'household_head.mobile' => ['nullable', 'string', 'max:50'],

@@ -26,6 +26,7 @@ import { usePerson } from "@/lib/api/people";
 import { ApiError } from "@/lib/api/client";
 import { relationshipLabel } from "@/lib/utils/relationship";
 import { calculateAge } from "@/lib/utils/date";
+import { maritalStatusLabels } from "@/lib/utils/marital-status";
 
 function InfoRow({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
   return (
@@ -156,6 +157,10 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
             <InfoRow
               label="الجنس"
               value={person.gender === "MALE" ? "ذكر" : "أنثى"}
+            />
+            <InfoRow
+              label="الحالة الاجتماعية"
+              value={maritalStatusLabels[person.marital_status ?? "UNKNOWN"]}
             />
             {person.birth_date && (
               <>

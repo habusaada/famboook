@@ -1295,6 +1295,33 @@ assistance.nominate   SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER
 - Targeting evaluates sensitive data server-side; the preview exposes only
   minimal indicators (docs/03 §47b).
 
+## V1-B Role Assignment
+
+Approved 2026-09-24 (Assistance V1-B, AUTH-ADR-053). Added only what was
+missing: `assistance.approve`, `assistance.deliver`,
+`assistance.complete`, `assistance.export`, `assistance.export-sensitive`.
+The existing `assistance.reverse` is now assigned.
+
+```text
+assistance.approve            SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER     (approve + reject)
+assistance.deliver            SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER, DATA_ENTRY
+                              (verify identity, record delivery, NOT_DELIVERED; INTERNAL only)
+assistance.reverse            SUPER_ADMIN, ADMINISTRATOR
+assistance.complete           SUPER_ADMIN, ADMINISTRATOR
+assistance.export             SUPER_ADMIN, ADMINISTRATOR                    (configure, preview, issue, view, download)
+assistance.export-sensitive   SUPER_ADMIN, ADMINISTRATOR                    (additionally required for SENSITIVE fields)
+```
+
+- SOCIAL_WORKER: operational approval and delivery; no export.
+- DATA_ENTRY: records deliveries (a data-entry act performed with identity
+  verification) but does not approve, export or complete.
+- REVIEWER: view only (including issued-list metadata, not their values).
+- REPORTS_VIEWER / FAMILY_USER: none.
+- `assistance.deliver` never implies `person.national-id.view`: typed IDs
+  are verified against the expected persons only. Likewise
+  `assistance.export-sensitive` exports National IDs only inside an
+  authorized issued list; it grants no general National ID access.
+
 ---
 
 # 51. Document Permissions
@@ -3152,6 +3179,9 @@ Needs V1 (§49): `need.view` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWE
 
 ### AUTH-ADR-052
 Assistance V1-A (§50) adds `assistance.open` and `assistance.nominate` (no equivalent existed; nominating must be separable from editing definitions). View: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER, REVIEWER. Create/update: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY. Open: SUPER_ADMIN, ADMINISTRATOR. Nominate (incl. targeting preview and removal): SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER. `assistance.reverse` stays unassigned for V1-B. REPORTS_VIEWER and FAMILY_USER have no access. No delete permission.
+
+### AUTH-ADR-053
+Assistance V1-B (§50) adds `assistance.approve`, `assistance.deliver`, `assistance.complete`, `assistance.export` and `assistance.export-sensitive`, and assigns the existing `assistance.reverse`. Approve: SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER. Deliver (incl. verification and NOT_DELIVERED): SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER, DATA_ENTRY. Reverse, complete, export, export-sensitive: SUPER_ADMIN, ADMINISTRATOR. Sensitive export fields (National ID, health indicators) require export-sensitive in addition to export. None of these grant `person.national-id.view`.
 ```
 
 ---
@@ -3294,6 +3324,10 @@ This is a baseline, not a substitute for explicit permissions.
 | Create/Update Assistance Definition (V1-A) | ✓ | ✓ | ✓ | — | — | — | — |
 | Open Assistance (V1-A) | ✓ | ✓ | — | — | — | — | — |
 | Targeting Preview & Nomination (V1-A) | ✓ | ✓ | ✓ | — | ✓ | — | — |
+| Approve/Reject Beneficiaries (V1-B) | ✓ | ✓ | — | — | ✓ | — | — |
+| Record Delivery / Not Delivered (V1-B) | ✓ | ✓ | ✓ | — | ✓ | — | — |
+| Reverse Delivery / Complete Assistance (V1-B) | ✓ | ✓ | — | — | — | — | — |
+| Issue External Lists incl. Sensitive Fields (V1-B) | ✓ | ✓ | — | — | — | — | — |
 | Review Change Request | Permission | ✓ | — | ✓ | Policy | — | — |
 | Approve Change Request | Permission | Permission | — | Permission | Policy | — | — |
 | Apply Change Request | Permission | Permission | — | Permission | Policy | — | — |
@@ -3487,7 +3521,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.8
+Version: 1.2.9
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3501,6 +3535,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.9 | 2026-09-24 | Approved | §50: V1-B permissions (approve, deliver, complete, export, export-sensitive; reverse assigned), V1-B rows in §140, AUTH-ADR-053 |
 | 1.2.8 | 2026-09-24 | Approved | §50: added `assistance.open` / `assistance.nominate` and the V1-A role assignment, V1-A rows in §140, AUTH-ADR-052 |
 | 1.2.7 | 2026-09-24 | Approved | §49 V1 Role Assignment for `need.view/create/update/close` (`need.close` covers fulfil and close), V1 Need rows in §140, AUTH-ADR-051 |
 | 1.2.6 | 2026-09-24 | Approved | §47 V1 Role Assignment for `assessment.view/create/update/complete`, V1 assessment rows in §140, AUTH-ADR-050 |

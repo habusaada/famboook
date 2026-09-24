@@ -1,5 +1,8 @@
 import type {
   AssistanceItem,
+  ExecutionMode,
+  ExportClassification,
+  ReceiptMode,
   AssistanceStatus,
   AssistanceType,
   Currency,
@@ -44,8 +47,34 @@ export const nominationSourceLabels: Record<NominationSource, string> = {
 
 export const nomineeStatusLabels: Record<NomineeStatus, string> = {
   NOMINATED: "مرشح",
+  APPROVED: "معتمد",
+  REJECTED: "مرفوض",
+  NOT_DELIVERED: "لم يُسلَّم",
   REMOVED: "أُزيل الترشيح",
 };
+
+export const executionModeLabels: Record<ExecutionMode, string> = {
+  INTERNAL: "تنفيذ داخلي (تسليم عبر Famboook)",
+  EXTERNAL: "تنفيذ خارجي (كشف لجهة أخرى)",
+};
+
+export const executionModeShort: Record<ExecutionMode, string> = {
+  INTERNAL: "داخلي",
+  EXTERNAL: "خارجي",
+};
+
+export const receiptModeLabels: Record<ReceiptMode, string> = {
+  PERSONAL: "المستفيد شخصيًا",
+  DELEGATE: "الاستلام بالنيابة",
+};
+
+export const exportClassificationLabels: Record<ExportClassification, string> = {
+  STANDARD: "عادي",
+  CONTACT: "اتصال",
+  SENSITIVE: "حساس",
+};
+
+export const relationshipLabels = { SON: "ابن", DAUGHTER: "ابنة" } as const;
 
 // Minimal eligibility indicators shown in the targeting preview.
 export const targetingIndicatorLabels = {

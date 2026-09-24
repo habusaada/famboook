@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, Lock, Pencil, PlayCircle, SearchX } from "lucide-react";
+import { AlertCircle, ArrowRight, Flag, Lock, Pencil, PlayCircle, SearchX } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,13 +36,14 @@ import { AssistanceFormDialog } from "@/components/assistances/assistance-form-d
 import { AssistanceStatusBadge } from "@/components/assistances/assistance-badges";
 import { AssistanceTargetingTab } from "@/components/assistances/assistance-targeting-tab";
 import { AssistanceNomineesTab } from "@/components/assistances/assistance-nominees-tab";
-import { useAssistance, useOpenAssistance } from "@/lib/api/assistances";
+import { AssistanceExportTab, AssistanceIssuedListsTab } from "@/components/assistances/assistance-lists";
+import { useAssistance, useCompleteAssistance, useOpenAssistance } from "@/lib/api/assistances";
 import { ApiError } from "@/lib/api/client";
-import type { Assistance } from "@/lib/types/api/assistance";
+import type { Assistance, AssistanceStatistics } from "@/lib/types/api/assistance";
 import { formatDateTime } from "@/lib/utils/date";
-import { assistanceTypeLabels, plannedPeriod } from "@/lib/utils/assistance";
+import { assistanceTypeLabels, executionModeLabels, plannedPeriod } from "@/lib/utils/assistance";
 
-const TABS = ["overview", "items", "targeting", "nominees"];
+const TABS = ["overview", "items", "targeting", "nominees", "export", "lists"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -100,6 +101,132 @@ function OpenAssistanceDialog({ assistance }: { assistance: Assistance }) {
   );
 }
 
+function Stat({ label, value, testId }: { label: string; value: React.ReactNode; testId: string }) {
+  return (
+    <div className="rounded-md border p-3" data-stat={testId}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xl font-semibold tabular-nums">{value ?? "—"}</p>
+    </div>
+  );
+}
+
+/** Derived execution figures; EXTERNAL never shows deliveries. */
+function StatisticsCard({ assistance, statistics }: { assistance: Assistance; statistics: AssistanceStatistics }) {
+  const s = statistics;
+  const internal = assistance.execution_mode === "INTERNAL";
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>إحصاءات التنفيذ</CardTitle>
+        <CardDescription>
+          {internal
+            ? "محسوبة من الاعتمادات والتسليمات الفعلية المسجلة في Famboook."
+            : "التنفيذ خارجي: نتيجة التسليم لدى الجهة غير معروفة. يظهر هنا ما تم إصداره في كشوف فقط."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
+          <Stat label="المستهدف" value={s.target} testId="target" />
+          <Stat label="المرشحون" value={s.total_nominees} testId="total_nominees" />
+          <Stat label="بانتظار الاعتماد" value={s.pending_approval} testId="pending_approval" />
+          <Stat label="المعتمدون" value={s.approved} testId="approved" />
+          <Stat label="المرفوضون" value={s.rejected} testId="rejected" />
+          {internal ? (
+            <>
+              <Stat label="بانتظار التسليم" value={s.awaiting_delivery} testId="awaiting_delivery" />
+              <Stat label="تم التسليم" value={s.delivered} testId="delivered" />
+              <Stat label="لم يُسلَّم" value={s.not_delivered} testId="not_delivered" />
+              <Stat label="تسليمات معكوسة" value={s.reversed_deliveries} testId="reversed_deliveries" />
+              <Stat
+                label="نسبة التنفيذ"
+                value={s.execution_percentage === null || s.execution_percentage === undefined ? "—" : `${s.execution_percentage}%`}
+                testId="execution_percentage"
+              />
+            </>
+          ) : (
+            <>
+              <Stat label="معتمدون لم يُدرجوا في كشف" value={s.approved_not_listed} testId="approved_not_listed" />
+              <Stat label="تم إصدارهم في كشوف" value={s.listed_unique} testId="listed_unique" />
+              <Stat label="عدد الكشوف الصادرة" value={s.issued_lists} testId="issued_lists" />
+            </>
+          )}
+        </div>
+        {internal && (s.package_totals?.length ?? 0) > 0 && (
+          <div className="text-sm">
+            <p className="mb-1 text-xs text-muted-foreground">إجمالي ما سُلِّم (الحزمة كاملة × التسليمات الفعّالة)</p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1" data-package-totals>
+              {s.package_totals!.map((p) => (
+                <li key={p.item_name}>
+                  {p.item_name}: <span className="tabular-nums">{p.quantity ?? "—"}</span> {p.unit ?? ""}
+                </li>
+              ))}
+              {s.monetary_totals!.map((m) => (
+                <li key={m.currency} className="font-medium">
+                  {m.total} {m.currency}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompleteAssistanceDialog({ assistance }: { assistance: Assistance }) {
+  const mutation = useCompleteAssistance(assistance.id);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const internal = assistance.execution_mode === "INTERNAL";
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && setOpen(next)}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" onClick={() => setError(null)}>
+          <Flag className="size-4" />
+          إكمال المساعدة
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>إكمال المساعدة</DialogTitle>
+          <DialogDescription>
+            {internal
+              ? "يشترط ألا يبقى مرشح بانتظار الاعتماد ولا مستفيد معتمد بانتظار التسليم."
+              : "يشترط ألا يبقى مرشح بانتظار الاعتماد وأن يُدرج كل مستفيد معتمد في كشف صادر. الإكمال لا يعني أن الجهة سلّمت المساعدة."}
+          </DialogDescription>
+        </DialogHeader>
+        <SaveError message={error} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={mutation.isPending}>
+            إلغاء
+          </Button>
+          <Button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() =>
+              mutation.mutate(undefined, {
+                onSuccess: () => setOpen(false),
+                onError: (e) => {
+                  const errors = e instanceof ApiError ? e.validationErrors : undefined;
+                  setError(
+                    (errors && Object.values(errors)[0]?.[0]) ||
+                      (e instanceof ApiError && e.message422) ||
+                      "تعذّر إكمال المساعدة."
+                  );
+                },
+              })
+            }
+          >
+            {mutation.isPending ? "جارٍ الإكمال..." : "تأكيد الإكمال"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId: string; initialTab?: string }) {
   const { data, isLoading, isError, error } = useAssistance(assistanceId);
 
@@ -145,7 +272,8 @@ export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId
     );
   }
 
-  const { data: assistance, abilities } = data!;
+  const { data: assistance, abilities, statistics } = data!;
+  const external = assistance.execution_mode === "EXTERNAL";
   const items = assistance.items ?? [];
 
   return (
@@ -173,11 +301,19 @@ export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId
                 />
               )}
               {abilities.open && <OpenAssistanceDialog assistance={assistance} />}
+              {abilities.complete && <CompleteAssistanceDialog assistance={assistance} />}
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            {assistance.category.name} · {assistanceTypeLabels[assistance.assistance_type]} · {assistance.provider_name}
+            {assistance.category.name} · {assistanceTypeLabels[assistance.assistance_type]} · {assistance.provider_name} ·{" "}
+            <span data-execution-mode={assistance.execution_mode}>{executionModeLabels[assistance.execution_mode]}</span>
           </p>
+          {assistance.completed_at && (
+            <p className="rounded-md bg-muted/60 px-3 py-2 text-sm">
+              اكتملت في {formatDateTime(assistance.completed_at)} بواسطة {assistance.completed_by?.name ?? "—"}
+              {external && " — التنفيذ خارجي ونتيجة التسليم لدى الجهة غير معروفة."}
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -187,9 +323,12 @@ export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId
           <TabsTrigger value="items">العناصر</TabsTrigger>
           <TabsTrigger value="targeting">الاستهداف</TabsTrigger>
           <TabsTrigger value="nominees">المرشحون</TabsTrigger>
+          {external && <TabsTrigger value="export">بيانات الكشف</TabsTrigger>}
+          {external && <TabsTrigger value="lists">الكشوف الصادرة</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-4 flex flex-col gap-4">
+          {assistance.status !== "DRAFT" && <StatisticsCard assistance={assistance} statistics={statistics} />}
           <Card size="sm">
             <CardContent>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -199,6 +338,7 @@ export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId
                 <Field label="التصنيف">{assistance.category.name}</Field>
                 <Field label="نوع المساعدة">{assistanceTypeLabels[assistance.assistance_type]}</Field>
                 <Field label="الجهة المقدمة">{assistance.provider_name}</Field>
+                <Field label="طريقة التنفيذ">{executionModeLabels[assistance.execution_mode]}</Field>
                 <Field label="عدد المستفيدين المستهدف">
                   <span className="tabular-nums">{assistance.target_beneficiaries ?? "—"}</span>
                 </Field>
@@ -271,8 +411,19 @@ export function AssistanceWorkspace({ assistanceId, initialTab }: { assistanceId
         </TabsContent>
 
         <TabsContent value="nominees" className="mt-4">
-          <AssistanceNomineesTab assistance={assistance} canNominate={abilities.nominate} />
+          <AssistanceNomineesTab assistance={assistance} abilities={abilities} />
         </TabsContent>
+
+        {external && (
+          <TabsContent value="export" className="mt-4">
+            <AssistanceExportTab assistance={assistance} abilities={abilities} />
+          </TabsContent>
+        )}
+        {external && (
+          <TabsContent value="lists" className="mt-4">
+            <AssistanceIssuedListsTab assistance={assistance} abilities={abilities} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

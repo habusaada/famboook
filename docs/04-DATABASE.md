@@ -1628,6 +1628,75 @@ GET   /reference/assistance-categories               reference-data.view OR assi
 No DELETE endpoints. The global Needs queue (`GET /needs`) also accepts
 an exact `family` code filter (used when nominating from Needs).
 
+# 48d. Assistance V1-B schema
+
+Approved 2026-09-24 (docs/03 §47d–§47i).
+
+```text
+persons
++ marital_status VARCHAR NOT NULL DEFAULT 'UNKNOWN'   SINGLE|MARRIED|DIVORCED|WIDOWED|UNKNOWN (CHECK, PostgreSQL)
+
+assistances
++ execution_mode VARCHAR NOT NULL DEFAULT 'INTERNAL'  INTERNAL|EXTERNAL; existing rows → INTERNAL
++ export_fields JSON NULL                             [{field_key, column_label, sort_order}]
++ completed_at TIMESTAMP NULL, completed_by BIGINT NULL FK users (SET NULL)
+  CHECK (status = 'COMPLETED') = (completed_at IS NOT NULL)
+
+assistance_beneficiaries
++ approved_at/approved_by, rejected_at/rejected_by/rejection_reason,
+  not_delivered_at/not_delivered_by/not_delivered_reason
+  CHECK status IN (NOMINATED, REMOVED, APPROVED, REJECTED, NOT_DELIVERED) with
+        matching timestamp/reason columns (PostgreSQL)
+  (the V1-A partial unique indexes are recreated: SQLite rebuilds the table)
+
+assistance_deliveries
+id, uuid UNIQUE, assistance_beneficiary_id FK (RESTRICT), receipt_mode PERSONAL|DELEGATE,
+original_beneficiary_person_id FK persons, recipient_person_id FK persons,
+delivered_at, delivered_by FK users, notes,
+reversed_at, reversed_by FK users, reversal_reason, timestamps
+UNIQUE (assistance_beneficiary_id) WHERE reversed_at IS NULL
+CHECK PERSONAL ⇔ recipient = original; DELEGATE ⇔ recipient ≠ original;
+      (reversed_at IS NULL) = (reversal_reason IS NULL)             (PostgreSQL)
+— no National ID column; model refuses delete and any change except one reversal
+
+assistance_beneficiary_lists
+id, uuid UNIQUE, assistance_id FK (RESTRICT), list_number UNIQUE (ABL-000001),
+recipient_organization, issued_at, issued_by FK users, notes,
+configuration_snapshot JSON, contains_sensitive BOOLEAN, row_count, created_at
+
+assistance_beneficiary_list_entries
+id, assistance_beneficiary_list_id FK (fk_abl_entries_list), assistance_beneficiary_id FK,
+row_number, snapshot_data TEXT (encrypted JSON), created_at
+UNIQUE (list, row_number), UNIQUE (list, beneficiary)
+— both immutable (models refuse update/delete)
+```
+
+`snapshot_data` uses Laravel's `encrypted:array` cast (application key).
+Rotating `APP_KEY` requires keeping the previous key in
+`APP_PREVIOUS_KEYS`, otherwise issued lists become unreadable.
+
+API additions (`/api/v1`):
+
+```text
+POST /assistances/{uuid}/complete                                   assistance.complete
+POST /assistances/{uuid}/nominees/bulk-approve                      assistance.approve
+POST /assistances/{uuid}/nominees/{uuid}/approve | /reject          assistance.approve
+POST /assistances/{uuid}/nominees/{uuid}/delivery/verify            assistance.deliver   (no write)
+POST /assistances/{uuid}/nominees/{uuid}/delivery                   assistance.deliver
+POST /assistances/{uuid}/nominees/{uuid}/not-delivered              assistance.deliver
+POST /assistance-deliveries/{uuid}/reverse                          assistance.reverse
+GET  /assistances/{uuid}/export-fields                              assistance.view
+PUT  /assistances/{uuid}/export-configuration                       assistance.export (+ export-sensitive for SENSITIVE fields)
+POST /assistances/{uuid}/beneficiary-lists/preview                  assistance.export (+ sensitive)
+POST /assistances/{uuid}/beneficiary-lists                          assistance.export (+ sensitive)
+GET  /assistances/{uuid}/beneficiary-lists                          assistance.view      metadata only
+GET  /assistance-beneficiary-lists/{uuid}                           assistance.export (+ sensitive)  snapshot rows
+GET  /assistance-beneficiary-lists/{uuid}/download                  assistance.export (+ sensitive)  XLSX, no-store
+GET  /families/{family}/assistances                                 assistance.view
+```
+
+National IDs travel only in the JSON bodies of the delivery endpoints.
+
 ---
 
 # 49. Person Notes
@@ -3359,7 +3428,7 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.6
+Version: 1.2.7
 Status: APPROVED
 Database: PostgreSQL 16+
 Date: 2026-09-24
@@ -3374,6 +3443,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.7 | 2026-09-24 | Approved | Assistance V1-B schema and API (§48d): marital status, execution mode, approval columns, deliveries, issued lists and encrypted snapshots |
 | 1.2.6 | 2026-09-24 | Approved | Assistance V1-A: `assistances`, `assistance_items` (§48a), `assistance_categories` (§48b), `assistance_beneficiaries` (§48c) and API; `assistance_nominee` activity subject |
 | 1.2.5 | 2026-09-24 | Approved | Added the V1 `family_needs` implementation (§47) and `need_categories` (§47a); `need` activity subject (§59a) |
 | 1.2.4 | 2026-09-24 | Approved | Added the V1 `assessments` / `assessment_results` implementation (§31) and `assessment_domains` (§31a); `assessment` activity subject (§59a) |

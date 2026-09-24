@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\Gender;
+use App\Enums\MaritalStatus;
 use App\Models\Person;
 use App\Support\HealthRecordRules;
 use Illuminate\Foundation\Http\FormRequest;
@@ -56,6 +57,7 @@ class UpdatePersonRequest extends FormRequest
                     }
                 },
             ],
+            'marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
             'birth_date' => ['sometimes', 'nullable', 'date', 'before_or_equal:today'],
             'mobile' => ['sometimes', 'nullable', 'string', 'max:50'],
             'alternate_mobile' => ['sometimes', 'nullable', 'string', 'max:50'],

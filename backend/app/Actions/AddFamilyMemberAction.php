@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\MaritalStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
@@ -38,12 +39,17 @@ class AddFamilyMemberAction
         return DB::transaction(function () use ($family, $data, $actingUserId) {
             $personId = BusinessIdentifier::nextId('persons');
 
-            $person = Person::create([
+            // forceCreate, not create: `id` is deliberately not fillable, so
+            // create() would silently drop the id reserved above; the INSERT
+            // would then draw a second sequence value and the public code
+            // would no longer match the row id (and codes would skip).
+            $person = Person::forceCreate([
                 'id' => $personId,
                 'person_code' => BusinessIdentifier::format('PER', $personId),
                 'full_name' => $data['full_name'],
                 'national_id' => $data['national_id'] ?? null,
                 'gender' => $data['gender'],
+                'marital_status' => $data['marital_status'] ?? MaritalStatus::UNKNOWN->value,
                 'birth_date' => $data['birth_date'] ?? null,
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $data['mobile'] ?? null,

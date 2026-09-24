@@ -34,12 +34,14 @@ import {
   toAddFamilyMemberPayload,
   type AddFamilyMemberValues,
 } from "@/lib/schemas/add-family-member";
+import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
 
 // Relationship is reset along with personal data so the next member never
 // silently inherits the previous member's relationship.
 const EMPTY_VALUES: Partial<AddFamilyMemberValues> = {
   relationshipTypeId: undefined,
   gender: "MALE",
+  maritalStatus: "UNKNOWN",
   fullName: "",
   nationalId: "",
   birthDate: "",
@@ -283,6 +285,17 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
                       <SelectItem value="FEMALE">أنثى</SelectItem>
                     </SelectContent>
                   </Select>
+                )}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="member-maritalStatus">الحالة الاجتماعية</Label>
+              <Controller
+                control={control}
+                name="maritalStatus"
+                render={({ field }) => (
+                  <MaritalStatusSelect id="member-maritalStatus" value={field.value} onChange={field.onChange} />
                 )}
               />
             </div>

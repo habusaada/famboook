@@ -40,6 +40,7 @@ export const assistanceSchema = z
     title: z.string().trim().min(1, "اسم المساعدة مطلوب").max(150, "الاسم طويل جدًا"),
     categoryCode: z.string().min(1, "اختر التصنيف"),
     assistanceType: z.string().min(1, "اختر نوع المساعدة"),
+    executionMode: z.string().min(1, "اختر طريقة التنفيذ"),
     providerName: z.string().trim().min(1, "الجهة المقدمة مطلوبة").max(150, "الاسم طويل جدًا"),
     targetBeneficiaries: z
       .string()
@@ -71,6 +72,7 @@ export function assistanceFormValues(assistance?: Assistance): AssistanceFormVal
     title: assistance?.title ?? "",
     categoryCode: assistance?.category.code ?? "",
     assistanceType: assistance?.assistance_type ?? "",
+    executionMode: assistance?.execution_mode ?? "",
     providerName: assistance?.provider_name ?? "",
     targetBeneficiaries: assistance?.target_beneficiaries ? String(assistance.target_beneficiaries) : "",
     startDate: assistance?.start_date ?? "",
@@ -104,6 +106,7 @@ export function toAssistancePayload(values: AssistanceFormValues, definition: bo
     title: values.title.trim(),
     category_code: values.categoryCode,
     assistance_type: values.assistanceType as AssistancePayload["assistance_type"],
+    execution_mode: values.executionMode as AssistancePayload["execution_mode"],
     provider_name: values.providerName.trim(),
     items: values.items.map((item) => ({
       item_name: item.itemName.trim(),
@@ -119,6 +122,7 @@ export const assistanceApiFieldToFormField: Record<string, keyof AssistanceFormV
   title: "title",
   category_code: "categoryCode",
   assistance_type: "assistanceType",
+  execution_mode: "executionMode",
   provider_name: "providerName",
   target_beneficiaries: "targetBeneficiaries",
   start_date: "startDate",

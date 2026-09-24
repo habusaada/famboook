@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Enums\AssistanceStatus;
 use App\Enums\AssistanceType;
 use App\Enums\Currency;
+use App\Enums\ExecutionMode;
 use App\Models\Assistance;
 use App\Models\AssistanceCategory;
 use App\Models\AssistanceItem;
@@ -35,6 +36,8 @@ class AssistanceFields
             'title' => [$required, 'string', 'max:150'],
             'category_code' => [$required, 'string', Rule::exists('assistance_categories', 'code')],
             'assistance_type' => [$required, Rule::enum(AssistanceType::class)],
+            // Chosen while DRAFT; locked once OPEN (not in OPEN_EDITABLE).
+            'execution_mode' => [$required, Rule::enum(ExecutionMode::class)],
             'provider_name' => [$required, 'string', 'max:150'],
             'target_beneficiaries' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000000'],
             'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
@@ -66,6 +69,8 @@ class AssistanceFields
             'category_code.exists' => 'تصنيف المساعدة غير معروف.',
             'assistance_type.required' => 'نوع المساعدة مطلوب.',
             'assistance_type.enum' => 'نوع المساعدة غير صالح.',
+            'execution_mode.required' => 'طريقة التنفيذ مطلوبة.',
+            'execution_mode.enum' => 'طريقة التنفيذ غير صالحة.',
             'provider_name.required' => 'الجهة المقدمة مطلوبة.',
             'provider_name.max' => 'اسم الجهة المقدمة طويل جدًا.',
             'target_beneficiaries.integer' => 'عدد المستفيدين المستهدف يجب أن يكون عددًا صحيحًا.',
@@ -120,7 +125,7 @@ class AssistanceFields
         }
 
         $assistance->fill(array_intersect_key($data, array_flip([
-            'title', 'assistance_type', 'provider_name', 'target_beneficiaries',
+            'title', 'assistance_type', 'execution_mode', 'provider_name', 'target_beneficiaries',
             'start_date', 'end_date', 'description',
         ])));
 

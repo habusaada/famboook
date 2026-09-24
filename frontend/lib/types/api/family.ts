@@ -5,6 +5,7 @@
 // not-yet-implemented concept and must not be conflated with this field.
 
 import type { RelationshipType } from "@/lib/types/api/reference";
+import type { MaritalStatus } from "@/lib/utils/marital-status";
 
 export type FamilyLifecycleStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
@@ -33,6 +34,7 @@ export interface FamilyMemberDetail {
   person_code: string;
   full_name: string;
   gender: Gender;
+  marital_status: MaritalStatus;
   birth_date: string | null;
   is_household_head: boolean;
   is_active: boolean;
@@ -107,6 +109,7 @@ export interface RegisterFamilyPayload {
     full_name: string;
     national_id?: string | null;
     gender: Gender;
+    marital_status?: MaritalStatus;
     birth_date: string;
     mobile?: string | null;
     alternate_mobile?: string | null;
@@ -156,6 +159,7 @@ export interface AddFamilyMemberPayload {
   full_name: string;
   national_id?: string | null;
   gender: Gender;
+  marital_status?: MaritalStatus;
   birth_date: string;
   mobile?: string | null;
   alternate_mobile?: string | null;

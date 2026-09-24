@@ -1022,11 +1022,163 @@ nomination is never proof that assistance was received.
   included in Family, Person or Need responses and is not available to
   REPORTS_VIEWER or FAMILY_USER in V1-A.
 
+V1-B (below) adds approval and execution.
+
 Out of scope for V1-A: approval, rejection, delivery, distribution,
 delivered quantities/value/dates, inventory, partial fulfilment,
 automatic Need closure, automatic nomination, scoring/ranking/eligibility
 scores, rules engine, provider or currency management, reports, exports,
 signatures, attachments, Family Portal and Filament management.
+
+---
+
+# 47d. Assistance V1-B — Execution Mode and Approval
+
+Approved 2026-09-24.
+
+```text
+NEED → ASSISTANCE → TARGETING → NOMINATION → APPROVAL → EXECUTION
+                                                  ├─ INTERNAL: DELIVERY (verified receipt in Famboook)
+                                                  └─ EXTERNAL: ISSUED BENEFICIARY LIST (to another organization)
+```
+
+- **Execution mode** (`INTERNAL` / `EXTERNAL`) is chosen while DRAFT and
+  locked once OPEN. Existing V1-A Assistances became INTERNAL (they
+  assumed execution inside Famboook).
+- **Targeting criteria decide WHO is considered; requested export fields
+  decide WHAT data is sent about approved beneficiaries.** They are
+  separate configurations and never influence each other.
+- **Approval:** NOMINATED → APPROVED (individual or bulk; bulk is
+  all-or-nothing and only touches NOMINATED rows) with `approved_at/by`.
+  **Rejection:** NOMINATED → REJECTED with a mandatory free-text reason
+  (`rejected_at/by`); terminal in V1-B. REMOVED rows can never be approved,
+  rejected, delivered or listed. Approval/rejection require an OPEN
+  Assistance.
+- All counts are derived (§47i); none are stored.
+
+# 47e. Assistance V1-B — INTERNAL Delivery
+
+- Applies only to INTERNAL Assistances; EXTERNAL never exposes delivery.
+- **Original beneficiary:** the nominated Person (person-level) or the
+  CURRENT household head (family-level; may be female). No current head →
+  delivery is blocked.
+- **Receipt modes:** exactly `PERSONAL` and `DELEGATE`. No anonymous or
+  free-text recipient, no automatic Person creation. Every delivery
+  requires National ID verification.
+- **PERSONAL:** the typed National ID must belong to the exact original
+  beneficiary.
+- **DELEGATE:** both IDs in the same attempt — the original beneficiary's
+  and the recipient's. The recipient must be an ACTIVE member of the same
+  family whose relationship is `SON` or `DAUGHTER`, whose marital status is
+  `SINGLE`, who is not deceased and not the original beneficiary. SPOUSE,
+  FATHER, MOTHER, OTHER, and MARRIED / DIVORCED / WIDOWED / UNKNOWN children
+  are refused.
+- **Relationship limitation:** SON/DAUGHTER are recorded relative to the
+  current household head (docs/02 §15). Parenthood is therefore provable
+  only when the original beneficiary IS the current household head. For a
+  person-level beneficiary who is not the head (e.g. a spouse), delegation
+  is refused and PERSONAL remains available. No genealogy is inferred.
+- **National ID handling:** typed IDs are normalized (Arabic-Indic/Persian
+  digits → ASCII, spaces/dashes/dots removed, upper-cased) and compared in
+  constant time only with the persons this beneficiary context allows —
+  there is no global National ID search. IDs are never stored, returned,
+  put in URLs, flashed or logged. Delivery permission does not grant
+  National ID viewing.
+- **Flow:** verify (no write) → minimal summary (names/codes,
+  relationship, marital status, package) → explicit confirmation → the API
+  re-verifies inside the transaction and records the delivery.
+- **Full package only:** one delivery = every item in its planned quantity.
+  No delivery items, partial/split delivery, installments or stock.
+- **One active delivery** per beneficiary. The beneficiary stays APPROVED;
+  "delivered" is the active delivery record.
+- **NOT_DELIVERED:** an explicit, final decision on an APPROVED beneficiary
+  without an active delivery, with a mandatory reason. Never automatic.
+- **Reverse Delivery** (`assistance.reverse`, admins): a delivery is never
+  deleted; reversal adds `reversed_at/by/reason`. The beneficiary is
+  awaiting delivery again and a fresh, freshly verified delivery may follow
+  while OPEN. Reversal remains possible after completion for correction and
+  does not reopen the Assistance.
+
+# 47f. Assistance V1-B — Family History
+
+The Family Profile "المساعدات" tab lists the family's nominations with the
+Assistance, category, provider, execution mode, target (family/person) and
+state. INTERNAL rows show awaiting/delivered (date, receipt mode, recipient
+name). EXTERNAL rows show only issued list numbers/dates — never
+"delivered". No National ID, list values or reasons appear.
+
+# 47g. Assistance V1-B — EXTERNAL Requested Fields
+
+- Each EXTERNAL Assistance may configure the columns the requesting
+  organization needs: an ordered list of fields from a **controlled
+  catalog** (docs/02 §36f) with custom Arabic column labels. No arbitrary
+  columns, SQL or formulas; each key at most once. Labels are presentation
+  only.
+- Fields are classified **STANDARD**, **CONTACT** (mobiles) or
+  **SENSITIVE** (National ID, health indicators). Configuring, previewing,
+  issuing, viewing or downloading a list containing SENSITIVE fields
+  requires `assistance.export-sensitive` in addition to
+  `assistance.export`. This never grants generic `person.national-id.view`.
+- Health indicators are yes/no only — never condition names or details.
+  Need descriptions and assessment notes are not in the catalog.
+
+# 47h. Assistance V1-B — Preview and Issued Lists
+
+- **Preview** ("معاينة الكشف") shows the current APPROVED beneficiaries with
+  the configured columns, labels and order and the row count; it writes
+  nothing (no list, no snapshot, no activity) and warns "يحتوي الكشف على
+  بيانات شخصية حساسة." when applicable.
+- **Issuance** requires an OPEN EXTERNAL Assistance, a saved configuration
+  and at least one explicitly selected APPROVED beneficiary; it is
+  confirmed explicitly and runs in one transaction.
+- The issued list stores the configuration snapshot and, per row, the
+  **exact values sent** (`snapshot_data`). This is a deliberate historical
+  snapshot: it is one of the rare places sensitive values are preserved,
+  because Famboook must know exactly what was transmitted. It is encrypted
+  at rest and only readable through the authorized external-list
+  endpoints; never in Assistance, Family, Person or Activity responses.
+- Lists are **immutable**: never regenerated from live data, edited or
+  deleted. A corrected list is a **new** list; a beneficiary may
+  intentionally appear in several lists, and previous list membership is
+  shown.
+- **XLSX** ("تنزيل XLSX") is generated on request from the snapshot:
+  exactly the snapshot's columns, labels and order, right-to-left, with no
+  ids, UUIDs, audit fields or unrequested columns. It is served only
+  through the authenticated API (no public URL, `Cache-Control:
+  no-store`); the filename is `<list_number>-<issue date>.xlsx` and holds
+  no personal data.
+- **Issuing a list is not delivery.** It means only "تم إصدار الكشف
+  للجهة". No AssistanceDelivery is created and nobody is marked delivered;
+  the external execution result remains UNKNOWN in V1-B.
+- **Future (not implemented):** external execution results
+  (DELIVERED_EXTERNALLY / NOT_DELIVERED_EXTERNALLY / UNKNOWN) entered
+  manually or imported from XLSX.
+
+# 47i. Assistance V1-B — Statistics and Completion
+
+Statistics are derived on read and differ by mode:
+
+- Common: target, total nominees (non-removed), pending approval,
+  approved, rejected, removed.
+- INTERNAL: awaiting delivery, delivered (active deliveries), not
+  delivered, reversed deliveries, execution % = delivered / target × 100
+  (only when target > 0), package totals = quantity per beneficiary ×
+  active deliveries, monetary totals = unit value × quantity × active
+  deliveries, grouped by currency (never combined).
+- EXTERNAL: approved not yet in any list, unique beneficiaries included in
+  lists ("تم إصدارهم في كشوف"; a corrected list does not inflate it),
+  number of issued lists. **No delivered figure.**
+
+Completion (OPEN → COMPLETED, `completed_at/by`, `assistance.complete`):
+
+- INTERNAL: no NOMINATED and no APPROVED without an active delivery.
+- EXTERNAL: no NOMINATED and every APPROVED included in at least one issued
+  list. Completion does not imply physical delivery.
+- REJECTED, REMOVED and NOT_DELIVERED never block. CANCELLED is not
+  implemented.
+
+**Need independence:** neither an internal delivery nor an external list
+fulfils, closes or otherwise changes a Need.
 
 ---
 
@@ -1820,7 +1972,16 @@ NEED_FULFILLED          Need resolved as fulfilled
 NEED_CLOSED             Need closed with a reason
 ASSISTANCE_NOMINEE_ADDED    family/person nominated for an Assistance (§47c)
 ASSISTANCE_NOMINEE_REMOVED  nomination withdrawn (history kept)
+ASSISTANCE_BENEFICIARY_APPROVED   nomination approved (§47d)
+ASSISTANCE_BENEFICIARY_REJECTED   nomination rejected
+ASSISTANCE_DELIVERED              INTERNAL verified delivery (§47e)
+ASSISTANCE_NOT_DELIVERED          INTERNAL final non-delivery
+ASSISTANCE_DELIVERY_REVERSED      INTERNAL delivery reversed
+ASSISTANCE_BENEFICIARY_LISTED     included in an issued EXTERNAL list (§47h) — not a delivery
 ```
+
+V1-B events carry no metadata: never National IDs, mobiles, health
+details, list values, or rejection / non-delivery / reversal reasons.
 
 Nomination events are recorded on the nominated family's timeline with no
 metadata: never targeting criteria, matching reasons, health conditions,
@@ -2784,7 +2945,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.7
+Version: 1.2.8
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2798,6 +2959,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.8 | 2026-09-24 | Approved | Added §47d–§47i "Assistance V1-B" (execution mode, approval, INTERNAL delivery with National ID verification and delegated receipt, family history, EXTERNAL requested fields, immutable issued lists, XLSX, statistics, completion) and V1-B activity events |
 | 1.2.7 | 2026-09-24 | Approved | Added §47a–§47c "Assistance V1-A" (program definition, targeting semantics, nomination) and nomination events in §97a |
 | 1.2.6 | 2026-09-24 | Approved | Added §46a "Needs Management (V1)" and the NEED_* events in §97a |
 | 1.2.5 | 2026-09-24 | Approved | Added §40a "Quick Multi-Domain Family Assessment (V1)" and the ASSESSMENT_* events in §97a |

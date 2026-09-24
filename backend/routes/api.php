@@ -2,8 +2,11 @@
 
 use App\Http\Controllers\Api\V1\AssessmentController;
 use App\Http\Controllers\Api\V1\AssistanceController;
+use App\Http\Controllers\Api\V1\AssistanceExecutionController;
+use App\Http\Controllers\Api\V1\AssistanceExportController;
 use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
+use App\Http\Controllers\Api\V1\FamilyAssistanceController;
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
@@ -142,6 +145,57 @@ Route::middleware('auth:sanctum')->group(function () {
     // History-preserving withdrawal (status REMOVED), not a DELETE.
     Route::post('/assistances/{assistance}/nominees/{nominee}/remove', [AssistanceNomineeController::class, 'remove'])
         ->middleware('can:assistance.nominate');
+
+    // Assistance V1-B (docs/06 §50): approval, INTERNAL delivery and
+    // EXTERNAL beneficiary lists. National IDs only travel in request
+    // bodies of the delivery endpoints; never in URLs.
+    Route::post('/assistances/{assistance}/complete', [AssistanceController::class, 'complete'])
+        ->middleware('can:assistance.complete');
+
+    Route::post('/assistances/{assistance}/nominees/bulk-approve', [AssistanceExecutionController::class, 'bulkApprove'])
+        ->middleware('can:assistance.approve');
+
+    Route::post('/assistances/{assistance}/nominees/{nominee}/approve', [AssistanceExecutionController::class, 'approve'])
+        ->middleware('can:assistance.approve');
+
+    Route::post('/assistances/{assistance}/nominees/{nominee}/reject', [AssistanceExecutionController::class, 'reject'])
+        ->middleware('can:assistance.approve');
+
+    Route::post('/assistances/{assistance}/nominees/{nominee}/delivery/verify', [AssistanceExecutionController::class, 'verifyDelivery'])
+        ->middleware('can:assistance.deliver');
+
+    Route::post('/assistances/{assistance}/nominees/{nominee}/delivery', [AssistanceExecutionController::class, 'deliver'])
+        ->middleware('can:assistance.deliver');
+
+    Route::post('/assistances/{assistance}/nominees/{nominee}/not-delivered', [AssistanceExecutionController::class, 'notDelivered'])
+        ->middleware('can:assistance.deliver');
+
+    Route::post('/assistance-deliveries/{delivery}/reverse', [AssistanceExecutionController::class, 'reverse'])
+        ->middleware('can:assistance.reverse');
+
+    Route::get('/assistances/{assistance}/export-fields', [AssistanceExportController::class, 'fields'])
+        ->middleware('can:assistance.view');
+
+    Route::put('/assistances/{assistance}/export-configuration', [AssistanceExportController::class, 'updateConfiguration'])
+        ->middleware('can:assistance.export');
+
+    Route::post('/assistances/{assistance}/beneficiary-lists/preview', [AssistanceExportController::class, 'preview'])
+        ->middleware('can:assistance.export');
+
+    Route::post('/assistances/{assistance}/beneficiary-lists', [AssistanceExportController::class, 'issue'])
+        ->middleware('can:assistance.export');
+
+    Route::get('/assistances/{assistance}/beneficiary-lists', [AssistanceExportController::class, 'index'])
+        ->middleware('can:assistance.view');
+
+    Route::get('/assistance-beneficiary-lists/{list}', [AssistanceExportController::class, 'show'])
+        ->middleware('can:assistance.export');
+
+    Route::get('/assistance-beneficiary-lists/{list}/download', [AssistanceExportController::class, 'download'])
+        ->middleware('can:assistance.export');
+
+    Route::get('/families/{family}/assistances', [FamilyAssistanceController::class, 'index'])
+        ->middleware('can:assistance.view');
 
     // reference-data.view OR assistance.view (checked in the controller).
     Route::get('/reference/assistance-categories', [ReferenceController::class, 'assistanceCategories']);

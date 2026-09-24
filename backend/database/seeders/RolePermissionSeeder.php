@@ -33,7 +33,7 @@ use Spatie\Permission\PermissionRegistrar;
  * verify/approve remain unassigned. The Needs row was resolved by
  * AUTH-ADR-051 (§49): need.close governs both fulfil and close in V1;
  * need.cancel remains unassigned. The Assistance row was resolved for
- * V1-A by AUTH-ADR-052 (§50); assistance.reverse remains unassigned.
+ * V1-A by AUTH-ADR-052 (§50) and for V1-B by AUTH-ADR-053.
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -152,6 +152,12 @@ class RolePermissionSeeder extends Seeder
         'assistance.open',
         'assistance.nominate',
         'assistance.reverse',
+        // V1-B execution (AUTH-ADR-053)
+        'assistance.approve',
+        'assistance.deliver',
+        'assistance.complete',
+        'assistance.export',
+        'assistance.export-sensitive',
 
         // §51 Document Permissions
         'document.view',
@@ -293,6 +299,13 @@ class RolePermissionSeeder extends Seeder
             'assistance.update',
             'assistance.open',
             'assistance.nominate',
+            // Assistance V1-B (§50 V1-B Role Assignment, AUTH-ADR-053)
+            'assistance.approve',
+            'assistance.deliver',
+            'assistance.complete',
+            'assistance.export',
+            'assistance.export-sensitive',
+            'assistance.reverse',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -379,6 +392,13 @@ class RolePermissionSeeder extends Seeder
             'assistance.update',
             'assistance.open',
             'assistance.nominate',
+            // Assistance V1-B (§50 V1-B Role Assignment, AUTH-ADR-053)
+            'assistance.approve',
+            'assistance.deliver',
+            'assistance.complete',
+            'assistance.export',
+            'assistance.export-sensitive',
+            'assistance.reverse',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -435,6 +455,8 @@ class RolePermissionSeeder extends Seeder
             'assistance.create',
             'assistance.update',
             'assistance.nominate',
+            // Assistance V1-B (§50 V1-B Role Assignment, AUTH-ADR-053)
+            'assistance.deliver',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
@@ -486,6 +508,9 @@ class RolePermissionSeeder extends Seeder
             // Assistance V1-A (§50 V1-A Role Assignment, AUTH-ADR-052)
             'assistance.view',
             'assistance.nominate',
+            // Assistance V1-B (§50 V1-B Role Assignment, AUTH-ADR-053)
+            'assistance.approve',
+            'assistance.deliver',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)

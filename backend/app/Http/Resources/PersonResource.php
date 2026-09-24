@@ -23,6 +23,7 @@ class PersonResource extends JsonResource
             'person_code' => $this->person_code,
             'full_name' => $this->full_name,
             'gender' => $this->gender,
+            'marital_status' => $this->marital_status,
             'birth_date' => $this->birth_date?->toDateString(),
             'mobile' => $this->mobile,
             'alternate_mobile' => $this->alternate_mobile,

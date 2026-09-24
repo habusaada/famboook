@@ -24,6 +24,12 @@ enum FamilyActivityType: string
     case NEED_CLOSED = 'NEED_CLOSED';
     case ASSISTANCE_NOMINEE_ADDED = 'ASSISTANCE_NOMINEE_ADDED';
     case ASSISTANCE_NOMINEE_REMOVED = 'ASSISTANCE_NOMINEE_REMOVED';
+    case ASSISTANCE_BENEFICIARY_APPROVED = 'ASSISTANCE_BENEFICIARY_APPROVED';
+    case ASSISTANCE_BENEFICIARY_REJECTED = 'ASSISTANCE_BENEFICIARY_REJECTED';
+    case ASSISTANCE_DELIVERED = 'ASSISTANCE_DELIVERED';
+    case ASSISTANCE_NOT_DELIVERED = 'ASSISTANCE_NOT_DELIVERED';
+    case ASSISTANCE_DELIVERY_REVERSED = 'ASSISTANCE_DELIVERY_REVERSED';
+    case ASSISTANCE_BENEFICIARY_LISTED = 'ASSISTANCE_BENEFICIARY_LISTED';
 
     /** @return list<self> */
     public static function healthCases(): array
@@ -46,6 +52,15 @@ enum FamilyActivityType: string
     /** @return list<self> */
     public static function assistanceCases(): array
     {
-        return [self::ASSISTANCE_NOMINEE_ADDED, self::ASSISTANCE_NOMINEE_REMOVED];
+        return [
+            self::ASSISTANCE_NOMINEE_ADDED,
+            self::ASSISTANCE_NOMINEE_REMOVED,
+            self::ASSISTANCE_BENEFICIARY_APPROVED,
+            self::ASSISTANCE_BENEFICIARY_REJECTED,
+            self::ASSISTANCE_DELIVERED,
+            self::ASSISTANCE_NOT_DELIVERED,
+            self::ASSISTANCE_DELIVERY_REVERSED,
+            self::ASSISTANCE_BENEFICIARY_LISTED,
+        ];
     }
 }

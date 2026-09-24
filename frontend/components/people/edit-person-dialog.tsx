@@ -34,11 +34,13 @@ import {
 } from "@/lib/schemas/edit-person";
 import type { PersonDetail } from "@/lib/types/api/person";
 import { lifeStatusLabel } from "@/lib/utils/life-status";
+import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
 
 function formValues(person: PersonDetail): EditPersonValues {
   return {
     fullName: person.full_name,
     gender: person.gender,
+    maritalStatus: person.marital_status ?? "UNKNOWN",
     birthDate: person.birth_date ?? "",
     mobile: person.mobile ?? "",
     alternateMobile: person.alternate_mobile ?? "",
@@ -137,6 +139,17 @@ export function EditPersonDialog({
                       <SelectItem value="FEMALE">أنثى</SelectItem>
                     </SelectContent>
                   </Select>
+                )}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="edit-maritalStatus">الحالة الاجتماعية</FieldLabel>
+              <Controller
+                control={control}
+                name="maritalStatus"
+                render={({ field }) => (
+                  <MaritalStatusSelect id="edit-maritalStatus" value={field.value} onChange={field.onChange} />
                 )}
               />
             </div>

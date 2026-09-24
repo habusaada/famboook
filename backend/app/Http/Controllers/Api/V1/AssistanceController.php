@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\CompleteAssistanceAction;
 use App\Actions\CreateAssistanceAction;
 use App\Actions\OpenAssistanceAction;
 use App\Actions\UpdateAssistanceAction;
@@ -12,6 +13,7 @@ use App\Http\Requests\Api\V1\StoreAssistanceRequest;
 use App\Http\Requests\Api\V1\UpdateAssistanceRequest;
 use App\Http\Resources\AssistanceResource;
 use App\Models\Assistance;
+use App\Support\AssistanceStatistics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -69,14 +71,22 @@ class AssistanceController extends Controller
         return $this->detail($request, $action->handle($assistance, $request->user()?->id));
     }
 
+    public function complete(Request $request, Assistance $assistance, CompleteAssistanceAction $action): AssistanceResource
+    {
+        return $this->detail($request, $action->handle($assistance, $request->user()?->id));
+    }
+
     private function detail(Request $request, Assistance $assistance): AssistanceResource
     {
-        $assistance->load(['category', 'items', 'creator:id,name', 'opener:id,name'])->loadCount('currentNominees');
+        $assistance->load(['category', 'items', 'creator:id,name', 'opener:id,name', 'completer:id,name'])->loadCount('currentNominees');
         $user = $request->user();
         $draft = $assistance->isDraft();
         $open = $assistance->isOpen();
+        $internal = $assistance->isInternal();
 
         return (new AssistanceResource($assistance))->additional([
+            // Derived on read, never stored; different per execution mode.
+            'statistics' => AssistanceStatistics::for($assistance),
             // UX hints only.
             'abilities' => [
                 // DRAFT: full edit; OPEN: description, target and dates only.
@@ -85,6 +95,12 @@ class AssistanceController extends Controller
                 'open' => $draft && $user->can('assistance.open'),
                 'preview' => ($draft || $open) && $user->can('assistance.nominate'),
                 'nominate' => $open && $user->can('assistance.nominate'),
+                'approve' => $open && $user->can('assistance.approve'),
+                'deliver' => $open && $internal && $user->can('assistance.deliver'),
+                'reverse' => $internal && $user->can('assistance.reverse'),
+                'export' => ! $internal && $user->can('assistance.export'),
+                'export_sensitive' => ! $internal && $user->can('assistance.export-sensitive'),
+                'complete' => $open && $user->can('assistance.complete'),
             ],
         ]);
     }

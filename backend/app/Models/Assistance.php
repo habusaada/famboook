@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AssistanceStatus;
 use App\Enums\AssistanceType;
 use App\Enums\BeneficiaryStatus;
+use App\Enums\ExecutionMode;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,6 +25,7 @@ class Assistance extends Model
         'title',
         'assistance_category_id',
         'assistance_type',
+        'execution_mode',
         'provider_name',
         'target_beneficiaries',
         'start_date',
@@ -31,8 +33,11 @@ class Assistance extends Model
         'description',
         'status',
         'targeting_criteria',
+        'export_fields',
         'opened_at',
         'opened_by',
+        'completed_at',
+        'completed_by',
         'created_by',
         'updated_by',
     ];
@@ -49,10 +54,13 @@ class Assistance extends Model
         return [
             'status' => AssistanceStatus::class,
             'assistance_type' => AssistanceType::class,
+            'execution_mode' => ExecutionMode::class,
             'start_date' => 'date',
             'end_date' => 'date',
             'targeting_criteria' => 'array',
+            'export_fields' => 'array',
             'opened_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -96,6 +104,26 @@ class Assistance extends Model
     public function currentNominees(): HasMany
     {
         return $this->beneficiaries()->where('status', '!=', BeneficiaryStatus::REMOVED);
+    }
+
+    public function isInternal(): bool
+    {
+        return $this->execution_mode === ExecutionMode::INTERNAL;
+    }
+
+    public function isExternal(): bool
+    {
+        return $this->execution_mode === ExecutionMode::EXTERNAL;
+    }
+
+    public function beneficiaryLists(): HasMany
+    {
+        return $this->hasMany(AssistanceBeneficiaryList::class)->latest('issued_at')->latest('id');
+    }
+
+    public function completer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
     }
 
     public function creator(): BelongsTo

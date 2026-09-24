@@ -284,7 +284,8 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('person.national-id.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('assessment.approve'));
         $this->assertFalse($superAdmin->hasPermissionTo('need.cancel'));
-        $this->assertFalse($superAdmin->hasPermissionTo('assistance.reverse'));
+        // Delivery reversal is granted to SUPER_ADMIN in V1-B (AUTH-ADR-053).
+        $this->assertTrue($superAdmin->hasPermissionTo('assistance.reverse'));
         $this->assertFalse($superAdmin->hasPermissionTo('document.verify'));
         $this->assertFalse($superAdmin->hasPermissionTo('residence.change'));
         $this->assertFalse($superAdmin->hasPermissionTo('import.apply'));
@@ -293,16 +294,17 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('workflow-history.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('audit.view-sensitive'));
 
-        // SUPER_ADMIN holds far fewer than the full 122-permission catalog,
+        // SUPER_ADMIN holds far fewer than the full 127-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 61 = 42 + residence.update (AUTH-ADR-046)
+        // 67 = 42 + residence.update (AUTH-ADR-046)
         //      + health-record.view/create/update/close (AUTH-ADR-048)
         //      + activity-log.view (AUTH-ADR-049)
         //      + assessment.view/create/update/complete (AUTH-ADR-050)
         //      + need.view/create/update/close (AUTH-ADR-051)
-        //      + assistance.view/create/update/open/nominate (AUTH-ADR-052).
-        $this->assertSame(61, $superAdmin->getAllPermissions()->count());
+        //      + assistance.view/create/update/open/nominate (AUTH-ADR-052)
+        //      + assistance.approve/deliver/complete/export/export-sensitive/reverse (AUTH-ADR-053).
+        $this->assertSame(67, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -601,8 +603,12 @@ class RolePermissionSeederTest extends TestCase
                     "{$role} / {$permission}"
                 );
             }
-            // Delivery corrections belong to V1-B.
-            $this->assertFalse($user->hasPermissionTo('assistance.reverse'), "{$role} / assistance.reverse");
+            // Delivery reversal is admin-only (AUTH-ADR-053).
+            $this->assertSame(
+                in_array($role, ['SUPER_ADMIN', 'ADMINISTRATOR'], true),
+                $user->hasPermissionTo('assistance.reverse'),
+                "{$role} / assistance.reverse"
+            );
         }
 
         $this->assertFalse(Permission::where('name', 'assistance.delete')->exists());
