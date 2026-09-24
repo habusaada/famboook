@@ -49,6 +49,11 @@ class Family extends Model
         return $this->hasOne(FamilyResidence::class)->where('is_current', true);
     }
 
+    public function activities(): HasMany
+    {
+        return $this->hasMany(FamilyActivity::class);
+    }
+
     public function householdHeadMembership(): HasOne
     {
         return $this->hasOne(FamilyMembership::class)

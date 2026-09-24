@@ -2,7 +2,9 @@
 
 namespace App\Actions;
 
+use App\Enums\FamilyActivityType;
 use App\Models\Family;
+use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -29,8 +31,15 @@ class UpdateFamilyAction
     {
         return DB::transaction(function () use ($family, $data, $actingUserId) {
             $family->fill(array_intersect_key($data, array_flip(self::EDITABLE)));
+            // A save that changes nothing is not an activity.
+            $changed = $family->isDirty(self::EDITABLE);
+
             $family->updated_by = $actingUserId;
             $family->save();
+
+            if ($changed) {
+                FamilyActivityLog::record($family->id, FamilyActivityType::FAMILY_UPDATED, $family, $actingUserId);
+            }
 
             return $family->fresh([
                 'memberships.person',

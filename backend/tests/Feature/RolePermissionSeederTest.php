@@ -62,6 +62,7 @@ class RolePermissionSeederTest extends TestCase
             'reference-data.deactivate',
             'audit.view-sensitive',
             'workflow-history.view',
+            'activity-log.view',
             'dashboard.view-executive',
             'export.sensitive',
             'import.apply',
@@ -284,12 +285,13 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('workflow-history.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('audit.view-sensitive'));
 
-        // SUPER_ADMIN holds far fewer than the full 119-permission catalog,
+        // SUPER_ADMIN holds far fewer than the full 120-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 47 = 42 + residence.update (AUTH-ADR-046)
-        //      + health-record.view/create/update/close (AUTH-ADR-048).
-        $this->assertSame(47, $superAdmin->getAllPermissions()->count());
+        // 48 = 42 + residence.update (AUTH-ADR-046)
+        //      + health-record.view/create/update/close (AUTH-ADR-048)
+        //      + activity-log.view (AUTH-ADR-049).
+        $this->assertSame(48, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -457,5 +459,36 @@ class RolePermissionSeederTest extends TestCase
         foreach (['health.view', 'health.delete', 'disability.view', 'disability.delete'] as $old) {
             $this->assertFalse(Permission::where('name', $old)->exists(), $old);
         }
+    }
+
+    public function test_activity_log_view_follows_approved_matrix(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §57a V1 Role Assignment, AUTH-ADR-049.
+        $expected = [
+            'SUPER_ADMIN' => true,
+            'ADMINISTRATOR' => true,
+            'DATA_ENTRY' => true,
+            'REVIEWER' => true,
+            'SOCIAL_WORKER' => true,
+            'REPORTS_VIEWER' => false,
+            'FAMILY_USER' => false,
+        ];
+
+        foreach ($expected as $role => $granted) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            $this->assertSame($granted, $user->hasPermissionTo('activity-log.view'), $role);
+        }
+
+        // Read-only by design: no activity write permissions exist, and the
+        // activity log does not grant the restricted full audit.
+        foreach (['activity-log.create', 'activity-log.update', 'activity-log.delete'] as $absent) {
+            $this->assertFalse(Permission::where('name', $absent)->exists(), $absent);
+        }
+        $dataEntry = User::factory()->create();
+        $dataEntry->assignRole('DATA_ENTRY');
+        $this->assertFalse($dataEntry->hasPermissionTo('audit.view'));
     }
 }

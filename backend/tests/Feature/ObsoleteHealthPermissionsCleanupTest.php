@@ -53,7 +53,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
     {
         $this->createObsoleteRows();
         $rolesBefore = $this->roleAssignments();
-        $this->assertSame(119 + 8, Permission::count());
+        $this->assertSame(120 + 8, Permission::count());
 
         $this->migration->up();
 
@@ -69,8 +69,9 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
         $this->migration->up();
 
         $canonical = $this->canonicalCatalog();
-        $this->assertCount(119, $canonical);
-        $this->assertSame(119, Permission::count());
+        // 120 = 119 + activity-log.view (AUTH-ADR-049).
+        $this->assertCount(120, $canonical);
+        $this->assertSame(120, Permission::count());
         $this->assertEqualsCanonicalizing($canonical, Permission::pluck('name')->all());
     }
 
@@ -82,7 +83,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
         $this->migration->up();
         $this->migration->up();
 
-        $this->assertSame(119, Permission::count());
+        $this->assertSame(120, Permission::count());
     }
 
     public function test_refuses_when_an_obsolete_permission_is_assigned_to_a_role(): void
@@ -95,7 +96,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
             $this->fail('Expected the cleanup to refuse.');
         } catch (\RuntimeException) {
             // Nothing was deleted.
-            $this->assertSame(119 + 8, Permission::count());
+            $this->assertSame(120 + 8, Permission::count());
         }
     }
 

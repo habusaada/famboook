@@ -1392,6 +1392,51 @@ Audit access is highly restricted.
 
 ---
 
+# 57a. Family Activity Log Permission
+
+Approved 2026-09-24 (Family Activity Log V1, AUTH-ADR-049):
+
+```text
+activity-log.view
+```
+
+Grants read access to the family-scoped Family Activity Log
+(docs/03 §97a): the system-generated timeline of successful family Domain
+Actions shown in the Staff App's Family Profile "السجل" tab.
+
+It is deliberately separate from:
+
+- `audit.view` / `audit.view-sensitive` (§57): the restricted full audit
+  (previous/new values, context). The activity log carries no values, so
+  operational staff can read it without being granted audit access.
+- `family.view-history` / `person.view-history` / `residence.view-history`
+  (§43, §44, §46): viewing historical canonical state (ended memberships,
+  past residences). These remain unassigned.
+
+There are no `activity-log.create/update/delete` permissions. Activity is
+written only by Domain Actions and is never edited or deleted through any
+application.
+
+Health events are additionally filtered by `health-record.view` (§40): a
+holder of `activity-log.view` without it does not see HEALTH_RECORD_*
+entries at all.
+
+## V1 Role Assignment
+
+```text
+activity-log.view
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+  REVIEWER
+  SOCIAL_WORKER
+```
+
+REPORTS_VIEWER receives no person/family activity detail in V1.
+FAMILY_USER has no access in V1 (no Family Portal activity).
+
+---
+
 # 58. Workflow History Permission
 
 Recommended:
@@ -2999,6 +3044,9 @@ View access does not automatically grant drill-down, export, or sensitive-field 
 
 ### AUTH-ADR-048
 Person health records are governed by `health-record.view/create/update/close` (§40), which replace the unassigned `health.*` / `disability.*` names. View: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER. Create/update/close: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY. REPORTS_VIEWER and FAMILY_USER have no person-level health access. There is no delete permission.
+
+### AUTH-ADR-049
+`activity-log.view` (read-only, family-scoped Family Activity Log, §57a) is granted to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER and SOCIAL_WORKER in V1. It is distinct from `audit.view` and from the `*.view-history` permissions. No activity write permissions exist. Health events additionally require `health-record.view`. REPORTS_VIEWER and FAMILY_USER have no access in V1.
 ```
 
 ---
@@ -3138,6 +3186,7 @@ This is a baseline, not a substitute for explicit permissions.
 | Apply Change Request | Permission | Permission | — | Permission | Policy | — | — |
 | Submit Change Request | — | — | — | — | — | — | ✓ |
 | View Audit | ✓ | Permission | — | Limited | — | — | — |
+| View Family Activity Log | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | View Executive Dashboard | Permission | Permission | — | — | Policy | ✓ | — |
 | Export Basic | Permission | Permission | Policy | Policy | Policy | Permission | — |
 | Export Sensitive | Permission | Permission | — | Policy | Policy | Policy | — |
@@ -3325,7 +3374,7 @@ Filament remains subject to the same rules.
 ```text
 Project: Famboook
 Document: Permissions & Authorization
-Version: 1.2.4
+Version: 1.2.5
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -3339,6 +3388,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.5 | 2026-09-24 | Approved | Added `activity-log.view` (§57a) with V1 role assignment, the "View Family Activity Log" row in §140, and AUTH-ADR-049 |
 | 1.2.4 | 2026-09-24 | Approved | Replaced `health.*` / `disability.*` with `health-record.view/create/update/close` (§40-41), health rows in §140, AUTH-ADR-048 |
 | 1.2.3 | 2026-09-24 | Approved | Added V1 role assignment for `person.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) in §44, the "Correct Basic Person Data" row in §140, and AUTH-ADR-047. National ID permissions unchanged |
 | 1.2.2 | 2026-09-23 | Approved | Added V1 role assignment for `residence.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) in §46, the "Correct Current Residence" row in §140, and AUTH-ADR-046 |

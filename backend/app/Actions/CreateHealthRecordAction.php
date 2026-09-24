@@ -2,10 +2,12 @@
 
 namespace App\Actions;
 
+use App\Enums\FamilyActivityType;
 use App\Enums\HealthRecordType;
 use App\Models\Family;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
+use App\Support\FamilyActivityLog;
 use App\Support\HealthRecordRules;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -63,6 +65,10 @@ class CreateHealthRecordAction
             HealthRecordRules::assertNoActiveDuplicate($record);
 
             $record->save();
+
+            FamilyActivityLog::record($family->id, FamilyActivityType::HEALTH_RECORD_CREATED, $record, $actingUserId, [
+                'health_record_type' => $type->value,
+            ]);
 
             return $record->load(['person', 'disabilityType']);
         });

@@ -1924,6 +1924,52 @@ Audit implementation is defined in the database and technical architecture docum
 
 ---
 
+# 61a. Family Activity
+
+Approved 2026-09-24 (Family Activity Log V1, docs/03 §97a).
+
+## Entity
+
+```text
+family_activities
+```
+
+## Purpose
+
+A system-generated, immutable, family-scoped timeline entry for one
+successful family Domain Action. It is **not** an audit record (§61): it
+holds no previous/new values.
+
+## Fields
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier |
+| `family_id` | yes | The Family whose timeline this belongs to |
+| `actor_user_id` | no | Authenticated application user who performed the operation. Not the field researcher. NULL reserved for future system/import operations |
+| `event_type` | yes | Canonical event code (see docs/03 §97a) |
+| `subject_type` | no | `family`, `person`, `residence` or `health_record` |
+| `subject_id` | no | Internal id of the subject record |
+| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING) |
+| `created_at` | yes | When the operation happened |
+
+There is no `updated_at`: entries are never modified.
+
+## Privacy
+
+Activity never stores National IDs, phone numbers, health details, disease
+names, disability types or details, notes, previous/new values, request
+payloads or serialized models. Person names are resolved from the subject
+at read time, not copied. Arabic wording is presentation (Staff App) and is
+not stored.
+
+## No Backfill
+
+Records created before the Activity Log was enabled have no activity. No
+events or actors are fabricated for them.
+
+---
+
 # 62. Data Classification
 
 Famboook uses data classification to support security decisions.
@@ -2859,6 +2905,9 @@ Approved direction (2026-09-23), not yet implemented:
 - collection date is recorded by the system as part of the collection
   process, not typed repeatedly.
 Final User Profile schema and field names are still open.
+Note (2026-09-24): the Family Activity Log actor (§61a) is the
+authenticated entry user only. It is not treated as the researcher;
+collection metadata remains deferred.
 ```
 
 ---
@@ -2980,7 +3029,7 @@ These concepts must remain separate.
 ```text
 Project: Famboook
 Document: Data Dictionary
-Version: 1.2.4
+Version: 1.2.5
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2994,6 +3043,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.5 | 2026-09-24 | Approved | Added §61a "Family Activity" (Family Activity Log V1): fields, allow-listed metadata, actor ≠ researcher, no backfill; PDD-025 note |
 | 1.2.4 | 2026-09-24 | Approved | §22: all health record types closable, gender integrity with active pregnancy/breastfeeding, deceased records kept as history, no minimum maternal age in V1 |
 | 1.2.3 | 2026-09-24 | Approved | Health & Special-Needs Records V1: unified person-based `person_health_records` (§22) replacing the separate health-condition/disability proposals, `disability_types` V1 baseline, derived family health indicators (today vs future collection date) |
 | 1.2.2 | 2026-09-23 | Approved | Added residence displacement fields (§19: `original_residence_text`, `displacement_status` V1 values, `displacement_location_text`), `persons.alternate_mobile_owner_relation` (§9-10) and PDD-025 (researcher/collection metadata direction) |

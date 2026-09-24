@@ -868,6 +868,27 @@ Entry Date
 
 Paper form layout does not determine the canonical digital model.
 
+## V1 Decision: Review / Signature Section
+
+Approved 2026-09-24 (Family Activity Log V1).
+
+The paper form's review/signature section (reviewer confirmation,
+signatures, fingerprints) is **not implemented literally** in V1. The
+digital system relies instead on authenticated entry and activity
+information:
+
+- "Entry Actor" is the authenticated application user who performed the
+  operation, recorded by the Family Activity Log (§97a);
+- "Entry Date" is the system timestamp of that operation.
+
+The authenticated entry user is **not** automatically the field researcher
+or data collector. Researcher/collection metadata remains deferred
+(docs/02 PDD-025).
+
+A future explicit review/approval workflow may be added if needed. The
+original paper-form field documentation is retained as source
+documentation.
+
 ---
 
 # 55. Derived Statistics
@@ -1491,6 +1512,69 @@ Context
 ```
 
 according to the audit architecture.
+
+---
+
+# 97a. Family Activity Log (V1)
+
+Approved 2026-09-24.
+
+The Family Activity Log is a family-scoped, read-only timeline of
+important successful operations. It answers: what happened, to what, who
+did it and when. It is **not** the full audit of §97: it stores no
+previous/new values, no snapshots and no restore/rollback information.
+
+Rules:
+
+- Activity is **system-generated**. Users cannot create, edit or delete
+  activity events. No application exposes activity write endpoints.
+- Activity is **immutable** (append-only).
+- Events are written by Domain Actions, **after** the business change and
+  **inside the same transaction**. If the operation fails or rolls back,
+  no activity remains. A save that changes nothing records no event.
+- Only business operations are logged; reads (GET/view), navigation and
+  arbitrary technical model saves are not.
+- The **actor** is the authenticated application user who performed the
+  operation. It is nullable for future system/import operations. The
+  actor is **not** automatically the field researcher or data collector;
+  researcher/collection metadata remains deferred (docs/02 PDD-025).
+- **No fabricated history.** Records that existed before the Activity Log
+  was enabled receive no backfilled events and no guessed actors. Their
+  timeline starts with the first operation after activation.
+- **Metadata is allow-listed.** V1 allows only the broad health record
+  category (`health_record_type`). Never stored: National ID, passwords
+  or tokens, phone numbers, health details, disease names, disability
+  types or details, pregnancy/breastfeeding notes, previous/new values,
+  request payloads or serialized models.
+- Person names are resolved at read time from the referenced Person, not
+  copied into the activity record.
+
+V1 events:
+
+```text
+FAMILY_CREATED          family registration
+FAMILY_UPDATED          family registration-metadata correction
+FAMILY_MEMBER_ADDED     new member (Person + membership)
+PERSON_UPDATED          basic Person data correction (current family)
+RESIDENCE_UPDATED       current-address correction
+DISPLACEMENT_UPDATED    displacement-field correction
+HEALTH_RECORD_CREATED
+HEALTH_RECORD_UPDATED
+HEALTH_RECORD_CLOSED
+```
+
+Residence and displacement corrections share one Domain Action. The event
+follows which field group changed: address fields → RESIDENCE_UPDATED;
+`original_residence_text`, `displacement_status`,
+`displacement_location_text` → DISPLACEMENT_UPDATED. A correction touching
+both records both. No values are compared or stored beyond this check.
+
+PERSON_UPDATED is recorded on the Person's current (active-membership)
+Family. A Person without an active membership has no family timeline.
+
+Out of scope for V1: field-by-field history, snapshots, restore, manual
+timeline notes, approval workflow, signatures, login history, view audit,
+export, and Family Portal access.
 
 ---
 
@@ -2425,7 +2509,7 @@ The registry must remain trustworthy regardless of which authorized interface in
 ```text
 Project: Famboook
 Document: Business Rules
-Version: 1.2.3
+Version: 1.2.4
 Status: APPROVED
 Date: 2026-09-24
 ```
@@ -2439,6 +2523,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.4 | 2026-09-24 | Approved | Added §97a "Family Activity Log (V1)" and the §54 V1 decision that the paper-form review/signature section is not implemented literally |
 | 1.2.3 | 2026-09-24 | Approved | §36 V1 health decisions: all record types closable (never deleted), active pregnancy/breastfeeding blocks gender correction away from FEMALE, deceased records stay historical but are excluded from current indicators, no minimum pregnancy/breastfeeding age |
 | 1.2.2 | 2026-09-24 | Approved | Added §36 "Health & Special-Needs Records (V1)": person-based types, FEMALE-only maternal records, duplicate-active rules, close-not-delete, derived indicators |
 | 1.2.1 | 2026-09-24 | Approved | Added §56 "Registration Date Independence": correcting `families.registration_date` does not cascade to membership or residence `started_at` |

@@ -2,7 +2,9 @@
 
 namespace App\Actions;
 
+use App\Enums\FamilyActivityType;
 use App\Models\PersonHealthRecord;
+use App\Support\FamilyActivityLog;
 use App\Support\HealthRecordRules;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +33,13 @@ class CloseHealthRecordAction
 
             $record->updated_by = $actingUserId;
             $record->save();
+
+            $familyId = $record->person->activeMembership?->family_id;
+            if ($familyId !== null) {
+                FamilyActivityLog::record($familyId, FamilyActivityType::HEALTH_RECORD_CLOSED, $record, $actingUserId, [
+                    'health_record_type' => $record->type->value,
+                ]);
+            }
 
             return $record->load(['person', 'disabilityType']);
         });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { familyActivityKey } from "@/lib/api/activity";
 import { apiClient } from "@/lib/api/client";
 import type { ResourceResponse } from "@/lib/types/api/family";
 import type {
@@ -25,7 +26,8 @@ export function useFamilyHealth(familyCode: string) {
   });
 }
 
-// Every write refreshes the family's health records and derived summary.
+// Every write refreshes the family's health records, derived summary and
+// activity timeline.
 function useHealthMutation<TPayload>(
   familyCode: string,
   request: (payload: TPayload) => Promise<ResourceResponse<HealthRecord>>
@@ -36,6 +38,7 @@ function useHealthMutation<TPayload>(
     mutationFn: request,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: healthKey(familyCode) });
+      queryClient.invalidateQueries({ queryKey: familyActivityKey(familyCode) });
     },
   });
 }

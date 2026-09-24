@@ -3,8 +3,10 @@
 namespace App\Actions;
 
 use App\Enums\DisplacementStatus;
+use App\Enums\FamilyActivityType;
 use App\Models\Family;
 use App\Models\FamilyResidence;
+use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,12 +20,17 @@ use Illuminate\Support\Facades\DB;
  */
 class UpdateFamilyResidenceAction
 {
-    private const EDITABLE = [
+    /** Current-address fields → RESIDENCE_UPDATED. */
+    private const ADDRESS_FIELDS = [
         'governorate',
         'city',
         'area',
         'neighborhood',
         'address_text',
+    ];
+
+    /** Displacement fields (docs/02 §19) → DISPLACEMENT_UPDATED. */
+    private const DISPLACEMENT_FIELDS = [
         'original_residence_text',
         'displacement_status',
         'displacement_location_text',
@@ -41,7 +48,8 @@ class UpdateFamilyResidenceAction
 
             abort_if($residence === null, 409, 'لا يوجد سكن حالي مسجّل لهذه الأسرة.');
 
-            $residence->fill(array_intersect_key($data, array_flip(self::EDITABLE)));
+            $editable = [...self::ADDRESS_FIELDS, ...self::DISPLACEMENT_FIELDS];
+            $residence->fill(array_intersect_key($data, array_flip($editable)));
 
             // A displacement location only exists for a displaced family:
             // switching to NOT_DISPLACED or unknown never leaves a stale one.
@@ -49,8 +57,20 @@ class UpdateFamilyResidenceAction
                 $residence->displacement_location_text = null;
             }
 
+            // Which group of fields changed decides the event; values are
+            // never recorded. One request touching both writes both events.
+            $addressChanged = $residence->isDirty(self::ADDRESS_FIELDS);
+            $displacementChanged = $residence->isDirty(self::DISPLACEMENT_FIELDS);
+
             $residence->updated_by = $actingUserId;
             $residence->save();
+
+            if ($addressChanged) {
+                FamilyActivityLog::record($family->id, FamilyActivityType::RESIDENCE_UPDATED, $residence, $actingUserId);
+            }
+            if ($displacementChanged) {
+                FamilyActivityLog::record($family->id, FamilyActivityType::DISPLACEMENT_UPDATED, $residence, $actingUserId);
+            }
 
             return $family->fresh([
                 'memberships.person',

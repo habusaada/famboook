@@ -2,11 +2,13 @@
 
 namespace App\Actions;
 
+use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
 use App\Support\BusinessIdentifier;
+use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -61,6 +63,8 @@ class AddFamilyMemberAction
                 'created_by' => $actingUserId,
                 'updated_by' => $actingUserId,
             ]);
+
+            FamilyActivityLog::record($family->id, FamilyActivityType::FAMILY_MEMBER_ADDED, $person, $actingUserId);
 
             return $membership->load(['person', 'relationshipType']);
         });

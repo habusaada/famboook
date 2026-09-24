@@ -1646,6 +1646,43 @@ depending on field classification.
 
 ---
 
+# 59a. Family Activity Log (V1)
+
+Approved 2026-09-24 (docs/02 §61a, docs/03 §97a). A lightweight,
+family-scoped activity timeline. It does **not** satisfy the full audit
+requirements of §59 (no previous/new values), which remain to be
+implemented separately.
+
+```text
+family_activities
+```
+
+```text
+id BIGINT PK
+uuid UUID NOT NULL UNIQUE             public API identifier
+family_id BIGINT NOT NULL FK families.id (RESTRICT)
+actor_user_id BIGINT NULL FK users.id (SET NULL)
+event_type VARCHAR NOT NULL
+subject_type VARCHAR NULL             morph map: family | person | residence | health_record
+subject_id BIGINT NULL
+metadata JSON NULL                    allow-listed keys only
+created_at TIMESTAMP NOT NULL
+
+INDEX (family_id, created_at, id)
+INDEX (subject_type, subject_id)
+```
+
+- Append-only: no `updated_at`. The model refuses update and delete.
+- Written only by `App\Support\FamilyActivityLog`, called by Domain
+  Actions after the business write and inside their transaction. It
+  refuses to run outside a transaction and rejects non-allow-listed
+  metadata keys.
+- No backfill migration: pre-existing records have no activity.
+- Read endpoint: `GET /api/v1/families/{family}/activities` (newest first,
+  standard Laravel pagination, `per_page` default 20, max 50).
+
+---
+
 # 61. Laravel Models
 
 Eloquent Models represent persistence entities.
@@ -3059,7 +3096,7 @@ Not every future reference taxonomy must be finalized before Laravel foundation 
 ```text
 Project: Famboook
 Document: Database Architecture
-Version: 1.2.2
+Version: 1.2.3
 Status: APPROVED
 Database: PostgreSQL 16+
 Date: 2026-09-24
@@ -3074,6 +3111,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.3 | 2026-09-24 | Approved | Added `family_activities` (§59a, Family Activity Log V1): append-only, allow-listed metadata, transactional with Domain Actions, no backfill |
 | 1.2.2 | 2026-09-24 | Approved | Replaced the proposed `person_health_conditions` / `person_disabilities` with `person_health_records` (§27) and added `disability_types` (§28), with partial unique indexes and CHECK constraints |
 | 1.2.1 | 2026-09-23 | Approved | Added `persons.alternate_mobile_owner_relation`, `family_residences.original_residence_text` / `displacement_location_text` and displacement CHECK constraints (§24) |
 

@@ -196,6 +196,10 @@ class RolePermissionSeeder extends Seeder
         'audit.view',
         'audit.view-sensitive',
 
+        // §57a Family Activity Log (read-only; no create/update/delete
+        // permissions exist — entries are written only by Domain Actions)
+        'activity-log.view',
+
         // §58 Workflow History Permission
         'workflow-history.view',
 
@@ -263,6 +267,8 @@ class RolePermissionSeeder extends Seeder
             'health-record.create',
             'health-record.update',
             'health-record.close',
+            // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
+            'activity-log.view',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -331,6 +337,8 @@ class RolePermissionSeeder extends Seeder
             'health-record.create',
             'health-record.update',
             'health-record.close',
+            // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
+            'activity-log.view',
             // Change Household Head: Permission (§97 names this permission directly)
             'family.change-household-head',
             // Transfer Membership: Permission (§98 names this permission directly)
@@ -370,6 +378,8 @@ class RolePermissionSeeder extends Seeder
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)
             'person.view',
+            // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
+            'activity-log.view',
             // Update Canonical Family: Draft/limited (grant + Workflow State constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
@@ -390,6 +400,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Health Records: view only (§40 V1 Role Assignment, AUTH-ADR-048)
             'health-record.view',
+            // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
+            'activity-log.view',
         ],
         'SOCIAL_WORKER' => [
             // View Family: Scope (grant + Data Scope constraint)
@@ -398,6 +410,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Health Records: view only (§40 V1 Role Assignment, AUTH-ADR-048)
             'health-record.view',
+            // Family Activity Log (§57a V1 Role Assignment, AUTH-ADR-049)
+            'activity-log.view',
             // Update Canonical Family: Limited (grant + Field/Object Access constraint)
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)

@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\DisplacementStatus;
+use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
@@ -10,6 +11,7 @@ use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\RelationshipType;
 use App\Support\BusinessIdentifier;
+use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -130,6 +132,8 @@ class RegisterFamilyAction
             ]);
 
             unset($membership);
+
+            FamilyActivityLog::record($family->id, FamilyActivityType::FAMILY_CREATED, $family, $actingUserId);
 
             return $family->fresh([
                 'householdHeadMembership.person',

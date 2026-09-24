@@ -2,9 +2,11 @@
 
 namespace App\Actions;
 
+use App\Enums\FamilyActivityType;
 use App\Enums\HealthRecordType;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
+use App\Support\FamilyActivityLog;
 use App\Support\HealthRecordRules;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +24,7 @@ class UpdateHealthRecordAction
     public function handle(PersonHealthRecord $record, array $data, ?int $actingUserId): PersonHealthRecord
     {
         return DB::transaction(function () use ($record, $data, $actingUserId) {
-            Person::whereKey($record->person_id)->lockForUpdate()->first();
+            $person = Person::whereKey($record->person_id)->lockForUpdate()->first();
             $record->refresh();
 
             $editable = match ($record->type) {
@@ -40,8 +42,18 @@ class UpdateHealthRecordAction
             HealthRecordRules::assertDates($record);
             HealthRecordRules::assertNoActiveDuplicate($record);
 
+            // A save that changes nothing is not an activity.
+            $changed = $record->isDirty($editable);
+
             $record->updated_by = $actingUserId;
             $record->save();
+
+            $familyId = $person?->activeMembership?->family_id;
+            if ($changed && $familyId !== null) {
+                FamilyActivityLog::record($familyId, FamilyActivityType::HEALTH_RECORD_UPDATED, $record, $actingUserId, [
+                    'health_record_type' => $record->type->value,
+                ]);
+            }
 
             return $record->load(['person', 'disabilityType']);
         });

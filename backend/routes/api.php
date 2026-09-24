@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
@@ -51,6 +52,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/health-records/{healthRecord}/close', [HealthRecordController::class, 'close'])
         ->middleware('can:health-record.close');
+
+    // Family Activity Log (docs/06 §57a): read-only. Entries are written
+    // only by Domain Actions; there is no POST/PATCH/DELETE by design.
+    Route::get('/families/{family}/activities', [FamilyActivityController::class, 'index'])
+        ->middleware('can:activity-log.view');
 
     Route::get('/reference/disability-types', [ReferenceController::class, 'disabilityTypes'])
         ->middleware('can:reference-data.view');

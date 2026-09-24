@@ -27,6 +27,7 @@ import { FamilyOverview } from "@/components/families/family-overview";
 import { FamilyMembersTable } from "@/components/families/family-members-table";
 import { FamilyResidenceTab } from "@/components/families/family-residence-tab";
 import { FamilyHealthTab } from "@/components/families/family-health-tab";
+import { FamilyActivityTab } from "@/components/families/family-activity-tab";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
@@ -37,7 +38,6 @@ const secondaryTabs = [
   { value: "needs", label: "الاحتياجات" },
   { value: "assistance", label: "المساعدات" },
   { value: "documents", label: "الوثائق" },
-  { value: "history", label: "السجل" },
 ] as const;
 
 function MetaItem({
@@ -232,6 +232,7 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
               {tab.label}
             </TabsTrigger>
           ))}
+          <TabsTrigger value="history">السجل</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -255,6 +256,10 @@ export function FamilyProfileView({ familyCode }: { familyCode: string }) {
             <TabPlaceholder />
           </TabsContent>
         ))}
+
+        <TabsContent value="history" className="mt-4">
+          <FamilyActivityTab familyCode={family.family_code} />
+        </TabsContent>
       </Tabs>
     </div>
   );
