@@ -2,7 +2,7 @@
 ## Database Architecture
 
 **Document:** `04-DATABASE.md`  
-**Version:** 1.2.8  
+**Version:** 1.2.9  
 **Status:** Approved  
 **Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System  
@@ -627,6 +627,21 @@ updated_by BIGINT NULL FK users.id
 created_at
 updated_at
 ```
+
+V1 index (2026-09-25, Operational Dashboard): `ix_family_memberships_family_active
+(family_id, is_active)`. Every current-population aggregate selects active
+memberships by scoped family; the only other family_id index is the partial
+household-head index.
+
+Operational Dashboard API (docs/03 §55a, docs/06 §59a):
+
+```text
+GET /api/v1/dashboard/scope-options                               dashboard.view-operational
+GET /api/v1/dashboard?clan={code}&branch_group={code}&branch={code}  dashboard.view-operational
+```
+
+Aggregates are grouped SQL over the scoped family/person subqueries (no
+per-family or per-domain queries); nothing is stored.
 
 ---
 
@@ -3522,6 +3537,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.9 | 2026-09-25 | Approved | §19: `ix_family_memberships_family_active` index and the Operational Dashboard API (derived aggregates, no storage) |
 | 1.2.8 | 2026-09-25 | Approved | §12a Clan structure tables (`clans`, `branch_groups`, `branches`), `families.clan_id` / `branch_id` with composite same-Clan foreign keys, Al-Breem backfill, API |
 | 1.2.7 | 2026-09-24 | Approved | Assistance V1-B schema and API (§48d): marital status, execution mode, approval columns, deliveries, issued lists and encrypted snapshots |
 | 1.2.6 | 2026-09-24 | Approved | Assistance V1-A: `assistances`, `assistance_items` (§48a), `assistance_categories` (§48b), `assistance_beneficiaries` (§48c) and API; `assistance_nominee` activity subject |

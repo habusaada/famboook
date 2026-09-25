@@ -2,7 +2,7 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.2.10  
+**Version:** 1.2.11  
 **Status:** Approved  
 **Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
@@ -2804,6 +2804,22 @@ Female Count
 
 They should be calculated from canonical records unless a justified performance strategy requires otherwise.
 
+## Age Bands (approved for Dashboard / Reports V1)
+
+```text
+UNDER_2       age < 2              أقل من سنتين
+AGE_2_5       2 <= age <= 5        2–5 سنوات
+AGE_6_17      6 <= age <= 17       6–17 سنة
+AGE_18_59     18 <= age <= 59      18–59 سنة
+AGE_60_PLUS   age >= 60            60 سنة فأكثر
+UNKNOWN       missing or future date of birth   العمر غير معروف
+```
+
+Age is computed from `persons.birth_date` relative to the application's
+current date (never the registration date). A person enters a band on the
+birthday itself: exactly 2 → AGE_2_5, exactly 6 → AGE_6_17, exactly 18 →
+AGE_18_59, exactly 60 → AGE_60_PLUS. Neither age nor age band is stored.
+
 ---
 
 # 76. Historical Data
@@ -3559,6 +3575,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.11 | 2026-09-25 | Approved | §75: approved Dashboard/Reports V1 age bands (derived, never stored) |
 | 1.2.10 | 2026-09-25 | Approved | Clan + Branch Structure V1: §7a `clans`, §7b `branch_groups` (nullable name), §7c `branches`; `families.clan_id` (required) and `families.branch_id` (optional); Clan ≠ Family |
 | 1.2.9 | 2026-09-24 | Approved | Assistance V1-B: `execution_mode`, beneficiary APPROVED/REJECTED/NOT_DELIVERED, §36e deliveries, §36f issued lists and the export field catalog; `persons.marital_status` (§10) |
 | 1.2.8 | 2026-09-24 | Approved | Assistance V1-A: Need/Assistance/Nomination/Delivery distinction, §36a `assistances` + items, §36b `assistance_categories`, §36c `assistance_beneficiaries` (nominees), §36d targeting criteria keys; `assistance_nominee` activity subject |

@@ -21,7 +21,7 @@ import { healthRecordTypeLabels } from "@/lib/utils/health";
  * Safe subject line: the Need title (if any), the person's name and, for
  * health, the broad type only.
  */
-function activitySubject(activity: FamilyActivity): string | null {
+export function activitySubject(activity: FamilyActivity): string | null {
   const parts: string[] = [];
   if (activity.subject.title) parts.push(activity.subject.title);
   const healthType = activity.metadata.health_record_type;

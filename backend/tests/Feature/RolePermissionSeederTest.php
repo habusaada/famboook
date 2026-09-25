@@ -297,15 +297,16 @@ class RolePermissionSeederTest extends TestCase
         // SUPER_ADMIN holds far fewer than the full 129-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
-        // 69 = 42 + residence.update (AUTH-ADR-046)
+        // 70 = 42 + residence.update (AUTH-ADR-046)
         //      + health-record.view/create/update/close (AUTH-ADR-048)
         //      + activity-log.view (AUTH-ADR-049)
         //      + assessment.view/create/update/complete (AUTH-ADR-050)
         //      + need.view/create/update/close (AUTH-ADR-051)
         //      + assistance.view/create/update/open/nominate (AUTH-ADR-052)
         //      + assistance.approve/deliver/complete/export/export-sensitive/reverse (AUTH-ADR-053)
-        //      + clan.view/manage (AUTH-ADR-054).
-        $this->assertSame(69, $superAdmin->getAllPermissions()->count());
+        //      + clan.view/manage (AUTH-ADR-054)
+        //      + dashboard.view-operational (AUTH-ADR-055).
+        $this->assertSame(70, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void

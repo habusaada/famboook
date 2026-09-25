@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\FamilyActivityType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FamilyActivityResource;
 use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
 use App\Models\FamilyNeed;
 use App\Models\PersonHealthRecord;
+use App\Support\FamilyActivityVisibility;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -24,40 +24,9 @@ class FamilyActivityController extends Controller
     {
         $perPage = min(max($request->integer('per_page', 20), 1), 50);
 
-        $activities = $family->activities()
-            // Even the broad fact that a member has a health record stays
-            // behind health-record.view.
-            ->when(
-                ! $request->user()->can('health-record.view'),
-                fn ($q) => $q->whereNotIn(
-                    'event_type',
-                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::healthCases()),
-                ),
-            )
-            // Likewise, assessment events stay behind assessment.view.
-            ->when(
-                ! $request->user()->can('assessment.view'),
-                fn ($q) => $q->whereNotIn(
-                    'event_type',
-                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::assessmentCases()),
-                ),
-            )
-            // And Need events behind need.view.
-            ->when(
-                ! $request->user()->can('need.view'),
-                fn ($q) => $q->whereNotIn(
-                    'event_type',
-                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::needCases()),
-                ),
-            )
-            // And nomination events behind assistance.view.
-            ->when(
-                ! $request->user()->can('assistance.view'),
-                fn ($q) => $q->whereNotIn(
-                    'event_type',
-                    array_map(fn (FamilyActivityType $t) => $t->value, FamilyActivityType::assistanceCases()),
-                ),
-            )
+        // Health, assessment, Need and nomination events stay behind their
+        // own view permissions (FamilyActivityVisibility).
+        $activities = FamilyActivityVisibility::apply($family->activities()->getQuery(), $request->user())
             ->with([
                 'actor:id,name',
                 'subject' => fn (MorphTo $morph) => $morph->morphWith([

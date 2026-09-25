@@ -2,7 +2,7 @@
 ## Implementation Roadmap
 
 **Document:** `07-ROADMAP.md`  
-**Version:** 1.2.5  
+**Version:** 1.2.6  
 **Status:** Approved  
 **Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
@@ -2085,6 +2085,18 @@ Executive dashboard custom-built
 
 No Filament dependency for executive reporting
 ```
+
+## Progress
+
+2026-09-25: **Operational Dashboard V1** delivered (docs/03 §55a): Staff
+dashboard scoped by Clan → Branch Group → Branch with KPIs (active
+families, current people, displaced families, open Needs), demographics
+with the approved age bands, displacement, health indicators, open Needs,
+latest completed assessment results per domain, INTERNAL/EXTERNAL
+assistance figures and recent activity. All figures derived on request;
+sections gated by domain permissions (AUTH-ADR-055). **Still open:**
+Executive Dashboard, Reports V1 (Phase 22), trends/date ranges, exports
+and any caching justified by measurement.
 
 ---
 
@@ -4599,6 +4611,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.6 | 2026-09-25 | Approved | Phase 21 progress note: Operational Dashboard V1 |
 | 1.2.5 | 2026-09-25 | Approved | Phase 8 progress note: Clan + Branch Structure V1 |
 | 1.2.4 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-B (approval and execution) |
 | 1.2.3 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-A (program, targeting, nomination); V1-B deferred |

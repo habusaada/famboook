@@ -232,16 +232,27 @@ class FamilyTargeting
     {
         $domainId = DB::table('assessment_domains')->where('code', $domainCode)->value('id');
 
+        return self::latestCompletedResults($query)->where('r.assessment_domain_id', $domainId);
+    }
+
+    /**
+     * Every family's latest COMPLETED result per domain (one row per
+     * family + domain it has ever had rated), using the same ordering as
+     * targeting. A domain never rated has no row — it is not NONE. Shared
+     * by the Operational Dashboard. Aliases: a = assessments,
+     * r = assessment_results.
+     */
+    public static function latestCompletedResults(QueryBuilder $query): QueryBuilder
+    {
         return $query->from('assessment_results as r')
             ->join('assessments as a', 'a.id', '=', 'r.assessment_id')
             ->where('a.status', AssessmentStatus::COMPLETED->value)
-            ->where('r.assessment_domain_id', $domainId)
             ->whereNotExists(fn (QueryBuilder $newer) => $newer
                 ->from('assessment_results as r2')
                 ->join('assessments as a2', 'a2.id', '=', 'r2.assessment_id')
                 ->whereColumn('a2.family_id', 'a.family_id')
                 ->where('a2.status', AssessmentStatus::COMPLETED->value)
-                ->where('r2.assessment_domain_id', $domainId)
+                ->whereColumn('r2.assessment_domain_id', 'r.assessment_domain_id')
                 ->where(fn ($q) => $q
                     ->whereColumn('a2.assessment_date', '>', 'a.assessment_date')
                     ->orWhere(fn ($q) => $q->whereColumn('a2.assessment_date', 'a.assessment_date')->whereColumn('a2.completed_at', '>', 'a.completed_at'))

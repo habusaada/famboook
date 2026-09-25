@@ -2,7 +2,7 @@
 ## Business Rules
 
 **Document:** `03-BUSINESS-RULES.md`  
-**Version:** 1.2.9  
+**Version:** 1.2.10  
 **Status:** Approved  
 **Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
@@ -1353,6 +1353,78 @@ Female Count
 should normally be derived from canonical data.
 
 Manual duplicated counters should be avoided.
+
+---
+
+# 55a. Operational Dashboard (V1)
+
+The Staff Operational Dashboard shows aggregates derived on each request
+from canonical data. No counter, snapshot, cache, materialized view or
+statistics table exists.
+
+## Organizational scope
+
+```text
+Clan (required)             all ACTIVE families of the Clan, including
+                            families without a Branch
+Clan + Branch Group         families whose Branch belongs to the group
+Clan + Branch               families assigned to that Branch
+```
+
+Families with no Branch count only at Clan scope. A Branch Group or Branch
+of another Clan, or a Branch outside the selected group, is rejected.
+Organizational scope is unrelated to residence or displacement.
+
+## Current population
+
+One population foundation serves every figure:
+
+```text
+Families   status ACTIVE, not soft-deleted, in scope
+People     not soft-deleted, not DECEASED, with an ACTIVE membership in
+           one of those families (same population as targeting and the
+           family health indicators)
+```
+
+## Figures
+
+```text
+Active Families      scoped families
+Current People       scoped current people
+Displaced Families   scoped families whose current residence is DISPLACED
+Open Needs           OPEN Needs of scoped families
+Demographics         gender and the approved age bands (docs/02 §75),
+                     age from date of birth relative to today
+Displacement         DISPLACED / NOT_DISPLACED / unknown (no current
+                     residence or not recorded); top locations by exact
+                     stored text (no normalization)
+Health               distinct current people with an active DISABILITY,
+                     CHRONIC_DISEASE, PREGNANCY or BREASTFEEDING record;
+                     disability by reference type. No condition names or
+                     details
+Needs                OPEN only, by priority and top categories
+Assessments          per scoped family and domain: the latest COMPLETED
+                     assessment that rated the domain (assessment date,
+                     then completion time, then id — the targeting rule).
+                     Drafts ignored; a domain never rated is "not
+                     assessed", never NONE
+Assistance           OPEN programs with a current beneficiary in scope;
+                     a beneficiary is scoped by its target Family
+  INTERNAL           nominated; approved (APPROVED + NOT_DELIVERED);
+                     awaiting delivery (APPROVED, no active delivery);
+                     delivered (active, non-reversed delivery);
+                     not delivered
+  EXTERNAL           nominated; approved; approved but not in any issued
+                     list; unique beneficiaries in at least one issued
+                     list ("تم إصدارهم في كشوف") — never called delivery
+Recent Activity      latest 10 Family Activity Log entries of scoped
+                     families, with the Family timeline's event-level
+                     visibility
+```
+
+Aggregates only: no National IDs, phone numbers, health details, Need
+descriptions, rejection reasons, delivery identity data or issued-list
+snapshot values.
 
 ---
 
@@ -3004,6 +3076,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.10 | 2026-09-25 | Approved | Added §55a "Operational Dashboard (V1)": organizational scope, current population, figure definitions, latest-completed-assessment-per-domain rule, INTERNAL vs EXTERNAL assistance semantics |
 | 1.2.9 | 2026-09-25 | Approved | Added §7a "Clan and Branch (V1)" (rules CB-1…CB-10): required Clan, optional Branch, same-Clan integrity, inactive handling, no inference, no hard delete |
 | 1.2.8 | 2026-09-24 | Approved | Added §47d–§47i "Assistance V1-B" (execution mode, approval, INTERNAL delivery with National ID verification and delegated receipt, family history, EXTERNAL requested fields, immutable issued lists, XLSX, statistics, completion) and V1-B activity events |
 | 1.2.7 | 2026-09-24 | Approved | Added §47a–§47c "Assistance V1-A" (program definition, targeting semantics, nomination) and nomination events in §97a |

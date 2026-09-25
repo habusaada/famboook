@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -220,6 +221,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reference/clans', [ClanStructureController::class, 'index']);
         Route::get('/clans/{clan}/branch-groups', [ClanStructureController::class, 'groups']);
         Route::get('/clans/{clan}/branches', [ClanStructureController::class, 'branches']);
+    });
+
+    // Operational Dashboard V1 (docs/06 §59a, AUTH-ADR-055): derived
+    // aggregates; sections the user may not read come back as null.
+    Route::middleware('can:dashboard.view-operational')->group(function () {
+        Route::get('/dashboard/scope-options', [DashboardController::class, 'scopeOptions']);
+        Route::get('/dashboard', [DashboardController::class, 'show']);
     });
 
     // No DELETE routes: structures are deactivated, never removed.

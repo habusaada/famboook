@@ -2,7 +2,7 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2.10  
+**Version:** 1.2.11  
 **Status:** Approved  
 **Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
@@ -1625,6 +1625,45 @@ dashboard.view-executive
 
 ---
 
+# 59a. Operational Dashboard Permission
+
+Approved 2026-09-25 (Operational Dashboard V1, AUTH-ADR-055). The existing
+catalog permission is reused; no new permission was added.
+
+```text
+dashboard.view-operational
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+  REVIEWER
+  SOCIAL_WORKER
+  REPORTS_VIEWER
+```
+
+FAMILY_USER does not receive it. It also covers the dashboard's own
+organizational scope list, so viewers need no `clan.view`.
+
+The dashboard is not a permission bypass. A section is computed only when
+the user holds the underlying domain permission; otherwise the API returns
+it as `null` (never computed, not merely hidden in the frontend):
+
+```text
+Active Families, Displaced Families, Displacement   family.view
+Current People, Demographics                        family.view + person.view
+Health                                              + health-record.view
+Open Needs KPI, Needs                               need.view
+Assessments                                         family.view + assessment.view
+Assistance                                          assistance.view
+Recent Activity                                     activity-log.view, with the
+                                                    same event-level visibility as
+                                                    the Family timeline (health,
+                                                    assessment, Need and
+                                                    assistance events need their
+                                                    domain view permission)
+```
+
+---
+
 # 60. Export Permissions
 
 Recommended:
@@ -3220,6 +3259,9 @@ Assistance V1-B (§50) adds `assistance.approve`, `assistance.deliver`, `assista
 
 ### AUTH-ADR-054
 Clan + Branch Structure V1 (§56a) adds `clan.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) and `clan.manage` (SUPER_ADMIN, ADMINISTRATOR), covering Clans, Branch Groups and Branches. Existing reference-data permissions were not reused: SOCIAL_WORKER needs the selectors for `family.update` but lacks `reference-data.view`, and ADMINISTRATOR must manage the structure while `reference-data.create/update` is SUPER_ADMIN-only. No delete capability exists.
+
+### AUTH-ADR-055
+Operational Dashboard V1 (§59a) reuses the existing `dashboard.view-operational` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER and REPORTS_VIEWER; FAMILY_USER is excluded. Each dashboard section additionally requires its domain view permission and is returned as null without it; recent activity applies the Family timeline's event-level visibility.
 ```
 
 ---
@@ -3375,6 +3417,7 @@ This is a baseline, not a substitute for explicit permissions.
 | View Audit | ✓ | Permission | — | Limited | — | — | — |
 | View Family Activity Log | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | View Executive Dashboard | Permission | Permission | — | — | Policy | ✓ | — |
+| View Operational Dashboard (V1; sections need domain permissions) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | Export Basic | Permission | Permission | Policy | Policy | Policy | Permission | — |
 | Export Sensitive | Permission | Permission | — | Policy | Policy | Policy | — |
 | Manage Users/Roles | ✓ | Permission | — | — | — | — | — |
@@ -3575,6 +3618,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.11 | 2026-09-25 | Approved | §59a: `dashboard.view-operational` V1 role assignment and per-section domain-permission rule, row in §140, AUTH-ADR-055 |
 | 1.2.10 | 2026-09-25 | Approved | §56a: `clan.view` / `clan.manage` with V1 role assignment, two rows in §140, AUTH-ADR-054 |
 | 1.2.9 | 2026-09-24 | Approved | §50: V1-B permissions (approve, deliver, complete, export, export-sensitive; reverse assigned), V1-B rows in §140, AUTH-ADR-053 |
 | 1.2.8 | 2026-09-24 | Approved | §50: added `assistance.open` / `assistance.nominate` and the V1-A role assignment, V1-A rows in §140, AUTH-ADR-052 |

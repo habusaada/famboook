@@ -35,6 +35,7 @@ use Spatie\Permission\PermissionRegistrar;
  * need.cancel remains unassigned. The Assistance row was resolved for
  * V1-A by AUTH-ADR-052 (§50) and for V1-B by AUTH-ADR-053. The Clan /
  * Branch structure permissions were added by AUTH-ADR-054 (§56a).
+ * dashboard.view-operational was assigned by AUTH-ADR-055 (§59a).
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -357,6 +358,8 @@ class RolePermissionSeeder extends Seeder
             // Clan / Branch structure (§56a V1 Role Assignment, AUTH-ADR-054)
             'clan.view',
             'clan.manage',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
             'system.settings.update',
@@ -432,6 +435,8 @@ class RolePermissionSeeder extends Seeder
             // Clan / Branch structure (§56a V1 Role Assignment, AUTH-ADR-054)
             'clan.view',
             'clan.manage',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
         ],
         'DATA_ENTRY' => [
             // Create Family ✓
@@ -476,6 +481,8 @@ class RolePermissionSeeder extends Seeder
             'reference-data.view',
             // Clan / Branch selection (§56a V1 Role Assignment, AUTH-ADR-054)
             'clan.view',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
         ],
         'REVIEWER' => [
             // Review Change Request ✓
@@ -498,6 +505,8 @@ class RolePermissionSeeder extends Seeder
             'need.view',
             // Assistance V1-A: view only (§50 V1-A Role Assignment, AUTH-ADR-052)
             'assistance.view',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
         ],
         'SOCIAL_WORKER' => [
             // View Family: Scope (grant + Data Scope constraint)
@@ -530,6 +539,8 @@ class RolePermissionSeeder extends Seeder
             'residence.update',
             // Clan / Branch selection (§56a V1 Role Assignment, AUTH-ADR-054)
             'clan.view',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
         ],
         'REPORTS_VIEWER' => [
             // View Executive Dashboard ✓
@@ -540,6 +551,8 @@ class RolePermissionSeeder extends Seeder
             'person.view',
             // Export Basic: Permission
             'export.basic',
+            // Operational Dashboard (§59a V1 Role Assignment, AUTH-ADR-055)
+            'dashboard.view-operational',
         ],
         'FAMILY_USER' => [
             // §53 Family User Change Request Permissions (explicit "may receive" list)
