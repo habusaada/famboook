@@ -27,7 +27,7 @@ class FamilyController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $families = Family::query()
-            ->with('householdHeadMembership.person')
+            ->with(['householdHeadMembership.person', 'clan:id,name', 'branch:id,name'])
             ->withCount('memberships')
             ->latest('id')
             ->paginate($request->integer('per_page', 15));
@@ -47,7 +47,7 @@ class FamilyController extends Controller
 
     public function show(Family $family): FamilyDetailResource
     {
-        $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence']);
+        $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence', 'clan', 'branch.group.branches']);
 
         return new FamilyDetailResource($family);
     }

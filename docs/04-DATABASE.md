@@ -2,9 +2,9 @@
 ## Database Architecture
 
 **Document:** `04-DATABASE.md`  
-**Version:** 1.2.2  
+**Version:** 1.2.8  
 **Status:** Approved  
-**Last Updated:** 2026-09-24  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System  
 **Database:** PostgreSQL 16+  
 **Backend:** Laravel 12
@@ -305,6 +305,9 @@ id BIGINT PK
 
 family_code VARCHAR UNIQUE NOT NULL
 
+clan_id BIGINT NOT NULL FK clans.id          (V1, §12a)
+branch_id BIGINT NULL                       (V1, §12a)
+
 status VARCHAR NOT NULL
 
 registration_date DATE NULL
@@ -340,6 +343,82 @@ INDEX registration_date
 ```
 
 Additional indexes should be based on actual query patterns.
+
+---
+
+# 12a. Clan Structure Tables (V1, 2026-09-25)
+
+Clan → Branch Groups → Branches → Families (docs/02 §7a–§7c; Clan ≠ Family).
+
+```text
+clans
+  id BIGINT PK
+  uuid UUID UNIQUE
+  code VARCHAR(50) UNIQUE NOT NULL
+  name VARCHAR(150) NOT NULL
+  is_active BOOLEAN NOT NULL DEFAULT true
+  created_at, updated_at
+
+branch_groups
+  id BIGINT PK
+  uuid UUID UNIQUE
+  clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT
+  code VARCHAR(50) NOT NULL
+  name VARCHAR(150) NULL                     -- unnamed container allowed
+  sort_order INT NOT NULL DEFAULT 0
+  is_active BOOLEAN NOT NULL DEFAULT true
+  created_at, updated_at
+  UNIQUE (clan_id, code)
+  UNIQUE (id, clan_id)                       -- composite FK target
+
+branches
+  id BIGINT PK
+  uuid UUID UNIQUE
+  branch_group_id BIGINT NOT NULL
+  clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT
+  code VARCHAR(50) NOT NULL
+  name VARCHAR(150) NOT NULL
+  sort_order INT NOT NULL DEFAULT 0
+  is_active BOOLEAN NOT NULL DEFAULT true
+  created_at, updated_at
+  FK fk_branches_group_clan (branch_group_id, clan_id)
+     → branch_groups (id, clan_id) ON DELETE RESTRICT
+  UNIQUE (clan_id, code)
+  UNIQUE (id, clan_id)                       -- composite FK target
+
+families (added)
+  clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT
+  branch_id BIGINT NULL
+  FK fk_families_branch_clan (branch_id, clan_id)
+     → branches (id, clan_id) ON DELETE RESTRICT   -- MATCH SIMPLE: NULL branch not checked
+  INDEX (clan_id, branch_id)
+```
+
+The composite foreign keys make "a Branch belongs to its Group's Clan" and
+"a Family's Branch belongs to the Family's Clan" database invariants.
+`branch_group_id` is intentionally **not** stored on `families`.
+
+Migration `2026_10_01_090001` inserts `AL_BREEM` / عائلة البريم if missing,
+backfills `clan_id` on every existing family (soft-deleted included), then
+makes it NOT NULL. `branch_id` stays NULL; nothing else changes.
+
+API (docs/06 §56a):
+
+```text
+GET   /api/v1/reference/clans                      clan.view  (active tree; ?include_inactive=1 needs clan.manage)
+GET   /api/v1/clans/{clan}/branch-groups           clan.view
+GET   /api/v1/clans/{clan}/branches?group={uuid}   clan.view
+POST  /api/v1/clans                                clan.manage
+PATCH /api/v1/clans/{clan}                         clan.manage
+POST  /api/v1/clans/{clan}/branch-groups           clan.manage
+PATCH /api/v1/branch-groups/{group}                clan.manage
+POST  /api/v1/branch-groups/{group}/branches       clan.manage
+PATCH /api/v1/branches/{branch}                    clan.manage
+```
+
+Route keys are UUIDs. Updates change name, sort_order and is_active only;
+codes are immutable. There is no DELETE endpoint. Family registration/update
+accept `clan_code` (required on create) and `branch_code` (nullable).
 
 ---
 
@@ -3443,6 +3522,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.8 | 2026-09-25 | Approved | §12a Clan structure tables (`clans`, `branch_groups`, `branches`), `families.clan_id` / `branch_id` with composite same-Clan foreign keys, Al-Breem backfill, API |
 | 1.2.7 | 2026-09-24 | Approved | Assistance V1-B schema and API (§48d): marital status, execution mode, approval columns, deliveries, issued lists and encrypted snapshots |
 | 1.2.6 | 2026-09-24 | Approved | Assistance V1-A: `assistances`, `assistance_items` (§48a), `assistance_categories` (§48b), `assistance_beneficiaries` (§48c) and API; `assistance_nominee` activity subject |
 | 1.2.5 | 2026-09-24 | Approved | Added the V1 `family_needs` implementation (§47) and `need_categories` (§47a); `need` activity subject (§59a) |

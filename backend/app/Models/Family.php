@@ -6,6 +6,7 @@ use App\Enums\FamilyStatus;
 use App\Enums\RegistrationSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -16,6 +17,8 @@ class Family extends Model
 
     protected $fillable = [
         'family_code',
+        'clan_id',
+        'branch_id',
         'status',
         'registration_date',
         'registration_source',
@@ -32,6 +35,18 @@ class Family extends Model
             'registration_source' => RegistrationSource::class,
             'registration_date' => 'date',
         ];
+    }
+
+    /** The large extended family this household belongs to (required). */
+    public function clan(): BelongsTo
+    {
+        return $this->belongsTo(Clan::class);
+    }
+
+    /** Optional: NULL while the household's branch is unknown. */
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function memberships(): HasMany

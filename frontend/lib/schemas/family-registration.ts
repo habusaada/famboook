@@ -15,6 +15,9 @@ export const familyRegistrationSchema = z.object({
   ]),
   paperFormNo: z.string().optional(),
   notes: z.string().optional(),
+  clanCode: z.string().min(1, "العشيرة / العائلة مطلوبة"),
+  // "" = no Branch (optional).
+  branchCode: z.string().optional(),
 
   headFullName: z.string().min(2, "اسم رب الأسرة مطلوب"),
   headNationalId: z.string().optional(),
@@ -51,6 +54,8 @@ export function toRegisterFamilyPayload(
     registration_source: values.registrationSource,
     paper_form_no: values.paperFormNo || null,
     notes: values.notes || null,
+    clan_code: values.clanCode,
+    branch_code: values.branchCode || null,
     household_head: {
       full_name: values.headFullName,
       national_id: values.headNationalId || null,
@@ -93,6 +98,8 @@ export const apiFieldToFormField: Record<string, keyof FamilyRegistrationValues>
   registration_source: "registrationSource",
   paper_form_no: "paperFormNo",
   notes: "notes",
+  clan_code: "clanCode",
+  branch_code: "branchCode",
   "household_head.full_name": "headFullName",
   "household_head.national_id": "headNationalId",
   "household_head.gender": "headGender",

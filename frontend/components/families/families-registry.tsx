@@ -195,6 +195,7 @@ export function FamiliesRegistry() {
                   <TableRow>
                     <TableHead>رقم الأسرة</TableHead>
                     <TableHead>رب الأسرة</TableHead>
+                    <TableHead>العشيرة / العائلة — الفرع</TableHead>
                     <TableHead>عدد الأفراد</TableHead>
                     <TableHead>الحالة</TableHead>
                     <TableHead>آخر تحديث</TableHead>
@@ -205,7 +206,7 @@ export function FamiliesRegistry() {
                   {isLoading ? (
                     Array.from({ length: 4 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 6 }).map((__, j) => (
+                        {Array.from({ length: 7 }).map((__, j) => (
                           <TableCell key={j}>
                             <Skeleton className="h-4 w-full max-w-32" />
                           </TableCell>
@@ -215,7 +216,7 @@ export function FamiliesRegistry() {
                   ) : filteredFamilies.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-10 text-center text-sm text-muted-foreground"
                       >
                         {families.length === 0
@@ -234,6 +235,12 @@ export function FamiliesRegistry() {
                           <span dir="ltr">{family.family_code}</span>
                         </TableCell>
                         <TableCell>{family.household_head_name ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {family.clan_name ?? "—"}
+                          <span className="block text-xs text-muted-foreground">
+                            {family.branch_name ?? "بدون فرع"}
+                          </span>
+                        </TableCell>
                         <TableCell className="tabular-nums">
                           {family.member_count}
                         </TableCell>

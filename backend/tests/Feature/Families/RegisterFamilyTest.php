@@ -31,6 +31,7 @@ class RegisterFamilyTest extends TestCase
                 'birth_date' => '1982-03-14',
                 'mobile' => '0790000000',
             ],
+            'clan_code' => 'AL_BREEM',
             'residence' => [
                 'governorate' => 'عمّان',
                 'city' => 'الزرقاء',

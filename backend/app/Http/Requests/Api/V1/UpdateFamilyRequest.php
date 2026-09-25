@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Support\FamilyLineage;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -25,6 +26,13 @@ class UpdateFamilyRequest extends FormRequest
             'registration_date' => ['sometimes', 'required', 'date'],
             'paper_form_no' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            // Clan/Branch correction (docs/03 §7a); checked by FamilyLineage.
+            ...FamilyLineage::rules(partial: true),
         ];
+    }
+
+    public function messages(): array
+    {
+        return FamilyLineage::messages();
     }
 }

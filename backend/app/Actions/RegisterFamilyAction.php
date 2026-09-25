@@ -13,6 +13,7 @@ use App\Models\Person;
 use App\Models\RelationshipType;
 use App\Support\BusinessIdentifier;
 use App\Support\FamilyActivityLog;
+use App\Support\FamilyLineage;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -60,6 +61,10 @@ class RegisterFamilyAction
     public function handle(array $data, ?int $actingUserId): Family
     {
         return DB::transaction(function () use ($data, $actingUserId) {
+            // Clan/Branch are validated before anything is written.
+            $lineage = new Family;
+            FamilyLineage::apply($lineage, $data);
+
             $familyId = BusinessIdentifier::nextId('families');
 
             // forceCreate, not create: `id` is deliberately not fillable, so
@@ -69,6 +74,8 @@ class RegisterFamilyAction
             $family = Family::forceCreate([
                 'id' => $familyId,
                 'family_code' => BusinessIdentifier::format('FAM', $familyId),
+                'clan_id' => $lineage->clan_id,
+                'branch_id' => $lineage->branch_id,
                 'status' => 'ACTIVE',
                 'registration_date' => $data['registration_date'],
                 'registration_source' => $data['registration_source'],

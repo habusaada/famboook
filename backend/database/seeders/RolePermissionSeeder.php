@@ -33,7 +33,8 @@ use Spatie\Permission\PermissionRegistrar;
  * verify/approve remain unassigned. The Needs row was resolved by
  * AUTH-ADR-051 (§49): need.close governs both fulfil and close in V1;
  * need.cancel remains unassigned. The Assistance row was resolved for
- * V1-A by AUTH-ADR-052 (§50) and for V1-B by AUTH-ADR-053.
+ * V1-A by AUTH-ADR-052 (§50) and for V1-B by AUTH-ADR-053. The Clan /
+ * Branch structure permissions were added by AUTH-ADR-054 (§56a).
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -206,6 +207,10 @@ class RolePermissionSeeder extends Seeder
         'reference-data.update',
         'reference-data.deactivate',
 
+        // §56a Clan / Branch Structure Permissions (AUTH-ADR-054)
+        'clan.view',
+        'clan.manage',
+
         // §57 Audit Permissions
         'audit.view',
         'audit.view-sensitive',
@@ -349,6 +354,9 @@ class RolePermissionSeeder extends Seeder
             'reference-data.create',
             'reference-data.update',
             'reference-data.deactivate',
+            // Clan / Branch structure (§56a V1 Role Assignment, AUTH-ADR-054)
+            'clan.view',
+            'clan.manage',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
             'system.settings.update',
@@ -421,6 +429,9 @@ class RolePermissionSeeder extends Seeder
             'export.sensitive',
             // View Reference Data ✓ (§56 V1 Role Assignment, AUTH-ADR-045)
             'reference-data.view',
+            // Clan / Branch structure (§56a V1 Role Assignment, AUTH-ADR-054)
+            'clan.view',
+            'clan.manage',
         ],
         'DATA_ENTRY' => [
             // Create Family ✓
@@ -463,6 +474,8 @@ class RolePermissionSeeder extends Seeder
             'residence.update',
             // View Reference Data ✓ (§56 V1 Role Assignment, AUTH-ADR-045)
             'reference-data.view',
+            // Clan / Branch selection (§56a V1 Role Assignment, AUTH-ADR-054)
+            'clan.view',
         ],
         'REVIEWER' => [
             // Review Change Request ✓
@@ -515,6 +528,8 @@ class RolePermissionSeeder extends Seeder
             'family.update',
             // Correct Current Residence (§46 V1 Role Assignment, AUTH-ADR-046)
             'residence.update',
+            // Clan / Branch selection (§56a V1 Role Assignment, AUTH-ADR-054)
+            'clan.view',
         ],
         'REPORTS_VIEWER' => [
             // View Executive Dashboard ✓

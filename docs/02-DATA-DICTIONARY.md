@@ -2,9 +2,9 @@
 ## Data Dictionary
 
 **Document:** `02-DATA-DICTIONARY.md`  
-**Version:** 1.2.4  
+**Version:** 1.2.10  
 **Status:** Approved  
-**Last Updated:** 2026-09-24  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -180,6 +180,8 @@ Assessment changes
 ```text
 id
 family_code
+clan_id
+branch_id
 status
 registration_date
 registration_source
@@ -270,6 +272,138 @@ It is not the Family primary identity.
 General authorized Family-level notes.
 
 Sensitive case notes should use dedicated case-note structures.
+
+---
+
+### clan_id
+
+The Clan (§7a) the Family belongs to. **Required.** Existing families were
+assigned to the Clan `AL_BREEM` (عائلة البريم) when the column was added.
+
+---
+
+### branch_id
+
+The Branch (§7c) within the Family's Clan. **Optional:** NULL means unknown
+or not yet assigned — never guessed. When set, the Branch must belong to the
+Family's Clan. The Family's Branch Group is derived from the Branch and is
+not stored on `families`.
+
+API payloads use `clan_code` / `branch_code`; responses expose code, name,
+active state and group context, never internal ids.
+
+---
+
+# 7a. Clan
+
+Hierarchy (Clan ≠ Family):
+
+```text
+Clan            (العشيرة / العائلة — e.g. عائلة البريم)
+  └─ Branch Group   (مجموعة الفروع — organizational; may be unnamed)
+       └─ Branch        (الفرع — named)
+            └─ Family       (الأسرة — the existing household entity)
+                 └─ Person      (via Family Membership)
+```
+
+## Entity
+
+```text
+clans
+```
+
+## Purpose
+
+The large extended family that households belong to. Not a tenant and not
+called "Community".
+
+Arabic UI terminology (the technical/domain term remains **Clan**):
+
+```text
+Clan (field label)             العشيرة / العائلة
+Clan management / navigation   العشائر والعائلات
+Branch Group                   مجموعة الفروع
+Branch                         الفرع
+Family (household)             الأسرة
+```
+
+## Fields
+
+```text
+id
+uuid           public identifier
+code           unique, immutable after creation (e.g. AL_BREEM)
+name           e.g. عائلة البريم
+is_active      inactive = not selectable for new assignments
+created_at
+updated_at
+```
+
+Seeded: `AL_BREEM` / عائلة البريم.
+
+---
+
+# 7b. Branch Group
+
+## Entity
+
+```text
+branch_groups
+```
+
+## Purpose
+
+An organizational container of Branches within a Clan. **A Branch Group may
+be unnamed**; it is then displayed by the names of its Branches.
+
+## Fields
+
+```text
+id
+uuid
+clan_id        required
+code           unique within the Clan, immutable
+name           NULLABLE
+sort_order
+is_active
+created_at
+updated_at
+```
+
+The Al-Breem taxonomy (16 groups and their Branches) is **not seeded** until
+the approved list is supplied.
+
+---
+
+# 7c. Branch
+
+## Entity
+
+```text
+branches
+```
+
+## Purpose
+
+A named Branch within a Branch Group.
+
+## Fields
+
+```text
+id
+uuid
+branch_group_id   required
+clan_id           equal to the group's Clan (kept for integrity)
+code              unique within the Clan, immutable
+name              required
+sort_order
+is_active
+created_at
+updated_at
+```
+
+A Branch is newly selectable only when it, its group and its Clan are active.
+Deactivating never removes it from existing Families.
 
 ---
 
@@ -3423,6 +3557,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.10 | 2026-09-25 | Approved | Clan + Branch Structure V1: §7a `clans`, §7b `branch_groups` (nullable name), §7c `branches`; `families.clan_id` (required) and `families.branch_id` (optional); Clan ≠ Family |
 | 1.2.9 | 2026-09-24 | Approved | Assistance V1-B: `execution_mode`, beneficiary APPROVED/REJECTED/NOT_DELIVERED, §36e deliveries, §36f issued lists and the export field catalog; `persons.marital_status` (§10) |
 | 1.2.8 | 2026-09-24 | Approved | Assistance V1-A: Need/Assistance/Nomination/Delivery distinction, §36a `assistances` + items, §36b `assistance_categories`, §36c `assistance_beneficiaries` (nominees), §36d targeting criteria keys; `assistance_nominee` activity subject |
 | 1.2.7 | 2026-09-24 | Approved | Needs Management V1: §34 V1 `family_needs` fields, §34a `need_categories` (14 V1 categories), §35 V1 statuses OPEN/FULFILLED/CLOSED, `need` activity subject in §61a |

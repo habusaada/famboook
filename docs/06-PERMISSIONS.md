@@ -2,9 +2,9 @@
 ## Permissions & Authorization
 
 **Document:** `06-PERMISSIONS.md`  
-**Version:** 1.2.4  
+**Version:** 1.2.10  
 **Status:** Approved  
-**Last Updated:** 2026-09-24  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -1498,6 +1498,41 @@ need it to select valid coded values.
 Other roles (REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER, FAMILY_USER) do not
 receive it by default in V1. A later decision can grant it when one of those
 roles gets a workflow that selects reference values.
+
+---
+
+# 56a. Clan / Branch Structure Permissions
+
+Approved 2026-09-25 (Clan + Branch Structure V1, AUTH-ADR-054):
+
+```text
+clan.view
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+  SOCIAL_WORKER
+
+clan.manage
+  SUPER_ADMIN
+  ADMINISTRATOR
+```
+
+One pair covers the whole Clan → Branch Group → Branch structure.
+
+`clan.view` reads the active structure so staff who register or correct
+Families (`family.create` / `family.update`) can select a Clan and Branch. It
+exposes no personal data. `reference-data.view` was not reused because
+SOCIAL_WORKER, who holds `family.update`, does not have it.
+
+`clan.manage` creates, renames, reorders and activates/deactivates Clans,
+Branch Groups and Branches, and reads the full tree including inactive items
+(`include_inactive=1`). `reference-data.create/update` was not reused because
+it is SUPER_ADMIN-only while ADMINISTRATOR must manage this structure.
+
+No permission deletes a structure: none can be hard-deleted.
+
+A Family's own Clan/Branch is shown to anyone who may view the Family
+(`family.view`); `clan.view` is needed only for the selectors.
 
 ---
 
@@ -3182,6 +3217,9 @@ Assistance V1-A (§50) adds `assistance.open` and `assistance.nominate` (no equi
 
 ### AUTH-ADR-053
 Assistance V1-B (§50) adds `assistance.approve`, `assistance.deliver`, `assistance.complete`, `assistance.export` and `assistance.export-sensitive`, and assigns the existing `assistance.reverse`. Approve: SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER. Deliver (incl. verification and NOT_DELIVERED): SUPER_ADMIN, ADMINISTRATOR, SOCIAL_WORKER, DATA_ENTRY. Reverse, complete, export, export-sensitive: SUPER_ADMIN, ADMINISTRATOR. Sensitive export fields (National ID, health indicators) require export-sensitive in addition to export. None of these grant `person.national-id.view`.
+
+### AUTH-ADR-054
+Clan + Branch Structure V1 (§56a) adds `clan.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) and `clan.manage` (SUPER_ADMIN, ADMINISTRATOR), covering Clans, Branch Groups and Branches. Existing reference-data permissions were not reused: SOCIAL_WORKER needs the selectors for `family.update` but lacks `reference-data.view`, and ADMINISTRATOR must manage the structure while `reference-data.create/update` is SUPER_ADMIN-only. No delete capability exists.
 ```
 
 ---
@@ -3309,6 +3347,8 @@ This is a baseline, not a substitute for explicit permissions.
 | View Health Records | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | Create/Correct/Close Health Records | ✓ | ✓ | ✓ | — | — | — | — |
 | View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
+| View / Select Clan & Branch (V1) | ✓ | ✓ | ✓ | — | ✓ | — | — |
+| Manage Clan & Branch Structure (V1) | ✓ | ✓ | — | — | — | — | — |
 | Correct Current Residence | ✓ | ✓ | Draft/limited | — | Limited | — | — |
 | Record Official Death | Permission | Permission | — | Policy | — | — | — |
 | Change Household Head | Permission | Permission | — | Policy | — | — | Request only |
@@ -3535,6 +3575,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.10 | 2026-09-25 | Approved | §56a: `clan.view` / `clan.manage` with V1 role assignment, two rows in §140, AUTH-ADR-054 |
 | 1.2.9 | 2026-09-24 | Approved | §50: V1-B permissions (approve, deliver, complete, export, export-sensitive; reverse assigned), V1-B rows in §140, AUTH-ADR-053 |
 | 1.2.8 | 2026-09-24 | Approved | §50: added `assistance.open` / `assistance.nominate` and the V1-A role assignment, V1-A rows in §140, AUTH-ADR-052 |
 | 1.2.7 | 2026-09-24 | Approved | §49 V1 Role Assignment for `need.view/create/update/close` (`need.close` covers fulfil and close), V1 Need rows in §140, AUTH-ADR-051 |

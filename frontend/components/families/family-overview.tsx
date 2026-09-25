@@ -59,6 +59,23 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
           </CardAction>
         </CardHeader>
         <CardContent>
+          {family.clan && (
+            <InfoRow
+              label="العشيرة / العائلة"
+              value={family.clan.name + (family.clan.is_active ? "" : " (غير مفعّلة)")}
+            />
+          )}
+          <InfoRow
+            label="الفرع"
+            value={
+              family.branch
+                ? family.branch.name + (family.branch.is_active ? "" : " (غير مفعّل)")
+                : "غير محدد"
+            }
+          />
+          {family.branch?.group.name && (
+            <InfoRow label="مجموعة الفروع" value={family.branch.group.name} />
+          )}
           {family.registration_date && (
             <InfoRow
               label="تاريخ التسجيل"

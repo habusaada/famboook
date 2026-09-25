@@ -42,6 +42,7 @@ class FamilyResidenceDisplacementTest extends TestCase
                 'mobile' => '0590000001',
                 ...$head,
             ],
+            'clan_code' => 'AL_BREEM',
             'residence' => [
                 'governorate' => 'خانيونس',
                 'city' => 'خانيونس',

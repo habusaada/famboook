@@ -8,6 +8,7 @@ import {
   Clock,
   MapPin,
   MoreVertical,
+  Network,
   SearchX,
   User,
 } from "lucide-react";
@@ -168,6 +169,12 @@ export function FamilyProfileView({
               {family.members.find((m) => m.is_household_head)?.full_name ??
                 "غير محدد"}
             </MetaItem>
+            {family.clan && (
+              <MetaItem icon={Network}>
+                {family.clan.name}
+                {family.branch ? ` — ${family.branch.name}` : ""}
+              </MetaItem>
+            )}
             {family.residence && (
               <MetaItem icon={MapPin}>
                 {family.residence.city}، {family.residence.governorate}

@@ -2,9 +2,9 @@
 ## Workflows & State Transitions
 
 **Document:** `05-WORKFLOWS.md`  
-**Version:** 1.2  
+**Version:** 1.2.5  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -429,6 +429,17 @@ Verify / Approve
 ```
 
 Where these operations form one initial registration transaction, partial invalid registry state must not be committed.
+
+## V1: Clan and Branch
+
+Registration requires selecting the Family's Clan; the Branch is optional
+(docs/03 §7a). Branch options are limited to the selected Clan and grouped by
+Branch Group. Changing the Clan clears a Branch that does not belong to it.
+
+A later correction may change the Branch within the Clan, or change the Clan
+together with a compatible Branch (or no Branch). It is recorded as
+FAMILY_UPDATED. Structure administration (create, rename, reorder,
+activate/deactivate) has no states beyond active/inactive and never deletes.
 
 ---
 
@@ -2955,3 +2966,4 @@ Date: 2026-09-24
 | 1.2.2 | 2026-09-24 | Approved | §37: V1 Need workflow OPEN → FULFILLED / CLOSED |
 | 1.2.3 | 2026-09-24 | Approved | §40: Assistance V1-A workflow (definition, opening, targeting preview, nomination) |
 | 1.2.4 | 2026-09-24 | Approved | §40: Assistance V1-B approval, INTERNAL delivery/reversal, EXTERNAL list issuance, completion |
+| 1.2.5 | 2026-09-25 | Approved | §22: V1 Clan (required) and Branch (optional) selection at registration and correction |

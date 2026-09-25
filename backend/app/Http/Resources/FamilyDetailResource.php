@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FamilyLineage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,7 @@ class FamilyDetailResource extends JsonResource
 
         return [
             'family_code' => $this->family_code,
+            ...FamilyLineage::present($this->resource),
             'status' => $this->status,
             'registration_date' => $this->registration_date?->toDateString(),
             'registration_source' => $this->registration_source,

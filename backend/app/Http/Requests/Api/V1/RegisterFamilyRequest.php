@@ -6,6 +6,7 @@ use App\Enums\DisplacementStatus;
 use App\Enums\Gender;
 use App\Enums\MaritalStatus;
 use App\Enums\RegistrationSource;
+use App\Support\FamilyLineage;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,6 +21,8 @@ class RegisterFamilyRequest extends FormRequest
     {
         return [
             'registration_date' => ['required', 'date'],
+            // Clan required, Branch optional (docs/03 §7a).
+            ...FamilyLineage::rules(partial: false),
             'registration_source' => ['required', Rule::enum(RegistrationSource::class)],
             'paper_form_no' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -61,5 +64,10 @@ class RegisterFamilyRequest extends FormRequest
             'residence.latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'residence.longitude' => ['nullable', 'numeric', 'between:-180,180'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return FamilyLineage::messages();
     }
 }

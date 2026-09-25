@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\HealthRecordController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
+use App\Http\Controllers\Api\V1\ClanStructureController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -212,4 +213,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/reference/relationship-types', [ReferenceController::class, 'relationshipTypes'])
         ->middleware('can:reference-data.view');
+
+    // Clan → Branch Group → Branch structure (docs/06 §56a, AUTH-ADR-054).
+    // Reads return the active structure (include_inactive=1 needs clan.manage).
+    Route::middleware('can:clan.view')->group(function () {
+        Route::get('/reference/clans', [ClanStructureController::class, 'index']);
+        Route::get('/clans/{clan}/branch-groups', [ClanStructureController::class, 'groups']);
+        Route::get('/clans/{clan}/branches', [ClanStructureController::class, 'branches']);
+    });
+
+    // No DELETE routes: structures are deactivated, never removed.
+    Route::middleware('can:clan.manage')->group(function () {
+        Route::post('/clans', [ClanStructureController::class, 'storeClan']);
+        Route::patch('/clans/{clan}', [ClanStructureController::class, 'updateClan']);
+        Route::post('/clans/{clan}/branch-groups', [ClanStructureController::class, 'storeGroup']);
+        Route::patch('/branch-groups/{branchGroup}', [ClanStructureController::class, 'updateGroup']);
+        Route::post('/branch-groups/{branchGroup}/branches', [ClanStructureController::class, 'storeBranch']);
+        Route::patch('/branches/{branch}', [ClanStructureController::class, 'updateBranch']);
+    });
 });

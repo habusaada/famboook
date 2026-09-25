@@ -113,6 +113,7 @@ class FamilyActivityLogTest extends TestCase
                 'mobile' => self::MOBILE,
                 'alternate_mobile' => self::ALT_MOBILE,
             ],
+            'clan_code' => 'AL_BREEM',
             'residence' => [
                 'governorate' => 'محافظة تجريبية',
                 'city' => 'مدينة تجريبية',

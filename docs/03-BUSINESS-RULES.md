@@ -2,9 +2,9 @@
 ## Business Rules
 
 **Document:** `03-BUSINESS-RULES.md`  
-**Version:** 1.2.3  
+**Version:** 1.2.9  
 **Status:** Approved  
-**Last Updated:** 2026-09-24  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -157,6 +157,51 @@ ARCHIVED
 Archiving a Family does not delete historical information.
 
 Family lifecycle changes require authorization and audit.
+
+---
+
+# 7a. Clan and Branch (V1)
+
+```text
+Clan            (العشيرة / العائلة — e.g. عائلة البريم)
+  └─ Branch Group   (مجموعة الفروع — organizational; may be unnamed)
+       └─ Branch        (الفرع — named)
+            └─ Family       (الأسرة — the existing household entity)
+                 └─ Person      (via Family Membership)
+```
+
+A Clan is not a Family; "Family" remains the household.
+
+Rules:
+
+```text
+CB-1  Every Family belongs to exactly one Clan (required at registration).
+CB-2  A Family's Branch is optional; NULL = unknown / not yet assigned.
+      Branches are never inferred (not from names, forms or members).
+CB-3  A Family's Branch must belong to the Family's Clan (enforced in the
+      Domain Action and by a composite foreign key).
+CB-4  Only an active Clan, and a Branch whose Branch, Group and Clan are all
+      active, can be newly selected.
+CB-5  An existing Family keeps and displays a since-deactivated Clan/Branch;
+      unrelated edits do not clear it. Once changed away, it cannot be
+      re-selected while inactive.
+CB-6  Changing the Clan never keeps an incompatible Branch: the request must
+      name a Branch of the new Clan or clear it. Choosing a Branch never
+      moves the Family to another Clan.
+CB-7  A Branch Group may be unnamed. Its Branches keep their own names.
+CB-8  Codes are immutable after creation. Groups do not move between Clans,
+      Branches do not move between Groups (V1).
+CB-9  Clans, Groups and Branches are deactivated, never hard-deleted; the
+      database refuses to delete a referenced structure.
+CB-10 A Clan/Branch change is a correction of the Family record and is
+      recorded as FAMILY_UPDATED in the Family Activity Log.
+```
+
+Migration: every Family existing before V1 (including soft-deleted) was
+assigned to `AL_BREEM` with no Branch; no other data changed.
+
+Out of scope for V1: multi-tenancy, genealogy, branch inference, bulk
+reassignment, import/export, Clan/Branch dashboards and reports.
 
 ---
 
@@ -2959,6 +3004,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.9 | 2026-09-25 | Approved | Added §7a "Clan and Branch (V1)" (rules CB-1…CB-10): required Clan, optional Branch, same-Clan integrity, inactive handling, no inference, no hard delete |
 | 1.2.8 | 2026-09-24 | Approved | Added §47d–§47i "Assistance V1-B" (execution mode, approval, INTERNAL delivery with National ID verification and delegated receipt, family history, EXTERNAL requested fields, immutable issued lists, XLSX, statistics, completion) and V1-B activity events |
 | 1.2.7 | 2026-09-24 | Approved | Added §47a–§47c "Assistance V1-A" (program definition, targeting semantics, nomination) and nomination events in §97a |
 | 1.2.6 | 2026-09-24 | Approved | Added §46a "Needs Management (V1)" and the NEED_* events in §97a |

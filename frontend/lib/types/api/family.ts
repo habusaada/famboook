@@ -4,6 +4,7 @@
 // §7) — ACTIVE/INACTIVE/ARCHIVED. Review/workflow status is a separate,
 // not-yet-implemented concept and must not be conflated with this field.
 
+import type { FamilyBranchRef, FamilyClanRef } from "@/lib/types/api/clan";
 import type { RelationshipType } from "@/lib/types/api/reference";
 import type { MaritalStatus } from "@/lib/utils/marital-status";
 
@@ -25,6 +26,9 @@ export interface FamilySummary {
   family_code: string;
   status: FamilyLifecycleStatus;
   household_head_name: string | null;
+  // Compact lineage display (docs/02 §7a–§7c); branch null = not set.
+  clan_name: string | null;
+  branch_name: string | null;
   member_count: number;
   registration_date: string | null;
   updated_at: string | null;
@@ -45,6 +49,9 @@ export interface FamilyMemberDetail {
 
 export interface FamilyDetail {
   family_code: string;
+  // Clan (required) and Branch (optional); an inactive one still displays.
+  clan: FamilyClanRef | null;
+  branch: FamilyBranchRef | null;
   status: FamilyLifecycleStatus;
   registration_date: string | null;
   registration_source: RegistrationSource | null;
@@ -105,6 +112,8 @@ export interface RegisterFamilyPayload {
   registration_source: RegistrationSource;
   paper_form_no?: string | null;
   notes?: string | null;
+  clan_code: string;
+  branch_code?: string | null;
   household_head: {
     full_name: string;
     national_id?: string | null;
@@ -137,6 +146,9 @@ export interface UpdateFamilyPayload {
   registration_date?: string;
   paper_form_no?: string | null;
   notes?: string | null;
+  // Changing clan_code requires a branch_code of that Clan, or null.
+  clan_code?: string;
+  branch_code?: string | null;
 }
 
 // Partial payload for PATCH /api/v1/families/{family}/residence

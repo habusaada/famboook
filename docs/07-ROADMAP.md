@@ -2,9 +2,9 @@
 ## Implementation Roadmap
 
 **Document:** `07-ROADMAP.md`  
-**Version:** 1.2  
+**Version:** 1.2.5  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -1208,6 +1208,17 @@ Pagination implemented
 
 Sensitive fields controlled
 ```
+
+## Progress
+
+2026-09-25: **Clan + Branch Structure V1** delivered (docs/03 §7a): Clan →
+Branch Groups → Branches → Families; `AL_BREEM` seeded and all existing
+families backfilled to it with no Branch; required Clan and optional Branch
+on registration and correction with same-Clan integrity; Staff
+Administration screen for the structure; `clan.view` / `clan.manage`
+(AUTH-ADR-054). **Still open:** the approved Al-Breem taxonomy (16 Branch
+Groups and their Branches) must be supplied and entered; Clan/Branch
+dashboards, reports, bulk reassignment and import are later work.
 
 ---
 
@@ -4587,6 +4598,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.5 | 2026-09-25 | Approved | Phase 8 progress note: Clan + Branch Structure V1 |
 | 1.2.4 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-B (approval and execution) |
 | 1.2.3 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-A (program, targeting, nomination); V1-B deferred |
 | 1.2.2 | 2026-09-24 | Approved | Phase 14 progress note: Needs Management V1 (Assistance deferred) |

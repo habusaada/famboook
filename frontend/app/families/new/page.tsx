@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
+import { ClanBranchFields } from "@/components/shared/clan-branch-fields";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowRight, Clock } from "lucide-react";
@@ -80,6 +81,8 @@ export default function NewFamilyPage() {
       registrationSource: "MANUAL_ENTRY",
       headGender: "MALE",
       headMaritalStatus: "UNKNOWN",
+      clanCode: "",
+      branchCode: "",
     },
   });
 
@@ -87,6 +90,12 @@ export default function NewFamilyPage() {
     useWatch({ control, name: "headAlternateMobile" })?.trim()
   );
   const isDisplaced = useWatch({ control, name: "isDisplaced" }) === "YES";
+  const clanCode = useWatch({ control, name: "clanCode" }) ?? "";
+  const branchCode = useWatch({ control, name: "branchCode" }) ?? "";
+  const setClanCode = useCallback(
+    (code: string) => setValue("clanCode", code, { shouldValidate: Boolean(code) }),
+    [setValue]
+  );
 
   function onSubmitFamily(values: FamilyRegistrationValues) {
     setSubmitError(null);
@@ -218,6 +227,27 @@ export default function NewFamilyPage() {
                 </FieldLabel>
                 <Textarea id="notes" rows={3} {...register("notes")} />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>العشيرة / العائلة والفرع</CardTitle>
+              <CardDescription>
+                انتماء الأسرة إلى العشيرة / العائلة (مطلوب) وفرعها داخلها (اختياري)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ClanBranchFields
+                idPrefix="register"
+                clanCode={clanCode}
+                branchCode={branchCode}
+                onClanChange={setClanCode}
+                onBranchChange={(code) => setValue("branchCode", code)}
+                clanError={errors.clanCode?.message}
+                branchError={errors.branchCode?.message}
+                preselectSingleClan
+              />
             </CardContent>
           </Card>
 

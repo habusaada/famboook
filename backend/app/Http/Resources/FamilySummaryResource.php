@@ -15,6 +15,9 @@ class FamilySummaryResource extends JsonResource
     {
         return [
             'family_code' => $this->family_code,
+            // Compact: names only for the list.
+            'clan_name' => $this->clan?->name,
+            'branch_name' => $this->branch?->name,
             'status' => $this->status,
             'household_head_name' => $this->householdHeadMembership?->person?->full_name,
             'member_count' => $this->memberships_count ?? $this->memberships->count(),

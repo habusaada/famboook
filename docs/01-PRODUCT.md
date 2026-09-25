@@ -2,9 +2,9 @@
 ## Product Definition
 
 **Document:** `01-PRODUCT.md`  
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Status:** Approved  
-**Last Updated:** 2026-09-22  
+**Last Updated:** 2026-09-25  
 **Project:** Famboook — Family Registry & Case Management System
 
 ---
@@ -689,6 +689,36 @@ Paper Form
 Those values may change while Family identity remains.
 
 Each Family receives a permanent internal identity and a stable business code.
+
+---
+
+# 25a. Clan and Branch (V1)
+
+Families are organized under a larger extended family:
+
+```text
+Clan            (العشيرة / العائلة — e.g. عائلة البريم)
+  └─ Branch Group   (مجموعة الفروع — organizational; may be unnamed)
+       └─ Branch        (الفرع — named)
+            └─ Family       (الأسرة — the existing household entity)
+                 └─ Person      (via Family Membership)
+```
+
+A **Clan is not a Family.** "Family" in Famboook always means the household
+(`families`); the Clan is the extended family those households belong to.
+The Clan is not called "Community" and is not a tenant: V1 is a single
+installation, not multi-tenant.
+
+Every Family belongs to exactly one Clan (required). Its Branch is optional —
+unknown or not yet assigned is a valid state, and no Branch is ever inferred.
+Branch Groups are organizational containers only; some have no name of their
+own. A Family's Branch Group is always the group of its Branch.
+
+Staff choose the Clan and Branch at registration and may correct them later.
+Administrators maintain the structure (add, rename, reorder,
+activate/deactivate) from the Staff Application's Administration area;
+nothing already used is deleted. Clan/Branch dashboards, reports, genealogy,
+bulk reassignment and import are outside V1.
 
 ---
 
@@ -3125,6 +3155,7 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
+| 1.2.1 | 2026-09-25 | Approved | Added §25a "Clan and Branch (V1)": Clan → Branch Groups → Branches → Families → Persons; Clan ≠ Family; required Clan, optional Branch; no multi-tenancy |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL, Laravel API-first backend, custom Next.js Staff/Executive/Family experiences, Famboook Design System, Sanctum authentication, Domain Actions, controlled API Resources, and restricted Filament System Administration |
 
 ---

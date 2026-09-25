@@ -43,6 +43,7 @@ class PublicIdentifierTest extends TestCase
             'registration_date' => '2026-09-20',
             'registration_source' => 'MANUAL_ENTRY',
             'household_head' => ['full_name' => $name, 'gender' => 'MALE', 'birth_date' => '1980-01-01'],
+            'clan_code' => 'AL_BREEM',
             'residence' => ['governorate' => 'محافظة تجريبية', 'city' => 'مدينة تجريبية'],
         ], null);
     }
