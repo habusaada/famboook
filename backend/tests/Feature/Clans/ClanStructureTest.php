@@ -45,7 +45,9 @@ class ClanStructureTest extends TestCase
         parent::setUp();
 
         $this->seed(RolePermissionSeeder::class);
-        $this->seed(ClanSeeder::class);
+        // AL_BREEM comes from the backfill migration. The approved taxonomy
+        // (ClanSeeder) is not loaded here so these synthetic fixtures stay
+        // isolated; ClanSeederTest covers the seed data.
 
         $this->alBreem = Clan::where('code', Clan::AL_BREEM)->firstOrFail();
         $this->namedGroup = BranchGroup::create(['clan_id' => $this->alBreem->id, 'code' => 'G01', 'name' => 'مجموعة تجريبية', 'sort_order' => 1]);

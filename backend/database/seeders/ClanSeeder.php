@@ -8,13 +8,18 @@ use App\Models\Clan;
 use Illuminate\Database\Seeder;
 
 /**
- * Clan structure baseline (docs/02 §7a–§7c). Only data that is explicitly
- * confirmed is seeded: the Clan عائلة البريم. Al-Breem's 16 Branch Groups
- * and their Branches are NOT seeded until the approved taxonomy is
- * supplied — add them to TAXONOMY below (never guessed).
+ * Clan structure baseline (docs/02 §7a–§7c): the Clan عائلة البريم and
+ * its approved Branch taxonomy (approved 2026-09-25). This is seed data,
+ * not a rule — administrators may add, rename, reorder or deactivate
+ * groups and branches afterwards.
  *
- * Idempotent and non-destructive: existing rows are never overwritten or
- * reactivated.
+ * Branch Groups are organizational containers without a name of their own
+ * (name NULL; displayed by their Branches' names). Codes are stable and
+ * never derived from database ids.
+ *
+ * Idempotent and non-destructive: rows are matched by code; existing rows
+ * are never overwritten, reordered or reactivated. No Family is assigned
+ * to a Branch here.
  */
 class ClanSeeder extends Seeder
 {
@@ -26,8 +31,67 @@ class ClanSeeder extends Seeder
     private const TAXONOMY = [
         Clan::AL_BREEM => [
             'name' => 'عائلة البريم',
-            // Pending the approved list of 16 groups and their branches.
-            'groups' => [],
+            'groups' => [
+                ['code' => 'BG01', 'name' => null, 'sort_order' => 1, 'branches' => [
+                    ['code' => 'BREEM_ABU_HANNUN', 'name' => 'البريم - أبو حنون', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG02', 'name' => null, 'sort_order' => 2, 'branches' => [
+                    ['code' => 'AL_JAHSH', 'name' => 'الجحش', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG03', 'name' => null, 'sort_order' => 3, 'branches' => [
+                    ['code' => 'AL_DARDEESI', 'name' => 'الدرديسي', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG04', 'name' => null, 'sort_order' => 4, 'branches' => [
+                    ['code' => 'AL_FAJM', 'name' => 'الفجم', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG05', 'name' => null, 'sort_order' => 5, 'branches' => [
+                    ['code' => 'AL_MADANI', 'name' => 'المدني', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG06', 'name' => null, 'sort_order' => 6, 'branches' => [
+                    ['code' => 'ABU_TEIM', 'name' => 'أبو تيم', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG07', 'name' => null, 'sort_order' => 7, 'branches' => [
+                    ['code' => 'ABU_TEIMA', 'name' => 'أبو تيمة', 'sort_order' => 1],
+                    ['code' => 'ABU_HALAS', 'name' => 'أبو حلس', 'sort_order' => 2],
+                    ['code' => 'AL_TARSHA', 'name' => 'الطرشة', 'sort_order' => 3],
+                    ['code' => 'ABU_SALEM', 'name' => 'أبو سالم', 'sort_order' => 4],
+                    ['code' => 'AL_SHEIBI', 'name' => 'الشيبي', 'sort_order' => 5],
+                ]],
+                ['code' => 'BG08', 'name' => null, 'sort_order' => 8, 'branches' => [
+                    ['code' => 'ABU_DAWOUD', 'name' => 'أبو داوود', 'sort_order' => 1],
+                    ['code' => 'ABU_HUSSEIN', 'name' => 'أبو حسين', 'sort_order' => 2],
+                    ['code' => 'ABU_ALTHANIN', 'name' => 'أبو الثنين', 'sort_order' => 3],
+                    ['code' => 'ABU_AQAB', 'name' => 'أبو عقب', 'sort_order' => 4],
+                    ['code' => 'ABU_SHABAB', 'name' => 'أبو شباب', 'sort_order' => 5],
+                ]],
+                ['code' => 'BG09', 'name' => null, 'sort_order' => 9, 'branches' => [
+                    ['code' => 'ABU_ADRAJ', 'name' => 'أبو أدرج', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG10', 'name' => null, 'sort_order' => 10, 'branches' => [
+                    ['code' => 'ABU_DEEB', 'name' => 'أبو ديب', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG11', 'name' => null, 'sort_order' => 11, 'branches' => [
+                    ['code' => 'ABU_SAADA', 'name' => 'أبو سعادة', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG12', 'name' => null, 'sort_order' => 12, 'branches' => [
+                    ['code' => 'ABU_SHEHADA', 'name' => 'أبو شحادة', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG13', 'name' => null, 'sort_order' => 13, 'branches' => [
+                    ['code' => 'ABU_ALI', 'name' => 'أبو علي', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG14', 'name' => null, 'sort_order' => 14, 'branches' => [
+                    ['code' => 'ABU_AWWAD', 'name' => 'أبو عواد', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG15', 'name' => null, 'sort_order' => 15, 'branches' => [
+                    ['code' => 'ABU_NUSEIRA', 'name' => 'أبو نصيرة', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG16', 'name' => null, 'sort_order' => 16, 'branches' => [
+                    ['code' => 'BARHAM', 'name' => 'برهم', 'sort_order' => 1],
+                ]],
+                ['code' => 'BG17', 'name' => null, 'sort_order' => 17, 'branches' => [
+                    ['code' => 'QABLAN', 'name' => 'قبلان', 'sort_order' => 1],
+                ]],
+            ],
         ],
     ];
 

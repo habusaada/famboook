@@ -1216,9 +1216,10 @@ Branch Groups → Branches → Families; `AL_BREEM` seeded and all existing
 families backfilled to it with no Branch; required Clan and optional Branch
 on registration and correction with same-Clan integrity; Staff
 Administration screen for the structure; `clan.view` / `clan.manage`
-(AUTH-ADR-054). **Still open:** the approved Al-Breem taxonomy (16 Branch
-Groups and their Branches) must be supplied and entered; Clan/Branch
-dashboards, reports, bulk reassignment and import are later work.
+(AUTH-ADR-054). The approved Al-Breem taxonomy (17 Branch Groups, 25
+Branches) is seeded; existing families remain without a Branch until
+classified. **Still open:** Clan/Branch dashboards, reports, bulk
+reassignment and import are later work.
 
 ---
 

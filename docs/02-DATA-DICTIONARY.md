@@ -370,8 +370,10 @@ created_at
 updated_at
 ```
 
-The Al-Breem taxonomy (16 groups and their Branches) is **not seeded** until
-the approved list is supplied.
+The approved Al-Breem taxonomy (2026-09-25) is seed data in `ClanSeeder`:
+currently 17 unnamed Branch Groups (`BG01`–`BG17`) with 25 Branches; groups
+07 and 08 hold five Branches each. The number of groups is not a rule;
+administrators may change the structure afterwards.
 
 ---
 
