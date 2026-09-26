@@ -20,7 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddMemberDialog } from "@/components/families/add-member-dialog";
-import { calculateAge } from "@/lib/utils/date";
+import { ageLabel, birthDateLabel } from "@/lib/utils/date";
 import { relationshipLabel } from "@/lib/utils/relationship";
 import type { FamilyDetail } from "@/lib/types/api/family";
 
@@ -72,12 +72,10 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
                 <TableCell>
                   {member.gender === "MALE" ? "ذكر" : "أنثى"}
                 </TableCell>
-                <TableCell className="tabular-nums" dir="ltr">
-                  {member.birth_date ?? "—"}
+                <TableCell className="tabular-nums" dir={member.birth_date ? "ltr" : undefined}>
+                  {birthDateLabel(member.birth_date)}
                 </TableCell>
-                <TableCell className="tabular-nums">
-                  {member.birth_date ? calculateAge(member.birth_date) : "—"}
-                </TableCell>
+                <TableCell className="tabular-nums">{ageLabel(member.birth_date)}</TableCell>
                 <TableCell>
                   <Badge variant={member.is_active ? "default" : "outline"}>
                     {member.is_active ? "نشط" : "غير نشط"}

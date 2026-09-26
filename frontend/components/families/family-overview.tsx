@@ -1,5 +1,6 @@
 "use client";
 
+import { birthDateLabel } from "@/lib/utils/date";
 import { useAuth } from "@/components/auth/auth-context";
 import {
   Card,
@@ -138,9 +139,7 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
                 label="الجنس"
                 value={head.gender === "MALE" ? "ذكر" : "أنثى"}
               />
-              {head.birth_date && (
-                <InfoRow label="تاريخ الميلاد" value={head.birth_date} ltr />
-              )}
+              <InfoRow label="تاريخ الميلاد" value={birthDateLabel(head.birth_date)} ltr={!!head.birth_date} />
               {headPerson && (
                 <>
                   <InfoRow label="الحالة" value={lifeStatusLabel(headPerson.life_status)} />

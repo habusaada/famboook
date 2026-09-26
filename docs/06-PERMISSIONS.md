@@ -3417,6 +3417,9 @@ Reports V1 (§59b) assigns the existing `report.view` to SUPER_ADMIN, ADMINISTRA
 
 ### AUTH-ADR-057
 Staff authentication and user administration (§59c). Real Staff login on the Sanctum session with generic failures and email+IP / IP rate limits; `/api/v1/me` for UX; `users.is_active` enforced centrally on every Staff API and Filament request. One Staff role per user; FAMILY_USER never logs in to the Staff Portal nor is assignable there. Filament (resolves PAUTH-028 for V1) is limited to Staff user administration and open to active holders of `system-admin.access`: SUPER_ADMIN (existing) and ADMINISTRATOR (new). ADMINISTRATOR newly receives `system-admin.access`, `user.view`, `user.create`, `user.update`, `user.activate`, `user.suspend`, `user.reset-access` and `role.assign`, bounded by ManageStaffUsersAction to the four non-privileged roles and their holders; role/permission definitions (`role.create/update/delete`, `permission.assign`) and Family User links stay SUPER_ADMIN-only. Nobody changes their own role or deactivates themselves; the last active SUPER_ADMIN is protected.
+
+### AUTH-ADR-058
+Registry search and exact National ID duplicate checks (docs/03 §93a). The Family registry keeps `family.view`; the new People registry uses `person.view` and shows Family context only with `family.view`; neither returns National IDs. The exact National ID pre-check (`POST /api/v1/people/national-id-check`) adds no permission: it is open to holders of `person.create` or `family.create` — exactly the users who can create a Person and are refused anyway on a duplicate — rate limited to 30 per minute per user, exact match only, and never returns a National ID (the Person name only with `person.view`). It grants no National ID viewing, browsing or search; `person.national-id.view` / `.view-masked` / `.update` stay unassigned.
 ```
 
 ---
@@ -3779,6 +3782,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.14 | 2026-09-26 | Approved | AUTH-ADR-058: registry search permissions and the exact National ID pre-check (person.create / family.create, rate limited, no new permission) |
 | 1.2.13 | 2026-09-26 | Approved | §59c: Staff authentication (login, logout, `/me`, rate limiting, `is_active`), one Staff role per user, Filament Staff user administration and escalation rules, ADMINISTRATOR user-administration grants, two rows in §140, PAUTH-028 V1 resolution, AUTH-ADR-057 |
 | 1.2.12 | 2026-09-26 | Approved | §59b: `report.view` V1 role assignment, per-report domain-permission rule, `export.basic` for XLSX, two rows in §140, AUTH-ADR-056 |
 | 1.2.11 | 2026-09-25 | Approved | §59a: `dashboard.view-operational` V1 role assignment and per-section domain-permission rule, row in §140, AUTH-ADR-055 |

@@ -162,7 +162,9 @@ class AddFamilyMemberTest extends TestCase
         );
 
         $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['full_name', 'gender', 'birth_date', 'relationship_type_id']);
+        $response->assertJsonValidationErrors(['full_name', 'gender', 'relationship_type_id']);
+        // Date of birth is optional: NULL = unknown (Pilot Slice B).
+        $response->assertJsonMissingValidationErrors(['birth_date']);
     }
 
     public function test_unauthenticated_user_cannot_add_a_family_member(): void

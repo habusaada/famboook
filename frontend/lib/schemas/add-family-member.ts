@@ -11,7 +11,8 @@ export const addFamilyMemberSchema = z.object({
   nationalId: z.string().optional(),
   gender: z.enum(["MALE", "FEMALE"]),
   maritalStatus: z.enum(["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "UNKNOWN"]),
-  birthDate: z.string().min(1, "تاريخ الميلاد مطلوب"),
+  // Optional: empty = unknown (NULL), never a placeholder date.
+  birthDate: z.string().optional(),
   mobile: z.string().optional(),
   alternateMobile: z.string().optional(),
 });
@@ -26,7 +27,7 @@ export function toAddFamilyMemberPayload(
     national_id: values.nationalId || null,
     gender: values.gender,
     marital_status: values.maritalStatus,
-    birth_date: values.birthDate,
+    birth_date: values.birthDate || null,
     mobile: values.mobile || null,
     alternate_mobile: values.alternateMobile || null,
     relationship_type_id: values.relationshipTypeId,

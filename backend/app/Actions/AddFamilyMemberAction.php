@@ -10,6 +10,7 @@ use App\Models\FamilyMembership;
 use App\Models\Person;
 use App\Support\BusinessIdentifier;
 use App\Support\FamilyActivityLog;
+use App\Support\NationalIdGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,7 +29,7 @@ class AddFamilyMemberAction
      *     full_name: string,
      *     national_id?: string|null,
      *     gender: string,
-     *     birth_date: string,
+     *     birth_date?: string|null,
      *     mobile?: string|null,
      *     alternate_mobile?: string|null,
      *     relationship_type_id: int,
@@ -37,6 +38,10 @@ class AddFamilyMemberAction
     public function handle(Family $family, array $data, ?int $actingUserId): FamilyMembership
     {
         return DB::transaction(function () use ($family, $data, $actingUserId) {
+            // Never a second Person with the same National ID (docs/03 §21):
+            // no new Person, no attaching the existing one, no merge.
+            NationalIdGuard::assertAvailable($data['national_id'] ?? null, 'national_id');
+
             $personId = BusinessIdentifier::nextId('persons');
 
             // forceCreate, not create: `id` is deliberately not fillable, so

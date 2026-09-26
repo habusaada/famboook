@@ -2118,6 +2118,74 @@ Family Users do not receive global Person/Family search.
 
 ---
 
+# 93a. Registry Search and Duplicate Prevention (V1)
+
+Approved 2026-09-26 (Pilot Readiness Slice B).
+
+## Registries
+
+```text
+Families   GET /api/v1/families   family.view
+           search: Family code, or the name / Person code of any current
+           member; optional status; server-side pagination (≤ 100/page);
+           `summary` counts the whole registry by status (never a page)
+People     GET /api/v1/people     person.view
+           search: Person code or name; non-deleted Persons; paginated
+```
+
+Search is a plain case-insensitive "contains" match. `%`, `_` and `!` in the
+term match literally. There is no Arabic normalization, fuzzy or phonetic
+matching (PDD-003 stays open) and no National ID search. Registry rows carry
+codes, names, gender, date of birth, life status and current Family context
+(Family context only with `family.view`) — never the National ID, contact
+details, health data or internal ids. Search state lives in the page URL
+(`?q=…&page=…`); a National ID is never put in a URL.
+
+## Exact National ID duplicate prevention
+
+A National ID already held by another non-deleted Person cannot be given to
+a new Person:
+
+```text
+Registering a household head    refused (422)
+Adding a Family member          refused (422)
+Changing a Person's National ID refused (422) if another Person holds it
+```
+
+The refusal ("يوجد شخص مسجل مسبقًا بهذه الهوية.") lists safe references to
+the existing record — Person code, name (with `person.view`), Family code,
+household-head flag and relationship — so staff can inspect it. Nothing is
+created; the existing Person is not attached to the new Family, not moved and
+not merged (§23: no automatic merge). The National ID value is never echoed.
+
+Matching is exact on the stored value (request whitespace trimmed only; PDD-001
+normalization stays open) — no partial, prefix or fuzzy match. A missing
+National ID is never a duplicate and may remain NULL (§19).
+
+Staff entering data get the same answer early through an exact pre-check
+(`POST /api/v1/people/national-id-check`, AUTH-ADR-058), which is not a
+search: exact value only, POST body only, rate limited, National ID never
+returned.
+
+National ID is not UNIQUE in the schema (documented duplicates must remain
+representable for review). The creation actions enforce the rule inside their
+transaction and hold a PostgreSQL advisory lock per National ID, so two
+concurrent creations with the same value cannot both succeed. Remaining
+limitation: the lock only covers writes through these actions (registration,
+add member, Person update); any future import or bulk path must use the same
+guard. Duplicates already present are not detected retroactively (see the
+Data Quality report roadmap).
+
+## Unknown date of birth
+
+Date of birth is optional when registering a household head or adding a
+member. An unknown date of birth is stored as NULL — never a placeholder
+(§26) — displays as "غير معروف", produces no age, and counts in the UNKNOWN
+age band (docs/02 §75) and the Data Quality "missing date of birth" check.
+Partial dates remain deferred (PDD-022).
+
+---
+
 # 94. Reporting
 
 Reports must use authorized canonical data.
@@ -3228,6 +3296,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.13 | 2026-09-26 | Approved | Added §93a: server-side Family/People registry search, exact National ID duplicate prevention (no merge, advisory-lock concurrency, remaining limitation), optional date of birth and UNKNOWN age |
 | 1.2.12 | 2026-09-26 | Approved | §116: V1 Staff authentication rules (login, logout, inactive accounts, one Staff role, Filament scope, safe seeding, local-only dev login) |
 | 1.2.11 | 2026-09-26 | Approved | Added §55b "Reports (V1)": six fixed reports over the §55a scope and population, Health aggregate-only, Needs lifecycle, latest domain state, scoped INTERNAL/EXTERNAL assistance, Data Quality checks and drill-down, XLSX privacy rules |
 | 1.2.10 | 2026-09-25 | Approved | Added §55a "Operational Dashboard (V1)": organizational scope, current population, figure definitions, latest-completed-assessment-per-domain rule, INTERNAL vs EXTERNAL assistance semantics |

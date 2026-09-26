@@ -6,6 +6,19 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** Shown wherever a date of birth / age is not recorded (NULL = unknown). */
+export const UNKNOWN_LABEL = "غير معروف";
+
+/** A date of birth, or the unknown label — never a placeholder date. */
+export function birthDateLabel(birthDate: string | null | undefined): string {
+  return birthDate || UNKNOWN_LABEL;
+}
+
+/** Age in years from the date of birth, or the unknown label — never a guess. */
+export function ageLabel(birthDate: string | null | undefined): string {
+  return birthDate ? String(calculateAge(birthDate)) : UNKNOWN_LABEL;
+}
+
 export function calculateAge(birthDate: string): number {
   const birth = new Date(birthDate);
   const today = new Date();

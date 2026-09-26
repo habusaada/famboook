@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  DUPLICATE_NATIONAL_ID_MESSAGE,
+  NationalIdDuplicateNotice,
+  useNationalIdDuplicate,
+} from "@/components/shared/national-id-duplicate";
 import { RequirePermission } from "@/components/auth/require-permission";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -76,6 +81,7 @@ function RegisterFamilyForm() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const registerFamily = useRegisterFamily();
+  const duplicate = useNationalIdDuplicate();
 
   const {
     register,
@@ -115,6 +121,12 @@ function RegisterFamilyForm() {
       },
       onError: (error) => {
         if (error instanceof ApiError && error.status === 422) {
+          // Existing Person with this National ID: nothing was created.
+          if (duplicate.fromError(error)) {
+            setError("headNationalId", { type: "server", message: DUPLICATE_NATIONAL_ID_MESSAGE });
+            setSubmitError(DUPLICATE_NATIONAL_ID_MESSAGE);
+            return;
+          }
           const validationErrors = error.validationErrors;
           if (validationErrors) {
             for (const [apiField, messages] of Object.entries(validationErrors)) {
@@ -284,8 +296,12 @@ function RegisterFamilyForm() {
                   id="headNationalId"
                   dir="ltr"
                   className="text-end"
-                  {...register("headNationalId")}
+                  {...register("headNationalId", {
+                    onChange: () => duplicate.clear(),
+                    onBlur: (event) => void duplicate.check(event.target.value),
+                  })}
                 />
+                <NationalIdDuplicateNotice matches={duplicate.matches} />
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -319,7 +335,7 @@ function RegisterFamilyForm() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="headBirthDate">تاريخ الميلاد</FieldLabel>
+                <FieldLabel htmlFor="headBirthDate" optional>تاريخ الميلاد</FieldLabel>
                 <Input
                   id="headBirthDate"
                   type="date"
@@ -327,6 +343,7 @@ function RegisterFamilyForm() {
                   className="text-end"
                   {...register("headBirthDate")}
                 />
+                <p className="text-xs text-muted-foreground">اتركه فارغًا إن لم يكن معروفًا.</p>
                 {errors.headBirthDate && (
                   <p className="text-xs text-destructive">
                     {errors.headBirthDate.message}

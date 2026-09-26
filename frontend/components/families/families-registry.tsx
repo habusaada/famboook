@@ -1,95 +1,67 @@
 "use client";
 
 import { useAuth } from "@/components/auth/auth-context";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, Search, X } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
+import { RegistryPagination } from "@/components/shared/registry-pagination";
 import { useFamilies } from "@/lib/api/families";
+import { useRegistrySearch } from "@/lib/hooks/use-registry-search";
 import type { FamilyLifecycleStatus } from "@/lib/types/api/family";
 
-const statusFilterOptions: { value: FamilyLifecycleStatus | "ALL"; label: string }[] = [
-  { value: "ALL", label: "كل الحالات" },
+const ALL = "ALL";
+
+const statusFilterOptions: { value: FamilyLifecycleStatus | typeof ALL; label: string }[] = [
+  { value: ALL, label: "كل الحالات" },
   { value: "ACTIVE", label: "نشطة" },
   { value: "INACTIVE", label: "غير نشطة" },
   { value: "ARCHIVED", label: "مؤرشفة" },
 ];
 
+/**
+ * Family registry (docs/03 §93a): search, status filter and pagination run
+ * on the server; state lives in the URL. The cards count the whole registry
+ * by status; the result count below the table is for the current search.
+ */
 export function FamiliesRegistry() {
   const router = useRouter();
   const { can } = useAuth();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<FamilyLifecycleStatus | "ALL">("ALL");
+  const registry = useRegistrySearch();
+  const status = registry.param("status");
 
-  const { data, isLoading, isError, error, refetch } = useFamilies();
-  const families = useMemo(() => data?.data ?? [], [data]);
+  const { data, isLoading, isFetching, isError, error, refetch } = useFamilies({
+    search: registry.q,
+    status,
+    page: registry.page,
+  });
+  const families = data?.data ?? [];
+  const summary = data?.summary;
+  const hasActiveFilters = registry.text.trim() !== "" || status !== "";
 
-  const summary = useMemo(
-    () => ({
-      total: families.length,
-      active: families.filter((f) => f.status === "ACTIVE").length,
-      inactive: families.filter((f) => f.status === "INACTIVE").length,
-      archived: families.filter((f) => f.status === "ARCHIVED").length,
-    }),
-    [families]
+  const stat = (label: string, value: number | undefined) => (
+    <Card size="sm">
+      <CardHeader className="pb-1">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className="text-2xl font-semibold tabular-nums">
+          {value === undefined ? <Skeleton className="h-8 w-12" /> : value.toLocaleString("ar")}
+        </CardTitle>
+      </CardHeader>
+    </Card>
   );
-
-  const filteredFamilies = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return families.filter((family) => {
-      const matchesStatus = statusFilter === "ALL" || family.status === statusFilter;
-      if (!matchesStatus) return false;
-      if (!query) return true;
-
-      return (
-        family.family_code.toLowerCase().includes(query) ||
-        (family.household_head_name?.toLowerCase().includes(query) ?? false)
-      );
-    });
-  }, [families, search, statusFilter]);
-
-  const hasActiveFilters = search.trim() !== "" || statusFilter !== "ALL";
-
-  function resetFilters() {
-    setSearch("");
-    setStatusFilter("ALL");
-  }
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">سجل العائلات</h2>
-          <p className="text-sm text-muted-foreground">
-            إدارة الأسر المسجلة ومتابعة حالة كل سجل
-          </p>
+          <p className="text-sm text-muted-foreground">إدارة الأسر المسجلة ومتابعة حالة كل سجل</p>
         </div>
         {can("family.create") && <Button onClick={() => router.push("/families/new")}>إضافة أسرة</Button>}
       </div>
@@ -99,56 +71,20 @@ export function FamiliesRegistry() {
           <AlertCircle className="size-4" />
           <AlertTitle>تعذّر تحميل سجل العائلات</AlertTitle>
           <AlertDescription className="flex flex-col gap-2">
-            <span>
-              {error instanceof Error
-                ? error.message
-                : "حدث خطأ غير متوقع أثناء الاتصال بالخادم."}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-fit"
-              onClick={() => refetch()}
-            >
+            <span>{error instanceof Error ? error.message : "حدث خطأ غير متوقع أثناء الاتصال بالخادم."}</span>
+            <Button variant="outline" size="sm" className="w-fit" onClick={() => refetch()}>
               إعادة المحاولة
             </Button>
           </AlertDescription>
         </Alert>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card size="sm">
-              <CardHeader className="pb-1">
-                <CardDescription>إجمالي الأسر</CardDescription>
-                <CardTitle className="text-2xl font-semibold tabular-nums">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : summary.total}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm">
-              <CardHeader className="pb-1">
-                <CardDescription>نشطة</CardDescription>
-                <CardTitle className="text-2xl font-semibold tabular-nums">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : summary.active}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm">
-              <CardHeader className="pb-1">
-                <CardDescription>غير نشطة</CardDescription>
-                <CardTitle className="text-2xl font-semibold tabular-nums">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : summary.inactive}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card size="sm">
-              <CardHeader className="pb-1">
-                <CardDescription>مؤرشفة</CardDescription>
-                <CardTitle className="text-2xl font-semibold tabular-nums">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : summary.archived}
-                </CardTitle>
-              </CardHeader>
-            </Card>
+          {/* Whole registry, independent of the search below. */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-registry-summary>
+            {stat("إجمالي الأسر في السجل", summary?.total)}
+            {stat("نشطة", summary?.active)}
+            {stat("غير نشطة", summary?.inactive)}
+            {stat("مؤرشفة", summary?.archived)}
           </div>
 
           <Card size="sm">
@@ -156,20 +92,18 @@ export function FamiliesRegistry() {
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="ابحث برقم الأسرة أو اسم رب الأسرة..."
+                  type="search"
+                  value={registry.text}
+                  onChange={(event) => registry.setText(event.target.value)}
+                  placeholder="ابحث برقم الأسرة أو اسم أحد أفرادها أو رقم الفرد..."
+                  aria-label="بحث في سجل العائلات"
                   className="ps-8"
+                  data-registry-search
                 />
               </div>
 
-              <Select
-                value={statusFilter}
-                onValueChange={(value) =>
-                  setStatusFilter(value as FamilyLifecycleStatus | "ALL")
-                }
-              >
-                <SelectTrigger className="sm:w-52">
+              <Select value={status || ALL} onValueChange={(value) => registry.setFilter("status", value === ALL ? "" : value)}>
+                <SelectTrigger className="sm:w-52" aria-label="الحالة">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,17 +116,17 @@ export function FamiliesRegistry() {
               </Select>
 
               {hasActiveFilters && (
-                <Button variant="ghost" onClick={resetFilters} className="sm:w-auto">
+                <Button variant="ghost" onClick={registry.reset} className="sm:w-auto" data-registry-reset>
                   <X className="size-4" />
-                  إعادة تعيين
+                  مسح البحث
                 </Button>
               )}
             </CardContent>
           </Card>
 
           <Card size="sm">
-            <CardContent className="overflow-x-auto p-0">
-              <Table>
+            <CardContent className="overflow-x-auto p-0" aria-busy={isFetching}>
+              <Table className={isFetching && !isLoading ? "opacity-60 transition-opacity" : undefined}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>رقم الأسرة</TableHead>
@@ -215,22 +149,18 @@ export function FamiliesRegistry() {
                         ))}
                       </TableRow>
                     ))
-                  ) : filteredFamilies.length === 0 ? (
+                  ) : families.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="py-10 text-center text-sm text-muted-foreground"
-                      >
-                        {families.length === 0
-                          ? "لا توجد أسر مسجّلة بعد"
-                          : "لا توجد نتائج مطابقة لبحثك"}
+                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                        {registry.q || status ? "لا توجد نتائج مطابقة لبحثك" : "لا توجد أسر مسجّلة بعد"}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredFamilies.map((family) => (
+                    families.map((family) => (
                       <TableRow
                         key={family.family_code}
                         className="cursor-pointer"
+                        data-family={family.family_code}
                         onClick={() => router.push(`/families/${family.family_code}`)}
                       >
                         <TableCell className="font-medium">
@@ -239,22 +169,15 @@ export function FamiliesRegistry() {
                         <TableCell>{family.household_head_name ?? "—"}</TableCell>
                         <TableCell className="text-sm">
                           {family.clan_name ?? "—"}
-                          <span className="block text-xs text-muted-foreground">
-                            {family.branch_name ?? "بدون فرع"}
-                          </span>
+                          <span className="block text-xs text-muted-foreground">{family.branch_name ?? "بدون فرع"}</span>
                         </TableCell>
-                        <TableCell className="tabular-nums">
-                          {family.member_count}
-                        </TableCell>
+                        <TableCell className="tabular-nums">{family.member_count}</TableCell>
                         <TableCell>
                           <FamilyStatusBadge status={family.status} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {family.updated_at
-                            ? new Date(family.updated_at).toLocaleString("ar", {
-                                dateStyle: "medium",
-                                timeStyle: "short",
-                              })
+                            ? new Date(family.updated_at).toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" })
                             : "—"}
                         </TableCell>
                         <TableCell className="text-end">
@@ -276,6 +199,13 @@ export function FamiliesRegistry() {
                 </TableBody>
               </Table>
             </CardContent>
+            {data && (
+              <RegistryPagination
+                meta={data.meta}
+                onPage={registry.setPage}
+                unit={registry.q || status ? "نتيجة" : "أسرة"}
+              />
+            )}
           </Card>
         </>
       )}

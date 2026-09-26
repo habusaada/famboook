@@ -2027,6 +2027,19 @@ Sensitive search permission-aware
 Duplicate workflow operational
 ```
 
+## Progress
+
+2026-09-26: **Pilot Readiness Slice B** delivered (docs/03 §93a,
+AUTH-ADR-058): server-side Family registry search/pagination with
+whole-registry status counts, a People registry (code / name), exact
+National ID duplicate prevention on household-head registration, member
+addition and Person update (safe references, no merge, advisory-lock
+concurrency, pre-check without echoing the value), optional date of birth
+(NULL = unknown, UNKNOWN age band), and measured `pg_trgm` search indexes.
+**Still open:** Arabic name normalization (PDD-003), National ID
+normalization (PDD-001), probable/possible duplicate detection and the human
+duplicate-review workflow, retroactive detection of existing duplicates.
+
 ---
 
 # 33. Phase 21 — Operational & Executive Dashboards
@@ -4641,6 +4654,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.9 | 2026-09-26 | Approved | Phase 20 progress note: Pilot Readiness Slice B (registry search, exact National ID duplicate prevention, optional date of birth) |
 | 1.2.8 | 2026-09-26 | Approved | Phase 4 progress note: Pilot Readiness Slice A (real Staff authentication and Staff access) |
 | 1.2.7 | 2026-09-26 | Approved | Phase 22 progress note: Reports V1 |
 | 1.2.6 | 2026-09-25 | Approved | Phase 21 progress note: Operational Dashboard V1 |

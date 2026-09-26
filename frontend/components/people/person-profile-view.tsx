@@ -26,7 +26,7 @@ import { EditPersonDialog } from "@/components/people/edit-person-dialog";
 import { usePerson } from "@/lib/api/people";
 import { ApiError } from "@/lib/api/client";
 import { relationshipLabel } from "@/lib/utils/relationship";
-import { calculateAge } from "@/lib/utils/date";
+import { ageLabel, birthDateLabel } from "@/lib/utils/date";
 import { maritalStatusLabels } from "@/lib/utils/marital-status";
 
 function InfoRow({ label, value, ltr }: { label: string; value: string; ltr?: boolean }) {
@@ -164,15 +164,8 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
               label="الحالة الاجتماعية"
               value={maritalStatusLabels[person.marital_status ?? "UNKNOWN"]}
             />
-            {person.birth_date && (
-              <>
-                <InfoRow label="تاريخ الميلاد" value={person.birth_date} ltr />
-                <InfoRow
-                  label="العمر"
-                  value={String(calculateAge(person.birth_date))}
-                />
-              </>
-            )}
+            <InfoRow label="تاريخ الميلاد" value={birthDateLabel(person.birth_date)} ltr={!!person.birth_date} />
+            <InfoRow label="العمر" value={ageLabel(person.birth_date)} />
           </CardContent>
         </Card>
 

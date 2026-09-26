@@ -670,6 +670,26 @@ added: every report query shape is served by existing indexes
 `assistance_beneficiaries (family_id)`, delivery and list-entry beneficiary
 indexes, `person_health_records (person_id, type)`).
 
+Registry search API (docs/03 §93a, AUTH-ADR-058):
+
+```text
+GET  /api/v1/families?search=&status=&page=&per_page=   family.view (per_page ≤ 100)
+GET  /api/v1/people?search=&page=&per_page=             person.view (per_page ≤ 100)
+POST /api/v1/people/national-id-check  {national_id}    person.create | family.create; 30/min/user
+```
+
+Search is `ILIKE '%term%'` (escape character `!`). Family search matches
+`families.family_code`, or `families.id IN (SELECT family_id FROM active
+memberships JOIN persons WHERE name/code match)` — one pass, no per-row
+queries. Indexes (2026-10-04 migration, PostgreSQL only): extension
+`pg_trgm` and trigram GIN indexes `ix_persons_full_name_trgm`,
+`ix_persons_person_code_trgm`, `ix_families_family_code_trgm`. Justified by
+measurement on 100,000 synthetic names: a selective search went from
+~400–600 ms (sequential scan) to ~5–8 ms; very broad terms (≤ 2 characters,
+or text every name contains) still scan. The exact National ID lookup uses the
+existing `persons.national_id` B-tree index. National ID stays non-UNIQUE;
+creation serializes per value with `pg_advisory_xact_lock(hashtext(…))`.
+
 ---
 
 # 20. One Active Family Membership
@@ -3581,6 +3601,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.12 | 2026-09-26 | Approved | §19: registry search API, `pg_trgm` trigram indexes (measured), National ID advisory-lock duplicate enforcement |
 | 1.2.11 | 2026-09-26 | Approved | §51: `users.is_active`, session storage note, Staff authentication API and Filament `/admin` |
 | 1.2.10 | 2026-09-26 | Approved | §19: Reports V1 API (derived on request, paginated, streamed XLSX, no storage); index review — no new index |
 | 1.2.9 | 2026-09-25 | Approved | §19: `ix_family_memberships_family_active` index and the Operational Dashboard API (derived aggregates, no storage) |

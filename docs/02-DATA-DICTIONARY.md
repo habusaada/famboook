@@ -532,6 +532,10 @@ Age is derived from this field.
 
 Age must not be permanently stored as canonical data.
 
+Optional (V1, 2026-09-26): NULL means unknown, also at creation. No
+placeholder date is ever stored; an unknown date of birth yields no age
+("غير معروف") and the UNKNOWN age band (§75). Partial dates: PDD-022.
+
 ---
 
 ### marital_status_id
@@ -3582,6 +3586,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.13 | 2026-09-26 | Approved | §10: `birth_date` optional at creation (NULL = unknown, no placeholder, UNKNOWN age band) |
 | 1.2.12 | 2026-09-26 | Approved | §40: V1 `users` fields including `is_active`; one Staff role per user |
 | 1.2.11 | 2026-09-25 | Approved | §75: approved Dashboard/Reports V1 age bands (derived, never stored) |
 | 1.2.10 | 2026-09-25 | Approved | Clan + Branch Structure V1: §7a `clans`, §7b `branch_groups` (nullable name), §7c `branches`; `families.clan_id` (required) and `families.branch_id` (optional); Clan ≠ Family |

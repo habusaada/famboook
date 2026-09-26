@@ -14,6 +14,7 @@ use App\Models\RelationshipType;
 use App\Support\BusinessIdentifier;
 use App\Support\FamilyActivityLog;
 use App\Support\FamilyLineage;
+use App\Support\NationalIdGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,7 +39,7 @@ class RegisterFamilyAction
      *         full_name: string,
      *         national_id?: string|null,
      *         gender: string,
-     *         birth_date: string,
+     *         birth_date?: string|null,
      *         mobile?: string|null,
      *         alternate_mobile?: string|null,
      *         alternate_mobile_owner_relation?: string|null,
@@ -64,6 +65,8 @@ class RegisterFamilyAction
             // Clan/Branch are validated before anything is written.
             $lineage = new Family;
             FamilyLineage::apply($lineage, $data);
+            // Never a second Person with the same National ID (docs/03 §21).
+            NationalIdGuard::assertAvailable($data['household_head']['national_id'] ?? null, 'household_head.national_id');
 
             $familyId = BusinessIdentifier::nextId('families');
 
@@ -96,7 +99,8 @@ class RegisterFamilyAction
                 'national_id' => $head['national_id'] ?? null,
                 'gender' => $head['gender'],
                 'marital_status' => $head['marital_status'] ?? MaritalStatus::UNKNOWN->value,
-                'birth_date' => $head['birth_date'],
+                // NULL = unknown; never a placeholder (docs/03 §26).
+                'birth_date' => $head['birth_date'] ?? null,
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $head['mobile'] ?? null,
                 'alternate_mobile' => $head['alternate_mobile'] ?? null,

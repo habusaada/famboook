@@ -23,7 +23,8 @@ export const familyRegistrationSchema = z.object({
   headNationalId: z.string().optional(),
   headGender: z.enum(["MALE", "FEMALE"]),
   headMaritalStatus: z.enum(["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "UNKNOWN"]),
-  headBirthDate: z.string().min(1, "تاريخ الميلاد مطلوب"),
+  // Optional: empty = unknown (NULL), never a placeholder date.
+  headBirthDate: z.string().optional(),
   headMobile: z.string().optional(),
   headAlternateMobile: z.string().optional(),
   headAlternateMobileOwnerRelation: z.string().optional(),
@@ -61,7 +62,7 @@ export function toRegisterFamilyPayload(
       national_id: values.headNationalId || null,
       gender: values.headGender,
       marital_status: values.headMaritalStatus,
-      birth_date: values.headBirthDate,
+      birth_date: values.headBirthDate || null,
       mobile: values.headMobile || null,
       alternate_mobile: values.headAlternateMobile || null,
       // Only meaningful alongside an alternate number.

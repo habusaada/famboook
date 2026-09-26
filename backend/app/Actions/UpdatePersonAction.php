@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Enums\FamilyActivityType;
 use App\Models\Person;
 use App\Support\FamilyActivityLog;
+use App\Support\NationalIdGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -25,6 +26,12 @@ class UpdatePersonAction
     public function handle(Person $person, array $data, ?int $actingUserId): Person
     {
         return DB::transaction(function () use ($person, $data, $actingUserId) {
+            // A changed National ID must not collide with another Person
+            // (docs/03 §21; changing it needs person.national-id.update).
+            if (array_key_exists('national_id', $data) && $data['national_id'] !== $person->national_id) {
+                NationalIdGuard::assertAvailable($data['national_id'], 'national_id', $person->id);
+            }
+
             $person->fill($data);
 
             // A save that changes nothing is not an activity.

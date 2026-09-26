@@ -24,7 +24,8 @@ class AddFamilyMemberRequest extends FormRequest
             // Optional; defaults to UNKNOWN (never inferred).
             'marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
             // docs/03-BUSINESS-RULES.md §25: birth date must not be in the future.
-            'birth_date' => ['required', 'date', 'before_or_equal:today'],
+            // Optional: NULL = unknown, never a placeholder (docs/03 §26).
+            'birth_date' => ['nullable', 'date', 'before_or_equal:today'],
             'mobile' => ['nullable', 'string', 'max:50'],
             'alternate_mobile' => ['nullable', 'string', 'max:50'],
             // Required: this endpoint never creates a household head, so

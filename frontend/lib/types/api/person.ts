@@ -46,3 +46,31 @@ export interface UpdatePersonPayload {
   alternate_mobile?: string | null;
   alternate_mobile_owner_relation?: string | null;
 }
+
+// A People registry row (backend PersonSummaryResource): no National ID,
+// contact details or health data. `family` is null without family.view.
+export interface PersonSummary {
+  person_code: string;
+  full_name: string;
+  gender: Gender | null;
+  birth_date: string | null;
+  life_status: LifeStatus;
+  family: {
+    family_code: string;
+    is_household_head: boolean;
+    relationship: { code: string; name: string } | null;
+    branch_name: string | null;
+  } | null;
+}
+
+// An existing Person holding a National ID that was entered again
+// (duplicate check / refused creation). Never contains the National ID.
+export interface NationalIdMatch {
+  person_code: string;
+  full_name: string | null;
+  family: {
+    family_code: string;
+    is_household_head: boolean;
+    relationship: string | null;
+  } | null;
+}

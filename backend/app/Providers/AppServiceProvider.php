@@ -48,5 +48,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('login', fn (Request $request) => Limit::perMinute(20)
             ->by('login-ip|'.$request->ip())
             ->response(fn () => response()->json(['message' => 'محاولات تسجيل دخول كثيرة. حاول مجددًا بعد قليل.'], 429)));
+
+        // Exact National ID pre-check (AUTH-ADR-058): enough for data entry,
+        // too few for enumerating National IDs.
+        RateLimiter::for('national-id-check', fn (Request $request) => Limit::perMinute(30)
+            ->by('nid-check|'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
+            ->response(fn () => response()->json(['message' => 'عدد كبير من عمليات التحقق. حاول مجددًا بعد قليل.'], 429)));
     }
 }

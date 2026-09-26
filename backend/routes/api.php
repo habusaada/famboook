@@ -51,6 +51,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/families/{family}/members', [FamilyMemberController::class, 'store'])
         ->middleware('can:person.create');
 
+    // People registry (docs/03 §93a).
+    Route::get('/people', [PersonController::class, 'index'])
+        ->middleware('can:person.view');
+
+    // Exact National ID duplicate pre-check (AUTH-ADR-058): authorized in
+    // NationalIdCheckRequest (person.create or family.create), rate limited.
+    Route::post('/people/national-id-check', [PersonController::class, 'nationalIdCheck'])
+        ->middleware('throttle:national-id-check');
+
     Route::get('/people/{person}', [PersonController::class, 'show'])
         ->middleware('can:person.view');
 

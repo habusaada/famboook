@@ -1,23 +1,28 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type {
   AddFamilyMemberPayload,
+  FamiliesListResponse,
   FamilyDetail,
   FamilyMemberDetail,
-  FamilySummary,
-  PaginatedResponse,
   RegisterFamilyPayload,
   ResourceResponse,
   UpdateFamilyPayload,
   UpdateFamilyResidencePayload,
 } from "@/lib/types/api/family";
 
-export function useFamilies() {
+/** Family registry: server-side search, status filter and pagination. */
+export function useFamilies(params: { search?: string; status?: string; page?: number }) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
   return useQuery({
-    queryKey: ["families"],
-    queryFn: () => apiClient.get<PaginatedResponse<FamilySummary>>("/api/v1/families"),
+    queryKey: ["families", "registry", params],
+    queryFn: () => apiClient.get<FamiliesListResponse>(`/api/v1/families?${search.toString()}`),
+    placeholderData: keepPreviousData,
   });
 }
 

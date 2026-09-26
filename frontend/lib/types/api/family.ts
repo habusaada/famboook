@@ -100,6 +100,12 @@ export interface PaginatedResponse<T> {
   meta: PaginationMeta;
 }
 
+// GET /api/v1/families: the page plus whole-registry counts by status
+// (independent of the search — never the page size).
+export type FamiliesListResponse = PaginatedResponse<FamilySummary> & {
+  summary: { total: number; active: number; inactive: number; archived: number };
+};
+
 export interface ResourceResponse<T> {
   data: T;
   message?: string;
@@ -119,7 +125,7 @@ export interface RegisterFamilyPayload {
     national_id?: string | null;
     gender: Gender;
     marital_status?: MaritalStatus;
-    birth_date: string;
+    birth_date?: string | null;
     mobile?: string | null;
     alternate_mobile?: string | null;
     alternate_mobile_owner_relation?: string | null;
@@ -172,7 +178,7 @@ export interface AddFamilyMemberPayload {
   national_id?: string | null;
   gender: Gender;
   marital_status?: MaritalStatus;
-  birth_date: string;
+  birth_date?: string | null;
   mobile?: string | null;
   alternate_mobile?: string | null;
   relationship_type_id: number;

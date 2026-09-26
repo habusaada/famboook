@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  DUPLICATE_NATIONAL_ID_MESSAGE,
+  NationalIdDuplicateNotice,
+  useNationalIdDuplicate,
+} from "@/components/shared/national-id-duplicate";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -68,6 +73,7 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
   // validation resolves, so a fast double click could otherwise send two
   // POSTs before the buttons disable.
   const submitting = useRef(false);
+  const duplicate = useNationalIdDuplicate();
 
   const {
     register,
@@ -104,6 +110,7 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
     reset(EMPTY_VALUES);
     setSubmitError(null);
     setJustAdded(null);
+    duplicate.clear();
   }
 
   function submit(andAddAnother: boolean) {
@@ -127,6 +134,7 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
             }
 
             reset(EMPTY_VALUES);
+            duplicate.clear();
 
             setJustAdded(values.fullName);
             if (confirmationTimeout.current) clearTimeout(confirmationTimeout.current);
@@ -138,6 +146,12 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
           },
           onError: (error) => {
             if (error instanceof ApiError && error.status === 422) {
+              // Existing Person with this National ID: nothing was created.
+              if (duplicate.fromError(error)) {
+                setError("nationalId", { type: "server", message: DUPLICATE_NATIONAL_ID_MESSAGE });
+                setSubmitError(null);
+                return;
+              }
               const validationErrors = error.validationErrors;
               if (validationErrors) {
                 for (const [apiField, messages] of Object.entries(validationErrors)) {
@@ -301,7 +315,10 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="member-birthDate">تاريخ الميلاد</Label>
+              <Label htmlFor="member-birthDate">
+                تاريخ الميلاد{" "}
+                <span className="text-xs font-normal text-muted-foreground">(اختياري)</span>
+              </Label>
               <Input
                 id="member-birthDate"
                 type="date"
@@ -309,6 +326,7 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
                 className="text-end"
                 {...register("birthDate")}
               />
+              <p className="text-xs text-muted-foreground">اتركه فارغًا إن لم يكن معروفًا.</p>
               {errors.birthDate && (
                 <p className="text-xs text-destructive">
                   {errors.birthDate.message}
@@ -328,8 +346,15 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
               id="member-nationalId"
               dir="ltr"
               className="text-end"
-              {...register("nationalId")}
+              {...register("nationalId", {
+                onChange: () => duplicate.clear(),
+                onBlur: (event) => void duplicate.check(event.target.value),
+              })}
             />
+            {errors.nationalId && duplicate.matches.length === 0 && (
+              <p className="text-xs text-destructive">{errors.nationalId.message}</p>
+            )}
+            <NationalIdDuplicateNotice matches={duplicate.matches} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

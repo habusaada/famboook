@@ -141,10 +141,11 @@ class RegisterFamilyTest extends TestCase
             'registration_source',
             'household_head.full_name',
             'household_head.gender',
-            'household_head.birth_date',
             'residence.governorate',
             'residence.city',
         ]);
+        // Date of birth is optional: NULL = unknown (Pilot Slice B).
+        $response->assertJsonMissingValidationErrors(['household_head.birth_date']);
     }
 
     public function test_registration_rejects_future_birth_date(): void

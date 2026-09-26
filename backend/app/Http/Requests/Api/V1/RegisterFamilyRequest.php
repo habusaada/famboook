@@ -34,7 +34,8 @@ class RegisterFamilyRequest extends FormRequest
             // Optional; defaults to UNKNOWN (never inferred).
             'household_head.marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
             // docs/03-BUSINESS-RULES.md §25: birth date must not be in the future.
-            'household_head.birth_date' => ['required', 'date', 'before_or_equal:today'],
+            // Optional: NULL = unknown, never a placeholder (docs/03 §26).
+            'household_head.birth_date' => ['nullable', 'date', 'before_or_equal:today'],
             'household_head.mobile' => ['nullable', 'string', 'max:50'],
             'household_head.alternate_mobile' => ['nullable', 'string', 'max:50'],
             // Descriptive only ("أحمد محمد – أخ"); meaningless without the
