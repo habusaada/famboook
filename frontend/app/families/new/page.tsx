@@ -1,5 +1,6 @@
 "use client";
 
+import { RequirePermission } from "@/components/auth/require-permission";
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
@@ -64,6 +65,14 @@ function FieldLabel({
 }
 
 export default function NewFamilyPage() {
+  return (
+    <RequirePermission permission="family.create">
+      <RegisterFamilyForm />
+    </RequirePermission>
+  );
+}
+
+function RegisterFamilyForm() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const registerFamily = useRegisterFamily();

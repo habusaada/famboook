@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Bell, Menu, NotebookText, Search, UserRound } from "lucide-react";
+import { Bell, Menu, NotebookText, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -11,17 +11,15 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
-import { navItems } from "@/lib/navigation";
+import { UserMenu } from "@/components/layout/user-menu";
+import { navItemFor, navItems } from "@/lib/navigation";
 import { useState } from "react";
 
 export function AppTopbar() {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const currentPage =
-    navItems.find((item) =>
-      item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-    ) ?? navItems[0];
+  const currentPage = navItemFor(pathname) ?? navItems[0];
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/80">
@@ -59,9 +57,7 @@ export function AppTopbar() {
           <Bell className="size-5" />
         </Button>
 
-        <Button variant="ghost" size="icon" aria-label="الملف الشخصي">
-          <UserRound className="size-5" />
-        </Button>
+        <UserMenu />
       </div>
     </header>
   );

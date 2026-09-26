@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-context";
 import { useRouter } from "next/navigation";
 import { Crown } from "lucide-react";
 import {
@@ -24,6 +25,7 @@ import { relationshipLabel } from "@/lib/utils/relationship";
 import type { FamilyDetail } from "@/lib/types/api/family";
 
 export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
+  const { can } = useAuth();
   const router = useRouter();
 
   return (
@@ -35,7 +37,7 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
             {family.members.length} فرد مسجّل ضمن الأسرة
           </CardDescription>
         </div>
-        <AddMemberDialog familyCode={family.family_code} />
+        {can("person.create") && <AddMemberDialog familyCode={family.family_code} />}
       </CardHeader>
       <CardContent className="overflow-x-auto p-0">
         <Table>

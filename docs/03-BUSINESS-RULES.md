@@ -2578,6 +2578,22 @@ Primary first-party web authentication uses Laravel Sanctum with secure cookie/s
 
 Authentication tokens for the primary web application must not be stored in browser localStorage.
 
+V1 Staff authentication (2026-09-26, docs/06 §59c, AUTH-ADR-057):
+
+```text
+Login        active user with one Staff role; generic failure otherwise
+             (wrong password / unknown email / inactive / non-Staff alike);
+             rate limited per email + IP and per IP; session regenerated
+Logout       session invalidated, CSRF token regenerated
+Inactive     cannot log in; an existing session is ended on its next request
+             (Staff Portal and Filament)
+Staff user   exactly one Staff role; FAMILY_USER is never a Staff Portal user
+Filament     Staff user administration only, for active holders of
+             system-admin.access; users are deactivated, never deleted
+Seeding      reference data only — never a user account or known password
+Dev login    /dev-login only when APP_ENV=local
+```
+
 ---
 
 # 117. Session Authorization
@@ -3212,6 +3228,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.12 | 2026-09-26 | Approved | §116: V1 Staff authentication rules (login, logout, inactive accounts, one Staff role, Filament scope, safe seeding, local-only dev login) |
 | 1.2.11 | 2026-09-26 | Approved | Added §55b "Reports (V1)": six fixed reports over the §55a scope and population, Health aggregate-only, Needs lifecycle, latest domain state, scoped INTERNAL/EXTERNAL assistance, Data Quality checks and drill-down, XLSX privacy rules |
 | 1.2.10 | 2026-09-25 | Approved | Added §55a "Operational Dashboard (V1)": organizational scope, current population, figure definitions, latest-completed-assessment-per-domain rule, INTERNAL vs EXTERNAL assistance semantics |
 | 1.2.9 | 2026-09-25 | Approved | Added §7a "Clan and Branch (V1)" (rules CB-1…CB-10): required Clan, optional Branch, same-Clan integrity, inactive handling, no inference, no hard delete |

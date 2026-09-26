@@ -36,7 +36,8 @@ use Spatie\Permission\PermissionRegistrar;
  * V1-A by AUTH-ADR-052 (§50) and for V1-B by AUTH-ADR-053. The Clan /
  * Branch structure permissions were added by AUTH-ADR-054 (§56a).
  * dashboard.view-operational was assigned by AUTH-ADR-055 (§59a) and
- * report.view by AUTH-ADR-056 (§59b).
+ * report.view by AUTH-ADR-056 (§59b). ADMINISTRATOR received Filament
+ * access and Staff user administration by AUTH-ADR-057 (§59c).
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -442,6 +443,16 @@ class RolePermissionSeeder extends Seeder
             'dashboard.view-operational',
             // Reports V1 (§59b V1 Role Assignment, AUTH-ADR-056)
             'report.view',
+            // Staff user administration in Filament (§59c, AUTH-ADR-057).
+            // Only non-privileged roles/users: ManageStaffUsersAction.
+            'system-admin.access',
+            'user.view',
+            'user.create',
+            'user.update',
+            'user.activate',
+            'user.suspend',
+            'user.reset-access',
+            'role.assign',
         ],
         'DATA_ENTRY' => [
             // Create Family ✓

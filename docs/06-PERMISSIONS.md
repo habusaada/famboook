@@ -1711,6 +1711,108 @@ it; Reports do not widen that decision.
 
 ---
 
+# 59c. Staff Authentication and Staff User Administration
+
+Approved 2026-09-26 (Pilot Readiness Slice A, AUTH-ADR-057).
+
+## Staff login (Sanctum first-party session)
+
+```text
+GET  /sanctum/csrf-cookie    XSRF-TOKEN cookie (sent back as X-XSRF-TOKEN)
+POST /api/v1/auth/login      email + password → session guard login,
+                             session id regenerated; returns /me payload
+POST /api/v1/auth/logout     session invalidated, CSRF token regenerated
+GET  /api/v1/me              authenticated user context (below)
+```
+
+No token is returned to JavaScript; the session cookie is HttpOnly and
+nothing is kept in localStorage. Login succeeds only for an **active**
+user holding a **Staff role**. Wrong password, unknown email, inactive
+account and non-Staff account (e.g. FAMILY_USER) all return the same
+generic Arabic failure, so the response never reveals whether an account
+exists. Passwords are never logged or echoed.
+
+Rate limiting: failed attempts per normalized email + IP (5 per minute,
+then a lockout with the remaining seconds), plus a per-IP ceiling on all
+attempts (20 per minute).
+
+`/api/v1/me` returns only `name`, `email`, `role`, `role_label` and the
+user's effective `permissions` — no ids, hashes, tokens or timestamps. It
+drives UX only (§12, §13).
+
+## Account status
+
+`users.is_active` (default true). An inactive user cannot log in, and a
+user deactivated while holding a session is logged out and refused on the
+very next request — one middleware (`EnsureUserIsActive`) on every Staff
+API and Filament request, not per-controller checks. Setting a temporary
+password also ends the user's existing sessions.
+
+## Staff roles
+
+A Staff user holds exactly **one** of SUPER_ADMIN, ADMINISTRATOR,
+DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER in V1. FAMILY_USER is
+not a Staff Portal user: it cannot log in to the Staff Portal, is never
+assignable from Staff administration, and FAMILY_USER accounts are not
+listed there.
+
+## Filament (System / High Administration)
+
+Filament (`/admin`) holds Staff user administration only; operational
+modules stay in the Next.js Staff Portal. Access requires an active user
+with `system-admin.access` (SUPER_ADMIN, ADMINISTRATOR). Same `users`
+table and session guard as the Staff Portal — no separate admin identity.
+
+```text
+List Staff users           user.view
+Create                     user.create + role.assign
+Edit name / email / role   user.update (+ role.assign to change the role)
+Deactivate                 user.suspend
+Reactivate                 user.activate
+Set temporary password     user.reset-access
+Delete                     never (deactivate instead)
+```
+
+Escalation rules (enforced in `ManageStaffUsersAction`, whatever the
+caller):
+
+```text
+SUPER_ADMIN     may assign any Staff role and manage any Staff user
+ADMINISTRATOR   may assign only DATA_ENTRY, REVIEWER, SOCIAL_WORKER,
+                REPORTS_VIEWER, and manage only users holding those roles
+                (not SUPER_ADMINs, not other ADMINISTRATORs)
+Nobody          changes their own role or deactivates themselves
+Last active     SUPER_ADMIN cannot be deactivated or demoted
+```
+
+Passwords are write-only: never shown or recoverable, hashed by Laravel;
+blank on edit keeps the current password. There is no role/permission
+editor in V1.
+
+Audit: create, role change, name/email change, activation, deactivation
+and temporary-password actions write an application-log entry (event,
+actor id, target id, role where relevant) — never a credential value.
+There is no audit table or audit UI yet.
+
+## Staff Portal UX
+
+The Staff Portal renders nothing Staff-related until `/api/v1/me`
+answers; without a session it redirects to `/login`. Navigation shows only
+sections the user can open, and the main actions (create/edit Family,
+member, Person, residence; module tabs; administration) are hidden without
+the permission. Health, Needs, Assessments and Assistance actions keep
+using the per-record `abilities` returned by the API. The API remains
+authoritative.
+
+## Development login
+
+`/dev-login` exists only when `APP_ENV=local` (404 otherwise) and is never
+the production login. Seeding creates reference data only — no user
+account and no known password; the first SUPER_ADMIN is created
+interactively with `php artisan famboook:create-super-admin`.
+
+---
+
 # 60. Export Permissions
 
 Recommended:
@@ -3312,6 +3414,9 @@ Operational Dashboard V1 (§59a) reuses the existing `dashboard.view-operational
 
 ### AUTH-ADR-056
 Reports V1 (§59b) assigns the existing `report.view` to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER and REPORTS_VIEWER; FAMILY_USER is excluded. Each report additionally requires all of its domain view permissions (403 otherwise). XLSX export reuses the existing `export.basic` (SUPER_ADMIN, ADMINISTRATOR, REPORTS_VIEWER; unchanged). REPORTS_VIEWER is deliberately not given health-record, Need, Assessment or Assistance access to fill the remaining tabs. `report.view-sensitive` and the sensitive export permissions stay unassigned because no report exposes sensitive values.
+
+### AUTH-ADR-057
+Staff authentication and user administration (§59c). Real Staff login on the Sanctum session with generic failures and email+IP / IP rate limits; `/api/v1/me` for UX; `users.is_active` enforced centrally on every Staff API and Filament request. One Staff role per user; FAMILY_USER never logs in to the Staff Portal nor is assignable there. Filament (resolves PAUTH-028 for V1) is limited to Staff user administration and open to active holders of `system-admin.access`: SUPER_ADMIN (existing) and ADMINISTRATOR (new). ADMINISTRATOR newly receives `system-admin.access`, `user.view`, `user.create`, `user.update`, `user.activate`, `user.suspend`, `user.reset-access` and `role.assign`, bounded by ManageStaffUsersAction to the four non-privileged roles and their holders; role/permission definitions (`role.create/update/delete`, `permission.assign`) and Family User links stay SUPER_ADMIN-only. Nobody changes their own role or deactivates themselves; the last active SUPER_ADMIN is protected.
 ```
 
 ---
@@ -3402,6 +3507,8 @@ Exact emergency/break-glass policy.
 
 PAUTH-028
 Exact Filament role eligibility.
+(V1 resolved 2026-09-26 by AUTH-ADR-057: SUPER_ADMIN and ADMINISTRATOR,
+Staff user administration only.)
 
 PAUTH-029
 Whether executive users receive record drill-down by default or separate permission.
@@ -3470,6 +3577,8 @@ This is a baseline, not a substitute for explicit permissions.
 | View Operational Dashboard (V1; sections need domain permissions) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | View Reports (V1; each report needs its domain permissions) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | Export Reports XLSX (V1; `export.basic` + report permissions) | ✓ | ✓ | — | — | — | ✓ | — |
+| Staff Portal login (V1; active account with a Staff role) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| Staff user administration in Filament (V1; §59c escalation rules) | ✓ | Non-privileged roles only | — | — | — | — | — |
 | Export Basic | Permission | Permission | Policy | Policy | Policy | Permission | — |
 | Export Sensitive | Permission | Permission | — | Policy | Policy | Policy | — |
 | Manage Users/Roles | ✓ | Permission | — | — | — | — | — |
@@ -3670,6 +3779,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.13 | 2026-09-26 | Approved | §59c: Staff authentication (login, logout, `/me`, rate limiting, `is_active`), one Staff role per user, Filament Staff user administration and escalation rules, ADMINISTRATOR user-administration grants, two rows in §140, PAUTH-028 V1 resolution, AUTH-ADR-057 |
 | 1.2.12 | 2026-09-26 | Approved | §59b: `report.view` V1 role assignment, per-report domain-permission rule, `export.basic` for XLSX, two rows in §140, AUTH-ADR-056 |
 | 1.2.11 | 2026-09-25 | Approved | §59a: `dashboard.view-operational` V1 role assignment and per-section domain-permission rule, row in §140, AUTH-ADR-055 |
 | 1.2.10 | 2026-09-25 | Approved | §56a: `clan.view` / `clan.manage` with V1 role assignment, two rows in §140, AUTH-ADR-054 |

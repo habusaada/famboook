@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -25,7 +26,13 @@ Route::get('/health', function () {
     ]);
 });
 
+// Staff authentication on the Sanctum session (docs/06 §59c, AUTH-ADR-057).
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
 Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+
     Route::get('/families', [FamilyController::class, 'index'])
         ->middleware('can:family.view');
 

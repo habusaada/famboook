@@ -240,13 +240,17 @@ class RolePermissionSeederTest extends TestCase
         $this->assertTrue($administrator->hasPermissionTo('export.basic'));
         $this->assertTrue($administrator->hasPermissionTo('export.sensitive'));
 
-        // Still no role/permission administration or Filament access — those
-        // remain restricted to SUPER_ADMIN per §55 and are unresolved for
-        // ADMINISTRATOR per the RBAC review.
-        $this->assertFalse($administrator->hasPermissionTo('role.assign'));
-        $this->assertFalse($administrator->hasPermissionTo('permission.assign'));
-        $this->assertFalse($administrator->hasPermissionTo('system-admin.access'));
-        $this->assertFalse($administrator->hasPermissionTo('user.suspend'));
+        // Filament Staff user administration (§59c, AUTH-ADR-057), limited
+        // to non-privileged roles/users by ManageStaffUsersAction.
+        foreach (['system-admin.access', 'user.view', 'user.create', 'user.update', 'user.activate',
+            'user.suspend', 'user.reset-access', 'role.assign'] as $permission) {
+            $this->assertTrue($administrator->hasPermissionTo($permission), $permission);
+        }
+        // Role/permission definitions and Family User links stay SUPER_ADMIN-only (§55).
+        foreach (['role.create', 'role.update', 'role.delete', 'permission.assign',
+            'user.link-person', 'user.verify-person-link'] as $permission) {
+            $this->assertFalse($administrator->hasPermissionTo($permission), $permission);
+        }
 
         // View Reference Data ✓ (docs/06 §56, §140, AUTH-ADR-045).
         $this->assertTrue($administrator->hasPermissionTo('reference-data.view'));

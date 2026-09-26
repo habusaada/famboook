@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-context";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -45,6 +46,16 @@ const secondaryTabs = [
 // assessment screen).
 const LINKABLE_TABS = ["overview", "members", "residence", "health", "assessments", "needs", "assistance", "history"];
 
+// Tabs of other modules appear only with that module's view permission
+// (docs/06 §59c); the API refuses them anyway.
+const TAB_PERMISSIONS: Record<string, string> = {
+  health: "health-record.view",
+  assessments: "assessment.view",
+  needs: "need.view",
+  assistance: "assistance.view",
+  history: "activity-log.view",
+};
+
 function MetaItem({
   icon: Icon,
   children,
@@ -68,6 +79,8 @@ export function FamilyProfileView({
   initialTab?: string;
 }) {
   const router = useRouter();
+  const { can } = useAuth();
+  const showTab = (tab: string) => !TAB_PERMISSIONS[tab] || can(TAB_PERMISSIONS[tab]);
   const { data, isLoading, isError, error } = useFamily(familyCode);
 
   if (isLoading) {
@@ -239,22 +252,22 @@ export function FamilyProfileView({
       </div>
 
       <Tabs
-        defaultValue={initialTab && LINKABLE_TABS.includes(initialTab) ? initialTab : "overview"}
+        defaultValue={initialTab && LINKABLE_TABS.includes(initialTab) && showTab(initialTab) ? initialTab : "overview"}
       >
         <TabsList variant="line" className="w-full justify-start border-b">
           <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger value="members">أفراد الأسرة</TabsTrigger>
           <TabsTrigger value="residence">السكن</TabsTrigger>
-          <TabsTrigger value="health">الحالة الصحية</TabsTrigger>
-          <TabsTrigger value="assessments">التقييمات</TabsTrigger>
-          <TabsTrigger value="needs">الاحتياجات</TabsTrigger>
-          <TabsTrigger value="assistance">المساعدات</TabsTrigger>
+          {showTab("health") && <TabsTrigger value="health">الحالة الصحية</TabsTrigger>}
+          {showTab("assessments") && <TabsTrigger value="assessments">التقييمات</TabsTrigger>}
+          {showTab("needs") && <TabsTrigger value="needs">الاحتياجات</TabsTrigger>}
+          {showTab("assistance") && <TabsTrigger value="assistance">المساعدات</TabsTrigger>}
           {secondaryTabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}
             </TabsTrigger>
           ))}
-          <TabsTrigger value="history">السجل</TabsTrigger>
+          {showTab("history") && <TabsTrigger value="history">السجل</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -269,21 +282,29 @@ export function FamilyProfileView({
           <FamilyResidenceTab family={family} />
         </TabsContent>
 
-        <TabsContent value="health" className="mt-4">
-          <FamilyHealthTab family={family} />
-        </TabsContent>
+        {showTab("health") && (
+          <TabsContent value="health" className="mt-4">
+            <FamilyHealthTab family={family} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="assessments" className="mt-4">
-          <FamilyAssessmentsTab familyCode={family.family_code} />
-        </TabsContent>
+        {showTab("assessments") && (
+          <TabsContent value="assessments" className="mt-4">
+            <FamilyAssessmentsTab familyCode={family.family_code} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="needs" className="mt-4">
-          <FamilyNeedsTab familyCode={family.family_code} />
-        </TabsContent>
+        {showTab("needs") && (
+          <TabsContent value="needs" className="mt-4">
+            <FamilyNeedsTab familyCode={family.family_code} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="assistance" className="mt-4">
-          <FamilyAssistanceTab familyCode={family.family_code} />
-        </TabsContent>
+        {showTab("assistance") && (
+          <TabsContent value="assistance" className="mt-4">
+            <FamilyAssistanceTab familyCode={family.family_code} />
+          </TabsContent>
+        )}
 
         {secondaryTabs.map((tab) => (
           <TabsContent key={tab.value} value={tab.value} className="mt-4">
@@ -291,9 +312,11 @@ export function FamilyProfileView({
           </TabsContent>
         ))}
 
-        <TabsContent value="history" className="mt-4">
-          <FamilyActivityTab familyCode={family.family_code} />
-        </TabsContent>
+        {showTab("history") && (
+          <TabsContent value="history" className="mt-4">
+            <FamilyActivityTab familyCode={family.family_code} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

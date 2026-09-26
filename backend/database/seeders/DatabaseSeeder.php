@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -11,7 +10,11 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Reference/catalog data only: idempotent and safe in every environment
+     * (AUTH-ADR-057). No user account is ever seeded — in particular no
+     * known-password account. The first SUPER_ADMIN is created interactively
+     * with `php artisan famboook:create-super-admin`; local development uses
+     * the environment-gated /dev-login; tests use factories.
      */
     public function run(): void
     {
@@ -22,12 +25,5 @@ class DatabaseSeeder extends Seeder
         $this->call(AssessmentDomainSeeder::class);
         $this->call(NeedCategorySeeder::class);
         $this->call(AssistanceCategorySeeder::class);
-
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
     }
 }

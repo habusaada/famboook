@@ -1933,6 +1933,13 @@ Additional security fields may be added.
 
 Roles are managed separately through the authorization layer.
 
+V1 implementation (2026-09-26, docs/06 §59c): `users` holds `name`,
+`email`, `password` (hashed; never returned or recoverable),
+`remember_token` and `is_active` (BOOLEAN NOT NULL DEFAULT TRUE; an inactive
+user cannot log in or keep using a session). `status`, `mobile` and
+`last_login_at` are not implemented. A Staff user holds exactly one Staff
+role (Spatie). A User is never a Person (§52).
+
 ---
 
 # 41. User-Person Link
@@ -3575,6 +3582,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.12 | 2026-09-26 | Approved | §40: V1 `users` fields including `is_active`; one Staff role per user |
 | 1.2.11 | 2026-09-25 | Approved | §75: approved Dashboard/Reports V1 age bands (derived, never stored) |
 | 1.2.10 | 2026-09-25 | Approved | Clan + Branch Structure V1: §7a `clans`, §7b `branch_groups` (nullable name), §7c `branches`; `families.clan_id` (required) and `families.branch_id` (optional); Clan ≠ Family |
 | 1.2.9 | 2026-09-24 | Approved | Assistance V1-B: `execution_mode`, beneficiary APPROVED/REJECTED/NOT_DELIVERED, §36e deliveries, §36f issued lists and the export field catalog; `persons.marital_status` (§10) |

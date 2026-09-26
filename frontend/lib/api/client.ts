@@ -51,16 +51,10 @@ async function ensureCsrfCookie(): Promise<void> {
   await fetch(`${API_URL}/sanctum/csrf-cookie`, { credentials: "include" });
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method ?? "GET").toUpperCase();
-
-  if (method !== "GET" && method !== "HEAD") {
-    await ensureCsrfCookie();
-  }
-
+async function send(path: string, options: RequestInit): Promise<Response> {
   const xsrfToken = getCookie("XSRF-TOKEN");
 
-  const response = await fetch(`${API_URL}${path}`, {
+  return fetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -70,6 +64,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ...options.headers,
     },
   });
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const isWrite = method !== "GET" && method !== "HEAD";
+
+  if (isWrite) {
+    await ensureCsrfCookie();
+  }
+
+  let response = await send(path, options);
+
+  // 419 = CSRF token mismatch: the session cookie changed underneath us
+  // (a concurrent guest request started another session, or the session
+  // expired). Refresh the token once and retry.
+  if (isWrite && response.status === 419) {
+    await ensureCsrfCookie();
+    response = await send(path, options);
+  }
 
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json")

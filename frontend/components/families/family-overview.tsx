@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-context";
 import {
   Card,
   CardAction,
@@ -42,6 +43,7 @@ export function InfoRow({
 }
 
 export function FamilyOverview({ family }: { family: FamilyDetail }) {
+  const { can } = useAuth();
   const head = family.members.find((m) => m.is_household_head);
   // The head is a Person: contact details, life status and the edit
   // dialog come from the existing Person endpoint.
@@ -54,9 +56,11 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
         <CardHeader>
           <CardTitle>معلومات التسجيل</CardTitle>
           <CardDescription>بيانات تسجيل الأسرة في السجل</CardDescription>
-          <CardAction>
-            <EditFamilyRegistrationDialog family={family} />
-          </CardAction>
+          {can("family.update") && (
+            <CardAction>
+              <EditFamilyRegistrationDialog family={family} />
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
           {family.clan && (
@@ -115,7 +119,7 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
         <CardHeader>
           <CardTitle>رب الأسرة</CardTitle>
           <CardDescription>الشخص المسؤول عن الأسرة حالياً</CardDescription>
-          {headPerson && (
+          {headPerson && can("person.update") && (
             <CardAction>
               <EditPersonDialog
                 person={headPerson}

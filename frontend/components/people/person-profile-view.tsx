@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -40,6 +41,7 @@ function InfoRow({ label, value, ltr }: { label: string; value: string; ltr?: bo
 }
 
 export function PersonProfileView({ personCode }: { personCode: string }) {
+  const { can } = useAuth();
   const router = useRouter();
   const { data, isLoading, isError, error } = usePerson(personCode);
 
@@ -111,7 +113,7 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
               <ArrowRight className="size-4" />
               رجوع
             </Button>
-            <EditPersonDialog person={person} />
+            {can("person.update") && <EditPersonDialog person={person} />}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

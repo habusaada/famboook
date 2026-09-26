@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth/auth-context";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, Search, X } from "lucide-react";
@@ -42,6 +43,7 @@ const statusFilterOptions: { value: FamilyLifecycleStatus | "ALL"; label: string
 
 export function FamiliesRegistry() {
   const router = useRouter();
+  const { can } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FamilyLifecycleStatus | "ALL">("ALL");
 
@@ -89,7 +91,7 @@ export function FamiliesRegistry() {
             إدارة الأسر المسجلة ومتابعة حالة كل سجل
           </p>
         </div>
-        <Button onClick={() => router.push("/families/new")}>إضافة أسرة</Button>
+        {can("family.create") && <Button onClick={() => router.push("/families/new")}>إضافة أسرة</Button>}
       </div>
 
       {isError ? (

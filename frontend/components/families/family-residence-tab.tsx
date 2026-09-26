@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAuth } from "@/components/auth/auth-context";
 import { InfoRow } from "@/components/families/family-overview";
 import {
   EditCurrentResidenceDialog,
@@ -17,6 +18,7 @@ import { displacementStatusLabel } from "@/lib/utils/displacement";
 const NOT_RECORDED = "غير مسجّل";
 
 export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
+  const { can } = useAuth();
   const residence = family.residence;
 
   if (!residence) {
@@ -36,7 +38,7 @@ export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
           <CardTitle>النزوح</CardTitle>
           <CardDescription>السكن الأصلي قبل النزوح وحالة النزوح الحالية</CardDescription>
           <CardAction>
-            <EditDisplacementDialog familyCode={family.family_code} residence={residence} />
+            {can("residence.update") && <EditDisplacementDialog familyCode={family.family_code} residence={residence} />}
           </CardAction>
         </CardHeader>
         <CardContent>
@@ -63,7 +65,7 @@ export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
           <CardTitle>السكن الحالي</CardTitle>
           <CardDescription>موقع إقامة الأسرة الحالي</CardDescription>
           <CardAction>
-            <EditCurrentResidenceDialog familyCode={family.family_code} residence={residence} />
+            {can("residence.update") && <EditCurrentResidenceDialog familyCode={family.family_code} residence={residence} />}
           </CardAction>
         </CardHeader>
         <CardContent>

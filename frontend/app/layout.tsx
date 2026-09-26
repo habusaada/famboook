@@ -1,6 +1,7 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
-import { AppShell } from "@/components/layout/app-shell";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { QueryProvider } from "@/components/providers/query-provider";
 import "./globals.css";
 
@@ -24,7 +25,10 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" className={ibmPlexSansArabic.variable}>
       <body className="font-sans antialiased">
         <QueryProvider>
-          <AppShell>{children}</AppShell>
+          {/* useSearchParams (login redirect target) needs a Suspense boundary. */}
+          <Suspense fallback={null}>
+            <AuthGate>{children}</AuthGate>
+          </Suspense>
         </QueryProvider>
       </body>
     </html>

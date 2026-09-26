@@ -798,6 +798,19 @@ Policies work
 /api/v1/me works
 ```
 
+## Progress
+
+2026-09-26: **Pilot Readiness Slice A — Real Authentication & Staff Access**
+delivered (docs/06 §59c, AUTH-ADR-057): Staff login/logout on the Sanctum
+session with generic failures and rate limiting, `/api/v1/me`,
+`users.is_active` enforced on every Staff API and Filament request, one
+Staff role per user, Filament limited to Staff user administration with
+escalation rules, permission-aware Staff Portal navigation and actions,
+local-only `/dev-login`, reference-only seeding plus
+`famboook:create-super-admin`. **Still open:** Laravel Policies for object
+authorization and data scopes (only the Staff user policy exists), audit
+storage beyond application-log entries, password recovery and 2FA.
+
 ---
 
 # 17. Phase 5 — Next.js Frontend Foundation
@@ -4628,6 +4641,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.8 | 2026-09-26 | Approved | Phase 4 progress note: Pilot Readiness Slice A (real Staff authentication and Staff access) |
 | 1.2.7 | 2026-09-26 | Approved | Phase 22 progress note: Reports V1 |
 | 1.2.6 | 2026-09-25 | Approved | Phase 21 progress note: Operational Dashboard V1 |
 | 1.2.5 | 2026-09-25 | Approved | Phase 8 progress note: Clan + Branch Structure V1 |

@@ -8,14 +8,17 @@
 // storage partition than the one the SPA's own credentialed fetches read
 // from (observed in Firefox's Total Cookie Protection / state partitioning);
 // triggering the request from inside the SPA keeps both in the same
-// partition, matching how the real login flow will work once built.
+// partition, as the real /login flow does. The backend route exists only
+// when APP_ENV=local (404 elsewhere); it is never the production login.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ME_QUERY_KEY } from "@/lib/api/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -23,6 +26,7 @@ type Status = "pending" | "success" | "error";
 
 export function DevLoginView() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<Status>("pending");
   const [detail, setDetail] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -52,6 +56,9 @@ export function DevLoginView() {
         }
 
         setStatus("success");
+        // A new session: drop anything cached and re-read /api/v1/me.
+        queryClient.clear();
+        await queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY });
         router.replace("/families");
       } catch {
         if (!cancelled) {
@@ -66,12 +73,14 @@ export function DevLoginView() {
     return () => {
       cancelled = true;
     };
-  }, [attempt, router]);
+  }, [attempt, router, queryClient]);
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8">
       <Card size="sm" className="w-full max-w-sm">
         <CardContent className="flex flex-col items-center gap-4 text-center">
+          <p className="text-base font-semibold">دخول التطوير</p>
+          <p className="-mt-3 text-xs text-muted-foreground">بيئة التطوير المحلية فقط — ليس تسجيل الدخول الحقيقي</p>
           {status === "pending" && (
             <>
               <Loader2 className="size-6 animate-spin text-muted-foreground" />
