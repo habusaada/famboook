@@ -2095,7 +2095,7 @@ with the approved age bands, displacement, health indicators, open Needs,
 latest completed assessment results per domain, INTERNAL/EXTERNAL
 assistance figures and recent activity. All figures derived on request;
 sections gated by domain permissions (AUTH-ADR-055). **Still open:**
-Executive Dashboard, Reports V1 (Phase 22), trends/date ranges, exports
+Executive Dashboard, Reports V1 (Phase 22; since delivered), trends/date ranges, exports
 and any caching justified by measurement.
 
 ---
@@ -2157,6 +2157,23 @@ Aggregates validated
 
 Sensitive drill-down controlled
 ```
+
+## Progress
+
+2026-09-26: **Reports V1** implemented (docs/03 §55b, docs/06 §59b,
+AUTH-ADR-056): six fixed Staff reports (Population & Families, Health,
+Needs, Assessments, Assistance, Data Quality) over the Dashboard's shared
+Clan → Branch Group → Branch scope and current population. Health is
+aggregate only. Needs covers OPEN / FULFILLED / CLOSED. Assessments use the
+latest completed state per domain with a family drill-down. Assistance
+figures are scoped to beneficiaries' target families, with INTERNAL and
+EXTERNAL semantics kept apart. Data Quality lists exact completeness and
+consistency issues with a record drill-down that never shows the missing
+value. Each report exports a fixed Arabic RTL XLSX, generated on request.
+Everything is derived on read; nothing is stored. **Still open:** Executive
+Dashboard, trends and date ranges, education/employment/household
+composition reports (no canonical data yet), workflow performance,
+duplicate detection, and any caching justified by measurement.
 
 ---
 
@@ -4611,6 +4628,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.7 | 2026-09-26 | Approved | Phase 22 progress note: Reports V1 |
 | 1.2.6 | 2026-09-25 | Approved | Phase 21 progress note: Operational Dashboard V1 |
 | 1.2.5 | 2026-09-25 | Approved | Phase 8 progress note: Clan + Branch Structure V1 |
 | 1.2.4 | 2026-09-24 | Approved | Phase 14 progress note: Assistance V1-B (approval and execution) |

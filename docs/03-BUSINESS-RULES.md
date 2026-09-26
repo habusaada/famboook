@@ -1428,6 +1428,142 @@ snapshot values.
 
 ---
 
+# 55b. Reports (V1)
+
+Staff Reports V1 are six fixed operational reports, derived on each request
+from canonical data exactly like the Operational Dashboard (§55a). No report
+counter, snapshot, cache, materialized view, stored file or background job
+exists. There is no report builder, arbitrary column, formula, trend or
+time series in V1.
+
+```text
+Population & Families   السكان والأسر
+Health                  الصحة
+Needs                   الاحتياجات
+Assessments             التقييمات
+Assistance              المساعدات
+Data Quality            جودة البيانات
+```
+
+## Scope and population
+
+Every report uses the §55a organizational scope and current population
+unchanged — the same code serves both, so Reports and the Dashboard cannot
+count different populations. Invalid Clan / Branch Group / Branch
+combinations are rejected. Age uses the approved bands (docs/02 §75).
+
+## Population & Families
+
+Summary: active families, current people, male / female / unknown gender,
+displaced / not displaced / unknown displacement; the six age bands; the
+top displacement locations by exact stored text (no normalization).
+
+Organizational breakdown (families and current people):
+
+```text
+Clan scope           every Branch Group with its Branches, plus a
+                     separate "غير محدد" row for families without a Branch
+                     (never attributed to a group)
+Branch Group scope   the group's Branches
+Branch scope         none
+```
+
+## Health
+
+Aggregate only: distinct current people with an active (not ended)
+DISABILITY, CHRONIC_DISEASE, PREGNANCY or BREASTFEEDING record, and
+disability by reference Disability Type (distinct people per type). No
+person-level drill-down, no condition names, details or notes. The XLSX
+contains the same aggregate tables only.
+
+## Needs
+
+Needs of scoped families across the whole lifecycle — OPEN, FULFILLED and
+CLOSED, each counted separately (CLOSED is never fulfilled). Optional
+filters: status, priority, category, target (Family / Person); every
+figure and row honours them. Breakdowns by status, priority, category and
+target. Paginated detail rows: title, category, priority, status, target
+code and name, Family code, created date, resolved date. Never the
+description or closure reason.
+
+## Assessments
+
+Analytical table: per scoped family and domain, the latest COMPLETED
+assessment that rated the domain (§55a / targeting rule), as NONE … CRITICAL
+plus assessed / not assessed families. Drafts are ignored; a domain never
+rated is NOT ASSESSED, never NONE. A domain/rating cell drills down to the
+families currently in that bucket (Family code, household head, Branch,
+assessment date, rating). A separate lifecycle count shows assessment
+records (DRAFT / COMPLETED) — records, not families. Never notes.
+
+## Assistance
+
+Programs in the selected status (default OPEN + COMPLETED) with at least one
+non-removed beneficiary whose target Family is in scope. Every figure counts
+only those scoped beneficiaries, never the program's global counters; the
+program's target is shown as defined.
+
+```text
+All        nominated, approved, rejected
+INTERNAL   awaiting delivery, delivered (active delivery), not delivered,
+           reversed deliveries, delivered ÷ approved (%)
+EXTERNAL   approved but not in any issued list; unique beneficiaries in at
+           least one issued list ("تم إصدارهم في كشوف"); issued lists
+           containing a scoped beneficiary
+```
+
+A beneficiary appearing in a corrected (re-issued) list is counted once.
+EXTERNAL listing is never called or counted as delivery. No National IDs,
+verification values or issued-list snapshot data.
+
+## Data Quality
+
+Actionable checks derived only from the canonical schema. Each check is an
+exact condition over the scoped families or current people, with a count
+and a paginated drill-down of the affected records.
+
+```text
+Completeness
+  FAMILY_WITHOUT_BRANCH              families.branch_id is null
+  FAMILY_WITHOUT_CURRENT_RESIDENCE   no current residence
+  DISPLACED_WITHOUT_LOCATION         current residence DISPLACED without a
+                                     displacement location
+  PERSON_MISSING_NATIONAL_ID         national_id empty
+  PERSON_MISSING_BIRTH_DATE          birth_date null
+  PERSON_MISSING_MOBILE              primary mobile empty
+  PERSON_UNKNOWN_GENDER              gender null (the schema's unknown state)
+  PERSON_MARITAL_STATUS_UNKNOWN      marital_status UNKNOWN
+Consistency
+  ACTIVE_FAMILY_WITHOUT_HEAD         no active household-head membership
+  HOUSEHOLD_HEAD_DECEASED            the active head is DECEASED (§16:
+                                     requires Household Head review)
+```
+
+Family Branch / Clan mismatch is not a check: the composite foreign key
+makes it impossible, and the report states it is protected by integrity.
+Heuristics (marital status from age, likely duplicates, likely wrong
+National IDs) and duplicate detection are out of scope.
+
+The drill-down identifies the record to correct — Family: code, household
+head, Clan, Branch; Person: code, name, Family code, Branch — and never the
+missing or sensitive value itself. Corrections are made in the existing
+Family / Person screens; Reports never edit data.
+
+## XLSX export
+
+Each report has one fixed workbook, generated on request and never stored:
+an information sheet (report, exact scope, filters, time) followed by the
+report's tables with Arabic headers on right-to-left sheets. Needs exports
+the filtered detail rows; Assessments may add the selected domain/rating
+families; Data Quality may add the selected issue's affected records;
+Health, Population and Assistance export aggregate / program-level rows.
+The download is authenticated, `no-store, private`, has no public URL and a
+value-free filename (`{report}-report-{date}.xlsx`), and contains no
+internal ids, National IDs, phone numbers, health details, notes,
+descriptions, reasons, verification values or snapshot data.
+
+---
+
 # 56. Corrections vs Real-World Changes
 
 Famboook distinguishes:
@@ -3076,6 +3212,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.11 | 2026-09-26 | Approved | Added §55b "Reports (V1)": six fixed reports over the §55a scope and population, Health aggregate-only, Needs lifecycle, latest domain state, scoped INTERNAL/EXTERNAL assistance, Data Quality checks and drill-down, XLSX privacy rules |
 | 1.2.10 | 2026-09-25 | Approved | Added §55a "Operational Dashboard (V1)": organizational scope, current population, figure definitions, latest-completed-assessment-per-domain rule, INTERNAL vs EXTERNAL assistance semantics |
 | 1.2.9 | 2026-09-25 | Approved | Added §7a "Clan and Branch (V1)" (rules CB-1…CB-10): required Clan, optional Branch, same-Clan integrity, inactive handling, no inference, no hard delete |
 | 1.2.8 | 2026-09-24 | Approved | Added §47d–§47i "Assistance V1-B" (execution mode, approval, INTERNAL delivery with National ID verification and delegated receipt, family history, EXTERNAL requested fields, immutable issued lists, XLSX, statistics, completion) and V1-B activity events |

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -228,6 +229,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('can:dashboard.view-operational')->group(function () {
         Route::get('/dashboard/scope-options', [DashboardController::class, 'scopeOptions']);
         Route::get('/dashboard', [DashboardController::class, 'show']);
+    });
+
+    // Reports V1 (docs/06 §59b, AUTH-ADR-056): report.view plus each
+    // report's domain permissions (checked in the controller); XLSX
+    // export additionally needs export.basic.
+    Route::middleware('can:report.view')->prefix('reports')->group(function () {
+        Route::get('/meta', [ReportController::class, 'meta']);
+        Route::get('/scope-options', [DashboardController::class, 'scopeOptions']);
+        Route::get('/population', [ReportController::class, 'population']);
+        Route::get('/health', [ReportController::class, 'health']);
+        Route::get('/needs', [ReportController::class, 'needs']);
+        Route::get('/assessments', [ReportController::class, 'assessments']);
+        Route::get('/assessments/families', [ReportController::class, 'assessmentFamilies']);
+        Route::get('/assistance', [ReportController::class, 'assistance']);
+        Route::get('/data-quality', [ReportController::class, 'dataQuality']);
+        Route::get('/data-quality/records', [ReportController::class, 'dataQualityRecords']);
+        Route::get('/{report}/export', [ReportController::class, 'export'])
+            ->whereIn('report', ['population', 'health', 'needs', 'assessments', 'assistance', 'data-quality']);
     });
 
     // No DELETE routes: structures are deactivated, never removed.

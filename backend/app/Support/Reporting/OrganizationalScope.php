@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Support\Dashboard;
+namespace App\Support\Reporting;
 
 use App\Enums\FamilyStatus;
 use App\Enums\LifeStatus;
@@ -11,9 +11,10 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The single population foundation of the Operational Dashboard
- * (docs/03 §55a). Every section counts from these two queries, so no two
- * cards can silently count different populations.
+ * The single organizational scope and population foundation shared by the
+ * Operational Dashboard and Reports (docs/03 §55a–§55b). Every figure
+ * counts from these queries, so no screen can silently count a different
+ * population.
  *
  * Families: ACTIVE, not soft-deleted, in the Clan; with a Branch Group,
  * only families whose Branch is in that group; with a Branch, only that
@@ -23,13 +24,19 @@ use Illuminate\Support\Facades\DB;
  * membership in one of those families — the same population as family
  * targeting and the family health indicators.
  */
-final class DashboardScope
+final class OrganizationalScope
 {
     public function __construct(
         public readonly Clan $clan,
         public readonly ?BranchGroup $group = null,
         public readonly ?Branch $branch = null,
     ) {}
+
+    /** Scope level: CLAN, BRANCH_GROUP or BRANCH. */
+    public function level(): string
+    {
+        return $this->branch ? 'BRANCH' : ($this->group ? 'BRANCH_GROUP' : 'CLAN');
+    }
 
     /** Subquery selecting families.id of the scoped current families. */
     public function familyIds(): Builder
@@ -79,5 +86,18 @@ final class DashboardScope
             ] : null,
             'branch' => $this->branch ? ['code' => $this->branch->code, 'name' => $this->branch->name] : null,
         ];
+    }
+
+    /**
+     * Joins the family's current household head (display name only) onto
+     * a query that has families aliased as $familyAlias. Alias: hp.
+     */
+    public static function joinHouseholdHead(Builder $query, string $familyAlias = 'f'): Builder
+    {
+        return $query
+            ->leftJoin('family_memberships as hm', fn ($j) => $j->on('hm.family_id', '=', "{$familyAlias}.id")
+                ->where('hm.is_active', true)
+                ->where('hm.is_household_head', true))
+            ->leftJoin('persons as hp', 'hp.id', '=', 'hm.person_id');
     }
 }

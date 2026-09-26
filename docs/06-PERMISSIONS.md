@@ -1664,6 +1664,53 @@ Recent Activity                                     activity-log.view, with the
 
 ---
 
+# 59b. Reports Permission
+
+Approved 2026-09-26 (Reports V1, AUTH-ADR-056). Existing catalog
+permissions are reused; no new permission was added.
+
+```text
+report.view
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+  REVIEWER
+  SOCIAL_WORKER
+  REPORTS_VIEWER
+
+export.basic (existing assignment, unchanged)
+  SUPER_ADMIN
+  ADMINISTRATOR
+  REPORTS_VIEWER
+```
+
+FAMILY_USER receives neither. `report.view` opens the Reports area and
+its organizational scope list; it grants no domain access by itself. Each
+report additionally requires ALL of its domain view permissions, enforced
+by the API (403), not only hidden in the frontend:
+
+```text
+Population & Families   family.view + person.view
+Health                  person.view + health-record.view
+Needs                   family.view + need.view
+Assessments             family.view + assessment.view
+Assistance              assistance.view
+Data Quality            family.view + person.view
+```
+
+XLSX export requires the report's permissions plus `export.basic`.
+`report.view-sensitive` and `export.sensitive` / `export.identity-data` /
+`export.health-data` remain unassigned: no report exposes National IDs,
+phone numbers, health details or other sensitive values, so none is
+needed.
+
+REPORTS_VIEWER therefore sees Population & Families and Data Quality (and
+may export them). It keeps no Need, Assessment, Assistance or health-record
+access (AUTH-ADR-048, -050, -051, -052), so those reports stay locked for
+it; Reports do not widen that decision.
+
+---
+
 # 60. Export Permissions
 
 Recommended:
@@ -3262,6 +3309,9 @@ Clan + Branch Structure V1 (§56a) adds `clan.view` (SUPER_ADMIN, ADMINISTRATOR,
 
 ### AUTH-ADR-055
 Operational Dashboard V1 (§59a) reuses the existing `dashboard.view-operational` for SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER and REPORTS_VIEWER; FAMILY_USER is excluded. Each dashboard section additionally requires its domain view permission and is returned as null without it; recent activity applies the Family timeline's event-level visibility.
+
+### AUTH-ADR-056
+Reports V1 (§59b) assigns the existing `report.view` to SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER and REPORTS_VIEWER; FAMILY_USER is excluded. Each report additionally requires all of its domain view permissions (403 otherwise). XLSX export reuses the existing `export.basic` (SUPER_ADMIN, ADMINISTRATOR, REPORTS_VIEWER; unchanged). REPORTS_VIEWER is deliberately not given health-record, Need, Assessment or Assistance access to fill the remaining tabs. `report.view-sensitive` and the sensitive export permissions stay unassigned because no report exposes sensitive values.
 ```
 
 ---
@@ -3418,6 +3468,8 @@ This is a baseline, not a substitute for explicit permissions.
 | View Family Activity Log | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | View Executive Dashboard | Permission | Permission | — | — | Policy | ✓ | — |
 | View Operational Dashboard (V1; sections need domain permissions) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| View Reports (V1; each report needs its domain permissions) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| Export Reports XLSX (V1; `export.basic` + report permissions) | ✓ | ✓ | — | — | — | ✓ | — |
 | Export Basic | Permission | Permission | Policy | Policy | Policy | Permission | — |
 | Export Sensitive | Permission | Permission | — | Policy | Policy | Policy | — |
 | Manage Users/Roles | ✓ | Permission | — | — | — | — | — |
@@ -3618,6 +3670,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.12 | 2026-09-26 | Approved | §59b: `report.view` V1 role assignment, per-report domain-permission rule, `export.basic` for XLSX, two rows in §140, AUTH-ADR-056 |
 | 1.2.11 | 2026-09-25 | Approved | §59a: `dashboard.view-operational` V1 role assignment and per-section domain-permission rule, row in §140, AUTH-ADR-055 |
 | 1.2.10 | 2026-09-25 | Approved | §56a: `clan.view` / `clan.manage` with V1 role assignment, two rows in §140, AUTH-ADR-054 |
 | 1.2.9 | 2026-09-24 | Approved | §50: V1-B permissions (approve, deliver, complete, export, export-sensitive; reverse assigned), V1-B rows in §140, AUTH-ADR-053 |

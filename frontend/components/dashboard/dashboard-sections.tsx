@@ -69,12 +69,12 @@ export function UnavailableSection({ title }: { title: string }) {
   );
 }
 
-function EmptyNote({ children }: { children: React.ReactNode }) {
+export function EmptyNote({ children }: { children: React.ReactNode }) {
   return <p className="py-2 text-sm text-muted-foreground">{children}</p>;
 }
 
 /** Label, count and a proportional bar. */
-function BarRow({
+export function BarRow({
   label,
   count,
   total,
@@ -104,7 +104,7 @@ function BarRow({
   );
 }
 
-function StatTile({ label, value, hint }: { label: string; value: number; hint?: string }) {
+export function StatTile({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border p-3" data-stat={label}>
       <span className="text-xs text-muted-foreground">{label}</span>

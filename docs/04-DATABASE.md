@@ -643,6 +643,33 @@ GET /api/v1/dashboard?clan={code}&branch_group={code}&branch={code}  dashboard.v
 Aggregates are grouped SQL over the scoped family/person subqueries (no
 per-family or per-domain queries); nothing is stored.
 
+Reports V1 API (docs/03 §55b, docs/06 §59b). Every endpoint takes the same
+scope (`clan` required, `branch_group`, `branch` optional; codes only) and
+requires `report.view` plus the report's domain permissions:
+
+```text
+GET /api/v1/reports/meta                    reports this user may open, can_export
+GET /api/v1/reports/scope-options
+GET /api/v1/reports/population
+GET /api/v1/reports/health                  aggregate only
+GET /api/v1/reports/needs                   status, priority, category, target, page, per_page
+GET /api/v1/reports/assessments
+GET /api/v1/reports/assessments/families    domain, rating (… | NOT_ASSESSED), page, per_page
+GET /api/v1/reports/assistance              status (default OPEN + COMPLETED), page, per_page
+GET /api/v1/reports/data-quality
+GET /api/v1/reports/data-quality/records    issue, page, per_page
+GET /api/v1/reports/{report}/export         same filters; + export.basic
+```
+
+Detail rows are paginated server-side (`per_page` ≤ 100, default 25) and
+exports stream rows in chunks of 1,000 into temp files; nothing is stored.
+Rows carry codes and UUIDs only, never internal numeric ids. No index was
+added: every report query shape is served by existing indexes
+(`families (clan_id, branch_id)`, `ix_family_memberships_family_active`,
+`family_needs (family_id, status)`, `assessments (family_id, …)`,
+`assistance_beneficiaries (family_id)`, delivery and list-entry beneficiary
+indexes, `person_health_records (person_id, type)`).
+
 ---
 
 # 20. One Active Family Membership
@@ -3537,6 +3564,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.10 | 2026-09-26 | Approved | §19: Reports V1 API (derived on request, paginated, streamed XLSX, no storage); index review — no new index |
 | 1.2.9 | 2026-09-25 | Approved | §19: `ix_family_memberships_family_active` index and the Operational Dashboard API (derived aggregates, no storage) |
 | 1.2.8 | 2026-09-25 | Approved | §12a Clan structure tables (`clans`, `branch_groups`, `branches`), `families.clan_id` / `branch_id` with composite same-Clan foreign keys, Al-Breem backfill, API |
 | 1.2.7 | 2026-09-24 | Approved | Assistance V1-B schema and API (§48d): marital status, execution mode, approval columns, deliveries, issued lists and encrypted snapshots |
