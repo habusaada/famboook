@@ -30,3 +30,5 @@ frontend/out/
 # Build
 dist/
 build/
+# Visual review artifacts (local screenshots)
+visual-review-v2/

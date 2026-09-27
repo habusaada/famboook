@@ -53,12 +53,21 @@ export function DashboardScopeFilters({
     onChange({ ...value, group: next, branch: keepsBranch ? value.branch : "" });
   }
 
+  // Toolbar fields: the label is a visible inline prefix of each select.
+  const field =
+    "flex h-9 min-w-0 flex-1 items-center rounded-control bg-surface-2 ring-1 ring-transparent transition-colors focus-within:bg-surface-1 focus-within:ring-ring/60 hover:bg-surface-hover has-[button:disabled]:opacity-60";
+  const trigger =
+    "h-9! min-w-0 flex-1 border-0 bg-transparent! ps-1.5 pe-2.5 font-medium shadow-none focus-visible:ring-0 hover:bg-transparent";
+  const label = "shrink-0 ps-3 text-xs font-normal whitespace-nowrap text-muted-foreground";
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="dashboard-clan">العشيرة / العائلة</Label>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className={field}>
+        <Label htmlFor="dashboard-clan" className={label}>
+          العشيرة / العائلة
+        </Label>
         <Select value={value.clan || undefined} onValueChange={(code) => onChange({ clan: code, group: "", branch: "" })}>
-          <SelectTrigger id="dashboard-clan" className="w-full">
+          <SelectTrigger id="dashboard-clan" className={trigger}>
             <SelectValue placeholder="اختر العشيرة / العائلة" />
           </SelectTrigger>
           <SelectContent>
@@ -71,10 +80,12 @@ export function DashboardScopeFilters({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="dashboard-group">مجموعة الفروع</Label>
+      <div className={field}>
+        <Label htmlFor="dashboard-group" className={label}>
+          مجموعة الفروع
+        </Label>
         <Select value={value.group || ALL} onValueChange={changeGroup} disabled={!clan}>
-          <SelectTrigger id="dashboard-group" className="w-full">
+          <SelectTrigger id="dashboard-group" className={trigger}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -88,14 +99,16 @@ export function DashboardScopeFilters({
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="dashboard-branch">الفرع</Label>
+      <div className={field}>
+        <Label htmlFor="dashboard-branch" className={label}>
+          الفرع
+        </Label>
         <Select
           value={value.branch || ALL}
           onValueChange={(code) => onChange({ ...value, branch: code === ALL ? "" : code })}
           disabled={!clan}
         >
-          <SelectTrigger id="dashboard-branch" className="w-full">
+          <SelectTrigger id="dashboard-branch" className={trigger}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, UserRound } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { Initials } from "@/components/shared/initials";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,16 +37,20 @@ export function UserMenu() {
   return (
     <DropdownMenu dir="rtl">
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-9 gap-2 px-2" aria-label="الملف الشخصي" data-user-menu>
-          <UserRound className="size-5" />
-          <span className="hidden max-w-40 truncate text-sm font-medium sm:inline">{user.name}</span>
+        <Button variant="ghost" className="h-10 gap-2.5 px-2 hover:bg-surface-hover active:bg-surface-pressed" aria-label={`الحساب: ${user.name}`} data-user-menu>
+          <Initials name={user.name} />
+          {/* The signed-in user's own name and role (never the email). */}
+          <span className="hidden min-w-0 flex-col items-start leading-tight sm:flex">
+            <bdi className="max-w-44 truncate text-sm font-medium text-foreground">{user.name}</bdi>
+            <span className="text-xs font-normal text-muted-foreground">{user.role_label ?? "بلا دور"}</span>
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
-          <span className="truncate text-sm font-medium text-foreground" data-user-name>
+          <bdi className="truncate text-sm font-medium text-foreground" data-user-name>
             {user.name}
-          </span>
+          </bdi>
           <span className="text-xs font-normal text-muted-foreground" data-user-role={user.role ?? ""}>
             {user.role_label ?? "بلا دور"}
           </span>

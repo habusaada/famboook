@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import type { FamilyLifecycleStatus } from "@/lib/types/api/family";
 
 const statusLabels: Record<FamilyLifecycleStatus, string> = {
@@ -7,15 +7,12 @@ const statusLabels: Record<FamilyLifecycleStatus, string> = {
   ARCHIVED: "مؤرشفة",
 };
 
-const statusVariant: Record<
-  FamilyLifecycleStatus,
-  "default" | "secondary" | "outline"
-> = {
-  ACTIVE: "default",
-  INACTIVE: "secondary",
-  ARCHIVED: "outline",
+const statusTone: Record<FamilyLifecycleStatus, StatusTone> = {
+  ACTIVE: "success",
+  INACTIVE: "neutral",
+  ARCHIVED: "neutral",
 };
 
 export function FamilyStatusBadge({ status }: { status: FamilyLifecycleStatus }) {
-  return <Badge variant={statusVariant[status]}>{statusLabels[status]}</Badge>;
+  return <StatusBadge tone={statusTone[status]}>{statusLabels[status]}</StatusBadge>;
 }
