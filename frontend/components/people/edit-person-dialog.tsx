@@ -64,10 +64,12 @@ export function EditPersonDialog({
   person,
   title = "تعديل بيانات الشخص",
   description = "تعديل البيانات الأساسية فقط. لا يشمل تغيير رب الأسرة أو نقل العضوية.",
+  triggerLabel,
 }: {
   person: PersonDetail;
   title?: string;
   description?: string;
+  triggerLabel?: string;
 }) {
   const {
     register,
@@ -101,7 +103,7 @@ export function EditPersonDialog({
         flow.setOpen(next);
       }}
     >
-      <EditTrigger />
+      <EditTrigger label={triggerLabel} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
