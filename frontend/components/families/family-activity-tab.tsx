@@ -1,16 +1,13 @@
 "use client";
 
-import { AlertCircle, History, Loader2, Lock } from "lucide-react";
+import { Activity, AlertCircle, Loader2, Lock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppCard } from "@/components/shared/app-card";
+import { ActivityItem } from "@/components/shared/activity-item";
+import { EmptyState } from "@/components/shared/empty-state";
+import { SectionHeader } from "@/components/shared/page-layout";
 import { useFamilyActivities } from "@/lib/api/activity";
 import { ApiError } from "@/lib/api/client";
 import type { FamilyActivity } from "@/lib/types/api/activity";
@@ -30,59 +27,20 @@ export function activitySubject(activity: FamilyActivity): string | null {
   return parts.length > 0 ? parts.join(" — ") : null;
 }
 
-function ActivityRow({ activity }: { activity: FamilyActivity }) {
-  const { label, icon: Icon } = familyActivityPresentation[activity.event_type];
-  const subject = activitySubject(activity);
-
-  return (
-    <li className="flex gap-3 px-4 py-3" data-activity-id={activity.id}>
-      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <p className="text-sm font-medium">{label}</p>
-        {subject && <p className="text-sm text-muted-foreground">{subject}</p>}
-        <p className="text-xs text-muted-foreground">
-          بواسطة: {activity.actor?.name ?? "النظام"}
-          <span className="mx-1.5">·</span>
-          <time dateTime={activity.occurred_at}>{formatActivityTime(activity.occurred_at)}</time>
-        </p>
-      </div>
-    </li>
-  );
-}
-
 export function FamilyActivityTab({ familyCode }: { familyCode: string }) {
   const { data, isLoading, isError, error, hasNextPage, fetchNextPage, isFetchingNextPage } =
     useFamilyActivities(familyCode);
 
   if (isLoading) {
-    return (
-      <Card size="sm">
-        <CardContent className="flex flex-col gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex gap-3">
-              <Skeleton className="size-8 rounded-full" />
-              <div className="flex flex-1 flex-col gap-2">
-                <Skeleton className="h-4 w-48" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
+    return <Skeleton className="h-48 w-full rounded-widget" />;
   }
 
   if (isError) {
     if (error instanceof ApiError && error.status === 403) {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-16 text-center">
-          <Lock className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            لا تملك صلاحية عرض سجل نشاط هذه الأسرة.
-          </p>
-        </div>
+        <AppCard padded={false}>
+          <EmptyState icon={Lock} title="لا تملك صلاحية عرض سجل نشاط هذه الأسرة." />
+        </AppCard>
       );
     }
 
@@ -98,40 +56,44 @@ export function FamilyActivityTab({ familyCode }: { familyCode: string }) {
   const activities = data!.pages.flatMap((page) => page.data);
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>سجل النشاط</CardTitle>
-        <CardDescription>
-          العمليات المسجّلة تلقائيًا على الأسرة وأفرادها، الأحدث أولًا
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+    <AppCard>
+      <SectionHeader
+        icon={Activity}
+        tone="neutral"
+        title="سجل النشاط"
+        description="العمليات المسجّلة تلقائيًا على الأسرة وأفرادها، الأحدث أولًا"
+      />
+      <div className="mt-4">
         {activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 p-12 text-center">
-            <History className="size-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              لا توجد أنشطة مسجّلة لهذه الأسرة بعد.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              يبدأ السجل من العمليات التي تتم بعد تفعيل هذه الميزة.
-            </p>
-          </div>
+          <EmptyState
+            icon={Activity}
+            title="لا توجد أنشطة مسجّلة لهذه الأسرة بعد"
+            description="يبدأ السجل من العمليات التي تتم بعد تفعيل هذه الميزة."
+          />
         ) : (
           <>
-            <ol className="divide-y">
-              {activities.map((activity) => (
-                <ActivityRow key={activity.id} activity={activity} />
+            <ol className="flex flex-col">
+              {activities.map((activity, index) => (
+                <ActivityItem
+                  key={activity.id}
+                  data-activity-id={activity.id}
+                  icon={familyActivityPresentation[activity.event_type].icon}
+                  title={familyActivityPresentation[activity.event_type].label}
+                  entity={activitySubject(activity) ?? undefined}
+                  meta={
+                    <>
+                      بواسطة: {activity.actor?.name ?? "النظام"}
+                      <span className="mx-1.5">·</span>
+                      <time dateTime={activity.occurred_at}>{formatActivityTime(activity.occurred_at)}</time>
+                    </>
+                  }
+                  last={index === activities.length - 1 && !hasNextPage}
+                />
               ))}
             </ol>
             {hasNextPage && (
-              <div className="flex justify-center border-t p-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isFetchingNextPage}
-                  onClick={() => fetchNextPage()}
-                >
+              <div className="flex justify-center border-t border-stroke-subtle pt-3">
+                <Button type="button" variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
                   {isFetchingNextPage && <Loader2 className="size-4 animate-spin" />}
                   عرض المزيد
                 </Button>
@@ -139,7 +101,7 @@ export function FamilyActivityTab({ familyCode }: { familyCode: string }) {
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </AppCard>
   );
 }

@@ -36,7 +36,7 @@ import type { FamilyDetail } from "@/lib/types/api/family";
  * (PATCH /api/v1/families/{family}). Family code, status and registration
  * source are not editable here.
  */
-export function EditFamilyRegistrationDialog({ family }: { family: FamilyDetail }) {
+export function EditFamilyRegistrationDialog({ family, triggerLabel }: { family: FamilyDetail; triggerLabel?: string }) {
   const {
     register,
     handleSubmit,
@@ -70,7 +70,7 @@ export function EditFamilyRegistrationDialog({ family }: { family: FamilyDetail 
         flow.setOpen(next);
       }}
     >
-      <EditTrigger />
+      <EditTrigger label={triggerLabel} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>تعديل معلومات التسجيل</DialogTitle>

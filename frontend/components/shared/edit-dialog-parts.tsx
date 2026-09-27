@@ -33,12 +33,12 @@ export function FieldError({ message }: { message?: string }) {
   return message ? <p className="text-xs text-destructive">{message}</p> : null;
 }
 
-export function EditTrigger() {
+export function EditTrigger({ label = "تعديل" }: { label?: string }) {
   return (
     <DialogTrigger asChild>
       <Button variant="outline" size="sm">
         <Pencil className="size-4" />
-        تعديل
+        {label}
       </Button>
     </DialogTrigger>
   );

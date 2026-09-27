@@ -1,14 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useAuth } from "@/components/auth/auth-context";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, SearchX } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronLeft, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FamilyStatusBadge } from "@/components/families/family-status-badge";
+import { FamilyIdentityHeader } from "@/components/families/family-identity-header";
+import { useFamilySnapshot } from "@/components/families/family-snapshot";
 import { FamilyOverview } from "@/components/families/family-overview";
 import { FamilyMembersTable } from "@/components/families/family-members-table";
 import { FamilyResidenceTab } from "@/components/families/family-residence-tab";
@@ -18,12 +20,11 @@ import { FamilyAssessmentsTab } from "@/components/families/family-assessments-t
 import { FamilyNeedsTab } from "@/components/families/family-needs-tab";
 import { FamilyAssistanceTab } from "@/components/families/family-assistance-tab";
 import { TabPlaceholder } from "@/components/families/tab-placeholder";
-import { Code, Panel } from "@/components/shared/page-layout";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { AppCard } from "@/components/shared/app-card";
+import { Code } from "@/components/shared/page-layout";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
-import type { FamilyDetail } from "@/lib/types/api/family";
 
 const secondaryTabs = [
   { value: "documents", label: "الوثائق" },
@@ -43,120 +44,26 @@ const TAB_PERMISSIONS: Record<string, string> = {
   history: "activity-log.view",
 };
 
-const fmt = (n: number) => n.toLocaleString("ar");
-
-// Quiet tab bar: the active tab is obvious (deep teal text and underline),
-// inactive tabs stay muted; the bar scrolls horizontally on small screens.
+// Enterprise tab bar (docs/10): strong selected state (teal text + 2px
+// underline + tint), quiet inactive tabs, visible focus, horizontal scroll
+// on small screens.
 const tabTrigger =
-  "h-11 flex-none rounded-none px-3.5 text-sm font-medium text-muted-foreground hover:text-foreground data-active:font-semibold data-active:text-brand-800 after:bg-brand-700 group-data-horizontal/tabs:after:bottom-0 focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset";
+  "h-10 flex-none rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground data-active:bg-surface-selected data-active:font-semibold data-active:text-brand-800 after:bg-brand-700 group-data-horizontal/tabs:after:-bottom-[5px] focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-inset";
 
-function BackToFamilies({ onClick }: { onClick: () => void }) {
+/** Page context: Families › this Family. */
+function Breadcrumb({ familyCode }: { familyCode?: string }) {
   return (
-    <Button type="button" variant="ghost" size="sm" className="-ms-2 w-fit gap-1.5 text-muted-foreground" onClick={onClick}>
-      <ArrowRight className="size-4" />
-      الأسر
-    </Button>
-  );
-}
-
-/** Separator between meta facts. */
-function Dot() {
-  return (
-    <span aria-hidden className="text-subtle-foreground">
-      •
-    </span>
-  );
-}
-
-function Meta({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex gap-1.5">
-      <dt>{label}:</dt>
-      <dd className="font-medium text-foreground">{children}</dd>
-    </div>
-  );
-}
-
-const notRecorded = <span className="font-normal text-subtle-foreground">غير مسجّل</span>;
-
-/**
- * Family identity from existing data only: code, status, household head
- * (the data model has no Family name), lineage, current size, paper form
- * number and, for a displaced family, the current displacement location.
- */
-function FamilyIdentity({ family }: { family: FamilyDetail }) {
-  const head = family.members.find((m) => m.is_household_head);
-  const residence = family.residence;
-  const displaced = residence?.displacement_status === "DISPLACED";
-
-  return (
-    <Panel className="flex flex-col gap-3 p-4 sm:px-6 sm:py-5" aria-label="هوية الأسرة">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Code className="text-[15px] text-brand-800">{family.family_code}</Code>
-            <FamilyStatusBadge status={family.status} />
-            {displaced && <StatusBadge tone="warning">نازحة</StatusBadge>}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <h1 className="text-2xl leading-tight font-bold text-foreground">
-              {head ? head.full_name : <span className="text-subtle-foreground">رب الأسرة غير محدد</span>}
-            </h1>
-            {head && <p className="text-[13px] text-muted-foreground">رب الأسرة</p>}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1.5 border-t border-border/70 pt-3 text-sm">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-foreground">
-          <span>{family.branch ? family.branch.name : <span className="text-subtle-foreground">بدون فرع</span>}</span>
-          {family.clan && (
-            <>
-              <Dot />
-              <span className="text-muted-foreground">{family.clan.name}</span>
-            </>
-          )}
-          <span className="hidden sm:inline">
-            <Dot />
-          </span>
-          {/* Current members: "5 أفراد · 3 ذكور · 2 إناث" */}
-          <span className="flex basis-full flex-wrap items-center gap-x-1.5 sm:basis-auto" data-member-summary>
-            <span>
-              <span className="font-semibold tabular-nums">{fmt(family.member_count)}</span> أفراد
-            </span>
-            <span aria-hidden className="text-subtle-foreground">·</span>
-            <span className="text-muted-foreground">
-              <span className="tabular-nums">{fmt(family.male_count)}</span> ذكور
-            </span>
-            <span aria-hidden className="text-subtle-foreground">·</span>
-            <span className="text-muted-foreground">
-              <span className="tabular-nums">{fmt(family.female_count)}</span> إناث
-            </span>
-          </span>
-        </p>
-        <dl className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-muted-foreground">
-          <Meta label="رقم النموذج الورقي">
-            {family.paper_form_no ? <bdi dir="ltr">{family.paper_form_no}</bdi> : notRecorded}
-          </Meta>
-          {family.registration_date && (
-            <Meta label="تاريخ التسجيل">
-              <bdi dir="ltr">{family.registration_date}</bdi>
-            </Meta>
-          )}
-          {displaced && <Meta label="مكان النزوح الحالي">{residence?.displacement_location_text ?? notRecorded}</Meta>}
-          {!displaced && residence && (residence.city || residence.governorate) && (
-            <Meta label="السكن الحالي">{[residence.city, residence.governorate].filter(Boolean).join("، ")}</Meta>
-          )}
-          {family.updated_at && (
-            <Meta label="آخر تحديث">
-              <span className="font-normal text-muted-foreground">
-                {new Date(family.updated_at).toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" })}
-              </span>
-            </Meta>
-          )}
-        </dl>
-      </div>
-    </Panel>
+    <nav aria-label="مسار الصفحة" className="flex items-center gap-1 text-[13px] text-muted-foreground">
+      <Link href="/families" className="rounded-sm px-0.5 hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-ring">
+        الأسر
+      </Link>
+      {familyCode && (
+        <>
+          <ChevronLeft className="size-3.5 text-subtle-foreground" aria-hidden />
+          <Code className="font-medium text-foreground">{familyCode}</Code>
+        </>
+      )}
+    </nav>
   );
 }
 
@@ -171,17 +78,23 @@ export function FamilyProfileView({
   const { can } = useAuth();
   const showTab = (tab: string) => !TAB_PERMISSIONS[tab] || can(TAB_PERMISSIONS[tab]);
   const { data, isLoading, isError, error } = useFamily(familyCode);
+  const snapshot = useFamilySnapshot(familyCode);
+  const [tab, setTab] = useState(
+    initialTab && LINKABLE_TABS.includes(initialTab) && showTab(initialTab) ? initialTab : "overview"
+  );
+  const openTab = (next: string) => {
+    if (!showTab(next)) return;
+    setTab(next);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-5" aria-busy="true">
-        <Skeleton className="h-8 w-20" />
-        <Panel className="flex flex-col gap-3 p-6">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-8 w-72 max-w-full" />
-          <Skeleton className="h-4 w-96 max-w-full" />
-        </Panel>
-        <Skeleton className="h-11 w-full" />
+      <div className="flex flex-col gap-4" aria-busy="true">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-48 w-full rounded-widget" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full rounded-widget" />
       </div>
     );
   }
@@ -190,10 +103,13 @@ export function FamilyProfileView({
     const notFound = error instanceof ApiError && error.status === 404;
 
     return (
-      <div className="flex flex-col gap-5">
-        <BackToFamilies onClick={() => router.push("/families")} />
+      <div className="flex flex-col gap-4">
+        <Button type="button" variant="ghost" size="sm" className="-ms-2 w-fit gap-1.5 text-muted-foreground" onClick={() => router.push("/families")}>
+          <ArrowRight className="size-4" />
+          الأسر
+        </Button>
         {notFound ? (
-          <Panel flush>
+          <AppCard padded={false}>
             <EmptyState
               icon={SearchX}
               title="لم يتم العثور على أسرة بهذا الرقم"
@@ -207,7 +123,7 @@ export function FamilyProfileView({
                 </>
               }
             />
-          </Panel>
+          </AppCard>
         ) : (
           <Alert variant="destructive">
             <AlertCircle className="size-4" />
@@ -225,18 +141,14 @@ export function FamilyProfileView({
 
   return (
     <div className="flex flex-col gap-4">
-      <BackToFamilies onClick={() => router.push("/families")} />
-      <FamilyIdentity family={family} />
+      <Breadcrumb familyCode={family.family_code} />
+      <FamilyIdentityHeader family={family} snapshot={snapshot} />
 
-      <Tabs
-        defaultValue={initialTab && LINKABLE_TABS.includes(initialTab) && showTab(initialTab) ? initialTab : "overview"}
-        className="gap-0"
-        // RTL keyboard semantics: ArrowLeft moves to the next tab visually.
-        dir="rtl"
-      >
+      <Tabs value={tab} onValueChange={setTab} className="gap-0" dir="rtl">
         <TabsList
           variant="line"
-          className="h-auto! w-full justify-start gap-0 overflow-x-auto overflow-y-hidden rounded-none border-b p-0"
+          aria-label="أقسام ملف الأسرة"
+          className="h-auto! w-full justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none border-b border-stroke-subtle p-0 pb-1"
         >
           <TabsTrigger className={tabTrigger} value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger className={tabTrigger} value="members">أفراد الأسرة</TabsTrigger>
@@ -245,16 +157,16 @@ export function FamilyProfileView({
           {showTab("assessments") && <TabsTrigger className={tabTrigger} value="assessments">التقييمات</TabsTrigger>}
           {showTab("needs") && <TabsTrigger className={tabTrigger} value="needs">الاحتياجات</TabsTrigger>}
           {showTab("assistance") && <TabsTrigger className={tabTrigger} value="assistance">المساعدات</TabsTrigger>}
-          {secondaryTabs.map((tab) => (
-            <TabsTrigger className={tabTrigger} key={tab.value} value={tab.value}>
-              {tab.label}
+          {secondaryTabs.map((t) => (
+            <TabsTrigger className={tabTrigger} key={t.value} value={t.value}>
+              {t.label}
             </TabsTrigger>
           ))}
           {showTab("history") && <TabsTrigger className={tabTrigger} value="history">السجل</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          <FamilyOverview family={family} />
+          <FamilyOverview family={family} snapshot={snapshot} onOpenTab={openTab} />
         </TabsContent>
 
         <TabsContent value="members" className="mt-4">
@@ -289,8 +201,8 @@ export function FamilyProfileView({
           </TabsContent>
         )}
 
-        {secondaryTabs.map((tab) => (
-          <TabsContent key={tab.value} value={tab.value} className="mt-4">
+        {secondaryTabs.map((t) => (
+          <TabsContent key={t.value} value={t.value} className="mt-4">
             <TabPlaceholder />
           </TabsContent>
         ))}

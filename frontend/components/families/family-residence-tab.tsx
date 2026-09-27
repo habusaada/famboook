@@ -1,19 +1,14 @@
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { MapPinOff } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-context";
-import { InfoRow } from "@/components/families/family-overview";
+import { InfoRow, ResidenceSummary } from "@/components/families/family-overview";
 import {
   EditCurrentResidenceDialog,
   EditDisplacementDialog,
 } from "@/components/families/edit-residence-dialogs";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { SectionHeader } from "@/components/shared/page-layout";
 import type { FamilyDetail } from "@/lib/types/api/family";
-import { displacementStatusLabel } from "@/lib/utils/displacement";
 
 const NOT_RECORDED = "غير مسجّل";
 
@@ -23,66 +18,41 @@ export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
 
   if (!residence) {
     return (
-      <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-        لا يوجد سكن حالي مسجّل
-      </p>
+      <AppCard padded={false}>
+        <EmptyState icon={MapPinOff} title="لا يوجد سكن حالي مسجّل" />
+      </AppCard>
     );
   }
 
-  const isDisplaced = residence.displacement_status === "DISPLACED";
+  const canEdit = can("residence.update");
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>النزوح</CardTitle>
-          <CardDescription>السكن الأصلي (قبل النزوح)، وحالة النزوح، ومكان النزوح الحالي</CardDescription>
-          <CardAction>
-            {can("residence.update") && <EditDisplacementDialog familyCode={family.family_code} residence={residence} />}
-          </CardAction>
-        </CardHeader>
-        <CardContent>
-          <InfoRow
-            label="السكن الأصلي (قبل النزوح)"
-            value={residence.original_residence_text ?? NOT_RECORDED}
+    <div className="flex flex-col gap-4">
+      <AppCard>
+        <SectionHeader
+          title="السكن والنزوح"
+          description="السكن الأصلي قبل النزوح، وحالة النزوح ومكانه، وعنوان الإقامة الحالي كما ورد في الاستمارة"
+        />
+        <div className="mt-3">
+          <ResidenceSummary
+            residence={residence}
+            displacementAction={canEdit ? <EditDisplacementDialog familyCode={family.family_code} residence={residence} /> : undefined}
+            residenceAction={canEdit ? <EditCurrentResidenceDialog familyCode={family.family_code} residence={residence} /> : undefined}
           />
-          <InfoRow
-            label="حالة النزوح"
-            value={displacementStatusLabel(residence.displacement_status)}
-          />
-          {/* A location only means something for a displaced family. */}
-          {isDisplaced && (
-            <InfoRow
-              label="مكان النزوح الحالي"
-              value={residence.displacement_location_text ?? NOT_RECORDED}
-            />
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      </AppCard>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>السكن الحالي</CardTitle>
-          <CardDescription>عنوان إقامة الأسرة الحالي كما ورد في الاستمارة</CardDescription>
-          <CardAction>
-            {can("residence.update") && <EditCurrentResidenceDialog familyCode={family.family_code} residence={residence} />}
-          </CardAction>
-        </CardHeader>
-        <CardContent>
+      <AppCard>
+        <SectionHeader title="تفاصيل العنوان الحالي" description="الحقول الجغرافية اختيارية؛ النص المسجّل قد يكون القيمة المعتمدة" />
+        <div className="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
           <InfoRow label="المحافظة" value={residence.governorate ?? NOT_RECORDED} />
           <InfoRow label="المدينة" value={residence.city ?? NOT_RECORDED} />
-          {residence.area && <InfoRow label="المنطقة" value={residence.area} />}
-          {residence.neighborhood && (
-            <InfoRow label="الحي" value={residence.neighborhood} />
-          )}
-          {residence.address_text && (
-            <InfoRow label="العنوان التفصيلي" value={residence.address_text} />
-          )}
-          {residence.started_at && (
-            <InfoRow label="تاريخ بدء السكن" value={residence.started_at} ltr />
-          )}
-        </CardContent>
-      </Card>
+          <InfoRow label="المنطقة" value={residence.area ?? NOT_RECORDED} />
+          <InfoRow label="الحي" value={residence.neighborhood ?? NOT_RECORDED} />
+          <InfoRow label="العنوان التفصيلي" value={residence.address_text ?? NOT_RECORDED} />
+          <InfoRow label="تاريخ بدء السكن" value={residence.started_at ?? NOT_RECORDED} ltr={!!residence.started_at} />
+        </div>
+      </AppCard>
     </div>
   );
 }

@@ -4,29 +4,33 @@ import { useState } from "react";
 import { AlertCircle, HeartHandshake, Loader2, Lock, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NeedFilterBar } from "@/components/needs/need-filters";
 import { NeedFormDialog } from "@/components/needs/need-form-dialog";
 import { NeedRow } from "@/components/needs/need-row";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { SectionHeader } from "@/components/shared/page-layout";
 import { ApiError } from "@/lib/api/client";
 import { useFamilyNeeds } from "@/lib/api/needs";
 import type { FamilyNeedSummary, NeedFilters } from "@/lib/types/api/need";
+import { cn } from "@/lib/utils";
 
 // Every number is derived by the API on read — nothing here is stored.
-const SUMMARY_CARDS: { key: keyof FamilyNeedSummary; label: string }[] = [
+const SUMMARY: { key: keyof FamilyNeedSummary; label: string; tone?: string }[] = [
   { key: "open", label: "احتياجات مفتوحة" },
-  { key: "urgent_open", label: "مفتوحة عاجلة" },
+  { key: "urgent_open", label: "مفتوحة عاجلة", tone: "text-danger" },
   { key: "fulfilled", label: "تمت تلبيتها" },
   { key: "closed", label: "مغلقة" },
 ];
+
+function GroupHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="border-t border-stroke-subtle bg-surface-2 px-4 py-2 text-xs font-semibold text-muted-foreground sm:px-5">
+      {children}
+    </h3>
+  );
+}
 
 export function FamilyNeedsTab({ familyCode }: { familyCode: string }) {
   const [filters, setFilters] = useState<NeedFilters>({});
@@ -34,25 +38,17 @@ export function FamilyNeedsTab({ familyCode }: { familyCode: string }) {
     useFamilyNeeds(familyCode, filters);
 
   if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {SUMMARY_CARDS.map((card) => (
-          <Skeleton key={card.key} className="h-20" />
-        ))}
-      </div>
-    );
+    return <Skeleton className="h-48 w-full rounded-widget" />;
   }
 
   if (isError) {
     if (error instanceof ApiError && error.status === 403) {
       return (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-16 text-center">
-          <Lock className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">لا تملك صلاحية عرض احتياجات هذه الأسرة.</p>
-        </div>
+        <AppCard padded={false}>
+          <EmptyState icon={Lock} title="لا تملك صلاحية عرض احتياجات هذه الأسرة." />
+        </AppCard>
       );
     }
-
     return (
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
@@ -70,92 +66,85 @@ export function FamilyNeedsTab({ familyCode }: { familyCode: string }) {
   const filtered = Object.values(filters).some(Boolean);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {SUMMARY_CARDS.map((card) => (
-          <Card key={card.key} size="sm" data-summary={card.key}>
-            <CardHeader className="pb-1">
-              <CardDescription>{card.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">{first.summary[card.key]}</CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
+    <AppCard padded={false} className="overflow-hidden">
+      <SectionHeader
+        className="p-4 sm:p-5"
+        icon={HeartHandshake}
+        tone="danger"
+        title="الاحتياجات"
+        description="احتياجات محددة للأسرة أو لأفرادها، المفتوحة والعاجلة أولًا"
+        action={
+          first.abilities.create ? (
+            <NeedFormDialog
+              familyCode={familyCode}
+              trigger={
+                <Button size="sm">
+                  <Plus className="size-4" />
+                  احتياج جديد
+                </Button>
+              }
+            />
+          ) : undefined
+        }
+      />
+
+      <div className="grid grid-cols-2 border-t border-stroke-subtle sm:grid-cols-4 [&>*]:border-stroke-subtle max-sm:[&>*:nth-child(odd)]:border-e max-sm:[&>*:nth-child(n+3)]:border-t sm:[&>*:not(:last-child)]:border-e">
+        {SUMMARY.map((item) => {
+          const value = first.summary[item.key];
+          return (
+            <div key={item.key} className="flex flex-col gap-0.5 px-4 py-3 sm:px-5" data-summary={item.key}>
+              <span className="text-xs text-muted-foreground">{item.label}</span>
+              <span className={cn("text-xl font-bold tabular-nums", value > 0 ? (item.tone ?? "text-foreground") : "text-subtle-foreground")}>
+                {value.toLocaleString("ar")}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>الاحتياجات</CardTitle>
-          <CardDescription>احتياجات محددة للأسرة أو لأفرادها، المفتوحة والعاجلة أولًا</CardDescription>
-          {first.abilities.create && (
-            <CardAction>
-              <NeedFormDialog
-                familyCode={familyCode}
-                trigger={
-                  <Button size="sm">
-                    <Plus className="size-4" />
-                    احتياج جديد
-                  </Button>
-                }
-              />
-            </CardAction>
-          )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-0">
-          <div className="px-4">
-            <NeedFilterBar filters={filters} onChange={setFilters} showTarget />
-          </div>
+      <div className="border-t border-stroke-subtle px-4 py-3 sm:px-5">
+        <NeedFilterBar filters={filters} onChange={setFilters} showTarget />
+      </div>
 
-          {needs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 border-t p-12 text-center">
-              <HeartHandshake className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {filtered ? "لا توجد احتياجات مطابقة للتصفية." : "لا توجد احتياجات مسجّلة لهذه الأسرة بعد."}
-              </p>
-            </div>
-          ) : (
-            <>
-              {open.length > 0 && (
-                <section>
-                  <h3 className="border-t bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
-                    الاحتياجات المفتوحة
-                  </h3>
-                  <ol className="divide-y border-t">
-                    {open.map((need) => (
-                      <NeedRow key={need.id} need={need} />
-                    ))}
-                  </ol>
-                </section>
-              )}
-              {history.length > 0 && (
-                <section>
-                  <h3 className="border-t bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
-                    السجل السابق (تمت تلبيتها أو مغلقة)
-                  </h3>
-                  <ol className="divide-y border-t">
-                    {history.map((need) => (
-                      <NeedRow key={need.id} need={need} />
-                    ))}
-                  </ol>
-                </section>
-              )}
-              {hasNextPage && (
-                <div className="flex justify-center border-t p-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isFetchingNextPage}
-                    onClick={() => fetchNextPage()}
-                  >
-                    {isFetchingNextPage && <Loader2 className="size-4 animate-spin" />}
-                    عرض المزيد
-                  </Button>
-                </div>
-              )}
-            </>
+      {needs.length === 0 ? (
+        <div className="border-t border-stroke-subtle">
+          <EmptyState
+            icon={HeartHandshake}
+            title={filtered ? "لا توجد احتياجات مطابقة للتصفية" : "لا توجد احتياجات مسجّلة لهذه الأسرة بعد"}
+          />
+        </div>
+      ) : (
+        <>
+          {open.length > 0 && (
+            <section>
+              <GroupHeading>الاحتياجات المفتوحة</GroupHeading>
+              <ol className="divide-y divide-stroke-subtle border-t border-stroke-subtle">
+                {open.map((need) => (
+                  <NeedRow key={need.id} need={need} />
+                ))}
+              </ol>
+            </section>
           )}
-        </CardContent>
-      </Card>
-    </div>
+          {history.length > 0 && (
+            <section className="opacity-75 transition-opacity hover:opacity-100 focus-within:opacity-100">
+              <GroupHeading>السجل السابق (تمت تلبيتها أو مغلقة)</GroupHeading>
+              <ol className="divide-y divide-stroke-subtle border-t border-stroke-subtle">
+                {history.map((need) => (
+                  <NeedRow key={need.id} need={need} />
+                ))}
+              </ol>
+            </section>
+          )}
+          {hasNextPage && (
+            <div className="flex justify-center border-t border-stroke-subtle p-3">
+              <Button type="button" variant="outline" size="sm" disabled={isFetchingNextPage} onClick={() => fetchNextPage()}>
+                {isFetchingNextPage && <Loader2 className="size-4 animate-spin" />}
+                عرض المزيد
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </AppCard>
   );
 }

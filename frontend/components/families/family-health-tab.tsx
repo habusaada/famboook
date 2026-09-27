@@ -1,16 +1,7 @@
 "use client";
 
 import { AlertCircle, HeartPulse, Lock } from "lucide-react";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -25,14 +16,19 @@ import {
   CloseHealthRecordDialog,
   EditHealthRecordDialog,
 } from "@/components/families/health-record-dialogs";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { SectionHeader } from "@/components/shared/page-layout";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { useFamilyHealth } from "@/lib/api/health";
 import { ApiError } from "@/lib/api/client";
 import type { FamilyDetail } from "@/lib/types/api/family";
 import type { FamilyHealthSummary } from "@/lib/types/api/health";
 import { healthRecordSubject, healthRecordTypeLabels } from "@/lib/utils/health";
+import { cn } from "@/lib/utils";
 
 // Every number is derived by the API on read — nothing here is stored.
-const SUMMARY_CARDS: { key: keyof FamilyHealthSummary; label: string; persons?: boolean }[] = [
+const SUMMARY: { key: keyof FamilyHealthSummary; label: string; persons?: boolean }[] = [
   { key: "disability_persons", label: "ذوو الإعاقة", persons: true },
   { key: "chronic_disease_persons", label: "الأمراض المزمنة", persons: true },
   { key: "pregnant", label: "الحوامل" },
@@ -41,6 +37,8 @@ const SUMMARY_CARDS: { key: keyof FamilyHealthSummary; label: string; persons?: 
   { key: "recent_births", label: "مواليد آخر 12 شهرًا" },
 ];
 
+const head = "h-10 text-xs font-medium text-muted-foreground";
+
 function personsLabel(count: number): string {
   if (count === 1) return "فرد";
   if (count === 2) return "فردان";
@@ -48,31 +46,25 @@ function personsLabel(count: number): string {
   return "فردًا";
 }
 
+function Restricted({ message }: { message: string }) {
+  return (
+    <AppCard padded={false}>
+      <EmptyState icon={Lock} title={message} />
+    </AppCard>
+  );
+}
+
 export function FamilyHealthTab({ family }: { family: FamilyDetail }) {
   const { data, isLoading, isError, error } = useFamilyHealth(family.family_code);
 
   if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {SUMMARY_CARDS.map((card) => (
-          <Skeleton key={card.key} className="h-20" />
-        ))}
-      </div>
-    );
+    return <Skeleton className="h-48 w-full rounded-widget" />;
   }
 
   if (isError) {
     if (error instanceof ApiError && error.status === 403) {
-      return (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-16 text-center">
-          <Lock className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            لا تملك صلاحية عرض البيانات الصحية لهذه الأسرة.
-          </p>
-        </div>
-      );
+      return <Restricted message="لا تملك صلاحية عرض البيانات الصحية لهذه الأسرة." />;
     }
-
     return (
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
@@ -84,89 +76,82 @@ export function FamilyHealthTab({ family }: { family: FamilyDetail }) {
 
   const { data: records, summary, reference_date, abilities } = data!;
   const canAct = abilities.update || abilities.close;
+  // Active records first; ended ones recede.
+  const ordered = [...records].sort((a, b) => Number(b.is_active) - Number(a.is_active));
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {SUMMARY_CARDS.map((card) => (
-          <Card key={card.key} size="sm" data-summary={card.key}>
-            <CardHeader className="pb-1">
-              <CardDescription>{card.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">
-                {summary[card.key]}
-                {card.persons && (
-                  <span className="ms-1.5 text-sm font-normal text-muted-foreground">
-                    {personsLabel(summary[card.key])}
-                  </span>
+      <AppCard padded={false} className="overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 [&>*]:border-stroke-subtle max-sm:[&>*:nth-child(odd)]:border-e max-sm:[&>*:nth-child(n+3)]:border-t sm:max-xl:[&>*:not(:nth-child(3n))]:border-e sm:max-xl:[&>*:nth-child(n+4)]:border-t xl:[&>*:not(:last-child)]:border-e">
+          {SUMMARY.map((item) => (
+            <div key={item.key} className="flex flex-col gap-0.5 px-4 py-3" data-summary={item.key}>
+              <span className="text-xs text-muted-foreground">{item.label}</span>
+              <span className={cn("text-xl font-bold tabular-nums", summary[item.key] > 0 ? "text-foreground" : "text-subtle-foreground")}>
+                {summary[item.key].toLocaleString("ar")}
+                {item.persons && (
+                  <span className="ms-1 text-xs font-normal text-muted-foreground">{personsLabel(summary[item.key])}</span>
                 )}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
-      <p className="-mt-2 text-xs text-muted-foreground">
-        المؤشرات محسوبة تلقائيًا من السجلات النشطة وتواريخ الميلاد بتاريخ{" "}
-        <span dir="ltr">{reference_date}</span>.
-      </p>
-
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>السجلات الصحية</CardTitle>
-          <CardDescription>
-            الإعاقات والأمراض المزمنة وحالات الحمل والرضاعة لأفراد الأسرة
-          </CardDescription>
-          {abilities.create && (
-            <CardAction>
-              <AddHealthRecordDialog familyCode={family.family_code} members={family.members} />
-            </CardAction>
-          )}
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          {records.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 p-12 text-center">
-              <HeartPulse className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                لا توجد حالات صحية مسجّلة لأفراد هذه الأسرة.
-              </p>
+              </span>
             </div>
-          ) : (
+          ))}
+        </div>
+        <p className="border-t border-stroke-subtle bg-surface-2 px-4 py-2 text-xs text-subtle-foreground">
+          المؤشرات محسوبة تلقائيًا من السجلات النشطة وتواريخ الميلاد بتاريخ <bdi dir="ltr">{reference_date}</bdi>.
+        </p>
+      </AppCard>
+
+      <AppCard padded={false} className="overflow-hidden">
+        <SectionHeader
+          className="p-4 sm:p-5"
+          icon={HeartPulse}
+          tone="info"
+          title="السجلات الصحية"
+          description="الإعاقات والأمراض المزمنة وحالات الحمل والرضاعة لأفراد الأسرة"
+          action={abilities.create ? <AddHealthRecordDialog familyCode={family.family_code} members={family.members} /> : undefined}
+        />
+        {records.length === 0 ? (
+          <div className="border-t border-stroke-subtle">
+            <EmptyState icon={HeartPulse} title="لا توجد حالات صحية مسجّلة لأفراد هذه الأسرة" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto border-t border-stroke-subtle">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>الشخص</TableHead>
-                  <TableHead>نوع الحالة</TableHead>
-                  <TableHead>الحالة / النوع</TableHead>
-                  <TableHead>التفاصيل</TableHead>
-                  <TableHead>الفترة</TableHead>
-                  <TableHead>الوضع</TableHead>
-                  {canAct && <TableHead className="w-0" />}
+              <TableHeader className="bg-surface-2">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={`${head} ps-5`}>الشخص</TableHead>
+                  <TableHead className={head}>نوع الحالة</TableHead>
+                  <TableHead className={head}>الحالة / النوع</TableHead>
+                  <TableHead className={head}>التفاصيل</TableHead>
+                  <TableHead className={head}>الفترة</TableHead>
+                  <TableHead className={head}>الوضع</TableHead>
+                  {canAct && <TableHead className={`${head} w-0 pe-5`} />}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.map((record) => (
-                  <TableRow key={record.id} data-record-id={record.id}>
-                    <TableCell className="font-medium">{record.person.full_name}</TableCell>
+                {ordered.map((record) => (
+                  <TableRow
+                    key={record.id}
+                    data-record-id={record.id}
+                    className={cn("h-14 border-stroke-subtle hover:bg-surface-hover", !record.is_active && "text-muted-foreground")}
+                  >
+                    <TableCell className="ps-5 font-medium">{record.person.full_name}</TableCell>
                     <TableCell>{healthRecordTypeLabels[record.type]}</TableCell>
                     <TableCell>{healthRecordSubject(record) ?? "—"}</TableCell>
-                    <TableCell className="max-w-64 whitespace-normal text-muted-foreground">
-                      {record.details || "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground" dir="ltr">
-                      {record.started_at || record.ended_at
-                        ? `${record.started_at ?? "…"} → ${record.ended_at ?? "…"}`
-                        : "—"}
+                    <TableCell className="max-w-64 whitespace-normal text-muted-foreground">{record.details || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {record.started_at || record.ended_at ? (
+                        <bdi dir="ltr">{`${record.started_at ?? "…"} → ${record.ended_at ?? "…"}`}</bdi>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={record.is_active ? "default" : "outline"}>
-                        {record.is_active ? "نشطة" : "منتهية"}
-                      </Badge>
+                      <StatusBadge tone={record.is_active ? "info" : "neutral"}>{record.is_active ? "نشطة" : "منتهية"}</StatusBadge>
                     </TableCell>
                     {canAct && (
-                      <TableCell>
+                      <TableCell className="pe-4">
                         <div className="flex items-center justify-end gap-1">
-                          {abilities.update && (
-                            <EditHealthRecordDialog familyCode={family.family_code} record={record} />
-                          )}
+                          {abilities.update && <EditHealthRecordDialog familyCode={family.family_code} record={record} />}
                           {abilities.close && record.is_active && (
                             <CloseHealthRecordDialog familyCode={family.family_code} record={record} />
                           )}
@@ -177,9 +162,9 @@ export function FamilyHealthTab({ family }: { family: FamilyDetail }) {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </AppCard>
     </div>
   );
 }
