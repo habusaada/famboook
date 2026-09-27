@@ -918,6 +918,44 @@ person.view
 
 must not automatically expose full National ID.
 
+## V1 Role Assignment
+
+Approved 2026-09-27 (Pilot Readiness Slice C, AUTH-ADR-059):
+
+```text
+person.national-id.view-masked   masked value only (*****6789)
+person.national-id.update        administrative correction
+  SUPER_ADMIN
+  ADMINISTRATOR
+
+person.national-id.view          FULL value
+  unassigned (nobody)
+```
+
+DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER receive
+none of them. DATA_ENTRY keeps the exact duplicate pre-check of AUTH-ADR-058,
+which never returns a value.
+
+Rules:
+
+- The API never returns the full stored National ID. `PersonResource` adds
+  `national_id_masked` only for holders of `.view-masked`; for everyone else
+  the key is omitted (HIDDEN, §36), so the response does not even reveal
+  whether a National ID exists. `null` = not recorded.
+- Masking has one implementation, `App\Support\NationalIdMask`: a fixed
+  prefix of five asterisks plus the last characters of the stored value —
+  at most four and never more than half of it. The fixed prefix does not
+  reveal the length. The Family Portal format stays open (PAUTH-008).
+- Correction uses the dedicated `PUT /api/v1/people/{person}/national-id`
+  (`person.national-id.update`). The replacement is required and typed twice
+  (`national_id_confirmation`); it is never pre-filled because the stored
+  value never reaches the browser; a blank value is refused, and V1 has no
+  "clear" action. The exact duplicate guard applies (docs/03 §93a). The
+  endpoint shares the National ID rate limit (30/min/user), because a
+  refusal tells whether a value is registered.
+- The generic `PATCH /api/v1/people/{person}` no longer accepts
+  `national_id` at all (403 without the permission, 422 with it).
+
 ---
 
 # 40. Health Record Permissions
@@ -1051,7 +1089,8 @@ mobile, alternate mobile and its owner/relation.
 It does **not** grant:
 
 - National ID viewing or editing. These need the dedicated
-  `person.national-id.*` permissions (§39), which stay unassigned.
+  `person.national-id.*` permissions (§39): since AUTH-ADR-059 masked view
+  and correction for SUPER_ADMIN and ADMINISTRATOR only; full view unassigned.
 - Life status or death recording. These need `person.record-death` and the
   controlled death operation (§96; docs/03 §30).
 - Household-head or membership changes (§97, §98).
@@ -1075,6 +1114,35 @@ family-membership.end
 
 family-membership.transfer
 ```
+
+## V1 Role Assignment
+
+Approved 2026-09-27 (Pilot Readiness Slice C, AUTH-ADR-059):
+
+```text
+family-membership.update   correct a current member's relationship
+  SUPER_ADMIN
+  ADMINISTRATOR
+  DATA_ENTRY
+
+family-membership.end      end an incorrect / no-longer-current membership
+  SUPER_ADMIN
+  ADMINISTRATOR
+```
+
+Relationship correction goes to the roles that "Correct Basic Person Data"
+(§44). Ending is withheld from DATA_ENTRY because it is not easily
+reversible in V1: there is no membership reactivation, no
+attach-existing-person and no transfer workflow, and the exact National ID
+duplicate rule (docs/03 §93a) prevents re-creating the Person. REVIEWER,
+SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER receive neither.
+
+Neither permission can move or remove the household head: the head keeps
+the HEAD relationship, HEAD cannot be given to another member, and the
+current head's membership cannot be ended (docs/03 §93b). That remains
+`family.change-household-head` (§97), still unused. `family-membership.view`
+and `.create` stay unassigned (adding a member keeps using `person.create`);
+`family-membership.transfer` is unchanged.
 
 ---
 
@@ -3420,6 +3488,9 @@ Staff authentication and user administration (§59c). Real Staff login on the Sa
 
 ### AUTH-ADR-058
 Registry search and exact National ID duplicate checks (docs/03 §93a). The Family registry keeps `family.view`; the new People registry uses `person.view` and shows Family context only with `family.view`; neither returns National IDs. The exact National ID pre-check (`POST /api/v1/people/national-id-check`) adds no permission: it is open to holders of `person.create` or `family.create` — exactly the users who can create a Person and are refused anyway on a duplicate — rate limited to 30 per minute per user, exact match only, and never returns a National ID (the Person name only with `person.view`). It grants no National ID viewing, browsing or search; `person.national-id.view` / `.view-masked` / `.update` stay unassigned.
+
+### AUTH-ADR-059
+Data-entry corrections (Pilot Readiness Slice C, docs/03 §93b). `family-membership.update` (relationship correction of a current member) goes to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY, mirroring "Correct Basic Person Data". `family-membership.end` (ending a current, non-head membership with a required reason; no delete) goes to SUPER_ADMIN and ADMINISTRATOR only: ending is not easily reversible in V1 (no reactivation, attach-existing-person or transfer, and the National ID duplicate rule prevents re-creating the Person). Neither can change the household head: the HEAD relationship stays tied to `is_household_head`, and the head's membership cannot be ended; `family.change-household-head` stays unused. `person.national-id.view-masked` and `person.national-id.update` go to SUPER_ADMIN and ADMINISTRATOR only; `person.national-id.view` (FULL) stays unassigned, so no API returns a full National ID. Masking is centralized (NationalIdMask). National ID changes move to one dedicated, rate-limited endpoint with a required, confirmed replacement (no clear action, duplicate guard active); the generic Person update no longer accepts the field. The three new activity events carry no metadata. This supersedes the "still unassigned" statements of AUTH-ADR-047 and AUTH-ADR-058 for `.view-masked` / `.update` only.
 ```
 
 ---
@@ -3546,6 +3617,9 @@ This is a baseline, not a substitute for explicit permissions.
 | View Person | ✓ | ✓ | Scope | Scope | Scope | Report scope | Authorized fields |
 | Create Person | ✓ | ✓ | ✓ | Policy | Policy | — | — |
 | Correct Basic Person Data | ✓ | ✓ | ✓ | — | — | — | — |
+| Correct Member Relationship (V1; never the household head) | ✓ | ✓ | ✓ | — | — | — | — |
+| End Incorrect Membership (V1; never the household head; not reversible in V1) | ✓ | ✓ | — | — | — | — | — |
+| View Masked National ID / Correct National ID (V1; full value never exposed) | ✓ | ✓ | — | — | — | — | — |
 | View Health Records | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | Create/Correct/Close Health Records | ✓ | ✓ | ✓ | — | — | — | — |
 | View Reference Data | ✓ | ✓ | ✓ | — | — | — | — |
@@ -3782,6 +3856,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.15 | 2026-09-27 | Approved | AUTH-ADR-059: §45 V1 assignment of `family-membership.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) and `family-membership.end` (SUPER_ADMIN, ADMINISTRATOR); §39 V1 assignment of `person.national-id.view-masked` / `.update` (SUPER_ADMIN, ADMINISTRATOR), central masking, dedicated correction endpoint; three rows in §140 |
 | 1.2.14 | 2026-09-26 | Approved | AUTH-ADR-058: registry search permissions and the exact National ID pre-check (person.create / family.create, rate limited, no new permission) |
 | 1.2.13 | 2026-09-26 | Approved | §59c: Staff authentication (login, logout, `/me`, rate limiting, `is_active`), one Staff role per user, Filament Staff user administration and escalation rules, ADMINISTRATOR user-administration grants, two rows in §140, PAUTH-028 V1 resolution, AUTH-ADR-057 |
 | 1.2.12 | 2026-09-26 | Approved | §59b: `report.view` V1 role assignment, per-report domain-permission rule, `export.basic` for XLSX, two rows in §140, AUTH-ADR-056 |

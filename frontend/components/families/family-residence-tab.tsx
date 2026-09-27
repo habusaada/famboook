@@ -36,14 +36,14 @@ export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
       <Card size="sm">
         <CardHeader>
           <CardTitle>النزوح</CardTitle>
-          <CardDescription>السكن الأصلي قبل النزوح وحالة النزوح الحالية</CardDescription>
+          <CardDescription>السكن الأصلي (قبل النزوح)، وحالة النزوح، ومكان النزوح الحالي</CardDescription>
           <CardAction>
             {can("residence.update") && <EditDisplacementDialog familyCode={family.family_code} residence={residence} />}
           </CardAction>
         </CardHeader>
         <CardContent>
           <InfoRow
-            label="السكن الأصلي"
+            label="السكن الأصلي (قبل النزوح)"
             value={residence.original_residence_text ?? NOT_RECORDED}
           />
           <InfoRow
@@ -63,14 +63,14 @@ export function FamilyResidenceTab({ family }: { family: FamilyDetail }) {
       <Card size="sm">
         <CardHeader>
           <CardTitle>السكن الحالي</CardTitle>
-          <CardDescription>موقع إقامة الأسرة الحالي</CardDescription>
+          <CardDescription>عنوان إقامة الأسرة الحالي كما ورد في الاستمارة</CardDescription>
           <CardAction>
             {can("residence.update") && <EditCurrentResidenceDialog familyCode={family.family_code} residence={residence} />}
           </CardAction>
         </CardHeader>
         <CardContent>
-          <InfoRow label="المحافظة" value={residence.governorate} />
-          <InfoRow label="المدينة" value={residence.city} />
+          <InfoRow label="المحافظة" value={residence.governorate ?? NOT_RECORDED} />
+          <InfoRow label="المدينة" value={residence.city ?? NOT_RECORDED} />
           {residence.area && <InfoRow label="المنطقة" value={residence.area} />}
           {residence.neighborhood && (
             <InfoRow label="الحي" value={residence.neighborhood} />

@@ -51,6 +51,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/families/{family}/members', [FamilyMemberController::class, 'store'])
         ->middleware('can:person.create');
 
+    // Membership corrections (AUTH-ADR-059), addressed by Family code and
+    // Person code. No DELETE: an ended membership stays as history.
+    Route::patch('/families/{family}/members/{person}/relationship', [FamilyMemberController::class, 'updateRelationship'])
+        ->middleware('can:family-membership.update');
+
+    Route::post('/families/{family}/members/{person}/end', [FamilyMemberController::class, 'end'])
+        ->middleware('can:family-membership.end');
+
     // People registry (docs/03 §93a).
     Route::get('/people', [PersonController::class, 'index'])
         ->middleware('can:person.view');
@@ -65,6 +73,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::patch('/people/{person}', [PersonController::class, 'update'])
         ->middleware('can:person.update');
+
+    // Administrative National ID correction (AUTH-ADR-059). Body only,
+    // never in a URL; shares the National ID rate limit because a refusal
+    // tells whether a value is already registered.
+    Route::put('/people/{person}/national-id', [PersonController::class, 'correctNationalId'])
+        ->middleware(['can:person.national-id.update', 'throttle:national-id-check']);
 
     // Person-based health records (docs/06 §40): health-record.* only.
     Route::get('/families/{family}/health-records', [HealthRecordController::class, 'index'])

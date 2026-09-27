@@ -56,8 +56,9 @@ export const displacementApiFieldToFormField: Record<
 // ---------- السكن الحالي ----------
 
 export const editCurrentResidenceSchema = z.object({
-  governorate: z.string().trim().min(1, "المحافظة مطلوبة").max(255, "النص طويل جدًا"),
-  city: z.string().trim().min(1, "المدينة مطلوبة").max(255, "النص طويل جدًا"),
+  // Optional: empty = not recorded (NULL), never a guessed value.
+  governorate: z.string().max(255, "النص طويل جدًا").optional(),
+  city: z.string().max(255, "النص طويل جدًا").optional(),
   area: z.string().max(255, "النص طويل جدًا").optional(),
   neighborhood: z.string().max(255, "النص طويل جدًا").optional(),
   addressText: z.string().optional(),
@@ -69,8 +70,8 @@ export function currentResidenceFormValues(
   residence: Residence
 ): EditCurrentResidenceValues {
   return {
-    governorate: residence.governorate,
-    city: residence.city,
+    governorate: residence.governorate ?? "",
+    city: residence.city ?? "",
     area: residence.area ?? "",
     neighborhood: residence.neighborhood ?? "",
     addressText: residence.address_text ?? "",
@@ -81,8 +82,8 @@ export function toCurrentResidencePayload(
   values: EditCurrentResidenceValues
 ): UpdateFamilyResidencePayload {
   return {
-    governorate: values.governorate,
-    city: values.city,
+    governorate: values.governorate?.trim() || null,
+    city: values.city?.trim() || null,
     area: values.area || null,
     neighborhood: values.neighborhood || null,
     address_text: values.addressText || null,

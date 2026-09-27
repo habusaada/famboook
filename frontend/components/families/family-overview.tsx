@@ -174,8 +174,11 @@ export function FamilyOverview({ family }: { family: FamilyDetail }) {
         <CardContent>
           {family.residence ? (
             <>
-              <InfoRow label="المحافظة" value={family.residence.governorate} />
-              <InfoRow label="المدينة" value={family.residence.city} />
+              <InfoRow label="المحافظة" value={family.residence.governorate ?? "غير مسجّل"} />
+              <InfoRow label="المدينة" value={family.residence.city ?? "غير مسجّل"} />
+              {family.residence.displacement_location_text && (
+                <InfoRow label="مكان النزوح الحالي" value={family.residence.displacement_location_text} />
+              )}
               {family.residence.area && (
                 <InfoRow label="المنطقة" value={family.residence.area} />
               )}

@@ -37,7 +37,10 @@ use Spatie\Permission\PermissionRegistrar;
  * Branch structure permissions were added by AUTH-ADR-054 (§56a).
  * dashboard.view-operational was assigned by AUTH-ADR-055 (§59a) and
  * report.view by AUTH-ADR-056 (§59b). ADMINISTRATOR received Filament
- * access and Staff user administration by AUTH-ADR-057 (§59c).
+ * access and Staff user administration by AUTH-ADR-057 (§59c). Membership
+ * corrections (family-membership.update; .end without DATA_ENTRY) and
+ * masked National ID view / correction were assigned by AUTH-ADR-059
+ * (§45, §39).
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -284,6 +287,13 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Membership corrections (§45 V1 Role Assignment, AUTH-ADR-059)
+            'family-membership.update',
+            'family-membership.end',
+            // National ID: masked view and correction only (§39, AUTH-ADR-059).
+            // person.national-id.view (full value) stays unassigned.
+            'person.national-id.view-masked',
+            'person.national-id.update',
             // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
             'health-record.view',
             'health-record.create',
@@ -384,6 +394,13 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Membership corrections (§45 V1 Role Assignment, AUTH-ADR-059)
+            'family-membership.update',
+            'family-membership.end',
+            // National ID: masked view and correction only (§39, AUTH-ADR-059).
+            // person.national-id.view (full value) stays unassigned.
+            'person.national-id.view-masked',
+            'person.national-id.update',
             // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
             'health-record.view',
             'health-record.create',
@@ -461,6 +478,9 @@ class RolePermissionSeeder extends Seeder
             'person.create',
             // Correct Basic Person Data (§44 V1 Role Assignment, AUTH-ADR-047)
             'person.update',
+            // Relationship correction (§45 V1 Role Assignment, AUTH-ADR-059).
+            // Not family-membership.end: ending is not reversible in V1.
+            'family-membership.update',
             // Health Records ✓ (§40 V1 Role Assignment, AUTH-ADR-048)
             'health-record.view',
             'health-record.create',

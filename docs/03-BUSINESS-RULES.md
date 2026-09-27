@@ -2152,6 +2152,9 @@ Adding a Family member          refused (422)
 Changing a Person's National ID refused (422) if another Person holds it
 ```
 
+(Since Slice C, a National ID is changed only through the administrative
+correction of §93b.)
+
 The refusal ("يوجد شخص مسجل مسبقًا بهذه الهوية.") lists safe references to
 the existing record — Person code, name (with `person.view`), Family code,
 household-head flag and relationship — so staff can inspect it. Nothing is
@@ -2183,6 +2186,117 @@ member. An unknown date of birth is stored as NULL — never a placeholder
 (§26) — displays as "غير معروف", produces no age, and counts in the UNKNOWN
 age band (docs/02 §75) and the Data Quality "missing date of birth" check.
 Partial dates remain deferred (PDD-022).
+
+---
+
+# 93b. Data-Entry Corrections (V1)
+
+Approved 2026-09-27 (Pilot Readiness Slice C, AUTH-ADR-059). These are
+**data corrections** (§56) of common entry mistakes. They never delete a
+Person or a membership and never merge Persons (§23).
+
+## Relationship correction
+
+`PATCH /api/v1/families/{family}/members/{person}/relationship`
+(`family-membership.update`). Corrects the relationship of a **current**
+member to the household head, using the canonical relationship types
+(active values only). The membership row is corrected in place: the
+Person, the membership, its dates and `is_household_head` are unchanged.
+
+The HEAD relationship and `is_household_head` always agree:
+
+```text
+household head   → only HEAD is accepted (a head cannot be "corrected" away)
+any other member → HEAD is refused
+```
+
+So an ordinary correction can never move, add or remove the household head;
+that remains the controlled household-head change (§15), not built in V1.
+A Person who is not a current member of that Family → 409. Re-saving the
+same relationship changes nothing and records no activity.
+
+## Ending an incorrect membership
+
+`POST /api/v1/families/{family}/members/{person}/end`
+(`family-membership.end`: SUPER_ADMIN, ADMINISTRATOR — not DATA_ENTRY,
+because ending is not reversible in V1), e.g. a Person attached to the wrong Family or no
+longer part of it. A short reason is required (3–255 characters).
+
+```text
+is_active   → false
+ended_at    → today (never before started_at)
+end_reason  → the staff member's reason (free text)
+```
+
+Nothing is deleted: the membership stays as history (§11, §99, §100), the
+Person stays in the registry unchanged and is **not** attached to any other
+Family (that would be a transfer, §13). The current household head's
+membership cannot be ended (409): a Family must not lose its head through an
+ordinary correction. An already-ended membership cannot be ended again.
+
+After ending, current views show the change: the Family profile lists and
+counts current members only, the Family registry's member count and member
+search use current memberships, and the Person shows no current Family.
+Family-level derived figures (health summary, targeting, dashboard,
+reports) already count active memberships only.
+
+## National ID correction
+
+`PUT /api/v1/people/{person}/national-id` (`person.national-id.update`:
+SUPER_ADMIN, ADMINISTRATOR). The only write path for an existing Person's
+National ID:
+
+- the replacement is entered explicitly, twice, and is never pre-filled —
+  the stored value is never sent to any client;
+- a blank value is refused; V1 has no "clear" action;
+- the exact duplicate rule of §93a applies (refused, nothing changes, safe
+  references only);
+- stored as entered — no normalization (PDD-001 stays open);
+- afterwards only the masked value (`*****6789`) is shown, and only to
+  holders of `person.national-id.view-masked` (docs/06 §39).
+
+## Activity privacy
+
+Each successful correction records one Family Activity event (§97a) on the
+Person's current Family, subject = the Person, **no metadata**:
+
+```text
+MEMBERSHIP_RELATIONSHIP_CORRECTED   never the old/new relationship
+MEMBERSHIP_ENDED                    never the reason
+NATIONAL_ID_CORRECTED               never the old or new National ID
+```
+
+A Person without a current membership has no family timeline, so a
+National ID correction for such a Person records no activity.
+
+## Residence decision (governorate / city)
+
+`family_residences.governorate` and `.city` are nullable (docs/02 §19,
+docs/04 §24); only validation required them. From Slice C they are optional
+at registration and in the residence correction: NULL = not recorded,
+shown as "غير مسجّل", never filled with a guessed value. A displaced Family
+whose form gives only the displacement location keeps it without fabricated
+geography. Labels distinguish:
+
+```text
+السكن الحالي                 current address (optional governorate / city)
+السكن الأصلي (قبل النزوح)    original_residence_text
+مكان النزوح الحالي           displacement_location_text (DISPLACED only)
+```
+
+No geographic hierarchy or maps (PDD-006 stays open).
+
+## Remaining limitations
+
+- An ended membership cannot be re-activated, and the Person cannot yet be
+  attached to another Family (no transfer / attach-existing operation).
+  Re-adding the Person as a new member is refused when they have a National
+  ID (§93a duplicate rule) — correct, but it leaves such a Person
+  Family-less until transfer exists.
+- Household-head change is not implemented; a wrong head needs that future
+  operation.
+- National ID normalization (PDD-001) and the geographic hierarchy
+  (PDD-006) stay open.
 
 ---
 
@@ -2279,6 +2393,9 @@ FAMILY_CREATED          family registration
 FAMILY_UPDATED          family registration-metadata correction
 FAMILY_MEMBER_ADDED     new member (Person + membership)
 PERSON_UPDATED          basic Person data correction (current family)
+MEMBERSHIP_RELATIONSHIP_CORRECTED  member relationship corrected (§93b)
+MEMBERSHIP_ENDED        incorrect membership ended; Person kept (§93b)
+NATIONAL_ID_CORRECTED   administrative National ID correction (§93b)
 RESIDENCE_UPDATED       current-address correction
 DISPLACEMENT_UPDATED    displacement-field correction
 HEALTH_RECORD_CREATED
@@ -3296,6 +3413,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.14 | 2026-09-27 | Approved | Added §93b: relationship correction, ending an incorrect membership, National ID correction and masking, correction activity privacy, optional governorate/city residence decision and remaining limitations; three §97a events |
 | 1.2.13 | 2026-09-26 | Approved | Added §93a: server-side Family/People registry search, exact National ID duplicate prevention (no merge, advisory-lock concurrency, remaining limitation), optional date of birth and UNKNOWN age |
 | 1.2.12 | 2026-09-26 | Approved | §116: V1 Staff authentication rules (login, logout, inactive accounts, one Staff role, Filament scope, safe seeding, local-only dev login) |
 | 1.2.11 | 2026-09-26 | Approved | Added §55b "Reports (V1)": six fixed reports over the §55a scope and population, Health aggregate-only, Needs lifecycle, latest domain state, scoped INTERNAL/EXTERNAL assistance, Data Quality checks and drill-down, XLSX privacy rules |

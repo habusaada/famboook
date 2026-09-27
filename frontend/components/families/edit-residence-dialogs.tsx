@@ -95,7 +95,8 @@ export function EditDisplacementDialog({
         <DialogHeader>
           <DialogTitle>تعديل بيانات النزوح</DialogTitle>
           <DialogDescription>
-            تصحيح السكن الأصلي وحالة النزوح الحالية للأسرة.
+            السكن الأصلي هو مكان سكن الأسرة قبل النزوح. مكان النزوح الحالي هو
+            المكان الذي تقيم فيه الأسرة النازحة الآن.
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +223,8 @@ export function EditCurrentResidenceDialog({
           <DialogTitle>تعديل السكن الحالي</DialogTitle>
           <DialogDescription>
             تصحيح عنوان السكن الحالي للأسرة. لا يُستخدم لتسجيل انتقال الأسرة
-            إلى سكن جديد.
+            إلى سكن جديد. اترك المحافظة والمدينة فارغتين إذا لم تذكرهما
+            الاستمارة؛ مكان النزوح يُسجَّل في قسم النزوح.
           </DialogDescription>
         </DialogHeader>
 
@@ -238,12 +240,12 @@ export function EditCurrentResidenceDialog({
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="edit-governorate">المحافظة</FieldLabel>
+              <FieldLabel htmlFor="edit-governorate" optional>المحافظة</FieldLabel>
               <Input id="edit-governorate" {...register("governorate")} />
               <FieldError message={errors.governorate?.message} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <FieldLabel htmlFor="edit-city">المدينة</FieldLabel>
+              <FieldLabel htmlFor="edit-city" optional>المدينة</FieldLabel>
               <Input id="edit-city" {...register("city")} />
               <FieldError message={errors.city?.message} />
             </div>

@@ -190,7 +190,8 @@ export function FamilyProfileView({
             )}
             {family.residence && (
               <MetaItem icon={MapPin}>
-                {family.residence.city}، {family.residence.governorate}
+                {[family.residence.city, family.residence.governorate].filter(Boolean).join("، ") ||
+                  "السكن الحالي غير مسجّل"}
                 {family.residence.displacement_status
                   ? ` — ${displacementStatusLabel(family.residence.displacement_status)}`
                   : ""}
@@ -243,9 +244,15 @@ export function FamilyProfileView({
         </Card>
         <Card size="sm">
           <CardHeader className="pb-1">
-            <CardDescription>موقع الإقامة الحالي</CardDescription>
+            <CardDescription>
+              {family.residence?.displacement_status === "DISPLACED" ? "مكان النزوح الحالي" : "موقع الإقامة الحالي"}
+            </CardDescription>
             <CardTitle className="text-base font-semibold">
-              {family.residence?.city ?? "—"}
+              {(family.residence?.displacement_status === "DISPLACED"
+                ? family.residence.displacement_location_text
+                : null) ??
+                family.residence?.city ??
+                "—"}
             </CardTitle>
           </CardHeader>
         </Card>

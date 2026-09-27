@@ -30,6 +30,14 @@ trait BuildsRegistryFixtures
         return $user;
     }
 
+    /** The next request is unauthenticated, even after earlier actingAs() calls. */
+    protected function asGuest(): static
+    {
+        $this->app['auth']->forgetGuards();
+
+        return $this;
+    }
+
     /** @param array<string, mixed> $head */
     protected function register(array $head = [], ?User $as = null): TestResponse
     {

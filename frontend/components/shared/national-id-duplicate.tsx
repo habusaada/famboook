@@ -43,7 +43,13 @@ export function useNationalIdDuplicate() {
 }
 
 /** The warning with safe references (codes, name, family) to inspect. */
-export function NationalIdDuplicateNotice({ matches }: { matches: NationalIdMatch[] }) {
+export function NationalIdDuplicateNotice({
+  matches,
+  description = "لا يمكن إنشاء شخص جديد بالهوية نفسها. راجع السجل الموجود قبل المتابعة:",
+}: {
+  matches: NationalIdMatch[];
+  description?: string;
+}) {
   if (matches.length === 0) return null;
 
   return (
@@ -51,7 +57,7 @@ export function NationalIdDuplicateNotice({ matches }: { matches: NationalIdMatc
       <UserX className="size-4" />
       <AlertTitle>{DUPLICATE_NATIONAL_ID_MESSAGE}</AlertTitle>
       <AlertDescription className="flex flex-col gap-2">
-        <span>لا يمكن إنشاء شخص جديد بالهوية نفسها. راجع السجل الموجود قبل المتابعة:</span>
+        <span>{description}</span>
         <ul className="flex flex-col gap-1.5">
           {matches.map((match) => (
             <li key={match.person_code} className="flex flex-wrap items-center gap-x-2 gap-y-1" data-duplicate-match={match.person_code}>

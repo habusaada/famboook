@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // back into a session or error context.
         $exceptions->dontFlash([
             'national_id',
+            'national_id_confirmation',
             'beneficiary_national_id',
             'delegate_national_id',
         ]);

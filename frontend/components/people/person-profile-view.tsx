@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowRight,
   Crown,
+  IdCard,
   Phone,
   SearchX,
   User,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -23,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EditPersonDialog } from "@/components/people/edit-person-dialog";
+import { CorrectNationalIdDialog } from "@/components/people/correct-national-id-dialog";
 import { usePerson } from "@/lib/api/people";
 import { ApiError } from "@/lib/api/client";
 import { relationshipLabel } from "@/lib/utils/relationship";
@@ -97,6 +100,9 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
 
   const person = data!.data;
   const membership = person.family_membership;
+  // Present only with person.national-id.view-masked (AUTH-ADR-059).
+  const showsNationalId = person.national_id_masked !== undefined;
+  const canCorrectNationalId = can("person.national-id.update");
 
   return (
     <div className="flex flex-col gap-5">
@@ -130,6 +136,12 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
             <span dir="ltr">{person.person_code}</span>
+            {!membership && (
+              <span className="flex items-center gap-1.5" data-no-current-family>
+                <User className="size-3.5" />
+                لا توجد عضوية حالية في أسرة
+              </span>
+            )}
             {membership && (
               <span className="flex items-center gap-1.5">
                 <User className="size-3.5" />
@@ -198,6 +210,28 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
             )}
           </CardContent>
         </Card>
+
+        {(showsNationalId || canCorrectNationalId) && (
+          <Card size="sm" data-national-id-card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5">
+                <IdCard className="size-4" />
+                رقم الهوية
+              </CardTitle>
+              <CardDescription>بيانات حساسة — للإدارة فقط. يظهر الرقم مخفيًا جزئيًا.</CardDescription>
+              {canCorrectNationalId && (
+                <CardAction>
+                  <CorrectNationalIdDialog person={person} />
+                </CardAction>
+              )}
+            </CardHeader>
+            <CardContent>
+              {showsNationalId && (
+                <InfoRow label="رقم الهوية (مخفي جزئيًا)" value={person.national_id_masked ?? "غير مسجّل"} ltr={!!person.national_id_masked} />
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -10,6 +10,11 @@ enum FamilyActivityType: string
     case FAMILY_UPDATED = 'FAMILY_UPDATED';
     case FAMILY_MEMBER_ADDED = 'FAMILY_MEMBER_ADDED';
     case PERSON_UPDATED = 'PERSON_UPDATED';
+    // Data-entry corrections (Pilot Readiness Slice C). No metadata: never
+    // the previous/new relationship, the ending reason or any National ID.
+    case MEMBERSHIP_RELATIONSHIP_CORRECTED = 'MEMBERSHIP_RELATIONSHIP_CORRECTED';
+    case MEMBERSHIP_ENDED = 'MEMBERSHIP_ENDED';
+    case NATIONAL_ID_CORRECTED = 'NATIONAL_ID_CORRECTED';
     case RESIDENCE_UPDATED = 'RESIDENCE_UPDATED';
     case DISPLACEMENT_UPDATED = 'DISPLACEMENT_UPDATED';
     case HEALTH_RECORD_CREATED = 'HEALTH_RECORD_CREATED';

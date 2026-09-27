@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { ApiError, apiClient } from "@/lib/api/client";
 import type { PaginatedResponse, ResourceResponse } from "@/lib/types/api/family";
 import type {
+  CorrectNationalIdPayload,
   NationalIdMatch,
   PersonDetail,
   PersonSummary,
@@ -35,6 +36,26 @@ export function useUpdatePerson(personCode: string) {
       queryClient.invalidateQueries({ queryKey: ["people", personCode] });
       // Person data (e.g. the household head's name) also appears in
       // family views; ["families"] prefix-matches every family query.
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+    },
+  });
+}
+
+/**
+ * Administrative National ID correction (person.national-id.update). The
+ * response carries only the masked value.
+ */
+export function useCorrectNationalId(personCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CorrectNationalIdPayload) =>
+      apiClient.put<ResourceResponse<PersonDetail>>(
+        `/api/v1/people/${encodeURIComponent(personCode)}/national-id`,
+        payload
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people", personCode] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
   });

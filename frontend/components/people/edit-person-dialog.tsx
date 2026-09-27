@@ -54,8 +54,9 @@ function formValues(person: PersonDetail): EditPersonValues {
  * Profile — it never changes who the head is or any membership.
  *
  * Not editable here, by design:
- * - National ID: needs person.national-id.update (docs/06 §39), which no
- *   role holds yet, and the API does not expose it — so it isn't shown.
+ * - National ID: corrected only through the separate administrative
+ *   CorrectNationalIdDialog (person.national-id.update, AUTH-ADR-059); the
+ *   generic PATCH refuses the field.
  * - Life status: recording death is a controlled operation (docs/03 §30,
  *   §16), so it is shown read-only.
  */

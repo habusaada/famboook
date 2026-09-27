@@ -1316,6 +1316,20 @@ Critical transactions tested
 Concurrency protection works
 ```
 
+## Progress
+
+2026-09-27: **Pilot Readiness Slice C — Data-Entry Corrections** delivered
+(docs/03 §93b, AUTH-ADR-059): relationship correction of current members
+(household-head invariant enforced), ending an incorrect non-head membership
+with a required reason (history kept, Person kept, no auto-transfer),
+administrative National ID correction with central masking (SUPER_ADMIN,
+ADMINISTRATOR; full value never exposed; duplicate guard; no clear action),
+privacy-safe activity events, and optional current governorate/city with
+clearer residence / displacement labels. No schema change. **Still open:**
+TransferFamilyMemberAction / attaching an existing Person, ChangeHouseholdHeadAction,
+re-activating an ended membership, residence history (`residence.change`),
+National ID normalization (PDD-001), geographic hierarchy (PDD-006).
+
 ---
 
 # 22. Phase 10 — Staff Registry Experience
@@ -4654,6 +4668,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.10 | 2026-09-27 | Approved | Phase 9 progress note: Pilot Readiness Slice C (data-entry corrections: relationship, membership ending, National ID correction and masking, optional governorate/city) |
 | 1.2.9 | 2026-09-26 | Approved | Phase 20 progress note: Pilot Readiness Slice B (registry search, exact National ID duplicate prevention, optional date of birth) |
 | 1.2.8 | 2026-09-26 | Approved | Phase 4 progress note: Pilot Readiness Slice A (real Staff authentication and Staff access) |
 | 1.2.7 | 2026-09-26 | Approved | Phase 22 progress note: Reports V1 |

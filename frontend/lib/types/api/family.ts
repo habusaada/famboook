@@ -59,8 +59,10 @@ export interface FamilyDetail {
   notes: string | null;
   updated_at: string | null;
   residence: {
-    governorate: string;
-    city: string;
+    // null = not recorded (e.g. the paper form gives only the displacement
+    // location). Never replaced by a guessed value.
+    governorate: string | null;
+    city: string | null;
     area: string | null;
     neighborhood: string | null;
     address_text: string | null;
@@ -131,8 +133,8 @@ export interface RegisterFamilyPayload {
     alternate_mobile_owner_relation?: string | null;
   };
   residence: {
-    governorate: string;
-    city: string;
+    governorate?: string | null;
+    city?: string | null;
     area?: string | null;
     neighborhood?: string | null;
     address_text?: string | null;
@@ -161,8 +163,8 @@ export interface UpdateFamilyPayload {
 // (backend/app/Http/Requests/Api/V1/UpdateFamilyResidenceRequest.php).
 // Only the fields sent are changed.
 export interface UpdateFamilyResidencePayload {
-  governorate?: string;
-  city?: string;
+  governorate?: string | null;
+  city?: string | null;
   area?: string | null;
   neighborhood?: string | null;
   address_text?: string | null;

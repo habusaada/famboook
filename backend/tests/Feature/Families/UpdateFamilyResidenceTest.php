@@ -247,8 +247,8 @@ class UpdateFamilyResidenceTest extends TestCase
     public function test_validation_errors(): void
     {
         $this->patchResidence([
-            'governorate' => '',
-            'city' => null,
+            'governorate' => str_repeat('م', 256),
+            'city' => ['not', 'a', 'string'],
             'displacement_status' => 'مقيم',
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['governorate', 'city', 'displacement_status']);

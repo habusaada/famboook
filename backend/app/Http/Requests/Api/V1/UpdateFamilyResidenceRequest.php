@@ -26,8 +26,9 @@ class UpdateFamilyResidenceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'governorate' => ['sometimes', 'required', 'string', 'max:255'],
-            'city' => ['sometimes', 'required', 'string', 'max:255'],
+            // Optional: NULL = not recorded (never a guessed value).
+            'governorate' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:255'],
             'area' => ['sometimes', 'nullable', 'string', 'max:255'],
             'neighborhood' => ['sometimes', 'nullable', 'string', 'max:255'],
             'address_text' => ['sometimes', 'nullable', 'string'],

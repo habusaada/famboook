@@ -45,8 +45,8 @@ class RegisterFamilyAction
      *         alternate_mobile_owner_relation?: string|null,
      *     },
      *     residence: array{
-     *         governorate: string,
-     *         city: string,
+     *         governorate?: string|null,
+     *         city?: string|null,
      *         area?: string|null,
      *         neighborhood?: string|null,
      *         address_text?: string|null,
@@ -130,8 +130,8 @@ class RegisterFamilyAction
             FamilyResidence::create([
                 'family_id' => $family->id,
                 'residence_type' => $residence['residence_type'] ?? null,
-                'governorate' => $residence['governorate'],
-                'city' => $residence['city'],
+                'governorate' => $residence['governorate'] ?? null,
+                'city' => $residence['city'] ?? null,
                 'area' => $residence['area'] ?? null,
                 'neighborhood' => $residence['neighborhood'] ?? null,
                 'address_text' => $residence['address_text'] ?? null,

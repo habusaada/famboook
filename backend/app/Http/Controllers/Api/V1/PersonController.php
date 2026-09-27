@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\CorrectNationalIdAction;
 use App\Actions\UpdatePersonAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\CorrectNationalIdRequest;
 use App\Http\Requests\Api\V1\NationalIdCheckRequest;
 use App\Http\Requests\Api\V1\UpdatePersonRequest;
 use App\Http\Resources\PersonResource;
@@ -72,5 +74,18 @@ class PersonController extends Controller
         $person = $action->handle($person, $request->validated(), $request->user()?->id);
 
         return new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS));
+    }
+
+    /**
+     * Administrative National ID correction (AUTH-ADR-059). The response is
+     * the usual Person resource: the new value comes back only masked, and
+     * only to holders of person.national-id.view-masked.
+     */
+    public function correctNationalId(CorrectNationalIdRequest $request, Person $person, CorrectNationalIdAction $action): PersonResource
+    {
+        $person = $action->handle($person, $request->validated('national_id'), $request->user()?->id);
+
+        return (new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS)))
+            ->additional(['message' => 'تم تصحيح رقم الهوية']);
     }
 }

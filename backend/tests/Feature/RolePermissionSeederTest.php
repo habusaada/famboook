@@ -310,8 +310,9 @@ class RolePermissionSeederTest extends TestCase
         //      + assistance.approve/deliver/complete/export/export-sensitive/reverse (AUTH-ADR-053)
         //      + clan.view/manage (AUTH-ADR-054)
         //      + dashboard.view-operational (AUTH-ADR-055)
-        //      + report.view (AUTH-ADR-056).
-        $this->assertSame(71, $superAdmin->getAllPermissions()->count());
+        //      + report.view (AUTH-ADR-056)
+        //      + family-membership.update/end, person.national-id.view-masked/update (AUTH-ADR-059).
+        $this->assertSame(75, $superAdmin->getAllPermissions()->count());
     }
 
     public function test_documented_role_permission_assignments_work(): void
@@ -435,14 +436,48 @@ class RolePermissionSeederTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        // National ID stays behind its own, still-unassigned permissions
-        // (docs/06 §39); person.update never implies them.
-        foreach (['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY', 'REVIEWER', 'SOCIAL_WORKER', 'REPORTS_VIEWER', 'FAMILY_USER'] as $role) {
+        // National ID stays behind its own permissions (docs/06 §39);
+        // person.update never implies them. AUTH-ADR-059 gives only masked
+        // view and correction, only to SUPER_ADMIN and ADMINISTRATOR; the
+        // FULL view (person.national-id.view) stays unassigned for everyone.
+        $expected = [
+            'SUPER_ADMIN' => ['person.national-id.view-masked', 'person.national-id.update'],
+            'ADMINISTRATOR' => ['person.national-id.view-masked', 'person.national-id.update'],
+            'DATA_ENTRY' => [],
+            'REVIEWER' => [],
+            'SOCIAL_WORKER' => [],
+            'REPORTS_VIEWER' => [],
+            'FAMILY_USER' => [],
+        ];
+        foreach ($expected as $role => $granted) {
             $user = User::factory()->create();
             $user->assignRole($role);
             foreach (['person.national-id.view', 'person.national-id.view-masked', 'person.national-id.update'] as $permission) {
-                $this->assertFalse($user->hasPermissionTo($permission), "{$role} / {$permission}");
+                $this->assertSame(in_array($permission, $granted, true), $user->hasPermissionTo($permission), "{$role} / {$permission}");
             }
+        }
+    }
+
+    public function test_membership_correction_permissions_follow_approved_matrix(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        // docs/06 §45 V1 Role Assignment, AUTH-ADR-059: relationship
+        // correction for the roles that correct basic Person data; ending
+        // (not reversible in V1) for SUPER_ADMIN and ADMINISTRATOR only.
+        // create / view stay unassigned.
+        $expected = [
+            'family-membership.update' => ['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY'],
+            'family-membership.end' => ['SUPER_ADMIN', 'ADMINISTRATOR'],
+        ];
+        foreach (['SUPER_ADMIN', 'ADMINISTRATOR', 'DATA_ENTRY', 'REVIEWER', 'SOCIAL_WORKER', 'REPORTS_VIEWER', 'FAMILY_USER'] as $role) {
+            $user = User::factory()->create();
+            $user->assignRole($role);
+            foreach ($expected as $permission => $roles) {
+                $this->assertSame(in_array($role, $roles, true), $user->hasPermissionTo($permission), "{$role} / {$permission}");
+            }
+            $this->assertFalse($user->hasPermissionTo('family-membership.create'), $role);
+            $this->assertFalse($user->hasPermissionTo('family-membership.view'), $role);
         }
     }
 

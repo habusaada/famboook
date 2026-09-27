@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddMemberDialog } from "@/components/families/add-member-dialog";
+import { MemberCorrectionMenu } from "@/components/families/member-correction-dialogs";
 import { ageLabel, birthDateLabel } from "@/lib/utils/date";
 import { relationshipLabel } from "@/lib/utils/relationship";
 import type { FamilyDetail } from "@/lib/types/api/family";
@@ -27,6 +28,7 @@ import type { FamilyDetail } from "@/lib/types/api/family";
 export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
   const { can } = useAuth();
   const router = useRouter();
+  const canCorrect = can("family-membership.update") || can("family-membership.end");
 
   return (
     <Card size="sm">
@@ -34,7 +36,7 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
         <div>
           <CardTitle>أفراد الأسرة</CardTitle>
           <CardDescription>
-            {family.members.length} فرد مسجّل ضمن الأسرة
+            {family.members.length} فرد حالي ضمن الأسرة
           </CardDescription>
         </div>
         {can("person.create") && <AddMemberDialog familyCode={family.family_code} />}
@@ -49,6 +51,11 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
               <TableHead>تاريخ الميلاد</TableHead>
               <TableHead>العمر</TableHead>
               <TableHead>الحالة</TableHead>
+              {canCorrect && (
+                <TableHead className="w-10">
+                  <span className="sr-only">إجراءات التصحيح</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -81,6 +88,11 @@ export function FamilyMembersTable({ family }: { family: FamilyDetail }) {
                     {member.is_active ? "نشط" : "غير نشط"}
                   </Badge>
                 </TableCell>
+                {canCorrect && (
+                  <TableCell className="w-10 p-1">
+                    <MemberCorrectionMenu familyCode={family.family_code} member={member} />
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

@@ -399,12 +399,19 @@ function RegisterFamilyForm() {
             <CardHeader>
               <CardTitle>السكن والنزوح</CardTitle>
               <CardDescription>
-                موقع إقامة الأسرة الحالي، والسكن الأصلي قبل النزوح
+                سجّل ما تذكره الاستمارة فقط. إذا لم تذكر الاستمارة المحافظة أو
+                المدينة فاتركهما فارغتين، ولا تُدخل قيمة تقديرية.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <p className="text-sm font-medium sm:col-span-2">
+                السكن الحالي
+                <span className="ms-1 text-xs font-normal text-muted-foreground">
+                  (عنوان الإقامة الحالي إن وُجد)
+                </span>
+              </p>
               <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="governorate">المحافظة</FieldLabel>
+                <FieldLabel htmlFor="governorate" optional>المحافظة</FieldLabel>
                 <Input id="governorate" {...register("governorate")} />
                 {errors.governorate && (
                   <p className="text-xs text-destructive">
@@ -414,7 +421,7 @@ function RegisterFamilyForm() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <FieldLabel htmlFor="city">المدينة</FieldLabel>
+                <FieldLabel htmlFor="city" optional>المدينة</FieldLabel>
                 <Input id="city" {...register("city")} />
                 {errors.city && (
                   <p className="text-xs text-destructive">
@@ -448,6 +455,12 @@ function RegisterFamilyForm() {
                 />
               </div>
 
+              <p className="mt-2 border-t pt-4 text-sm font-medium sm:col-span-2">
+                النزوح
+                <span className="ms-1 text-xs font-normal text-muted-foreground">
+                  (السكن الأصلي قبل النزوح، ومكان النزوح الحالي)
+                </span>
+              </p>
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <FieldLabel htmlFor="originalResidenceText" optional>
                   مكان السكن الأصلي قبل النزوح

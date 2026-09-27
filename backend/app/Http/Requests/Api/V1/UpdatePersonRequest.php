@@ -16,6 +16,10 @@ use Illuminate\Validation\ValidationException;
  * those are separate, controlled domain operations (docs/03-BUSINESS-
  * RULES.md §14-16, §30: household head and death are controlled
  * operations, not generic field edits).
+ *
+ * National ID is not accepted either: it is corrected only through
+ * PUT /people/{person}/national-id (CorrectNationalIdAction, AUTH-ADR-059),
+ * which never clears it and records its own activity event.
  */
 class UpdatePersonRequest extends FormRequest
 {
@@ -40,7 +44,9 @@ class UpdatePersonRequest extends FormRequest
     {
         return [
             'full_name' => ['sometimes', 'required', 'string', 'max:255'],
-            'national_id' => ['sometimes', 'nullable', 'string', 'max:50'],
+            // `missing`, not `prohibited`: prohibited lets an explicit null
+            // through, which would clear the stored National ID.
+            'national_id' => ['missing'],
             'gender' => [
                 'sometimes',
                 Rule::enum(Gender::class),
@@ -71,6 +77,13 @@ class UpdatePersonRequest extends FormRequest
                     }
                 },
             ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'national_id.missing' => 'يُصحَّح رقم الهوية من إجراء "تصحيح رقم الهوية" المخصص فقط.',
         ];
     }
 

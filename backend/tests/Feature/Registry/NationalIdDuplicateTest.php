@@ -104,11 +104,12 @@ class NationalIdDuplicateTest extends TestCase
         $admin = $this->user('SUPER_ADMIN');
         $admin->givePermissionTo('person.national-id.update');
 
-        $this->actingAs($admin)->patchJson("/api/v1/people/{$other['person_code']}", ['national_id' => self::NID])
+        // National ID changes go through the dedicated correction (AUTH-ADR-059).
+        $this->actingAs($admin)->putJson("/api/v1/people/{$other['person_code']}/national-id", ['national_id' => self::NID, 'national_id_confirmation' => self::NID])
             ->assertStatus(422)->assertJsonPath('errors', ['national_id' => [DuplicateNationalIdException::MESSAGE]]);
         $this->assertSame('SYN-OTHER-01', Person::where('person_code', $other['person_code'])->value('national_id'));
         // Re-saving a Person's own National ID is not a duplicate.
-        $this->actingAs($admin)->patchJson("/api/v1/people/{$other['person_code']}", ['national_id' => 'SYN-OTHER-01'])->assertOk();
+        $this->actingAs($admin)->putJson("/api/v1/people/{$other['person_code']}/national-id", ['national_id' => 'SYN-OTHER-01', 'national_id_confirmation' => 'SYN-OTHER-01'])->assertOk();
     }
 
     public function test_pre_check_is_exact_and_never_echoes_the_national_id(): void

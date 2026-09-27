@@ -1,7 +1,7 @@
 // Types mirroring backend/app/Http/Resources/PersonResource.php exactly.
-// national_id is deliberately absent from the API response (see the
-// resource's docblock) — do not add it here to match a UI wish; it
-// isn't exposed until field-level authorization exists.
+// The full National ID is never returned (docs/06 §39). Holders of
+// person.national-id.view-masked receive only `national_id_masked`
+// (AUTH-ADR-059); for everyone else the key is absent.
 
 import type { MaritalStatus } from "@/lib/utils/marital-status";
 import type { Gender } from "@/lib/types/api/family";
@@ -28,17 +28,26 @@ export interface PersonDetail {
   alternate_mobile_owner_relation: string | null;
   life_status: LifeStatus;
   is_active: boolean;
+  // Present only with person.national-id.view-masked: "*****6789", or
+  // null when no National ID is recorded. Absent = not authorized.
+  national_id_masked?: string | null;
   family_membership?: PersonFamilyMembership;
+}
+
+// PUT /api/v1/people/{person}/national-id (CorrectNationalIdRequest). The
+// replacement is typed twice; it is never pre-filled and never shown back.
+export interface CorrectNationalIdPayload {
+  national_id: string;
+  national_id_confirmation: string;
 }
 
 // Canonical payload for PATCH /api/v1/people/{person}
 // (backend/app/Http/Requests/Api/V1/UpdatePersonRequest.php). All
-// fields optional — partial updates only. Does not include
-// life_status, death_date, or household-head/membership fields; those
+// fields optional — partial updates only. Does not include the National
+// ID, life_status, death_date, or household-head/membership fields; those
 // remain separate controlled domain operations.
 export interface UpdatePersonPayload {
   full_name?: string;
-  national_id?: string | null;
   gender?: Gender;
   marital_status?: MaritalStatus;
   birth_date?: string | null;

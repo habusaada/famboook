@@ -14,7 +14,9 @@ class FamilyDetailResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $members = $this->memberships;
+        // Current members only. Ended memberships stay in the database as
+        // history but are not part of the Family as it is today.
+        $members = $this->memberships->where('is_active', true)->values();
 
         return [
             'family_code' => $this->family_code,

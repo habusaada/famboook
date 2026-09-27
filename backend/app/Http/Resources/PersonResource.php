@@ -2,16 +2,19 @@
 
 namespace App\Http\Resources;
 
+use App\Support\NationalIdMask;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * national_id is deliberately omitted: docs/06-PERMISSIONS.md §39 states
+ * The full National ID is never returned: docs/06-PERMISSIONS.md §39 states
  * a general person.view permission "must not automatically expose full
- * National ID" — dedicated field-level permissions/masking
- * (person.national-id.view / .view-masked) aren't implemented yet, so
- * this defaults to hidden per the documented default-deny principle
- * (§112) until that layer exists.
+ * National ID", and person.national-id.view (FULL) is unassigned.
+ *
+ * Holders of person.national-id.view-masked (AUTH-ADR-059) receive
+ * `national_id_masked` from the central NationalIdMask rule — NULL when no
+ * National ID is recorded. For everyone else the key is omitted (HIDDEN,
+ * §36), so the response never reveals whether a National ID exists.
  */
 class PersonResource extends JsonResource
 {
@@ -30,6 +33,10 @@ class PersonResource extends JsonResource
             'alternate_mobile_owner_relation' => $this->alternate_mobile_owner_relation,
             'life_status' => $this->life_status,
             'is_active' => $this->is_active,
+            'national_id_masked' => $this->when(
+                $request->user()?->can('person.national-id.view-masked') ?? false,
+                fn () => NationalIdMask::mask($this->national_id),
+            ),
             'family_membership' => $this->when($membership, fn () => [
                 'family_code' => $membership->family->family_code,
                 'is_household_head' => $membership->is_household_head,

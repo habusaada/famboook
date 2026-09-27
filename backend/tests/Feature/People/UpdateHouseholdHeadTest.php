@@ -145,22 +145,26 @@ class UpdateHouseholdHeadTest extends TestCase
         $original = $this->head->fresh()->national_id;
 
         // person.update alone is not enough (docs/06 §39, §95).
-        $this->patchHead(['national_id' => '999999999'])->assertStatus(403);
+        $this->patchHead(['national_id' => '999999999'], $this->user('DATA_ENTRY'))->assertStatus(403);
         $this->assertSame($original, $this->head->fresh()->national_id);
     }
 
-    public function test_national_id_update_allowed_with_national_id_permission(): void
+    public function test_generic_update_never_changes_national_id_even_with_permission(): void
     {
-        // No seeded role holds person.national-id.update yet; grant it to a
-        // throwaway test role to prove the gate opens with the permission.
+        // The National ID is corrected only through the dedicated
+        // PUT /people/{person}/national-id (AUTH-ADR-059): the generic PATCH
+        // refuses the field even for holders of person.national-id.update.
+        $original = $this->head->fresh()->national_id;
         $role = Role::create(['name' => 'TEST_NATIONAL_ID_EDITOR', 'guard_name' => 'web']);
         $role->givePermissionTo(['person.update', 'person.national-id.update']);
         $user = User::factory()->create();
         $user->assignRole($role);
 
-        $this->patchHead(['national_id' => '999999999'], $user)->assertOk();
+        $this->patchHead(['national_id' => '999999999'], $user)
+            ->assertStatus(422)->assertJsonValidationErrors(['national_id']);
+        $this->patchHead(['national_id' => null], $user)->assertStatus(422);
 
-        $this->assertSame('999999999', $this->head->fresh()->national_id);
+        $this->assertSame($original, $this->head->fresh()->national_id);
     }
 
     public function test_national_id_is_not_exposed_by_person_or_family_responses(): void
@@ -219,9 +223,12 @@ class UpdateHouseholdHeadTest extends TestCase
                 ->assertJsonPath('data.full_name', "اسم مصحح {$role}")
                 ->assertJsonMissingPath('data.national_id');
 
-            // person.update alone never authorizes National ID changes.
-            $this->patchHead(['national_id' => '999999999'], $user)->assertStatus(403);
-            $this->patchHead(['full_name' => 'x', 'national_id' => '999999999'], $user)->assertStatus(403);
+            // The generic update never changes the National ID: 403 without
+            // person.national-id.update (DATA_ENTRY), 422 with it
+            // (ADMINISTRATOR, AUTH-ADR-059 — dedicated endpoint only).
+            $expected = $role === 'DATA_ENTRY' ? 403 : 422;
+            $this->patchHead(['national_id' => '999999999'], $user)->assertStatus($expected);
+            $this->patchHead(['full_name' => 'x', 'national_id' => '999999999'], $user)->assertStatus($expected);
         }
 
         $this->assertSame($originalNationalId, $this->head->fresh()->national_id);

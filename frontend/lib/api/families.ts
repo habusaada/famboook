@@ -82,6 +82,48 @@ export function useUpdateFamily(familyCode: string) {
   });
 }
 
+/**
+ * Relationship correction of a current member (family-membership.update).
+ * Never changes the household head; the API enforces that.
+ */
+export function useCorrectMemberRelationship(familyCode: string, personCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { relationship_type_id: number }) =>
+      apiClient.patch<ResourceResponse<FamilyMemberDetail>>(
+        `/api/v1/families/${encodeURIComponent(familyCode)}/members/${encodeURIComponent(personCode)}/relationship`,
+        payload
+      ),
+    onSuccess: () => invalidateMember(queryClient, personCode),
+  });
+}
+
+/**
+ * Ends a current, non-head membership (family-membership.end). The Person
+ * stays in the registry and the membership stays as history.
+ */
+export function useEndMembership(familyCode: string, personCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { reason: string }) =>
+      apiClient.post<{ message: string }>(
+        `/api/v1/families/${encodeURIComponent(familyCode)}/members/${encodeURIComponent(personCode)}/end`,
+        payload
+      ),
+    onSuccess: () => invalidateMember(queryClient, personCode),
+  });
+}
+
+function invalidateMember(queryClient: ReturnType<typeof useQueryClient>, personCode: string) {
+  // ["families"] prefix-matches the profile, its activity timeline and the
+  // registry.
+  queryClient.invalidateQueries({ queryKey: ["families"] });
+  queryClient.invalidateQueries({ queryKey: ["people", personCode] });
+  queryClient.invalidateQueries({ queryKey: ["people", "registry"] });
+}
+
 export function useUpdateFamilyResidence(familyCode: string) {
   const queryClient = useQueryClient();
 

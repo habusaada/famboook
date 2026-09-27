@@ -49,7 +49,8 @@ class FamilyController extends Controller
 
         $families = Family::query()
             ->with(['householdHeadMembership.person', 'clan:id,name', 'branch:id,name'])
-            ->withCount('memberships')
+            // Current members only; ended memberships are history.
+            ->withCount(['memberships' => fn ($q) => $q->where('is_active', true)])
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('families.status', $status))
             ->when($term !== '', fn ($q) => $q->where(fn ($w) => RegistrySearch::contains($w, 'families.family_code', $term)
                 ->orWhereIn('families.id', DB::table('family_memberships as sm')

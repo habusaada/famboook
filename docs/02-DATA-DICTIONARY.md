@@ -819,6 +819,10 @@ OTHER
 
 Death does not require deleting membership history.
 
+V1 (Pilot Readiness Slice C, docs/03 §93b): ending an incorrect membership
+stores the staff member's short free-text reason here (required, 3–255
+characters). It stays on the membership and is never copied into activity.
+
 ---
 
 # 15. Relationship Type
@@ -1012,6 +1016,12 @@ It may be set only when `displacement_status = DISPLACED`; otherwise it is
 
 V1 uses free text for both location fields. There are no governorate/city
 reference data for them; see PDD-006 for the geographic hierarchy.
+
+### governorate / city (V1)
+
+Optional (Pilot Readiness Slice C). `NULL` = not recorded — for example a
+paper form that gives only the displacement location. Never filled with a
+guessed value; displayed as "غير مسجّل".
 
 ---
 
@@ -2477,7 +2487,7 @@ holds no previous/new values.
 | `event_type` | yes | Canonical event code (see docs/03 §97a) |
 | `subject_type` | no | `family`, `person`, `residence`, `health_record`, `assessment`, `need` or `assistance_nominee` (also the subject of V1-B approval, delivery and listing events) |
 | `subject_id` | no | Internal id of the subject record |
-| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment, Need and nomination events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities) |
+| `metadata` | no | Allow-listed keys only. V1: `health_record_type` (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING). Assessment, Need and nomination events carry no metadata (no ratings, notes, descriptions, closure reasons or quantities); nor do the correction events (no relationships, ending reasons or National IDs, docs/03 §93b) |
 | `created_at` | yes | When the operation happened |
 
 There is no `updated_at`: entries are never modified.
@@ -3586,6 +3596,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.14 | 2026-09-27 | Approved | §14: V1 `end_reason` (required free-text correction reason); §19: governorate / city optional (NULL = not recorded); §61a: correction events carry no metadata |
 | 1.2.13 | 2026-09-26 | Approved | §10: `birth_date` optional at creation (NULL = unknown, no placeholder, UNKNOWN age band) |
 | 1.2.12 | 2026-09-26 | Approved | §40: V1 `users` fields including `is_active`; one Staff role per user |
 | 1.2.11 | 2026-09-25 | Approved | §75: approved Dashboard/Reports V1 age bands (derived, never stored) |

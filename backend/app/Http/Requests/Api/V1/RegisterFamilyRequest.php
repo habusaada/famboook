@@ -46,8 +46,11 @@ class RegisterFamilyRequest extends FormRequest
             ],
 
             'residence' => ['required', 'array'],
-            'residence.governorate' => ['required', 'string', 'max:255'],
-            'residence.city' => ['required', 'string', 'max:255'],
+            // Optional (Pilot Readiness Slice C): NULL = not recorded, e.g. a
+            // paper form that gives only the displacement location. Never
+            // filled with a guessed value. Free text (PDD-006 stays open).
+            'residence.governorate' => ['nullable', 'string', 'max:255'],
+            'residence.city' => ['nullable', 'string', 'max:255'],
             'residence.area' => ['nullable', 'string', 'max:255'],
             'residence.neighborhood' => ['nullable', 'string', 'max:255'],
             'residence.address_text' => ['nullable', 'string'],

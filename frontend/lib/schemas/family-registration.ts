@@ -29,8 +29,10 @@ export const familyRegistrationSchema = z.object({
   headAlternateMobile: z.string().optional(),
   headAlternateMobileOwnerRelation: z.string().optional(),
 
-  governorate: z.string().min(1, "المحافظة مطلوبة"),
-  city: z.string().min(1, "المدينة مطلوبة"),
+  // Optional: empty = not recorded (NULL), never a guessed value — e.g. a
+  // paper form that gives only the displacement location.
+  governorate: z.string().max(255, "النص طويل جدًا").optional(),
+  city: z.string().max(255, "النص طويل جدًا").optional(),
   area: z.string().optional(),
   neighborhood: z.string().optional(),
   addressText: z.string().optional(),
@@ -71,8 +73,8 @@ export function toRegisterFamilyPayload(
         : null,
     },
     residence: {
-      governorate: values.governorate,
-      city: values.city,
+      governorate: values.governorate?.trim() || null,
+      city: values.city?.trim() || null,
       area: values.area || null,
       neighborhood: values.neighborhood || null,
       address_text: values.addressText || null,
