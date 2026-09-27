@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNeedCategories } from "@/lib/api/reference";
+import { cn } from "@/lib/utils";
 import type { NeedFilters as Filters, NeedPriority, NeedStatus } from "@/lib/types/api/need";
 import {
   FAMILY_TARGET_LABEL,
@@ -25,15 +26,17 @@ function FilterSelect({
   value,
   onChange,
   options,
+  triggerClassName,
 }: {
   label: string;
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   options: { value: string; label: string }[];
+  triggerClassName?: string;
 }) {
   return (
     <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? undefined : v)}>
-      <SelectTrigger size="sm" aria-label={label} className="min-w-36">
+      <SelectTrigger size="sm" aria-label={label} className={cn("min-w-36", triggerClassName)}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -52,10 +55,13 @@ export function NeedFilterBar({
   filters,
   onChange,
   showTarget = false,
+  triggerClassName,
 }: {
   filters: Filters;
   onChange: (filters: Filters) => void;
   showTarget?: boolean;
+  /** Optional trigger styling (the /needs workspace toolbar); defaults unchanged. */
+  triggerClassName?: string;
 }) {
   const categories = useNeedCategories().data?.data ?? [];
 
@@ -65,18 +71,21 @@ export function NeedFilterBar({
         label="الحالة"
         value={filters.status}
         onChange={(v) => onChange({ ...filters, status: v as NeedStatus | undefined })}
+        triggerClassName={triggerClassName}
         options={NEED_STATUSES.map((s) => ({ value: s, label: needStatusLabels[s] }))}
       />
       <FilterSelect
         label="الأولوية"
         value={filters.priority}
         onChange={(v) => onChange({ ...filters, priority: v as NeedPriority | undefined })}
+        triggerClassName={triggerClassName}
         options={[...NEED_PRIORITIES].reverse().map((p) => ({ value: p, label: needPriorityLabels[p] }))}
       />
       <FilterSelect
         label="التصنيف"
         value={filters.category}
         onChange={(v) => onChange({ ...filters, category: v })}
+        triggerClassName={triggerClassName}
         options={categories.map((c) => ({ value: c.code, label: c.name }))}
       />
       {showTarget && (
@@ -84,6 +93,7 @@ export function NeedFilterBar({
           label="المستفيد"
           value={filters.target}
           onChange={(v) => onChange({ ...filters, target: v as Filters["target"] })}
+          triggerClassName={triggerClassName}
           options={[
             { value: "family", label: FAMILY_TARGET_LABEL },
             { value: "person", label: "فرد من الأسرة" },
