@@ -1,0 +1,120 @@
+# Famboook Pilot — Nginx TEMPLATE (docs/08-PILOT-DEPLOYMENT.md §9).
+# Placeholders: <CERT_PATH>, <KEY_PATH>, <PHP_FPM_SOCKET>, /var/www/famboook.
+# TLS is terminated here. Laravel runs on PHP-FPM through FastCGI, so it sees
+# HTTPS=on and the real client address directly: Laravel trusts NO proxy
+# headers (no TrustProxies needed, X-Forwarded-For cannot be spoofed).
+# Next.js listens on 127.0.0.1:3000 only.
+
+# ---------------------------------------------------------------- HTTP → HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name famboook.com api.famboook.com admin.famboook.com;
+    return 301 https://$host$request_uri;
+}
+
+# Shared TLS / header settings (repeat or move into an include).
+# ssl_protocols TLSv1.2 TLSv1.3;  ssl_prefer_server_ciphers off;
+
+# ---------------------------------------------------------------- Staff Portal
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name famboook.com;
+
+    ssl_certificate     <CERT_PATH>;
+    ssl_certificate_key <KEY_PATH>;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 1m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+
+# ---------------------------------------------------------------- Laravel API
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name api.famboook.com;
+
+    ssl_certificate     <CERT_PATH>;
+    ssl_certificate_key <KEY_PATH>;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    root /var/www/famboook/backend/public;
+    index index.php;
+    client_max_body_size 2m;
+
+    # Only the API surface is served on this host.
+    location ^~ /api/ { try_files $uri /index.php?$query_string; }
+    location = /sanctum/csrf-cookie { try_files $uri /index.php?$query_string; }
+    location = /up { try_files $uri /index.php?$query_string; }
+    location / { return 404; }
+
+    location = /index.php {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+        fastcgi_pass unix:<PHP_FPM_SOCKET>;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~ /\.(?!well-known) { deny all; }
+}
+
+# ---------------------------------------------------------------- Filament
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name admin.famboook.com;
+
+    ssl_certificate     <CERT_PATH>;
+    ssl_certificate_key <KEY_PATH>;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    root /var/www/famboook/backend/public;
+    index index.php;
+    client_max_body_size 2m;
+
+    location = / { return 302 /admin; }
+    # The Staff API is not served on the admin host.
+    location ^~ /api/ { return 404; }
+    location ^~ /sanctum/ { return 404; }
+
+    # Filament pages, Livewire endpoints and published Filament assets.
+    location / { try_files $uri $uri/ /index.php?$query_string; }
+
+    location = /index.php {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+        fastcgi_pass unix:<PHP_FPM_SOCKET>;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~ \.php$ { return 404; }
+    location ~ /\.(?!well-known) { deny all; }
+}

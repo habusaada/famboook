@@ -55,6 +55,14 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Host serving Filament (System / High Administration), e.g.
+    | admin.famboook.com (docs/08). When set, the panel answers only on that
+    | host; when empty (local development, tests) it answers on any host.
+    */
+
+    'admin_domain' => env('ADMIN_DOMAIN'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

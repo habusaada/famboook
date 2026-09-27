@@ -58,7 +58,7 @@ class RolePermissionSeeder extends Seeder
     /**
      * Canonical roles, exactly as documented in docs/06-PERMISSIONS.md §14 / §61.
      */
-    private const ROLES = [
+    public const ROLES = [
         'SUPER_ADMIN',
         'ADMINISTRATOR',
         'DATA_ENTRY',
@@ -72,7 +72,7 @@ class RolePermissionSeeder extends Seeder
      * Canonical permission catalog, derived from docs/06-PERMISSIONS.md.
      * Grouped by the document section each permission set comes from.
      */
-    private const PERMISSIONS = [
+    public const PERMISSIONS = [
         // §43 Family Permissions
         'family.view',
         'family.create',
@@ -272,7 +272,7 @@ class RolePermissionSeeder extends Seeder
      * matrix row / role-specific text at all. See the RBAC review conducted
      * 2026-09-22 for the full list of deliberately unresolved assignments.
      */
-    private const ROLE_PERMISSIONS = [
+    public const ROLE_PERMISSIONS = [
         'SUPER_ADMIN' => [
             // Filament ✓
             'system-admin.access',

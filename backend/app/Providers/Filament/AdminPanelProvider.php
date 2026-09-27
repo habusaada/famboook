@@ -35,6 +35,9 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // Pilot: only on admin.famboook.com (ADMIN_DOMAIN), never on the
+            // API host. Empty locally, so /admin works on any host there.
+            ->domain(config('app.admin_domain'))
             ->login()
             ->brandName('Famboook — الإدارة')
             ->colors([

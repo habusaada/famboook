@@ -2691,6 +2691,19 @@ Operational SOPs updated
 Production rollout approved
 ```
 
+## Progress
+
+2026-09-27: **Pilot Readiness Slice D — Production Pilot Environment**
+prepared in the repository (docs/08-PILOT-DEPLOYMENT.md, docs/09-PILOT-SOP.md,
+`deploy/`): environment templates, `.famboook.com` cookie / Sanctum / CORS
+decision, Filament bound to `ADMIN_DOMAIN`, `famboook:verify-permissions` run
+on every deployment, frontend `/dev-login` 404 and build-time API URL guard,
+Nginx/backup/restore templates, checklist. **Still open (server side):**
+provisioning, TLS, database preflight, first SUPER_ADMIN, Staff accounts,
+first backup and a passed restore test, smoke test — all required before
+real data.
+
+
 ---
 
 # 42. Phase 30 — Production Rollout
@@ -4668,6 +4681,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.11 | 2026-09-27 | Approved | Phase 29 progress note: Pilot Readiness Slice D (production Pilot environment preparation; server-side steps outstanding) |
 | 1.2.10 | 2026-09-27 | Approved | Phase 9 progress note: Pilot Readiness Slice C (data-entry corrections: relationship, membership ending, National ID correction and masking, optional governorate/city) |
 | 1.2.9 | 2026-09-26 | Approved | Phase 20 progress note: Pilot Readiness Slice B (registry search, exact National ID duplicate prevention, optional date of birth) |
 | 1.2.8 | 2026-09-26 | Approved | Phase 4 progress note: Pilot Readiness Slice A (real Staff authentication and Staff access) |

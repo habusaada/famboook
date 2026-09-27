@@ -21,8 +21,11 @@ permissions, workflows, or major features, read the relevant documents:
 - `docs/05-WORKFLOWS.md`
 - `docs/06-PERMISSIONS.md`
 - `docs/07-ROADMAP.md`
+- `docs/08-PILOT-DEPLOYMENT.md`
+- `docs/09-PILOT-SOP.md`
 
-Treat these documents as the approved Famboook Architecture Baseline v1.2.
+Treat these documents as the approved Famboook Architecture Baseline v1.2
+(08 and 09 are the approved Pilot deployment and operating procedures).
 
 If an implementation request conflicts with the documentation:
 
