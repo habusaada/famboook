@@ -4,17 +4,9 @@ import { useState } from "react";
 import { Controller, useForm, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { cn } from "cn";
-import { Search, UserPlus } from "lucide-react";
+import { Filter, Search, SearchX, UserPlus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,8 +24,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FieldError, FieldLabel, SaveError } from "@/components/shared/edit-dialog-parts";
-import { AssessmentRatingBadge } from "@/components/assessments/assessment-badges";
-import { NeedPriorityBadge } from "@/components/needs/need-badges";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Code, SectionHeader } from "@/components/shared/page-layout";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { AssessmentRatingTag } from "@/components/assessments/assessment-case";
+import { NeedPriorityTag } from "@/components/needs/need-case";
 import { useNominateFromTargeting, useTargetingPreview } from "@/lib/api/assistances";
 import { ApiError } from "@/lib/api/client";
 import { useAssessmentDomains, useNeedCategories } from "@/lib/api/reference";
@@ -77,7 +73,7 @@ function SelectField({
         name={name}
         render={({ field }) => (
           <Select value={field.value || ANY} onValueChange={(v) => field.onChange(v === ANY ? "" : v)}>
-            <SelectTrigger id={`targeting-${name}`}>
+            <SelectTrigger id={`targeting-${name}`} className="w-full bg-surface-2">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -124,7 +120,7 @@ function Chips({
                   onClick={() => field.onChange(on ? field.value.filter((v) => v !== o.value) : [...field.value, o.value])}
                   className={cn(
                     "h-7 rounded-md border px-2.5 text-xs transition-colors",
-                    on ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"
+                    on ? "border-brand-700/40 bg-brand-50 font-semibold text-brand-800" : "border-stroke-subtle bg-surface-1 text-muted-foreground hover:bg-surface-hover"
                   )}
                 >
                   {o.label}
@@ -148,18 +144,18 @@ const TRI = [
 function Indicators({ match }: { match: TargetingMatch }) {
   const chips: React.ReactNode[] = [];
   if (match.indicators.children_under_two !== undefined) {
-    chips.push(<Badge key="u2" variant="secondary">أطفال دون سنتين: {match.indicators.children_under_two}</Badge>);
+    chips.push(<StatusBadge key="u2" tone="neutral">أطفال دون سنتين: {match.indicators.children_under_two}</StatusBadge>);
   }
   for (const [key, label] of Object.entries(targetingIndicatorLabels)) {
     if (match.indicators[key as keyof typeof targetingIndicatorLabels]) {
-      chips.push(<Badge key={key} variant="secondary">{label}</Badge>);
+      chips.push(<StatusBadge key={key} tone="neutral">{label}</StatusBadge>);
     }
   }
   if (match.matching_need) {
     chips.push(
       <span key="need" className="inline-flex items-center gap-1 text-xs">
         احتياج {match.matching_need.category.name} مفتوح:
-        <NeedPriorityBadge priority={match.matching_need.priority} />
+        <NeedPriorityTag priority={match.matching_need.priority} />
       </span>
     );
   }
@@ -167,7 +163,7 @@ function Indicators({ match }: { match: TargetingMatch }) {
     chips.push(
       <span key="assessment" className="inline-flex items-center gap-1 text-xs">
         تقييم {match.matching_assessment.domain.name}:
-        <AssessmentRatingBadge rating={match.matching_assessment.rating} />
+        <AssessmentRatingTag rating={match.matching_assessment.rating} />
       </span>
     );
   }
@@ -202,11 +198,17 @@ export function AssistanceTargetingTab({
 
   if (!abilities.preview) {
     return (
-      <p className="rounded-lg border border-dashed p-12 text-center text-sm text-muted-foreground">
-        {assistance.status === "DRAFT" || assistance.status === "OPEN"
-          ? "لا تملك صلاحية معاينة الاستهداف."
-          : "الاستهداف غير متاح في حالة المساعدة الحالية."}
-      </p>
+      <AppCard padded={false}>
+        <EmptyState
+          icon={Filter}
+          title={
+            assistance.status === "DRAFT" || assistance.status === "OPEN"
+              ? "لا تملك صلاحية معاينة الاستهداف."
+              : "الاستهداف غير متاح في حالة المساعدة الحالية."
+          }
+          description={assistance.status === "COMPLETED" ? "المساعدة مكتملة؛ الترشيحات السابقة تظهر في تبويب المرشحين." : undefined}
+        />
+      </AppCard>
     );
   }
 
@@ -255,14 +257,13 @@ export function AssistanceTargetingTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>معايير الاستهداف</CardTitle>
-          <CardDescription>
-            تُطبَّق جميع المعايير المحددة معًا (و). الحقول الفارغة لا تُقيّد النتائج. المعاينة لا تحفظ شيئًا ولا ترشّح أحدًا.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <AppCard aria-labelledby="targeting-criteria-title">
+        <SectionHeader
+          icon={Filter}
+          title={<span id="targeting-criteria-title">١. معايير الاستهداف</span>}
+          description="تُطبَّق جميع المعايير المحددة معًا (و). الحقول الفارغة لا تُقيّد النتائج. المعاينة لا تحفظ شيئًا ولا ترشّح أحدًا."
+        />
+        <div className="mt-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -275,7 +276,7 @@ export function AssistanceTargetingTab({
             className="flex flex-col gap-5"
           >
             <section className="grid gap-3 sm:grid-cols-4">
-              <h3 className="text-sm font-medium sm:col-span-4">حجم الأسرة (الأفراد النشطون الأحياء)</h3>
+              <h3 className="text-[13px] font-semibold text-foreground sm:col-span-4">حجم الأسرة (الأفراد النشطون الأحياء)</h3>
               <div className="flex flex-col gap-1.5">
                 <FieldLabel htmlFor="targeting-min">الحد الأدنى</FieldLabel>
                 <Input id="targeting-min" inputMode="numeric" dir="ltr" className="text-end" {...register("minMembers")} />
@@ -288,8 +289,8 @@ export function AssistanceTargetingTab({
               </div>
             </section>
 
-            <section className="grid gap-3 border-t pt-4 sm:grid-cols-4">
-              <h3 className="text-sm font-medium sm:col-span-4">النزوح</h3>
+            <section className="grid gap-3 border-t border-stroke-subtle pt-4 sm:grid-cols-4">
+              <h3 className="text-[13px] font-semibold text-foreground sm:col-span-4">النزوح</h3>
               <SelectField
                 control={control}
                 name="displacement"
@@ -308,8 +309,8 @@ export function AssistanceTargetingTab({
               </div>
             </section>
 
-            <section className="grid gap-3 border-t pt-4 sm:grid-cols-4">
-              <h3 className="text-sm font-medium sm:col-span-4">الفئات</h3>
+            <section className="grid gap-3 border-t border-stroke-subtle pt-4 sm:grid-cols-4">
+              <h3 className="text-[13px] font-semibold text-foreground sm:col-span-4">الفئات</h3>
               <SelectField control={control} name="childUnderTwo" label="طفل دون سنتين" options={TRI} />
               <div className="flex flex-col gap-1.5">
                 <FieldLabel htmlFor="targeting-min-children" optional>
@@ -324,8 +325,8 @@ export function AssistanceTargetingTab({
               <SelectField control={control} name="chronic" label="يوجد مرض مزمن" options={TRI} />
             </section>
 
-            <section className="grid gap-3 border-t pt-4 sm:grid-cols-2">
-              <h3 className="text-sm font-medium sm:col-span-2">الاحتياجات المفتوحة</h3>
+            <section className="grid gap-3 border-t border-stroke-subtle pt-4 sm:grid-cols-2">
+              <h3 className="text-[13px] font-semibold text-foreground sm:col-span-2">الاحتياجات المفتوحة</h3>
               <SelectField
                 control={control}
                 name="needCategory"
@@ -341,8 +342,8 @@ export function AssistanceTargetingTab({
               />
             </section>
 
-            <section className="grid gap-3 border-t pt-4 sm:grid-cols-2">
-              <h3 className="text-sm font-medium sm:col-span-2">
+            <section className="grid gap-3 border-t border-stroke-subtle pt-4 sm:grid-cols-2">
+              <h3 className="text-[13px] font-semibold text-foreground sm:col-span-2">
                 التقييم <span className="font-normal text-muted-foreground">(آخر تقييم مكتمل قيّم هذا المجال)</span>
               </h3>
               <div className="flex flex-col gap-1.5">
@@ -363,15 +364,15 @@ export function AssistanceTargetingTab({
               />
             </section>
 
-            <div className="flex justify-end border-t pt-4">
+            <div className="flex justify-end border-t border-stroke-subtle pt-4">
               <Button type="submit" disabled={preview.isPending}>
                 <Search className="size-4" />
                 {preview.isPending ? "جارٍ المعاينة..." : "معاينة الأسر المطابقة"}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </AppCard>
 
       <SaveError message={error} />
       {message && (
@@ -381,117 +382,147 @@ export function AssistanceTargetingTab({
       )}
 
       {result && (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>عدد الأسر المطابقة: {result.meta.total}</CardTitle>
-            <CardDescription>
-              {abilities.nominate
-                ? "اختر الأسر المراد ترشيحها. لا تُرشَّح أي أسرة تلقائيًا."
-                : "افتح المساعدة لإضافة مرشحين."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 p-0">
-            {rows.length > 0 && (
-              <div className="overflow-x-auto border-t">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-0">
+        <AppCard padded={false} className="overflow-hidden" aria-labelledby="targeting-results-title">
+          <div className="px-4 pt-4 pb-3 sm:px-5">
+            <SectionHeader
+              icon={Search}
+              tone="info"
+              title={
+                <span id="targeting-results-title">
+                  ٢. الأسر المطابقة: <bdi className="tabular-nums">{result.meta.total}</bdi>
+                </span>
+              }
+              description={
+                abilities.nominate
+                  ? "مطابقة المعايير لا تعني الترشيح ولا الاستلام. اختر الأسر المراد ترشيحها — لا تُرشَّح أي أسرة تلقائيًا."
+                  : "مطابقة المعايير لا تعني الترشيح. افتح المساعدة لإضافة مرشحين."
+              }
+            />
+          </div>
+          {rows.length === 0 ? (
+            <EmptyState icon={SearchX} title="لا توجد أسر مطابقة لهذه المعايير" className="border-t border-stroke-subtle py-8" />
+          ) : (
+            <>
+              <Table className="hidden border-t border-stroke-subtle lg:table">
+                <TableHeader className="bg-surface-1">
+                  <TableRow className="border-stroke-subtle hover:bg-transparent">
+                    <TableHead className="w-0 ps-5">
+                      <input
+                        type="checkbox"
+                        aria-label="تحديد أسر هذه الصفحة"
+                        className="size-4 accent-brand-700"
+                        disabled={!abilities.nominate || selectable.length === 0}
+                        checked={pageAllSelected}
+                        onChange={() => {
+                          const next = new Set(selected);
+                          for (const r of selectable) {
+                            if (pageAllSelected) next.delete(r.family_code);
+                            else next.add(r.family_code);
+                          }
+                          setSelected(next);
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead className="text-xs text-muted-foreground">الأسرة</TableHead>
+                    <TableHead className="text-xs text-muted-foreground">الأفراد</TableHead>
+                    <TableHead className="text-xs text-muted-foreground">النزوح</TableHead>
+                    <TableHead className="text-xs text-muted-foreground">مؤشرات المطابقة</TableHead>
+                    <TableHead className="pe-5 text-xs text-muted-foreground">الترشيح</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.family_code} data-match={r.family_code} className="border-stroke-subtle">
+                      <TableCell className="ps-5">
                         <input
                           type="checkbox"
-                          aria-label="تحديد أسر هذه الصفحة"
-                          className="size-4 accent-primary"
-                          disabled={!abilities.nominate || selectable.length === 0}
-                          checked={pageAllSelected}
-                          onChange={() => {
-                            const next = new Set(selected);
-                            for (const r of selectable) {
-                              if (pageAllSelected) next.delete(r.family_code);
-                              else next.add(r.family_code);
-                            }
-                            setSelected(next);
-                          }}
+                          aria-label={`تحديد ${r.family_code}`}
+                          className="size-4 accent-brand-700"
+                          disabled={!abilities.nominate || r.already_nominated}
+                          checked={selected.has(r.family_code)}
+                          onChange={() => toggle(r.family_code)}
                         />
-                      </TableHead>
-                      <TableHead>الأسرة</TableHead>
-                      <TableHead>الأفراد</TableHead>
-                      <TableHead>النزوح</TableHead>
-                      <TableHead>مؤشرات المطابقة</TableHead>
-                      <TableHead>الترشيح</TableHead>
+                      </TableCell>
+                      <TableCell>
+                        <Code className="font-semibold text-brand-800">{r.family_code}</Code>
+                        {r.household_head_name && <span className="block text-xs text-muted-foreground">{r.household_head_name}</span>}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{r.member_count}</TableCell>
+                      <TableCell className="text-xs">
+                        {r.displacement?.status ? displacementStatusLabel(r.displacement.status) : "—"}
+                        {r.displacement?.location_text && <span className="block text-muted-foreground">{r.displacement.location_text}</span>}
+                      </TableCell>
+                      <TableCell>
+                        <Indicators match={r} />
+                      </TableCell>
+                      <TableCell className="pe-5">
+                        {r.already_nominated ? <StatusBadge tone="brand">مرشحة مسبقًا</StatusBadge> : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((r) => (
-                      <TableRow key={r.family_code} data-match={r.family_code}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            aria-label={`تحديد ${r.family_code}`}
-                            className="size-4 accent-primary"
-                            disabled={!abilities.nominate || r.already_nominated}
-                            checked={selected.has(r.family_code)}
-                            onChange={() => toggle(r.family_code)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <span dir="ltr" className="font-medium">{r.family_code}</span>
-                          {r.household_head_name && (
-                            <span className="block text-xs text-muted-foreground">{r.household_head_name}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="tabular-nums">{r.member_count}</TableCell>
-                        <TableCell className="text-xs">
-                          {r.displacement?.status ? displacementStatusLabel(r.displacement.status) : "—"}
-                          {r.displacement?.location_text && (
-                            <span className="block text-muted-foreground">{r.displacement.location_text}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Indicators match={r} />
-                        </TableCell>
-                        <TableCell>
-                          {r.already_nominated ? <Badge variant="outline">مرشحة مسبقًا</Badge> : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                  ))}
+                </TableBody>
+              </Table>
+              <ul className="divide-y divide-stroke-subtle border-t border-stroke-subtle lg:hidden" aria-label="الأسر المطابقة">
+                {rows.map((r) => (
+                  <li key={r.family_code} className="flex gap-3 px-4 py-3" data-match={r.family_code}>
+                    <input
+                      type="checkbox"
+                      aria-label={`تحديد ${r.family_code}`}
+                      className="mt-1 size-4 accent-brand-700"
+                      disabled={!abilities.nominate || r.already_nominated}
+                      checked={selected.has(r.family_code)}
+                      onChange={() => toggle(r.family_code)}
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <Code className="font-semibold text-brand-800">{r.family_code}</Code>
+                        {r.already_nominated && <StatusBadge tone="brand">مرشحة مسبقًا</StatusBadge>}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {r.household_head_name ?? "رب الأسرة غير محدد"} · {r.member_count} أفراد
+                        {r.displacement?.status ? ` · ${displacementStatusLabel(r.displacement.status)}` : ""}
+                      </span>
+                      <Indicators match={r} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={preview.isPending || result.meta.current_page <= 1 || !criteria}
-                  onClick={() => criteria && run(criteria, result.meta.current_page - 1)}
-                >
-                  السابق
-                </Button>
-                <span>
-                  صفحة {result.meta.current_page} من {Math.max(result.meta.last_page, 1)}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={preview.isPending || result.meta.current_page >= result.meta.last_page || !criteria}
-                  onClick={() => criteria && run(criteria, result.meta.current_page + 1)}
-                >
-                  التالي
-                </Button>
-              </div>
-              {abilities.nominate && (
-                <Button type="button" disabled={selected.size === 0 || nominate.isPending} onClick={nominateSelected}>
-                  <UserPlus className="size-4" />
-                  {nominate.isPending ? "جارٍ الإضافة..." : `إضافة المحددين كمرشحين (${selected.size})`}
-                </Button>
-              )}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stroke-subtle px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={preview.isPending || result.meta.current_page <= 1 || !criteria}
+                onClick={() => criteria && run(criteria, result.meta.current_page - 1)}
+              >
+                السابق
+              </Button>
+              <span>
+                صفحة <bdi className="tabular-nums">{result.meta.current_page}</bdi> من{" "}
+                <bdi className="tabular-nums">{Math.max(result.meta.last_page, 1)}</bdi>
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={preview.isPending || result.meta.current_page >= result.meta.last_page || !criteria}
+                onClick={() => criteria && run(criteria, result.meta.current_page + 1)}
+              >
+                التالي
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+            {abilities.nominate && (
+              <Button type="button" disabled={selected.size === 0 || nominate.isPending} onClick={nominateSelected}>
+                <UserPlus className="size-4" />
+                {nominate.isPending ? "جارٍ الإضافة..." : `إضافة المحددين كمرشحين (${selected.size})`}
+              </Button>
+            )}
+          </div>
+        </AppCard>
       )}
     </div>
   );

@@ -1,18 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertTriangle, ArrowDown, ArrowUp, Download, Eye, FileSpreadsheet, Plus, Save, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Columns3, Download, Eye, FileSpreadsheet, Plus, Save, Send, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +31,10 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldLabel, SaveError } from "@/components/shared/edit-dialog-parts";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { SectionHeader } from "@/components/shared/page-layout";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   downloadBeneficiaryList,
   useBeneficiaryList,
@@ -79,9 +74,10 @@ function errorText(e: unknown, fallback: string): string {
 
 function ClassificationBadge({ classification }: { classification: ExportClassification }) {
   return (
-    <Badge variant={classification === "SENSITIVE" ? "destructive" : "outline"} className="font-normal">
+    <StatusBadge tone={classification === "SENSITIVE" ? "danger" : classification === "CONTACT" ? "warning" : "neutral"}>
+      <span className="sr-only">التصنيف: </span>
       {exportClassificationLabels[classification]}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -129,24 +125,22 @@ function FieldEditor({
   }
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>بيانات الكشف المطلوبة</CardTitle>
-        <CardDescription>
-          الأعمدة التي طلبتها الجهة في كشف المستفيدين، بالترتيب والتسمية المطلوبين. هذه ليست معايير استهداف:
-          تحدد فقط البيانات التي تُرسل عن المستفيدين المعتمدين.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <AppCard aria-labelledby="export-fields-title">
+      <SectionHeader
+        icon={Columns3}
+        title={<span id="export-fields-title">١. بيانات الكشف المطلوبة</span>}
+        description="الأعمدة التي طلبتها الجهة في كشف المستفيدين، بالترتيب والتسمية المطلوبين. هذه ليست معايير استهداف: تحدد فقط البيانات التي تُرسل عن المستفيدين المعتمدين."
+      />
+      <div className="mt-4 flex flex-col gap-3">
         <SaveError message={error} />
         {fields.length === 0 ? (
-          <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">لم تُحدد أي أعمدة بعد.</p>
+          <p className="rounded-lg border border-dashed border-stroke-subtle p-6 text-center text-sm text-muted-foreground">لم تُحدد أي أعمدة بعد.</p>
         ) : (
           <ol className="flex flex-col gap-2">
             {fields.map((field, index) => {
               const meta = byKey.get(field.field_key);
               return (
-                <li key={field.field_key} data-export-field={field.field_key} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+                <li key={field.field_key} data-export-field={field.field_key} className="flex flex-wrap items-center gap-2 rounded-lg border border-stroke-subtle bg-surface-1 p-2">
                   <span className="w-6 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
                   <Input
                     aria-label={`اسم عمود ${meta?.default_label ?? field.field_key}`}
@@ -186,7 +180,7 @@ function FieldEditor({
         )}
 
         {canConfigure && (
-          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+          <div className="flex flex-wrap items-center gap-2 border-t border-stroke-subtle pt-3">
             <Select value={adding} onValueChange={setAdding}>
               <SelectTrigger aria-label="حقل جديد" className="min-w-56">
                 <SelectValue placeholder="اختر حقلًا لإضافته" />
@@ -236,8 +230,8 @@ function FieldEditor({
           </div>
         )}
         {saved && <p className="text-xs text-muted-foreground">تم حفظ بيانات الكشف.</p>}
-      </CardContent>
-    </Card>
+      </div>
+    </AppCard>
   );
 }
 
@@ -286,21 +280,22 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
   }
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>معاينة وإصدار الكشف</CardTitle>
-        <CardDescription>المعاينة تعرض البيانات الحالية للمستفيدين المعتمدين ولا تحفظ شيئًا. الإصدار ينشئ نسخة ثابتة لا تتغير.</CardDescription>
+    <AppCard padded={false} className="overflow-hidden" aria-labelledby="list-issue-title">
+      <div className="flex flex-col gap-3 px-4 pt-4 pb-3 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+        <SectionHeader
+          icon={Send}
+          title={<span id="list-issue-title">٢. معاينة وإصدار الكشف</span>}
+          description="المعاينة تعرض البيانات الحالية للمستفيدين المعتمدين ولا تحفظ شيئًا. الإصدار ينشئ نسخة ثابتة لا تتغير."
+        />
         {assistance.status === "OPEN" && (
-          <CardAction>
-            <Button type="button" size="sm" variant="outline" disabled={!!disabledReason || preview.isPending} onClick={runPreview}>
-              <Eye className="size-4" />
-              {preview.isPending ? "جارٍ المعاينة..." : "معاينة الكشف"}
-            </Button>
-          </CardAction>
+          <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={!!disabledReason || preview.isPending} onClick={runPreview}>
+            <Eye className="size-4" />
+            {preview.isPending ? "جارٍ المعاينة..." : "معاينة الكشف"}
+          </Button>
         )}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 p-0">
-        <div className="flex flex-col gap-2 px-4">
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 px-4 sm:px-5">
           {disabledReason && <p className="text-xs text-muted-foreground">{disabledReason}</p>}
           <SaveError message={error} />
           {issued && (
@@ -312,7 +307,7 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
 
         {data && (
           <>
-            <div className="flex flex-wrap items-center gap-3 px-4 text-sm">
+            <div className="flex flex-wrap items-center gap-3 px-4 text-sm sm:px-5">
               <span className="font-medium">عدد السجلات: {data.row_count}</span>
               <span className="text-muted-foreground">المحدد للإصدار: {selectedIds.length}</span>
               {data.contains_sensitive && (
@@ -323,9 +318,9 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
               )}
             </div>
             {data.rows.length === 0 ? (
-              <p className="border-t p-8 text-center text-sm text-muted-foreground">لا يوجد مستفيدون معتمدون لإصدارهم.</p>
+              <p className="border-t border-stroke-subtle p-8 text-center text-sm text-muted-foreground">لا يوجد مستفيدون معتمدون لإصدارهم.</p>
             ) : (
-              <div className="overflow-x-auto border-t">
+              <div className="overflow-x-auto border-t border-stroke-subtle">
                 <Table data-list-preview>
                   <TableHeader>
                     <TableRow>
@@ -366,7 +361,7 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
               </div>
             )}
             {data.rows.length > 0 && (
-              <div className="grid gap-3 border-t px-4 py-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+              <div className="grid gap-3 border-t border-stroke-subtle px-4 py-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:px-5">
                 <div className="flex flex-col gap-1.5">
                   <FieldLabel htmlFor="list-recipient">الجهة المستلمة للكشف</FieldLabel>
                   <Input id="list-recipient" value={recipient} onChange={(e) => setRecipient(e.target.value)} />
@@ -385,7 +380,7 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
             )}
           </>
         )}
-      </CardContent>
+      </div>
 
       <Dialog open={confirming} onOpenChange={(next) => !issue.isPending && setConfirming(next)}>
         <DialogContent>
@@ -412,7 +407,7 @@ function IssueSection({ assistance, disabledReason }: { assistance: Assistance; 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </AppCard>
   );
 }
 
@@ -421,8 +416,13 @@ export function AssistanceExportTab({ assistance, abilities }: { assistance: Ass
   const { data, isLoading, isError } = useExportFields(assistance.id, true);
   const [dirty, setDirty] = useState(false);
 
-  if (isLoading) return <Skeleton className="h-48" />;
-  if (isError || !data) return <p className="text-sm text-muted-foreground">تعذّر تحميل بيانات الكشف.</p>;
+  if (isLoading) return <Skeleton className="h-48 rounded-widget" />;
+  if (isError || !data)
+    return (
+      <AppCard padded={false}>
+        <EmptyState icon={FileSpreadsheet} title="تعذّر تحميل بيانات الكشف." />
+      </AppCard>
+    );
 
   const configured = data.data.configuration.length > 0;
   const disabledReason = !abilities.export
@@ -519,76 +519,102 @@ export function AssistanceIssuedListsTab({ assistance, abilities }: { assistance
   const lists = data?.data ?? [];
   const canOpen = (l: BeneficiaryList) => abilities.export && (!l.contains_sensitive || abilities.export_sensitive);
 
+  const actions = (l: BeneficiaryList) =>
+    canOpen(l) ? (
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => setViewing(l)} aria-label={`عرض الكشف ${l.list_number}`}>
+          <Eye className="size-4" />
+          عرض
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8"
+          aria-label={`تنزيل الكشف ${l.list_number} بصيغة XLSX`}
+          onClick={async () => {
+            setError(null);
+            const status = await downloadBeneficiaryList(l);
+            if (status) setError(status === 403 ? "لا تملك صلاحية تنزيل هذا الكشف." : "تعذّر تنزيل الملف.");
+          }}
+        >
+          <Download className="size-4" />
+          تنزيل XLSX
+        </Button>
+      </div>
+    ) : null;
+
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>الكشوف الصادرة</CardTitle>
-        <CardDescription>كل كشف نسخة ثابتة لما أُرسل للجهة. الإصدار يعني &quot;تم إصدار الكشف للجهة&quot; فقط، وليس التسليم.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 p-0">
-        <div className="px-4">
+    <AppCard padded={false} className="overflow-hidden" aria-labelledby="issued-lists-title">
+      <div className="px-4 pt-4 pb-3 sm:px-5">
+        <SectionHeader
+          icon={FileSpreadsheet}
+          title={<span id="issued-lists-title">الكشوف الصادرة</span>}
+          description='كل كشف نسخة ثابتة لما أُرسل للجهة. الإصدار يعني "تم إصدار الكشف للجهة" فقط، وليس التسليم.'
+        />
+      </div>
+      {error && (
+        <div className="px-4 pb-3 sm:px-5">
           <SaveError message={error} />
         </div>
-        {isLoading ? (
-          <Skeleton className="mx-4 mb-4 h-24" />
-        ) : lists.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 border-t p-12 text-center">
-            <FileSpreadsheet className="size-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">لم يُصدر أي كشف بعد.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto border-t">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>رقم الكشف</TableHead>
-                  <TableHead>الجهة المستلمة</TableHead>
-                  <TableHead>تاريخ الإصدار</TableHead>
-                  <TableHead>بواسطة</TableHead>
-                  <TableHead>عدد السجلات</TableHead>
-                  <TableHead>بيانات حساسة</TableHead>
-                  <TableHead className="w-0" />
+      )}
+      {isLoading ? (
+        <div className="border-t border-stroke-subtle p-4">
+          <Skeleton className="h-24" />
+        </div>
+      ) : lists.length === 0 ? (
+        <EmptyState icon={FileSpreadsheet} title="لم يُصدر أي كشف بعد" className="border-t border-stroke-subtle" />
+      ) : (
+        <>
+          <Table className="hidden border-t border-stroke-subtle lg:table">
+            <TableHeader className="bg-surface-1">
+              <TableRow className="border-stroke-subtle hover:bg-transparent">
+                <TableHead className="ps-5 text-xs text-muted-foreground">رقم الكشف</TableHead>
+                <TableHead className="text-xs text-muted-foreground">الجهة المستلمة</TableHead>
+                <TableHead className="text-xs text-muted-foreground">تاريخ الإصدار</TableHead>
+                <TableHead className="text-xs text-muted-foreground">بواسطة</TableHead>
+                <TableHead className="text-xs text-muted-foreground">عدد السجلات</TableHead>
+                <TableHead className="text-xs text-muted-foreground">بيانات حساسة</TableHead>
+                <TableHead className="w-0 pe-5">
+                  <span className="sr-only">الإجراءات</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lists.map((l) => (
+                <TableRow key={l.id} data-list-number={l.list_number} className="border-stroke-subtle">
+                  <TableCell className="ps-5">
+                    <bdi dir="ltr" className="font-semibold tabular-nums">{l.list_number}</bdi>
+                  </TableCell>
+                  <TableCell>{l.recipient_organization}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{formatDateTime(l.issued_at)}</TableCell>
+                  <TableCell>{l.issued_by?.name ?? "—"}</TableCell>
+                  <TableCell className="tabular-nums">{l.row_count}</TableCell>
+                  <TableCell>
+                    {l.contains_sensitive ? <StatusBadge tone="danger">نعم</StatusBadge> : <span className="text-muted-foreground">لا</span>}
+                  </TableCell>
+                  <TableCell className="pe-5">{actions(l)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lists.map((l) => (
-                  <TableRow key={l.id} data-list-number={l.list_number}>
-                    <TableCell className="font-medium" dir="ltr">{l.list_number}</TableCell>
-                    <TableCell>{l.recipient_organization}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(l.issued_at)}</TableCell>
-                    <TableCell>{l.issued_by?.name ?? "—"}</TableCell>
-                    <TableCell className="tabular-nums">{l.row_count}</TableCell>
-                    <TableCell>{l.contains_sensitive ? <Badge variant="destructive">نعم</Badge> : <span className="text-muted-foreground">لا</span>}</TableCell>
-                    <TableCell>
-                      {canOpen(l) && (
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setViewing(l)}>
-                            <Eye className="size-4" />
-                            عرض
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              setError(null);
-                              const status = await downloadBeneficiaryList(l);
-                              if (status) setError(status === 403 ? "لا تملك صلاحية تنزيل هذا الكشف." : "تعذّر تنزيل الملف.");
-                            }}
-                          >
-                            <Download className="size-4" />
-                            تنزيل XLSX
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
+              ))}
+            </TableBody>
+          </Table>
+          <ul className="divide-y divide-stroke-subtle border-t border-stroke-subtle lg:hidden" aria-label="الكشوف الصادرة">
+            {lists.map((l) => (
+              <li key={l.id} className="flex flex-col gap-1.5 px-4 py-3" data-list-number={l.list_number}>
+                <div className="flex items-center justify-between gap-2">
+                  <bdi dir="ltr" className="font-semibold tabular-nums">{l.list_number}</bdi>
+                  {l.contains_sensitive && <StatusBadge tone="danger">بيانات حساسة</StatusBadge>}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {l.recipient_organization} · {l.row_count} سجل · {formatDateTime(l.issued_at)}
+                </span>
+                {actions(l)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <ListRowsDialog list={viewing} onClose={() => setViewing(null)} />
-    </Card>
+    </AppCard>
   );
 }
+

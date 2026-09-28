@@ -6,14 +6,6 @@ import { Check, CheckCheck, ListChecks, Search, UserMinus, UserPlus, Users } fro
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -40,7 +32,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FieldLabel, SaveError } from "@/components/shared/edit-dialog-parts";
-import { NominationSourceBadge } from "@/components/assistances/assistance-badges";
+import { AppCard } from "@/components/shared/app-card";
+import { EmptyState } from "@/components/shared/empty-state";
+import { IconBox } from "@/components/shared/icon-box";
+import { Code, SectionHeader } from "@/components/shared/page-layout";
+import { RegistryPagination } from "@/components/shared/registry-pagination";
+import { NominationSourceTag, NomineeStatusTag } from "@/components/assistances/assistance-case";
+import { NeedPriorityTag } from "@/components/needs/need-case";
 import {
   DeliveryDialog,
   ExecutionState,
@@ -64,8 +62,11 @@ import { useNeedCategories } from "@/lib/api/reference";
 import type { Assistance, AssistanceResponse, Nominee, NomineeSummary } from "@/lib/types/api/assistance";
 import type { NeedPriority } from "@/lib/types/api/need";
 import { formatDateTime } from "@/lib/utils/date";
-import { nomineeStatusLabels } from "@/lib/utils/assistance";
+import { cn } from "@/lib/utils";
 import { FAMILY_TARGET_LABEL, NEED_PRIORITIES, needPriorityLabels } from "@/lib/utils/need";
+
+const fmt = (n: number) => n.toLocaleString("ar");
+const head = "h-10 text-xs font-medium text-muted-foreground";
 
 // Every number is derived by the API on read — nothing here is stored.
 const COUNTERS: { key: keyof NomineeSummary; label: string }[] = [
@@ -476,7 +477,7 @@ function BulkApproveButton({ assistance, selected, onDone }: { assistance: Assis
 function ApproveButton({ assistance, nominee }: { assistance: Assistance; nominee: Nominee }) {
   const mutation = useApproveNominee(assistance.id);
   return (
-    <Button variant="ghost" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate(nominee.id)}>
+    <Button size="sm" className="h-8" disabled={mutation.isPending} onClick={() => mutation.mutate(nominee.id)}>
       <Check className="size-4" />
       اعتماد
     </Button>
@@ -495,12 +496,16 @@ export function AssistanceNomineesTab({
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const { data, isLoading, isError, error } = useNominees(assistance.id, includeRemoved, page);
+  const external = assistance.execution_mode === "EXTERNAL";
 
   if (isError) {
     return (
-      <p className="rounded-lg border border-dashed p-12 text-center text-sm text-muted-foreground">
-        {error instanceof ApiError && error.status === 403 ? "لا تملك صلاحية عرض المرشحين." : "تعذّر تحميل المرشحين."}
-      </p>
+      <AppCard padded={false}>
+        <EmptyState
+          icon={Users}
+          title={error instanceof ApiError && error.status === 403 ? "لا تملك صلاحية عرض المرشحين." : "تعذّر تحميل المرشحين."}
+        />
+      </AppCard>
     );
   }
 
@@ -514,193 +519,297 @@ export function AssistanceNomineesTab({
     setSelected(next);
   };
 
+  /** The row's actions, per the API abilities and the nominee's state (unchanged rules). */
+  const actions = (n: Nominee) => (
+    <>
+      {abilities.approve && n.status === "NOMINATED" && (
+        <>
+          <ApproveButton assistance={assistance} nominee={n} />
+          <RejectNomineeDialog assistance={assistance} nominee={n} />
+        </>
+      )}
+      {abilities.deliver && n.status === "APPROVED" && !n.active_delivery && (
+        <>
+          <DeliveryDialog assistance={assistance} nominee={n} />
+          <NotDeliveredDialog assistance={assistance} nominee={n} />
+        </>
+      )}
+      {abilities.reverse && n.active_delivery && <ReverseDeliveryDialog assistance={assistance} deliveryId={n.active_delivery.id} />}
+      {canNominate && n.status === "NOMINATED" && <RemoveNomineeButton assistance={assistance} nominee={n} />}
+    </>
+  );
+  const rowHasActions = (n: Nominee) =>
+    (abilities.approve && n.status === "NOMINATED") ||
+    (abilities.deliver && n.status === "APPROVED" && !n.active_delivery) ||
+    (abilities.reverse && !!n.active_delivery) ||
+    (canNominate && n.status === "NOMINATED");
+
+  const who = (n: Nominee, linked = true) =>
+    n.person ? (
+      linked ? (
+        <Link
+          href={`/people/${encodeURIComponent(n.person.person_code)}`}
+          className="rounded-sm font-semibold text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          {n.person.full_name}
+        </Link>
+      ) : (
+        <span className="font-semibold text-foreground">{n.person.full_name}</span>
+      )
+    ) : (
+      <span className="font-semibold text-foreground">{n.family.household_head_name ?? FAMILY_TARGET_LABEL}</span>
+    );
+
+  const selectBox = (n: Nominee) =>
+    abilities.approve && n.status === "NOMINATED" ? (
+      <input
+        type="checkbox"
+        aria-label={`تحديد ${n.person?.full_name ?? n.family.family_code}`}
+        className="size-4 accent-brand-700"
+        checked={selected.has(n.id)}
+        onChange={() => toggle(n.id)}
+      />
+    ) : null;
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {COUNTERS.map((c) => (
-          <Card key={c.key} size="sm" data-counter={c.key}>
-            <CardHeader className="pb-1">
-              <CardDescription>{c.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums">
-                {data ? data.summary[c.key] : <Skeleton className="h-7 w-8" />}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+      {/* Nomination breakdown: server-derived summary, never a delivery count. */}
+      <AppCard padded={false} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:gap-6 sm:px-5" data-nominee-summary>
+        <div className="flex items-center gap-3">
+          <IconBox icon={Users} size="sm" />
+          <div className="flex items-baseline gap-2">
+            {data ? (
+              <bdi className="text-xl font-bold tabular-nums">{fmt(data.summary.total)}</bdi>
+            ) : (
+              <Skeleton className="h-6 w-8" />
+            )}
+            <span className="text-[13px] text-muted-foreground">إجمالي المرشحين</span>
+          </div>
+        </div>
+        <div className="hidden h-6 w-px bg-stroke-subtle sm:block" aria-hidden />
+        <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px]">
+          {COUNTERS.filter((c) => c.key !== "total").map((c) => (
+            <div key={c.key} className="flex items-center gap-1.5" data-counter={c.key}>
+              <dt className="text-muted-foreground">{c.label}</dt>
+              <dd className="font-semibold tabular-nums text-foreground">{data ? fmt(data.summary[c.key]) : "…"}</dd>
+            </div>
+          ))}
+        </dl>
+      </AppCard>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>المرشحون</CardTitle>
-          <CardDescription>
-            المرشح مستفيد محتمل فقط — الترشيح ليس إثباتًا لاستلام المساعدة.
-            {!canNominate && assistance.status === "DRAFT" && " افتح المساعدة لإضافة مرشحين."}
-          </CardDescription>
+      <AppCard padded={false} className="overflow-hidden" aria-labelledby="nominees-title">
+        <div className="flex flex-col gap-3 px-4 pt-4 pb-3 sm:flex-row sm:items-start sm:justify-between sm:px-5">
+          <SectionHeader
+            title={<span id="nominees-title">{external ? "المرشحون والاعتماد" : "المرشحون والتسليم"}</span>}
+            description={
+              <>
+                المرشح مستفيد محتمل فقط — الترشيح ليس إثباتًا لاستلام المساعدة.
+                {!canNominate && assistance.status === "DRAFT" && " افتح المساعدة لإضافة مرشحين."}
+              </>
+            }
+          />
           {(canNominate || abilities.approve) && (
-            <CardAction className="flex flex-wrap items-start gap-2">
+            <div className="flex shrink-0 flex-wrap items-start gap-2" data-nominee-actions>
+              {canNominate && <ManualNomineeDialog assistance={assistance} />}
+              {canNominate && <NeedsNomineeDialog assistance={assistance} />}
               {abilities.approve && (
                 <BulkApproveButton assistance={assistance} selected={[...selected]} onDone={() => setSelected(new Set())} />
               )}
-              {canNominate && <ManualNomineeDialog assistance={assistance} />}
-              {canNominate && <NeedsNomineeDialog assistance={assistance} />}
-            </CardAction>
+            </div>
           )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-0">
-          <label className="flex w-fit items-center gap-2 px-4 text-sm text-muted-foreground">
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stroke-subtle bg-surface-2 px-4 py-2 text-[13px] sm:px-5">
+          <label className="flex items-center gap-2 text-muted-foreground">
             <input
               type="checkbox"
-              className="size-4 accent-primary"
+              className="size-4 accent-brand-700"
               checked={includeRemoved}
               onChange={(e) => {
                 setIncludeRemoved(e.target.checked);
                 setPage(1);
               }}
             />
-            إظهار الترشيحات المُزالة ({data?.summary.removed ?? 0})
+            إظهار الترشيحات المُزالة ({fmt(data?.summary.removed ?? 0)})
           </label>
+          {abilities.approve && approvable.length > 0 && (
+            <label className="flex items-center gap-2 text-muted-foreground lg:hidden">
+              <input
+                type="checkbox"
+                className="size-4 accent-brand-700"
+                checked={approvable.every((n) => selected.has(n.id))}
+                onChange={(e) => {
+                  const next = new Set(selected);
+                  for (const n of approvable) {
+                    if (e.target.checked) next.add(n.id);
+                    else next.delete(n.id);
+                  }
+                  setSelected(next);
+                }}
+              />
+              تحديد مرشحي هذه الصفحة
+            </label>
+          )}
+        </div>
 
-          {isLoading ? (
-            <Skeleton className="mx-4 mb-4 h-24" />
-          ) : nominees.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 border-t p-12 text-center">
-              <Users className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">لا يوجد مرشحون بعد.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto border-t">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {abilities.approve && (
-                      <TableHead className="w-0">
-                        <input
-                          type="checkbox"
-                          aria-label="تحديد المرشحين في هذه الصفحة"
-                          className="size-4 accent-primary"
-                          disabled={approvable.length === 0}
-                          checked={approvable.length > 0 && approvable.every((n) => selected.has(n.id))}
-                          onChange={(e) => {
-                            const next = new Set(selected);
-                            for (const n of approvable) {
-                              if (e.target.checked) next.add(n.id);
-                              else next.delete(n.id);
-                            }
-                            setSelected(next);
-                          }}
-                        />
-                      </TableHead>
-                    )}
-                    <TableHead>المرشح</TableHead>
-                    <TableHead>الأسرة</TableHead>
-                    <TableHead>نوع الترشيح</TableHead>
-                    <TableHead>المصدر</TableHead>
-                    <TableHead>الاحتياج المرتبط</TableHead>
-                    <TableHead>بواسطة</TableHead>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>الحالة</TableHead>
-                    <TableHead>{assistance.execution_mode === "EXTERNAL" ? "الكشوف" : "التسليم"}</TableHead>
-                    {hasActions && <TableHead className="w-0" />}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {nominees.map((n) => (
-                    <TableRow key={n.id} data-nominee-id={n.id} className={n.status === "REMOVED" ? "opacity-60" : undefined}>
-                      {abilities.approve && (
-                        <TableCell>
-                          {n.status === "NOMINATED" && (
-                            <input
-                              type="checkbox"
-                              aria-label={`تحديد ${n.person?.full_name ?? n.family.family_code}`}
-                              className="size-4 accent-primary"
-                              checked={selected.has(n.id)}
-                              onChange={() => toggle(n.id)}
-                            />
-                          )}
-                        </TableCell>
-                      )}
-                      <TableCell className="font-medium">
-                        {n.person ? (
-                          <Link href={`/people/${encodeURIComponent(n.person.person_code)}`} className="hover:underline">
-                            {n.person.full_name}
+        {isLoading ? (
+          <div className="border-t border-stroke-subtle p-4">
+            <Skeleton className="h-24" />
+          </div>
+        ) : nominees.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="لا يوجد مرشحون بعد"
+            description={
+              canNominate
+                ? "أضف مرشحين من تبويب الاستهداف، أو يدويًا، أو من الاحتياجات المفتوحة."
+                : assistance.status === "DRAFT"
+                  ? "يُضاف المرشحون بعد فتح المساعدة."
+                  : undefined
+            }
+            className="border-t border-stroke-subtle"
+          />
+        ) : (
+          <>
+            {/* Desktop (≥ lg): semantic table */}
+            <Table className="hidden border-t border-stroke-subtle lg:table">
+              <TableHeader className="bg-surface-1">
+                <TableRow className="border-stroke-subtle hover:bg-transparent">
+                  {abilities.approve && (
+                    <TableHead className="w-0 ps-5">
+                      <input
+                        type="checkbox"
+                        aria-label="تحديد المرشحين في هذه الصفحة"
+                        className="size-4 accent-brand-700"
+                        disabled={approvable.length === 0}
+                        checked={approvable.length > 0 && approvable.every((n) => selected.has(n.id))}
+                        onChange={(e) => {
+                          const next = new Set(selected);
+                          for (const n of approvable) {
+                            if (e.target.checked) next.add(n.id);
+                            else next.delete(n.id);
+                          }
+                          setSelected(next);
+                        }}
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead className={`${head} ${abilities.approve ? "" : "ps-5"}`}>المرشح</TableHead>
+                  <TableHead className={head}>المصدر</TableHead>
+                  <TableHead className={head}>الحالة</TableHead>
+                  <TableHead className={head}>{external ? "الكشوف" : "التسليم"}</TableHead>
+                  {hasActions && (
+                    <TableHead className={`${head} pe-5`}>
+                      <span className="sr-only">الإجراءات</span>
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {nominees.map((n) => (
+                  <TableRow
+                    key={n.id}
+                    data-nominee-id={n.id}
+                    data-nominee-status={n.status}
+                    className={cn("border-stroke-subtle align-top", n.status === "REMOVED" && "opacity-70")}
+                  >
+                    {abilities.approve && <TableCell className="ps-5 pt-4">{selectBox(n)}</TableCell>}
+                    <TableCell className={cn("max-w-72 py-3", !abilities.approve && "ps-5")}>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        {who(n)}
+                        <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                          <Link
+                            href={`/families/${encodeURIComponent(n.family.family_code)}`}
+                            className="rounded-sm font-medium text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                            data-family-link
+                          >
+                            <Code>{n.family.family_code}</Code>
                           </Link>
-                        ) : (
-                          n.family.household_head_name ?? FAMILY_TARGET_LABEL
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/families/${encodeURIComponent(n.family.family_code)}`} className="hover:underline" dir="ltr">
-                          {n.family.family_code}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{n.person ? "فرد محدد" : "الأسرة كاملة"}</TableCell>
-                      <TableCell>
-                        <NominationSourceBadge source={n.nomination_source} />
-                      </TableCell>
-                      <TableCell>
-                        {n.source_need ? (
-                          <Link href={`/needs/${n.source_need.id}`} className="inline-flex items-center gap-1 hover:underline">
+                          <span aria-hidden>·</span>
+                          <span>{n.person ? "فرد محدد" : "الأسرة كاملة"}</span>
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-56 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <NominationSourceTag source={n.nomination_source} />
+                        {n.source_need && (
+                          <Link
+                            href={`/needs/${n.source_need.id}`}
+                            className="inline-flex max-w-full items-center gap-1 truncate rounded-sm text-xs text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                          >
                             {n.source_need.title}
-                            <NeedPriorityBadge priority={n.source_need.priority} />
+                            <NeedPriorityTag priority={n.source_need.priority} />
                           </Link>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
                         )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <NomineeStatusTag status={n.status} />
+                        <span className="text-xs text-muted-foreground">
+                          {n.nominated_by?.name ?? "—"} · <time dateTime={n.nominated_at}>{formatDateTime(n.nominated_at)}</time>
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-64 py-3">
+                      <ExecutionState assistance={assistance} nominee={n} />
+                    </TableCell>
+                    {hasActions && (
+                      <TableCell className="pe-5 py-2.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1">{actions(n)}</div>
                       </TableCell>
-                      <TableCell>{n.nominated_by?.name ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{formatDateTime(n.nominated_at)}</TableCell>
-                      <TableCell>
-                        <Badge variant={n.status === "APPROVED" ? "default" : n.status === "NOMINATED" ? "secondary" : "outline"}>
-                          {nomineeStatusLabels[n.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <ExecutionState assistance={assistance} nominee={n} />
-                      </TableCell>
-                      {hasActions && (
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            {abilities.approve && n.status === "NOMINATED" && (
-                              <>
-                                <ApproveButton assistance={assistance} nominee={n} />
-                                <RejectNomineeDialog assistance={assistance} nominee={n} />
-                              </>
-                            )}
-                            {abilities.deliver && n.status === "APPROVED" && !n.active_delivery && (
-                              <>
-                                <DeliveryDialog assistance={assistance} nominee={n} />
-                                <NotDeliveredDialog assistance={assistance} nominee={n} />
-                              </>
-                            )}
-                            {abilities.reverse && n.active_delivery && (
-                              <ReverseDeliveryDialog assistance={assistance} deliveryId={n.active_delivery.id} />
-                            )}
-                            {canNominate && n.status === "NOMINATED" && <RemoveNomineeButton assistance={assistance} nominee={n} />}
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
 
-          {data && data.meta.last_page > 1 && (
-            <div className="flex items-center justify-center gap-2 border-t p-3 text-xs text-muted-foreground">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                السابق
-              </Button>
-              <span>
-                صفحة {data.meta.current_page} من {data.meta.last_page}
-              </span>
-              <Button type="button" variant="outline" size="sm" disabled={page >= data.meta.last_page} onClick={() => setPage(page + 1)}>
-                التالي
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            {/* Tablet and phone (< lg): compact work items */}
+            <ul className="divide-y divide-stroke-subtle border-t border-stroke-subtle lg:hidden" aria-label="قائمة المرشحين">
+              {nominees.map((n) => (
+                <li
+                  key={n.id}
+                  className={cn("flex gap-3 px-4 py-3 sm:px-5", n.status === "REMOVED" && "opacity-70")}
+                  data-nominee-id={n.id}
+                >
+                  {abilities.approve && <div className="pt-1">{selectBox(n)}</div>}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="min-w-0">{who(n)}</span>
+                      <NomineeStatusTag status={n.status} />
+                    </div>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <Link
+                        href={`/families/${encodeURIComponent(n.family.family_code)}`}
+                        className="rounded-sm font-medium text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <Code>{n.family.family_code}</Code>
+                      </Link>
+                      <span aria-hidden>·</span>
+                      <span>{n.person ? "فرد محدد" : "الأسرة كاملة"}</span>
+                      <span aria-hidden>·</span>
+                      <NominationSourceTag source={n.nomination_source} />
+                    </span>
+                    {n.status !== "NOMINATED" && n.status !== "REMOVED" && (
+                      <div className="text-xs">
+                        <ExecutionState assistance={assistance} nominee={n} />
+                      </div>
+                    )}
+                    {rowHasActions(n) && <div className="flex flex-wrap items-center gap-1 pt-0.5">{actions(n)}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {data && nominees.length > 0 && (
+          <div className="border-t border-stroke-subtle">
+            <RegistryPagination meta={data.meta} onPage={setPage} unit="مرشحين" />
+          </div>
+        )}
+      </AppCard>
     </div>
   );
 }

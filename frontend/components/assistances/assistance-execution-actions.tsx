@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { CheckCircle2, PackageCheck, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError, FieldLabel, SaveError } from "@/components/shared/edit-dialog-parts";
+import { StatusBadge } from "@/components/shared/status-badge";
 import {
   useMarkNotDelivered,
   useRecordDelivery,
@@ -135,7 +135,7 @@ function ReasonDialog({
 export function RejectNomineeDialog({ assistance, nominee }: { assistance: Assistance; nominee: Nominee }) {
   return (
     <ReasonDialog
-      trigger={<Button variant="ghost" size="sm">رفض</Button>}
+      trigger={<Button variant="ghost" size="sm" className="h-8">رفض</Button>}
       title="رفض المرشح"
       description="الرفض نهائي في هذه المرحلة. يُحفظ السبب مع الترشيح ولا يظهر في سجل نشاط الأسرة."
       label="سبب الرفض"
@@ -150,7 +150,7 @@ export function RejectNomineeDialog({ assistance, nominee }: { assistance: Assis
 export function NotDeliveredDialog({ assistance, nominee }: { assistance: Assistance; nominee: Nominee }) {
   return (
     <ReasonDialog
-      trigger={<Button variant="ghost" size="sm">لم يُسلَّم</Button>}
+      trigger={<Button variant="ghost" size="sm" className="h-8">لم يُسلَّم</Button>}
       title="تسجيل عدم التسليم"
       description="قرار نهائي بعدم التسليم لهذا المستفيد المعتمد (مثلًا: لم يحضر ضمن فترة التوزيع)."
       label="سبب عدم التسليم"
@@ -165,7 +165,7 @@ export function NotDeliveredDialog({ assistance, nominee }: { assistance: Assist
 export function ReverseDeliveryDialog({ assistance, deliveryId }: { assistance: Assistance; deliveryId: string }) {
   return (
     <ReasonDialog
-      trigger={<Button variant="ghost" size="sm">عكس التسليم</Button>}
+      trigger={<Button variant="ghost" size="sm" className="h-8 text-muted-foreground">عكس التسليم</Button>}
       title="عكس التسليم"
       description="يبقى سجل التسليم الأصلي محفوظًا ويُضاف إليه العكس، ويعود المستفيد إلى انتظار التسليم. يلزم تحقق جديد من الهوية لأي تسليم لاحق."
       label="سبب عكس التسليم"
@@ -259,7 +259,7 @@ export function DeliveryDialog({ assistance, nominee }: { assistance: Assistance
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" className="h-8">
           <PackageCheck className="size-4" />
           تسجيل التسليم
         </Button>
@@ -403,7 +403,7 @@ export function DeliveryDialog({ assistance, nominee }: { assistance: Assistance
 /** Execution state of one beneficiary, per execution mode. Never implies delivery for EXTERNAL. */
 export function ExecutionState({ assistance, nominee }: { assistance: Assistance; nominee: Nominee }) {
   if (nominee.status === "REJECTED") {
-    return <span className="text-xs text-muted-foreground">{nominee.rejection_reason}</span>;
+    return <span className="text-xs text-muted-foreground">سبب الرفض: {nominee.rejection_reason}</span>;
   }
   if (nominee.status === "NOT_DELIVERED") {
     return <span className="text-xs text-muted-foreground">لم يُسلَّم: {nominee.not_delivered_reason}</span>;
@@ -412,30 +412,34 @@ export function ExecutionState({ assistance, nominee }: { assistance: Assistance
 
   if (assistance.execution_mode === "EXTERNAL") {
     return nominee.listed_in.length > 0 ? (
-      <span className="flex flex-wrap items-center gap-1 text-xs">
-        تم إصداره في كشف:
+      <span className="flex flex-wrap items-center gap-1 text-xs" data-execution="LISTED">
+        <StatusBadge tone="info">تم إصداره في كشف</StatusBadge>
         {nominee.listed_in.map((l) => (
-          <Badge key={l.list_id} variant="outline" dir="ltr">{l.list_number}</Badge>
+          <bdi key={l.list_id} dir="ltr" className="font-medium text-foreground tabular-nums">
+            {l.list_number}
+          </bdi>
         ))}
       </span>
     ) : (
-      <span className="text-xs text-muted-foreground">لم يُدرج في كشف بعد</span>
+      <span className="text-xs text-muted-foreground" data-execution="NOT_LISTED">
+        لم يُدرج في كشف بعد
+      </span>
     );
   }
 
   const d = nominee.active_delivery;
   return (
-    <span className="flex flex-col gap-0.5 text-xs">
+    <span className="flex flex-col items-start gap-1 text-xs" data-execution={d ? "DELIVERED" : "AWAITING"}>
       {d ? (
         <>
-          <Badge variant="secondary" className="w-fit">تم التسليم</Badge>
+          <StatusBadge tone="success">تم التسليم</StatusBadge>
           <span className="text-muted-foreground">
             {formatDateTime(d.delivered_at)} — {receiptModeLabels[d.receipt_mode]}
             {d.receipt_mode === "DELEGATE" && d.recipient ? `: ${d.recipient.full_name}` : ""}
           </span>
         </>
       ) : (
-        <Badge variant="outline" className="w-fit">بانتظار التسليم</Badge>
+        <StatusBadge tone="warning">بانتظار التسليم</StatusBadge>
       )}
       {nominee.reversed_deliveries.length > 0 && (
         <span className="text-muted-foreground">تسليم معكوس: {nominee.reversed_deliveries.length}</span>

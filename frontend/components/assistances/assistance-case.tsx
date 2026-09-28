@@ -1,6 +1,6 @@
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
-import type { AssistanceStatus, ExecutionMode, NomineeStatus } from "@/lib/types/api/assistance";
-import { assistanceStatusLabels, executionModeShort, nomineeStatusLabels } from "@/lib/utils/assistance";
+import type { AssistanceStatus, ExecutionMode, NominationSource, NomineeStatus } from "@/lib/types/api/assistance";
+import { assistanceStatusLabels, executionModeShort, nominationSourceLabels, nomineeStatusLabels } from "@/lib/utils/assistance";
 
 // Assistance presentation on the shared StatusBadge language (docs/10).
 // Stored codes only, canonical labels from lib/utils/assistance; the legacy
@@ -51,6 +51,16 @@ export function NomineeStatusTag({ status }: { status: NomineeStatus }) {
     <StatusBadge tone={nomineeTones[status]}>
       <span className="sr-only">حالة الترشيح: </span>
       {nomineeStatusLabels[status]}
+    </StatusBadge>
+  );
+}
+
+/** How a nominee entered the program (targeting, manual, open need). */
+export function NominationSourceTag({ source }: { source: NominationSource }) {
+  return (
+    <StatusBadge tone={source === "NEED" ? "info" : "neutral"}>
+      <span className="sr-only">مصدر الترشيح: </span>
+      {nominationSourceLabels[source]}
     </StatusBadge>
   );
 }
