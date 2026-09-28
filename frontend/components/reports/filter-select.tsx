@@ -23,12 +23,12 @@ export function FilterSelect({
   allLabel?: string;
 }) {
   return (
-    <div className="flex min-w-36 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5 sm:w-44">
       <Label htmlFor={id} className="text-xs text-muted-foreground">
         {label}
       </Label>
       <Select value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : v)}>
-        <SelectTrigger id={id} size="sm" className="w-full">
+        <SelectTrigger id={id} size="sm" className="h-9! w-full bg-surface-2">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
