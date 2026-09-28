@@ -106,6 +106,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/families/{family}/assessments', [AssessmentController::class, 'store'])
         ->middleware('can:assessment.create');
 
+    // Cross-family registry (Assessments Pilot Workspace): read-only, no
+    // notes; creation stays family-scoped.
+    Route::get('/assessments', [AssessmentController::class, 'registry'])
+        ->middleware('can:assessment.view');
+
     Route::get('/assessments/{assessment}', [AssessmentController::class, 'show'])
         ->middleware('can:assessment.view');
 

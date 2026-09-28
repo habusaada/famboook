@@ -1,5 +1,5 @@
-import { PagePlaceholder } from "@/components/layout/page-placeholder";
+import { AssessmentsWorkspace } from "@/components/assessments/assessments-workspace";
 
 export default function AssessmentsPage() {
-  return <PagePlaceholder title="التقييمات" />;
+  return <AssessmentsWorkspace />;
 }

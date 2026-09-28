@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\CompleteAssessmentAction;
 use App\Actions\CreateAssessmentAction;
 use App\Actions\UpdateAssessmentAction;
+use App\Enums\AssessmentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\CompleteAssessmentRequest;
 use App\Http\Requests\Api\V1\StoreAssessmentRequest;
 use App\Http\Requests\Api\V1\UpdateAssessmentRequest;
+use App\Http\Resources\AssessmentRegistryResource;
 use App\Http\Resources\AssessmentResource;
 use App\Http\Resources\AssessmentSummaryResource;
 use App\Models\Assessment;
@@ -16,6 +18,7 @@ use App\Models\Family;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 /**
  * Family-level assessments V1 (docs/06-PERMISSIONS.md §47, assessment.*
@@ -41,6 +44,48 @@ class AssessmentController extends Controller
         return AssessmentSummaryResource::collection($assessments)->additional([
             // UX hint only; every write is re-authorized by its request.
             'abilities' => ['create' => $user->can('assessment.create')],
+        ]);
+    }
+
+    /**
+     * Cross-family registry (Assessments Pilot Workspace): unfinished work
+     * first (DRAFT), then the newest business date, then the newest entry.
+     * `summary` counts the whole registry regardless of filters — one
+     * grouped query, derived on read, never stored.
+     */
+    public function registry(Request $request): AnonymousResourceCollection
+    {
+        $filters = $request->validate([
+            'status' => ['sometimes', Rule::enum(AssessmentStatus::class)],
+            'family' => ['sometimes', 'string', 'max:50'],
+        ]);
+        $perPage = min(max($request->integer('per_page', 20), 1), 50);
+
+        $assessments = Assessment::query()
+            ->with(AssessmentRegistryResource::RELATIONS)
+            ->withCount('results')
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['family'] ?? null, fn ($q, $code) => $q->whereHas('family', fn ($f) => $f->where('family_code', $code)))
+            ->orderByRaw('CASE WHEN status = ? THEN 0 ELSE 1 END', [AssessmentStatus::DRAFT->value])
+            ->orderByDesc('assessment_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $counts = Assessment::query()
+            ->selectRaw('status, COUNT(*) AS aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return AssessmentRegistryResource::collection($assessments)->additional([
+            'summary' => [
+                'total' => (int) $counts->sum(),
+                'draft' => (int) ($counts[AssessmentStatus::DRAFT->value] ?? 0),
+                'completed' => (int) ($counts[AssessmentStatus::COMPLETED->value] ?? 0),
+            ],
+            // UX hint only: continuing a DRAFT needs assessment.update.
+            'abilities' => ['update' => $request->user()->can('assessment.update')],
         ]);
     }
 

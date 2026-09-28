@@ -2,6 +2,7 @@
 // AssessmentSummaryResource.php and AssessmentController. Assessment data
 // is only ever returned by the assessment endpoints (assessment.* permissions).
 
+import type { PaginatedResponse } from "@/lib/types/api/family";
 import type { AssessmentDomain } from "@/lib/types/api/reference";
 
 export type AssessmentStatus = "DRAFT" | "COMPLETED";
@@ -49,6 +50,33 @@ export interface AssessmentSummary {
   created_at: string;
   completed_at: string | null;
 }
+
+// Cross-family registry row (AssessmentRegistryResource): identity and
+// lifecycle only — no notes, no ratings detail, no identity/contact data.
+export interface AssessmentRegistryRow {
+  id: string;
+  assessment_date: string;
+  status: AssessmentStatus;
+  assessed_domain_count: number;
+  family: { family_code: string; household_head_name: string | null; branch_name: string | null };
+  created_by: { name: string } | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface AssessmentRegistryFilters {
+  status?: AssessmentStatus;
+  // Exact Family code.
+  family?: string;
+}
+
+export type AssessmentRegistryResponse = PaginatedResponse<AssessmentRegistryRow> & {
+  // Whole registry, independent of filters; derived on read.
+  summary: { total: number; draft: number; completed: number };
+  // UX hint only: continuing a DRAFT needs assessment.update.
+  abilities: { update: boolean };
+};
 
 export interface AssessmentDraftPayload {
   assessment_date?: string;

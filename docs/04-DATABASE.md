@@ -1086,6 +1086,7 @@ API (`/api/v1`):
 ```text
 GET   /families/{family}/assessments       assessment.view   newest assessment_date, then newest entry; paginated (per_page 20, max 50)
 POST  /families/{family}/assessments       assessment.create creates a DRAFT
+GET   /assessments                         assessment.view   cross-family registry (Assessments workspace); filters status, family (exact Family code); DRAFT first, then newest assessment_date, newest entry; paginated (per_page 20, max 50)
 GET   /assessments/{uuid}                  assessment.view
 PATCH /assessments/{uuid}                  assessment.update DRAFT only (409 once COMPLETED)
 POST  /assessments/{uuid}/complete         assessment.complete (+ assessment.update if a final draft payload is sent)
@@ -1096,6 +1097,16 @@ Draft payload: `assessment_date`, `general_notes`, and `results` as
 `[{domain_code, rating, notes}]`. When `results` is sent it is the full
 result set, synchronized transactionally; duplicate domains are rejected.
 There is no delete endpoint.
+
+The cross-family registry (`GET /assessments`) is read-only. Each row
+carries the assessment id, `assessment_date`, `status`, the derived
+`assessed_domain_count`, `created_by`, `created_at`, `updated_at`,
+`completed_at` and the family context (`family_code`, household-head name,
+branch name). It never returns general or domain notes, individual
+ratings, National IDs, contact or health data. The response adds a
+`summary` (`total`, `draft`, `completed`) counted over the whole registry
+regardless of filters — derived on read, never stored — and an
+`abilities.update` UX hint. Creation stays family-scoped.
 
 ---
 
@@ -3609,6 +3620,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.14 | 2026-09-28 | Approved | §31: cross-family assessment registry API (`GET /assessments`, status and exact-family filters, whole-registry summary); read-only, no schema change |
 | 1.2.13 | 2026-09-27 | Approved | §19: membership ending / relationship correction are in-place UPDATEs with row locks; no schema change (Pilot Readiness Slice C) |
 | 1.2.12 | 2026-09-26 | Approved | §19: registry search API, `pg_trgm` trigram indexes (measured), National ID advisory-lock duplicate enforcement |
 | 1.2.11 | 2026-09-26 | Approved | §51: `users.is_active`, session storage note, Staff authentication API and Filament `/admin` |

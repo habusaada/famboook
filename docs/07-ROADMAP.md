@@ -1549,6 +1549,18 @@ lifecycle, Activity Log integration and the Family Profile "التقييمات"
 tab. Assessment Types, Form Submissions, versioned questionnaires, review
 workflow and the cross-family Assessment List remain open for this phase.
 
+2026-09-28: **Assessments Pilot Workspace** delivered: the standalone
+cross-family Assessment List at `/assessments` (replacing the placeholder),
+backed by the read-only registry API `GET /api/v1/assessments`
+(`assessment.view`; server-side status and exact Family-code filters,
+pagination, DRAFT-first ordering, whole-registry DRAFT/COMPLETED counts),
+plus the redesigned Assessment Detail, Draft Editor and New Assessment
+screens. The lifecycle stays DRAFT → COMPLETED (completed assessments are
+read-only; no reopen, delete or scoring) and the eight domains remain
+independent ratings, a missing result meaning "not assessed". Creation
+stays family-scoped. Assessment Types, Form Submissions, versioned
+questionnaires and the review workflow remain open for this phase.
+
 ---
 
 # 26. Phase 14 — Needs & Assistance
@@ -4681,6 +4693,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.12 | 2026-09-28 | Approved | Phase 13 progress note: Assessments Pilot Workspace (cross-family Assessment List and registry API, Assessment Detail, Draft Editor and New Assessment) |
 | 1.2.11 | 2026-09-27 | Approved | Phase 29 progress note: Pilot Readiness Slice D (production Pilot environment preparation; server-side steps outstanding) |
 | 1.2.10 | 2026-09-27 | Approved | Phase 9 progress note: Pilot Readiness Slice C (data-entry corrections: relationship, membership ending, National ID correction and masking, optional governorate/city) |
 | 1.2.9 | 2026-09-26 | Approved | Phase 20 progress note: Pilot Readiness Slice B (registry search, exact National ID duplicate prevention, optional date of birth) |

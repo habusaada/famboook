@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -11,6 +12,8 @@ import { apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/types/api/family";
 import type {
   AssessmentDraftPayload,
+  AssessmentRegistryFilters,
+  AssessmentRegistryResponse,
   AssessmentResponse,
   AssessmentSummary,
 } from "@/lib/types/api/assessment";
@@ -40,6 +43,21 @@ export function useFamilyAssessments(familyCode: string) {
         ? last.meta.current_page + 1
         : undefined,
     enabled: familyCode.length > 0,
+    retry: false,
+  });
+}
+
+/** Cross-family registry: server-side status / exact family filters and pages. */
+export function useAssessmentRegistry(filters: AssessmentRegistryFilters, page: number) {
+  return useQuery({
+    queryKey: ["assessments", "registry", filters, page],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (filters.status) params.set("status", filters.status);
+      if (filters.family) params.set("family", filters.family);
+      return apiClient.get<AssessmentRegistryResponse>(`/api/v1/assessments?${params}`);
+    },
+    placeholderData: keepPreviousData,
     retry: false,
   });
 }
