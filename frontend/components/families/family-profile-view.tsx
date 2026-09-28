@@ -19,16 +19,11 @@ import { FamilyActivityTab } from "@/components/families/family-activity-tab";
 import { FamilyAssessmentsTab } from "@/components/families/family-assessments-tab";
 import { FamilyNeedsTab } from "@/components/families/family-needs-tab";
 import { FamilyAssistanceTab } from "@/components/families/family-assistance-tab";
-import { TabPlaceholder } from "@/components/families/tab-placeholder";
 import { AppCard } from "@/components/shared/app-card";
 import { Code } from "@/components/shared/page-layout";
 import { EmptyState } from "@/components/shared/empty-state";
 import { useFamily } from "@/lib/api/families";
 import { ApiError } from "@/lib/api/client";
-
-const secondaryTabs = [
-  { value: "documents", label: "الوثائق" },
-] as const;
 
 // Tabs that can be opened directly via ?tab= (e.g. returning from an
 // assessment screen).
@@ -157,11 +152,6 @@ export function FamilyProfileView({
           {showTab("assessments") && <TabsTrigger className={tabTrigger} value="assessments">التقييمات</TabsTrigger>}
           {showTab("needs") && <TabsTrigger className={tabTrigger} value="needs">الاحتياجات</TabsTrigger>}
           {showTab("assistance") && <TabsTrigger className={tabTrigger} value="assistance">المساعدات</TabsTrigger>}
-          {secondaryTabs.map((t) => (
-            <TabsTrigger className={tabTrigger} key={t.value} value={t.value}>
-              {t.label}
-            </TabsTrigger>
-          ))}
           {showTab("history") && <TabsTrigger className={tabTrigger} value="history">السجل</TabsTrigger>}
         </TabsList>
 
@@ -200,12 +190,6 @@ export function FamilyProfileView({
             <FamilyAssistanceTab familyCode={family.family_code} />
           </TabsContent>
         )}
-
-        {secondaryTabs.map((t) => (
-          <TabsContent key={t.value} value={t.value} className="mt-4">
-            <TabPlaceholder />
-          </TabsContent>
-        ))}
 
         {showTab("history") && (
           <TabsContent value="history" className="mt-4">
