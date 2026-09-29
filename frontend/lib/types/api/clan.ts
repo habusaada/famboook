@@ -58,6 +58,8 @@ export interface FamilyBranchRef {
 export interface CreateClanPayload {
   code: string;
   name: string;
+  // Optional; a new Clan is active unless explicitly created inactive.
+  is_active?: boolean;
 }
 
 export interface UpdateClanPayload {

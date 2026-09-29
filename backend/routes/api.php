@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
 use App\Http\Controllers\Api\V1\HealthRecordController;
+use App\Http\Controllers\Api\V1\InitialFamilyImportController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
@@ -292,5 +293,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/branch-groups/{branchGroup}', [ClanStructureController::class, 'updateGroup']);
         Route::post('/clans/{clan}/branches', [ClanStructureController::class, 'storeBranch']);
         Route::patch('/branches/{branch}', [ClanStructureController::class, 'updateBranch']);
+    });
+
+    // Import Wizard — staging, mapping and review (docs/03 §96a,
+    // docs/06 §61, AUTH-ADR-060). No Apply endpoint in this phase.
+    Route::prefix('imports/initial-families')->group(function () {
+        // Steps 1–2: explicit Clan + import mode, workbook, worksheet.
+        Route::middleware('can:import.upload')->group(function () {
+            Route::post('/', [InitialFamilyImportController::class, 'store']);
+            Route::post('/{importBatch}/file', [InitialFamilyImportController::class, 'replaceFile']);
+            Route::put('/{importBatch}/worksheet', [InitialFamilyImportController::class, 'selectWorksheet']);
+        });
+        // Step 3: column mapping; confirming it stages the rows.
+        Route::middleware('can:import.validate')->group(function () {
+            Route::get('/{importBatch}/columns', [InitialFamilyImportController::class, 'columns']);
+            Route::post('/{importBatch}/mapping', [InitialFamilyImportController::class, 'confirmMapping']);
+            // Step 5: reconciliation with the registry (read-only on the registry; not Apply).
+            Route::post('/{importBatch}/reconcile', [InitialFamilyImportController::class, 'reconcile']);
+        });
+        // Steps 4–5: read-only review.
+        Route::middleware('can:import.review')->group(function () {
+            Route::get('/', [InitialFamilyImportController::class, 'index']);
+            Route::get('/{importBatch}', [InitialFamilyImportController::class, 'show']);
+            Route::get('/{importBatch}/family-keys', [InitialFamilyImportController::class, 'familyKeys']);
+            Route::get('/{importBatch}/rows', [InitialFamilyImportController::class, 'problemRows']);
+            Route::get('/{importBatch}/reconciliation', [InitialFamilyImportController::class, 'reconciliationRows']);
+            // Step 4 decisions (creating a Branch additionally needs clan.manage,
+            // enforced in ResolveFamilyKeyAction). Keys travel in the body.
+            Route::put('/{importBatch}/family-keys/resolution', [InitialFamilyImportController::class, 'resolveFamilyKey']);
+            Route::post('/{importBatch}/family-keys/resolution/clear', [InitialFamilyImportController::class, 'clearFamilyKey']);
+            Route::post('/{importBatch}/family-keys/bulk', [InitialFamilyImportController::class, 'bulkResolveFamilyKeys']);
+        });
     });
 });

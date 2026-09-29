@@ -2294,6 +2294,43 @@ data is imported. **Still open (Phase 2):** Excel parser, normalization,
 validation, duplicate detection, branch matching, preview/review UI and API,
 controlled apply; then exports and import audit.
 
+2026-09-29: **Initial Family Import — Phase 2A** delivered (docs/03 §96a,
+AUTH-ADR-060): upload of the source workbook for an explicit target Clan,
+positional parsing (OpenSpout; formulas never evaluated, cached values
+flagged), staging with sanitized raw and normalized payloads, batch summary
+and read-only family-key discovery scoped to the target Clan, minimal staff
+UI (`/administration/imports`). No registry record is created. **Still
+open:** Phase 2B family-key review ("مراجعة مفاتيح الأسر"), Phase 2C
+validation and duplicate detection, Phase 2D apply.
+
+2026-09-29: **Import Wizard** delivered (docs/03 §96a): one six-step RTL
+Wizard for INITIAL and INCREMENTAL imports — explicit Clan (select or create)
+and import mode, workbook inspection with explicit worksheet, reviewable
+column mapping (positional, excluded columns never mappable), staging on
+mapping confirmation with READY / NEEDS REVIEW / REJECTED counts and issue
+breakdown, read-only family keys, staging review and an Apply shell.
+Reconciliation statuses are reserved; nothing is written to the registry.
+**Still open:** family-key resolution, incremental reconciliation (National
+ID candidates, field comparison, Person ≠ Family), Apply.
+
+2026-09-29: **Family-key resolution (Phase 2B)** delivered (docs/03 §96a):
+step 4 "مراجعة مفاتيح الأسر" records one explicit decision per batch and
+exact source key (existing Branch, new ungrouped Branch via `clan.manage`,
+same Branch as another key, or no Branch), with search, filters, reviewed
+bulk actions, backend progress and Step 5 gated until every key is resolved.
+Source keys stay immutable; nothing is inferred or copied between batches.
+**Still open:** suggesting prior decisions in later batches, incremental
+reconciliation, Apply.
+
+2026-09-29: **Record reconciliation (Phase 3)** delivered (docs/03 §96a):
+Step 5 compares staged rows with the permanent registry without changing it
+— HEAD Person by exact National ID, Family only through that Person's active
+household-head membership in the batch's Clan, spouses separately — and
+classifies each row NEW / UNCHANGED / CHANGED / DUPLICATE_IN_FILE / CONFLICT
+/ REVIEW_REQUIRED with evidence, differences and a staleness fingerprint;
+Step 6 is gated on a current result. **Still open:** review decisions for
+CHANGED / duplicate / conflict rows, Apply.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4704,6 +4741,10 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.17 | 2026-09-29 | Approved | Phase 23 progress note: record reconciliation (Phase 3) |
+| 1.2.16 | 2026-09-29 | Approved | Phase 23 progress note: family-key resolution (Phase 2B) |
+| 1.2.15 | 2026-09-29 | Approved | Phase 23 progress note: Import Wizard (INITIAL / INCREMENTAL, mapping-based staging, review; no Apply) |
+| 1.2.14 | 2026-09-29 | Approved | Phase 23 progress note: Initial Family Import Phase 2A (upload, parse, stage, family-key discovery) |
 | 1.2.13 | 2026-09-29 | Approved | Phase 23 progress note: Initial Family Import Phase 1 foundation (staging tables, Declared Household Statistics, RecordPersonDeathAction) |
 | 1.2.12 | 2026-09-28 | Approved | Phase 13 progress note: Assessments Pilot Workspace (cross-family Assessment List and registry API, Assessment Detail, Draft Editor and New Assessment) |
 | 1.2.11 | 2026-09-27 | Approved | Phase 29 progress note: Pilot Readiness Slice D (production Pilot environment preparation; server-side steps outstanding) |

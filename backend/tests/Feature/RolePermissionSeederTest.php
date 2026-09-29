@@ -311,8 +311,12 @@ class RolePermissionSeederTest extends TestCase
         //      + clan.view/manage (AUTH-ADR-054)
         //      + dashboard.view-operational (AUTH-ADR-055)
         //      + report.view (AUTH-ADR-056)
-        //      + family-membership.update/end, person.national-id.view-masked/update (AUTH-ADR-059).
-        $this->assertSame(75, $superAdmin->getAllPermissions()->count());
+        //      + family-membership.update/end, person.national-id.view-masked/update (AUTH-ADR-059)
+        //      + import.upload/validate/review (AUTH-ADR-060; import.apply stays unassigned).
+        $this->assertSame(78, $superAdmin->getAllPermissions()->count());
+        foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
+            $this->assertTrue($superAdmin->hasPermissionTo($permission));
+        }
     }
 
     public function test_documented_role_permission_assignments_work(): void

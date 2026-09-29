@@ -4,6 +4,7 @@ namespace Tests\Feature\Import;
 
 use App\Enums\ImportBatchStatus;
 use App\Enums\ImportRowStatus;
+use App\Models\Clan;
 use App\Models\Family;
 use App\Models\ImportBatch;
 use App\Models\ImportRow;
@@ -27,7 +28,10 @@ class ImportStagingTest extends TestCase
         $uploader = User::factory()->create();
         $applier = User::factory()->create();
 
+        $clan = Clan::create(['code' => 'SYN_STAGING', 'name' => 'عشيرة تجريبية']);
         $batch = ImportBatch::create([
+            'clan_id' => $clan->id,
+            'import_mode' => 'INITIAL',
             'source_filename' => 'synthetic.xlsx',
             'source_checksum' => hash('sha256', 'synthetic'),
             'status' => ImportBatchStatus::UPLOADED,
@@ -41,6 +45,7 @@ class ImportStagingTest extends TestCase
         $this->assertSame(ImportBatchStatus::UPLOADED, $batch->status);
         $this->assertSame(3, $batch->row_count);
         $this->assertTrue($batch->uploader->is($uploader));
+        $this->assertTrue($batch->clan->is($clan));
         $this->assertNull($batch->applier);
 
         $batch->update(['status' => ImportBatchStatus::APPLIED, 'applied_by' => $applier->id, 'applied_at' => now()]);

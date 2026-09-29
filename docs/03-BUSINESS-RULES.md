@@ -2417,32 +2417,336 @@ Controlled Application
 
 ---
 
-# 96a. Import Staging and the Initial Family Import
+# 96a. Import Wizard — Initial and Incremental Family Import
 
-Approved 2026-09-29. Phase 1 (foundation) is implemented; Phase 2 (parser,
-normalization, validation, duplicate detection, branch matching, preview,
-review, apply) is not.
+Approved 2026-09-29. Staging foundation, the **Import Wizard (steps 1–5,
+step 6 as a shell)**, **family-key resolution (Phase 2B)** and **record
+reconciliation (Phase 3)** are **IMPLEMENTED NOW**. **Apply is a FUTURE
+PHASE** — an import has not written any Family, Person or Membership; the
+only reference data it may produce are Branches explicitly created by an
+authorized administrator while resolving keys.
 
-## Staging (implemented)
+## The Wizard (`/administration/imports`, "الاستيراد الأولي وتحديث بيانات الأسر")
 
 ```text
-UPLOAD → PARSE → VALIDATE → DUPLICATE DETECTION → BRANCH MATCHING
-       → PREVIEW → REVIEW → APPLY (Domain Actions only)
+1 العشيرة             explicit target Clan (select or create) + import mode   IMPLEMENTED
+2 ملف البيانات        upload, inspect, explicit worksheet                     IMPLEMENTED
+3 تعيين الأعمدة       column → canonical field mapping; confirming STAGES     IMPLEMENTED
+4 مراجعة مفاتيح الأسر  discovery + one explicit decision per distinct key      IMPLEMENTED
+5 مراجعة البيانات     staging review (counts, issues, keys, problem rows,     IMPLEMENTED
+                      key-resolution summary) + reconciliation with the
+                      registry (read-only on the registry)
+6 الاعتماد والاستيراد  shell only (shows reconciliation) — no Apply          FUTURE
 ```
 
-- Source files are staged as `import_batches` / `import_rows` (docs/02
-  §88a, docs/04 §83a). Staging is never canonical data; canonical tables
-  are written only by the existing Domain Actions (RegisterFamilyAction,
-  AddFamilyMemberAction, RecordPersonDeathAction,
-  RecordHouseholdDeclarationAction) with `NationalIdGuard`.
-- Permissions are the existing `import.upload`, `import.validate`,
-  `import.review` and `import.apply` (docs/06 §61, §84). There is no public
-  import endpoint.
-- `raw_payload` is RESTRICTED (it may hold National IDs).
-- **Excluded source fields are never persisted** — not in `raw_payload`,
-  not anywhere: `هويتك` and `الديانة`. The parser drops them
-  (`ImportRawPayload::sanitize`) and the `ImportRow` model refuses any
-  write that still contains them.
+A step opens only when its prerequisites hold (1: Clan + mode; 3: inspected
+workbook with a selected worksheet; 4: confirmed mapping and staged rows;
+5: additionally every distinct non-blank family key explicitly resolved;
+6: additionally a CURRENT reconciliation).
+Warnings never block navigation. The batch lives in the URL (`?batch=`), so
+reopening restores its context; its Clan and mode never change — another
+Clan or mode needs a new import flow.
+
+## Two import modes (explicit, never inferred)
+
+```text
+INITIAL       first controlled population of a Clan's dataset
+INCREMENTAL   a later (possibly daily) complete workbook for the same Clan
+```
+
+Repeated uploads for a Clan are **expected**. An INCREMENTAL workbook may
+repeat previously imported records, add new ones, change some and contain
+duplicates or conflicts — the system never assumes "new workbook = new
+Families/Persons". Every upload is an **independent Import Batch**; batches
+are never merged or replaced, so the history of what each file contained is
+kept (future phases record which batch introduced, re-encountered or
+proposed changes to a record and which changes were accepted or rejected).
+
+## Staging rules (implemented)
+
+- **Target Clan is mandatory and explicit** (`import_batches.clan_id`); there
+  is no default Clan and it is never read from the Excel. A Clan may be
+  created inside step 1 through the existing Clan creation (`clan.manage`):
+  it creates the Clan only — no Branch Group, Branch or Family.
+- **Upload is not staging.** The workbook is stored on the PRIVATE disk and
+  inspected: worksheet names, header labels with their column letters and
+  positions, row counts — never cell values. One obvious data sheet is
+  suggested; several plausible sheets require an explicit choice.
+- **Column mapping.** Famboook works on canonical fields
+  (`source_family_key`, `national_id`, `full_name`, `birth_date`, `gender`,
+  `marital_status`, `original_residence_text`, `life_status_source`,
+  `death_date`, `declared_household_size`, `declared_living_sons`,
+  `declared_living_daughters`, `mobile`, `wife_1…4_national_id`,
+  `wife_1…4_name`). Required: `source_family_key`, `national_id`,
+  `full_name`; the rest are optional and stay NULL when absent. Known
+  headers get reviewable suggestions (header-only cosmetic normalization);
+  source VALUES are never fuzzy-normalized. Columns are identified by
+  letter/position, never by header text alone, so the repeated
+  "هوية الزوجة" / "الزوجة" headers stay distinct. Every kept column is
+  explicitly mapped or ignored ("تجاهل هذا العمود"); a column serves one
+  field at most. Samples in the preview are masked (IDs and phones show
+  the last 3 digits only).
+- **Staging happens only on "اعتماد تعيين الأعمدة".** Replacing the
+  workbook or changing the worksheet invalidates the mapping; confirming a
+  different mapping re-stages. Only that batch's own staged rows are
+  discarded — never another batch, never registry data.
+- **Excluded source fields are never persisted or mappable**: `هويتك` and
+  `الديانة`. They are listed under "أعمدة مستبعدة" by header only; their
+  values never reach `raw_payload`, `normalized_payload`, `issues`, batch
+  metadata, previews, API responses or logs (`ImportRawPayload` guard).
+- **Family key is explicit source data** (`المفتاح`), whitespace-normalized
+  only (trim, collapse spaces; no ة/ه or hamza changes). It is **never
+  inferred** from the head's name, surname, gender, marital status or a
+  spouse's name. Formula-produced keys keep Excel's cached value (formulas
+  are never evaluated), are marked `source_family_key_origin = FORMULA` and
+  flagged — never trusted as approved Branch membership.
+- **Female and widowed household heads are valid** and stage normally; a
+  widow's surname is never used to infer her late husband's Branch.
+- **Branch Groups are outside the import.**
+- **Row classification is structural only**, with stable issue codes:
+
+```text
+TOTAL          every non-blank source row that was staged
+READY          PENDING — staged without issues
+NEEDS REVIEW   FLAGGED — staged with review flags (NOT rejected):
+               MISSING_FAMILY_KEY, FAMILY_KEY_FROM_FORMULA,
+               FAMILY_KEY_TOO_LONG, MISSING_FULL_NAME
+REJECTED       kept in staging, structurally blocked: CELL_ERROR, EXTRA_CELLS
+TOTAL = READY + NEEDS REVIEW + REJECTED
+```
+
+- **Staging success is not a domain import.** The UI says "تم تجهيز … صف"
+  and "لم يتم تطبيق البيانات على السجل بعد" — never "تم استيراد … أسرة".
+- **Step 4 is read-only discovery**: per distinct key its row count,
+  formula-row count, example source rows and whether a Branch with EXACTLY
+  that name exists in the TARGET Clan (another Clan's Branch is
+  irrelevant). No mapping, no Branch creation, no fuzzy matching.
+
+## Duplicate file ≠ existing record ≠ duplicate row
+
+```text
+Duplicate FILE         the same SHA-256 for the same Clan while an earlier
+                       batch of it is live (not FAILED) → refused (409, link
+                       to that batch), whatever the import mode. IMPLEMENTED.
+Existing DOMAIN record a source row describing a Person/Family already in
+                       Famboook → FUTURE reconciliation.
+Duplicate SOURCE row   the same identity twice inside one workbook → FUTURE.
+```
+
+A different workbook for the same Clan is always allowed, and a different
+checksum never means its rows are new. The same file for another Clan may
+be staged (another intended context).
+
+## Record reconciliation (IMPLEMENTED NOW — Phase 3)
+
+**Reconciliation ≠ Apply.** Reconciliation answers "what does each staged
+row correspond to in the current permanent registry?" and persists only
+staging metadata (`import_rows.reconciliation_status` and an evidence record
+per row, docs/02 §88c). It never writes Persons, Families, Memberships,
+Residences, declarations or Branches and never changes staged source values.
+Endpoint `POST …/{batch}/reconcile` (`import.validate`); it requires staged
+rows and every family key resolved. Re-running replaces the result
+(deterministic; no duplicates).
+
+**Person matching ≠ Family matching.**
+
+- **HEAD Person**: an **exact** National ID match on the stored value — the
+  same rule as `NationalIdGuard` (PDD-001 normalization stays open). A match
+  that only appears after normalizing digits/separators is surfaced
+  (`FORMAT_VARIANT`, review), never used. A matching National ID is a
+  deterministic *candidate* — never permission to update the Person.
+- **Family**: only through the matched Person's **active household-head
+  membership** in a Family of the batch's Clan. Never by head name, family
+  key, Branch, phone, city, declared size or spouse name — a family key or
+  Branch is classification, not household identity.
+- **Spouses** (up to four): matched separately by exact National ID as
+  candidates only; never created or merged here.
+- **No National ID**: never deduplicated by name. A no-ID head is `NEW`
+  unless the same (whitespace-normalized) name exists in another staged row
+  or in the registry, in which case it is `REVIEW_REQUIRED` — the name only
+  raises review, it never matches.
+- An existing Person who heads no Family gives `NEW` (new Family) with
+  `head_match = EXISTING_PERSON`, `family_match = NO_EXISTING_FAMILY`.
+
+States (strongest wins: CONFLICT > DUPLICATE_IN_FILE > REVIEW_REQUIRED >
+CHANGED > UNCHANGED > NEW):
+
+```text
+NEW                no deterministic existing Family — creation candidate for a
+                   future Apply (nothing is created now)
+UNCHANGED          deterministic Family match, no meaningful differences
+CHANGED            deterministic Family match with differences (shown field by
+                   field: registry vs file; nothing is overwritten)
+DUPLICATE_IN_FILE  the same head National ID on several rows of the batch
+                   (all such rows; none chosen, none collapsed)
+CONFLICT           unsafe identity evidence: the ID is on several registry
+                   Persons; the Person is a non-head member of another Family;
+                   the Person heads a Family of another Clan; head ID equals a
+                   spouse ID of the same row
+REVIEW_REQUIRED    insufficient or ambiguous evidence: head/spouse cross-role
+                   use in the file (except an accepted polygamous household
+                   pair, see below), a spouse ID repeated within a
+                   row, a spouse
+                   ID repeated across rows unless every other head of the group
+                   is deceased (see below), a spouse in another Family, a
+                   deleted-Person match,
+                   a format-variant ID, a birth-date/gender mismatch with the
+                   existing Person, no-ID name ambiguity, a death date without
+                   "متوفى"/"متوفي", an unknown source value, a rejected row
+```
+
+**Repeated spouse across households (widow remarriage)**: the same exact
+spouse National ID on several household rows is one Person candidate, and
+the whole group of rows is judged together by the heads' mapped life status:
+
+- at most one head ALIVE and every other head DECEASED → legitimate
+  (remarriage after the husband's death); informational only, it does not
+  by itself require review;
+- two or more heads ALIVE → REVIEW_REQUIRED ("ظهرت الزوجة نفسها في أكثر من
+  أسرة مع أرباب أسر أحياء");
+- otherwise, any head with an unknown/unmapped life status → REVIEW_REQUIRED;
+  death is never assumed.
+
+Excel row order is never treated as marriage chronology. This rule does not
+change the duplicate-head rule, the same-spouse-in-one-row rule, head/spouse
+cross-role use or identity conflicts.
+
+**Polygamous household (approved source semantics)**: the wife slots of a
+head's row are in source order (wife_1 first, the last non-empty slot last).
+Slot position is kept as source evidence only; it does NOT decide which wife
+belongs to which Family. A HEAD ↔ SPOUSE cross-role between a man and a woman
+is accepted as two independent source households (informational "أسرة مستقلة
+لزوجة رب أسرة متعدد الزوجات", not blocking) only when all hold:
+
+1. his row: MALE and ALIVE;
+2. his marital status is exactly "متعدد الزوجات";
+3. her exact National ID is in one of his wife slots (any slot, including
+   the last);
+4. she heads her own source row;
+5. her row names him back by his exact National ID;
+6. neither row (his, hers) needs review for any other reason.
+
+Several women heading their own rows may name the same polygamous husband;
+for such validated pairs that is not a shared spouse (other spouse reuse
+follows the normal rules). A DECEASED husband is not handled by this rule
+(the ordinary and widow/remarriage rules apply); an unknown life status, an
+ordinary married head, a missing reciprocal ID or a name-only relationship
+keeps REVIEW_REQUIRED. Polygamy is never inferred from several women naming
+the same man, and Excel row order is never used. The same exact ID is one
+Person candidate.
+
+**Architecture constraint for a future Apply** (not implemented): each
+accepted household row becomes its own Family with that row's head as
+Household Head; a woman with an accepted independent row stays head of her
+own Family. V1 allows one active membership per Person and one active head
+per Family, so Apply must not also make the husband an active member of her
+Family, and must not create conflicting active memberships to reproduce
+every source spouse reference; those references are preserved as evidence
+for future relationship modeling. Wife-slot position never decides
+membership. This rule is separate from widow remarriage above.
+
+Differences compare only fields the source provides (an absent source value
+is never a change): Person full name (whitespace-collapsed), birth date,
+gender, marital status, mobile, life status, death date; Family — only with a
+deterministic Family match — resolved Branch (a `NO_BRANCH` decision means
+"no information", never "remove the Branch"), original residence and the
+declared household statistics. Source text is mapped through fixed spelling
+lists (e.g. ذكر/أنثى, متزوج/متعدد الزوجات → MARRIED, حي, متوفى/متوفي →
+DECEASED) — no fuzzy Arabic normalization. Forbidden columns never take part.
+
+**Preliminary readiness**: `NEW` and `UNCHANGED` are non-blocking; `CHANGED`,
+`DUPLICATE_IN_FILE`, `CONFLICT` and `REVIEW_REQUIRED` need review before any
+future Apply. Final Apply eligibility is decided in the Apply phase.
+
+**Staleness**: a run stores a fingerprint of its inputs — the staging
+(mapping confirmation), the key decisions and cheap registry markers
+(counts / latest updates of persons, families, memberships, residences,
+declarations and the Clan's Branches). A different current fingerprint marks
+the result `STALE`; a re-confirmed mapping, a new workbook or a new worksheet
+discards it (`NOT_RUN`). A future Apply must refuse a result that is not
+`CURRENT`. Step 6 opens only for a `CURRENT` reconciliation.
+
+**INITIAL and INCREMENTAL** use the same engine. INCREMENTAL is **not
+synchronization**: a Person or Family absent from a later workbook is
+**never** deleted, deactivated, marked deceased, stripped of memberships or
+spouse links, or otherwise modified — absence is never examined and no
+deletion is ever proposed. Each batch has its own result; results are never
+reused across batches. Unchanged records will be skipped by a future Apply,
+while the batch keeps the record that it encountered them.
+
+## Family-key resolution — "مراجعة مفاتيح الأسر" (IMPLEMENTED NOW)
+
+**`source_family_key` ≠ Branch.** A key from Excel is source data only; an
+authorized administrator decides explicitly what it means inside the
+batch's Clan. The decision is made **once per (batch, exact source key)** and
+applies to every staged row of that batch with exactly that key
+(`import_family_key_resolutions`, docs/02 §88b). The staged source key is
+**immutable** — resolution is a separate layer and never rewrites it.
+
+```text
+MATCH_EXISTING_BRANCH  "ربط بفرع موجود"          a selectable Branch of the batch's Clan
+CREATE_NEW_BRANCH      "إنشاء فرع جديد"           creates ONE Branch in the batch's Clan,
+                                                  UNGROUPED (branch_group_id NULL), then maps
+SAME_BRANCH_AS_KEY     "ربط بنفس فرع مفتاح آخر"   reuses the FINAL Branch of another resolved
+                                                  key of the batch (spelling variants)
+NO_BRANCH              "بدون فرع"                 explicit: families may later get branch_id NULL
+(no decision)          "لم يُحسم"                 UNRESOLVED — NOT the same as NO_BRANCH
+```
+
+- **Nothing is inferred or automatic**: never from a Person's name or
+  surname, gender, marital or widow status, or row frequency. An exact
+  Branch-name match in the target Clan is shown as a **suggestion only** and
+  is never saved without the administrator's confirmation. There is no fuzzy
+  matching and no automatic merging of spelling variants (أ/ا, ة/ه, ى/ي,
+  "ال", …): the administrator decides, e.g. by resolving "ابو سعادة" to the
+  same Branch as "أبو سعادة" (SAME_BRANCH_AS_KEY). A key that appears once is
+  not invalid by itself; its row count stays visible.
+- **Target Clan only.** Only selectable Branches of the batch's Clan
+  (`Branch::isSelectable`: Branch and Clan active and, when grouped, its
+  Group active) can be chosen — enforced by the Domain Action and by
+  composite foreign keys in the database.
+- **Branch creation is an explicit reference-data action**, never an
+  automatic import effect: it requires `clan.manage` (in addition to
+  `import.review`), an explicit name (defaulting to the source key) and an
+  explicit code (the domain requires one; it is never derived from Arabic
+  text), and a confirmation. It uses the existing Branch creation (ungrouped)
+  and refuses a name already used by a Branch of the Clan (link it instead).
+  No Branch Group, Family, Person or Membership is created. Bulk creation is
+  possible only for keys the administrator selected, after a preview in
+  which each name and code is reviewed (a helper can fill blank codes with a
+  neutral numbered sequence, still editable); it is all or nothing.
+  Explicitly selected keys can also be set to NO_BRANCH in bulk.
+- **SAME_BRANCH_AS_KEY stores the final Branch directly** (the other key is
+  kept for audit only), so there are no chains or loops; changing the other
+  key later does not cascade.
+- **Editing before Apply**: a decision can be changed or cleared (back to
+  UNRESOLVED). A Branch created by an earlier decision is **never deleted**;
+  it simply stays in the Clan's structure.
+- **Audit**: each decision records who decided (`resolved_by`) and when
+  (`resolved_at`), the exact key, the decision and the target Branch.
+- **Progress & readiness** are backend-authoritative (distinct, resolved,
+  unresolved, per decision). NO_BRANCH counts as resolved. Rows with a blank
+  key need no (and get no) resolution. Step 5 opens only when every distinct
+  non-blank key is resolved (both import modes).
+- **Staging interplay**: re-confirming the column mapping keeps decisions
+  for keys that are still staged and drops only those whose key disappeared;
+  replacing the workbook or changing the worksheet clears the batch's
+  decisions. Branches are never touched.
+- Branch Groups are created and Branches organized manually after import.
+
+**FUTURE PHASE**: decisions belong to their batch. A later (e.g. INCREMENTAL)
+batch with the same keys starts UNRESOLVED — prior confirmed decisions are
+**not** copied or applied automatically; a future phase may *suggest* them.
+No alias intelligence, no fuzzy matching.
+
+## Authorization
+
+`import.upload` (steps 1–2), `import.validate` (mapping and staging),
+`import.review` (steps 4–5, including key decisions) — SUPER_ADMIN only
+(AUTH-ADR-060). Creating a Clan (step 1) or a Branch (step 4) additionally
+requires `clan.manage`; a reviewer without it may still map to existing
+Branches or choose NO_BRANCH. `import.apply` stays unassigned; there is no
+Apply endpoint.
 
 ## Initial Family Excel import — approved mapping (Phase 2 target)
 
@@ -2450,15 +2754,19 @@ UPLOAD → PARSE → VALIDATE → DUPLICATE DETECTION → BRANCH MATCHING
 هويتك              ignored completely (never a National ID, never a Person,
                    never used for duplicate detection, never persisted)
 الديانة            ignored completely (outside the approved dataset)
+المفتاح            source family key → Phase 2B review → families.branch_id
+                   (or NULL); never inferred from any name
 رقم الهوية         head persons.national_id (read as text)
-الاسم              head persons.full_name (as written); branch source
+الاسم              head persons.full_name (as written); never a branch source
 الميلاد            head persons.birth_date (NULL when unknown/partial)
 الجنس              head persons.gender
 الحالة الاجتماعية  head persons.marital_status (unmapped → flagged)
 المدينة            family_residences.original_residence_text — the ORIGINAL
                    city; never city, never current residence, never
                    displacement status or location
-حالة الوفاة        حي → ALIVE, متوفي → DECEASED (via RecordPersonDeathAction)
+حالة الوفاة        حي → ALIVE, متوفي → DECEASED (via RecordPersonDeathAction);
+                   the 2026-09-29 source spells it متوفى — Phase 2C decides
+                   the exact accepted spellings
 الوفاة             head persons.death_date (never invented)
 أفراد الأسرة       declared_household_size          (§55c)
 أبناء ذكور أحياء   declared_living_sons              (§55c)
@@ -2494,21 +2802,13 @@ unknown / unmapped death status    FLAGGED
 death date without DECEASED        FLAGGED
 ```
 
-- **Branch:** derived from the END of the head's full name against the
-  canonical `branches` names only: Arabic-normalized comparison (أ/إ/آ → ا,
-  ى → ي, no tatweel, no diacritics, normalized whitespace and separators
-  such as "-"; ة handled conservatively), whole-token suffix match,
-  longest match wins, compound names supported. No match, an ambiguous or a
-  conflicting match → `branch_id` NULL and the row FLAGGED. Branches are
-  never created automatically and never derived from a wife's name.
-  *Update 2026-09-29 (not implemented):* the source will carry a dedicated
-  `مفتاح العائلة` column intended to create/match Branches of the target
-  Clan. How it combines with or replaces name-suffix matching, and whether
-  and how Branches may be created from it, is a Phase 2 decision (it must
-  be reconciled with CB-2 and the "never created automatically" rule
-  above). Either way, the import matches or creates Branches **per Clan
-  only and never depends on Branch Groups** (§7a); grouping is an
-  administrative step after import.
+- **Branch:** comes only from the explicit `المفتاح` key through the
+  Phase 2B administrator decision (above) — **superseding** the earlier
+  name-suffix matching idea, which is withdrawn. The system never derives a
+  Branch from any name (consistent with CB-2: the key is source data, not an
+  inference) and never creates a Branch without that explicit decision.
+  Branches are resolved per target Clan only and never depend on Branch
+  Groups (§7a).
 - **National IDs:** read as strings (never Excel numbers); Arabic/Western
   digits and formatting noise normalized for comparison only; duplicates
   detected inside the batch and against existing Persons; the canonical
@@ -3609,6 +3909,13 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.23 | 2026-09-29 | Approved | §96a polygamous-household correction: wife-slot position is source evidence only and never decides Family membership; the cross-role is accepted for any wife slot (including the last) when the husband is MALE, ALIVE and "متعدد الزوجات" and both rows reference each other by exact National ID with no other review reason; deceased husband → not this rule; unknown life status, ordinary married, missing reciprocal → REVIEW_REQUIRED; future-Apply one-active-membership constraint recorded |
+| 1.2.22 | 2026-09-29 | Approved | §96a polygamous-household rule: wife-slot order is marriage order (last non-empty slot = latest wife, stays with the male head); an earlier wife of a "متعدد الزوجات" head heading her own row is accepted (informational) when linked by exact ID and neither row has another review reason; latest-wife HEAD ↔ SPOUSE, ordinary married and unknown statuses stay REVIEW_REQUIRED; no inference from row order or from several women naming one man |
+| 1.2.21 | 2026-09-29 | Approved | §96a spouse-reuse correction: a spouse National ID repeated across household rows is accepted automatically only when every other head of the group is DECEASED (widow remarriage); two or more living heads or an unknown head status → REVIEW_REQUIRED; group evaluation, no row-order chronology, one Person candidate per exact ID |
+| 1.2.20 | 2026-09-29 | Approved | §96a record reconciliation implemented (Phase 3): reconciliation ≠ Apply; Person (exact National ID) ≠ Family (active household-head membership in the batch's Clan) matching; spouses separate; no name-only dedup; family key / Branch are not household identity; NEW / UNCHANGED / CHANGED / DUPLICATE_IN_FILE / CONFLICT / REVIEW_REQUIRED with precedence; field differences; STALE fingerprint; non-destructive incremental imports; Step 6 gated on a CURRENT reconciliation |
+| 1.2.19 | 2026-09-29 | Approved | §96a family-key resolution implemented (Phase 2B): source key ≠ Branch; one decision per batch + exact key (MATCH_EXISTING_BRANCH / CREATE_NEW_BRANCH ungrouped / SAME_BRANCH_AS_KEY / NO_BRANCH); UNRESOLVED ≠ NO_BRANCH; immutable source key; explicit clan.manage Branch creation (single and reviewed bulk); suggestions never auto-saved; Step 5 requires all keys resolved; created Branches never deleted on re-decision; no cross-batch copying |
+| 1.2.18 | 2026-09-29 | Approved | §96a rewritten as the Import Wizard: six steps (Clan + mode, workbook, column mapping, family keys, review, apply shell), explicit INITIAL / INCREMENTAL modes, upload ≠ staging (staging on mapping confirmation), canonical fields and required/optional mapping, READY / NEEDS REVIEW / REJECTED definitions, duplicate file vs existing record vs duplicate row, non-destructive incremental imports, National ID as identity candidate only, Person ≠ Family reconciliation, reserved reconciliation statuses; IMPLEMENTED vs FUTURE marked |
+| 1.2.17 | 2026-09-29 | Approved | §96a Initial Family Import Phase 2A implemented (mandatory target Clan, explicit `المفتاح` key never inferred from names, female/widowed heads valid, formula keys flagged, discovery only, one live batch per file and Clan); Phase 2B family-key review approved (not implemented); name-suffix branch matching withdrawn |
 | 1.2.16 | 2026-09-29 | Approved | §7a: Branch Group is an optional organizational classification (CB-4 selectability for ungrouped Branches, CB-7, CB-8 assign/move/remove within the same Clan); §96a: import never depends on Branch Groups, `مفتاح العائلة` noted as an open Phase 2 decision |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §30 V1 `RecordPersonDeathAction`; §55 Registered Household Size stays derived; §55c Declared Household Statistics; §96a import staging, excluded source fields (هويتك / الديانة) and the approved initial-family Excel mapping for Phase 2; §97a events `PERSON_DEATH_RECORDED`, `HOUSEHOLD_DECLARATION_RECORDED` (no metadata) |
 | 1.2.14 | 2026-09-27 | Approved | Added §93b: relationship correction, ending an incorrect membership, National ID correction and masking, correction activity privacy, optional governorate/city residence decision and remaining limitations; three §97a events |

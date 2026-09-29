@@ -3249,6 +3249,14 @@ One uploaded source file.
 | Field | Required | Meaning |
 |---|---|---|
 | `uuid` | yes | Public identifier |
+| `clan_id` | yes | The target Clan, chosen explicitly (no default). All Branch lookups for the batch are scoped to it |
+| `import_mode` | yes | `INITIAL` or `INCREMENTAL` — explicit, never inferred (docs/03 §96a) |
+| `source_size_bytes` | no | Size of the uploaded workbook |
+| `source_file_path` | no | The workbook on the PRIVATE disk (kept because staging happens after mapping); never exposed |
+| `worksheet_name` | no | The selected / confirmed data worksheet; NULL while several sheets are plausible |
+| `inspection` | no | Worksheet and header STRUCTURE only (sheet names, column letters/positions, header labels, row counts, suggestions) — never cell values |
+| `column_mapping` | no | The confirmed mapping `{"fields": {canonical field: column letter}, "ignored": [letters]}` |
+| `mapping_confirmed_at` | no | Set exactly when a mapping is confirmed (and the rows staged) |
 | `source_filename` | yes | Original file name |
 | `source_checksum` | yes | Lower-case hex SHA-256 of the file (traceability; not unique — a re-upload is legitimate) |
 | `status` | yes | See below |
@@ -3277,10 +3285,20 @@ One staged source row.
 |---|---|---|
 | `import_batch_id` | yes | The batch |
 | `row_number` | yes | 1-based row number in the source sheet; unique within the batch |
-| `raw_payload` | yes | The **sanitized** source values (JSON) needed for validation and traceability |
+| `raw_payload` | yes | The **sanitized** source values (JSON) needed for validation and traceability. Initial-family format: `{"cells": {"B": {"header": "المفتاح", "value": "…", "formula": true}, …}}` — keyed by column letter, so repeated wife headers never collide; formula cells keep Excel's cached value and a marker, never the formula text |
+| `normalized_payload` | no | The explicit normalized representation (JSON): `source_family_key`, `source_family_key_origin` (VALUE / FORMULA), `national_id`, `full_name`, `birth_date`, `gender`, `marital_status`, `original_residence_text`, `life_status_source`, `death_date`, `declared_household_size`, `declared_living_sons`, `declared_living_daughters`, `mobile`, `wife_1…4_national_id`, `wife_1…4_name`, `formula_fields`. Text is trimmed and whitespace-collapsed only; nothing is mapped to domain enums yet |
+| `source_family_key` | no | `المفتاح` after whitespace normalization only (max 150); NULL = missing. Indexed per batch for discovery |
 | `status` | yes | See below |
-| `issues` | no | Validation / review findings (JSON); `NULL` = none recorded |
+| `reconciliation_status` | no | RESERVED for future reconciliation with the registry: `NEW`, `UNCHANGED`, `CHANGED`, `DUPLICATE_IN_FILE`, `CONFLICT`, `REVIEW_REQUIRED`; NULL = not reconciled (always NULL today) |
+| `issues` | no | Validation / review findings (JSON) — codes and field names only, never values; `NULL` = none recorded. Staging codes: `MISSING_FAMILY_KEY`, `FAMILY_KEY_FROM_FORMULA`, `FAMILY_KEY_TOO_LONG`, `MISSING_FULL_NAME` (FLAG); `CELL_ERROR`, `EXTRA_CELLS` (REJECT) |
 | `family_id` | no | The Family this row created; present exactly when `APPLIED`; a Family is created by at most one row |
+
+A file (SHA-256) can be staged only once per Clan while its batch has not
+FAILED (`uq_import_batch_clan_checksum`), whatever the import mode; a
+different file is always allowed and says nothing about whether its records
+are new. An uploaded batch is `UPLOADED` (inspected, not staged); confirming
+the mapping stages it (`VALIDATING` → `READY_FOR_REVIEW`) with rows in
+PENDING (ready) / FLAGGED (needs review) / REJECTED.
 
 Row statuses:
 
@@ -3295,7 +3313,8 @@ SKIPPED   deliberately not applied
 
 ## Privacy
 
-- `raw_payload` may contain National IDs and is **RESTRICTED** (§63), with
+- `raw_payload` and `normalized_payload` may contain National IDs and are
+  **RESTRICTED** (§63); the API never returns them. `raw_payload` has
   the same access philosophy as `persons.national_id`. It is hidden from
   model serialization and may only be exposed through an authorized API
   Resource.
@@ -3306,6 +3325,68 @@ SKIPPED   deliberately not applied
 هويتك     no role in the import
 الديانة   religion is outside the approved Famboook dataset
 ```
+
+---
+
+# 88b. Import Family-Key Resolutions
+
+Approved 2026-09-29 (Import Wizard step 4, docs/03 §96a).
+
+## Entity
+
+```text
+import_family_key_resolutions
+```
+
+One administrator decision per (import batch, exact source family key).
+**No record = UNRESOLVED**, which is distinct from an explicit `NO_BRANCH`.
+The staged `import_rows.source_family_key` is never rewritten.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `import_batch_id` | yes | The batch |
+| `clan_id` | yes | The batch's Clan (mirrors it; lets the database guarantee the Branch is in the same Clan) |
+| `source_family_key` | yes | The exact staged key; unique per batch |
+| `decision` | yes | `MATCH_EXISTING_BRANCH`, `CREATE_NEW_BRANCH`, `SAME_BRANCH_AS_KEY`, `NO_BRANCH` |
+| `branch_id` | no | The FINAL target Branch of the batch's Clan; NULL exactly for `NO_BRANCH` |
+| `reference_source_key` | no | For `SAME_BRANCH_AS_KEY` only: the other key whose Branch was reused (audit; no chains) |
+| `resolved_by` | no | The deciding user |
+| `resolved_at` | yes | When the current decision was made |
+
+A decision applies to every staged row of the batch whose source key equals
+`source_family_key`. Decisions are batch-scoped: another batch never
+inherits them.
+
+---
+
+# 88c. Import Row Reconciliations
+
+Approved 2026-09-29 (Import Wizard step 5, docs/03 §96a). Staging metadata
+only — never registry data.
+
+The authoritative per-row state is `import_rows.reconciliation_status`
+(`NEW`, `UNCHANGED`, `CHANGED`, `DUPLICATE_IN_FILE`, `CONFLICT`,
+`REVIEW_REQUIRED`; NULL = not reconciled). The evidence lives in:
+
+```text
+import_row_reconciliations
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `import_row_id` | yes | The staged row (one evidence record per row; removed with the row) |
+| `import_batch_id` | yes | The batch |
+| `head_match` | yes | HEAD Person evidence: `NO_NATIONAL_ID`, `NO_EXISTING_PERSON`, `EXISTING_PERSON`, `MULTIPLE_PERSONS`, `DELETED_PERSON`, `FORMAT_VARIANT` |
+| `head_person_id` | no | The exact-National-ID Person candidate |
+| `family_match` | yes | Family evidence (separate): `NO_EXISTING_FAMILY`, `EXISTING_FAMILY`, `OTHER_CLAN_FAMILY`, `PERSON_NOT_HEAD`, `NOT_DETERMINED` |
+| `family_id` | no | The deterministic Family (only for `EXISTING_FAMILY`) |
+| `spouse_matches` | no | Per wife slot: candidate status and existing Person id — no values |
+| `differences` | no | For deterministic matches: `[{field, scope, registry, source}]` |
+| `issues` | no | `[{code, context}]` — codes, row numbers, masked National IDs, public person/family codes; never forbidden columns |
+
+`import_batches` gains `reconciled_at`, `reconciled_by` and
+`reconciliation_fingerprint` (the inputs of the last run; a different current
+fingerprint means the result is STALE).
 
 ---
 
@@ -3777,6 +3858,10 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.20 | 2026-09-29 | Approved | §88c `import_row_reconciliations` (HEAD Person vs Family evidence, spouse candidates, differences, issues) and batch `reconciled_at` / `reconciled_by` / `reconciliation_fingerprint`; `import_rows.reconciliation_status` now populated |
+| 1.2.19 | 2026-09-29 | Approved | §88b `import_family_key_resolutions`: one decision per batch + exact source key (MATCH_EXISTING_BRANCH / CREATE_NEW_BRANCH / SAME_BRANCH_AS_KEY / NO_BRANCH), final `branch_id` in the batch's Clan, `reference_source_key`, `resolved_by` / `resolved_at`; no record = UNRESOLVED |
+| 1.2.18 | 2026-09-29 | Approved | §88a Import Wizard: `import_batches.import_mode` (INITIAL / INCREMENTAL), `source_size_bytes`, private `source_file_path`, `worksheet_name`, structure-only `inspection`, `column_mapping` + `mapping_confirmed_at`; reserved `import_rows.reconciliation_status`; upload ≠ staging |
+| 1.2.17 | 2026-09-29 | Approved | §88a Initial Family Import Phase 2A: `import_batches.clan_id` (explicit target Clan), `import_rows.normalized_payload` / `source_family_key`, positional `raw_payload`, Phase 2A issue codes, one live batch per file and Clan |
 | 1.2.16 | 2026-09-29 | Approved | §7a–§7c: Branch Group is an optional organizational classification of Branches — `branches.branch_group_id` nullable (ungrouped = بدون مجموعة), assign/move/remove within the same Clan only, ungrouped active Branches selectable; import must not depend on Branch Groups |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §20a Declared Household Statistics (`family_household_declarations`; Registered vs Declared terminology), §75 Registered-vs-Declared clarification (registered counts stay derived), §88a Import Staging (`import_batches`, `import_rows`, excluded source fields هويتك / الديانة never persisted) |
 | 1.2.14 | 2026-09-27 | Approved | §14: V1 `end_reason` (required free-text correction reason); §19: governorate / city optional (NULL = not recorded); §61a: correction events carry no metadata |

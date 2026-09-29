@@ -59,7 +59,8 @@ async function send(path: string, options: RequestInit): Promise<Response> {
     credentials: "include",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
+      // Multipart uploads let the browser set the boundary itself.
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(xsrfToken ? { "X-XSRF-TOKEN": xsrfToken } : {}),
       ...options.headers,
     },
@@ -104,4 +105,7 @@ export const apiClient = {
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  // Multipart POST (file uploads); same CSRF/session handling.
+  upload: <T>(path: string, form: FormData) =>
+    request<T>(path, { method: "POST", body: form }),
 };

@@ -1916,6 +1916,47 @@ import.apply
 
 Uploading a file must not imply permission to apply data to the canonical registry.
 
+## V1 Role Assignment (AUTH-ADR-060, 2026-09-29)
+
+```text
+import.upload     SUPER_ADMIN
+import.validate   SUPER_ADMIN
+import.review     SUPER_ADMIN
+import.apply      (unassigned until the apply phase)
+```
+
+Import Wizard (docs/03 §96a):
+
+```text
+POST /api/v1/clans                                         clan.manage     (step 1: create the Clan only; optional is_active)
+POST /api/v1/imports/initial-families                      import.upload   (clan_code + import_mode + file: inspect, no staging)
+POST /api/v1/imports/initial-families/{batch}/file         import.upload   (replace workbook; invalidates mapping)
+PUT  /api/v1/imports/initial-families/{batch}/worksheet    import.upload   (select worksheet; invalidates mapping)
+GET  /api/v1/imports/initial-families/{batch}/columns      import.validate (columns, suggestions, masked samples)
+POST /api/v1/imports/initial-families/{batch}/mapping      import.validate (confirm mapping = stage rows)
+GET  /api/v1/imports/initial-families                      import.review   (recent batches)
+GET  /api/v1/imports/initial-families/{batch}              import.review   (batch context + counts)
+GET  /api/v1/imports/initial-families/{batch}/family-keys  import.review   (read-only key discovery)
+GET  /api/v1/imports/initial-families/{batch}/rows         import.review   (problem rows: row number, status, issue codes, key)
+PUT  /api/v1/imports/initial-families/{batch}/family-keys/resolution        import.review (+ clan.manage to create a Branch)
+POST /api/v1/imports/initial-families/{batch}/family-keys/resolution/clear  import.review (back to unresolved)
+POST /api/v1/imports/initial-families/{batch}/family-keys/bulk              import.review (+ clan.manage for bulk Branch creation)
+POST /api/v1/imports/initial-families/{batch}/reconcile                     import.validate (compare with the registry; never a registry write)
+GET  /api/v1/imports/initial-families/{batch}/reconciliation                import.review   (rows: masked IDs, codes, differences)
+```
+
+Reconciliation is not Apply and never uses `import.apply`.
+
+Family-key decisions use `import.review`. Creating a Branch while resolving
+additionally requires `clan.manage`, checked in the Domain Action (403
+otherwise); a reviewer without it may map to existing Branches of the
+batch's Clan or choose NO_BRANCH.
+
+No endpoint returns row payloads, full National IDs or phone numbers,
+names in bulk, or the excluded source values (their headers are listed as
+excluded columns only); samples are masked. There is no apply endpoint. `famboook:verify-permissions` treats SUPER_ADMIN holding
+`import.apply` as a critical failure.
+
 ---
 
 # 62. System Administration Permissions
@@ -3865,6 +3906,10 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.21 | 2026-09-29 | Approved | §61 reconciliation endpoints: run with `import.validate`, read with `import.review`; no new permission; `import.apply` still unassigned |
+| 1.2.20 | 2026-09-29 | Approved | §61 family-key resolution endpoints: decisions with `import.review`; Branch creation during resolution additionally requires `clan.manage`; no new permission |
+| 1.2.19 | 2026-09-29 | Approved | §61 Import Wizard endpoints: `import.upload` (upload, replace workbook, worksheet), `import.validate` (columns, confirm mapping = staging), `import.review` (batch, keys, problem rows); Clan creation in the Wizard via `clan.manage`; no new permission, `import.apply` still unassigned |
+| 1.2.18 | 2026-09-29 | Approved | AUTH-ADR-060: §61 V1 assignment of `import.upload` / `import.validate` / `import.review` to SUPER_ADMIN (`import.apply` unassigned); Phase 2A import endpoints; SUPER_ADMIN 75 → 78 permissions |
 | 1.2.17 | 2026-09-29 | Approved | §56a: `clan.manage` also covers creating ungrouped Branches and assigning/moving/ungrouping Branches within the same Clan; no new permission |
 | 1.2.16 | 2026-09-29 | Approved | §84: staged import rows are RESTRICTED (may hold National IDs; same philosophy as `persons.national_id`), excluded source fields never stored; no new permission |
 | 1.2.15 | 2026-09-27 | Approved | AUTH-ADR-059: §45 V1 assignment of `family-membership.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) and `family-membership.end` (SUPER_ADMIN, ADMINISTRATOR); §39 V1 assignment of `person.national-id.view-masked` / `.update` (SUPER_ADMIN, ADMINISTRATOR), central masking, dedicated correction endpoint; three rows in §140 |

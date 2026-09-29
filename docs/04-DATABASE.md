@@ -2754,9 +2754,17 @@ import_batches
 ```text
 id BIGINT PK
 uuid UUID UNIQUE
+clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT   -- explicit target Clan (Phase 2A), indexed
+import_mode VARCHAR(20) NOT NULL     -- INITIAL | INCREMENTAL (explicit)
 
 source_filename VARCHAR NOT NULL
 source_checksum CHAR(64) NOT NULL   -- lower-case hex SHA-256; indexed, not unique
+source_size_bytes BIGINT NULL
+source_file_path VARCHAR NULL        -- private disk; never exposed
+worksheet_name VARCHAR NULL          -- selected data worksheet
+inspection JSONB NULL                -- sheet/header STRUCTURE only, no cell values
+column_mapping JSONB NULL            -- confirmed {fields, ignored}
+mapping_confirmed_at TIMESTAMP NULL
 status VARCHAR NOT NULL
 row_count INTEGER NOT NULL DEFAULT 0
 failure_reason TEXT NULL
@@ -2776,8 +2784,13 @@ chk_import_batch_status    status IN ('UPLOADED','VALIDATING','READY_FOR_REVIEW'
 chk_import_batch_row_count row_count >= 0
 chk_import_batch_checksum  source_checksum ~ '^[0-9a-f]{64}$'
 chk_import_batch_applied   status <> 'APPLIED' OR applied_at IS NOT NULL
+chk_import_batch_mode      import_mode IN ('INITIAL','INCREMENTAL')
+chk_import_batch_mapping_confirmed (mapping_confirmed_at IS NULL) = (column_mapping IS NULL)
 
-INDEX (status), INDEX (source_checksum)
+INDEX (status), INDEX (source_checksum), INDEX (clan_id)
+
+CREATE UNIQUE INDEX uq_import_batch_clan_checksum
+ON import_batches (clan_id, source_checksum) WHERE status <> 'FAILED';   -- one live batch per file and Clan
 ```
 
 ```text
@@ -2790,7 +2803,10 @@ id BIGINT PK
 import_batch_id BIGINT NOT NULL FK import_batches.id ON DELETE RESTRICT
 row_number INTEGER NOT NULL           -- 1-based source row
 raw_payload JSONB NOT NULL            -- sanitized; RESTRICTED (may hold National IDs)
+normalized_payload JSONB NULL         -- Phase 2A normalized representation; RESTRICTED
+source_family_key VARCHAR(150) NULL   -- المفتاح, whitespace-normalized only; NULL = missing
 status VARCHAR NOT NULL
+reconciliation_status VARCHAR(30) NULL  -- RESERVED for future reconciliation; NULL = not reconciled
 issues JSONB NULL
 family_id BIGINT NULL FK families.id ON DELETE RESTRICT
 
@@ -2801,6 +2817,7 @@ updated_at
 ```sql
 UNIQUE (import_batch_id, row_number)
 INDEX (import_batch_id, status)
+INDEX (import_batch_id, source_family_key)   -- family-key discovery
 
 CREATE UNIQUE INDEX uq_import_row_family
 ON import_rows (family_id) WHERE family_id IS NOT NULL;
@@ -2810,6 +2827,8 @@ chk_import_row_status         status IN ('PENDING','VALID','FLAGGED','REJECTED',
                               'APPLIED','SKIPPED')
 chk_import_row_number         row_number >= 1
 chk_import_row_applied_family (status = 'APPLIED') = (family_id IS NOT NULL)
+chk_import_row_reconciliation reconciliation_status IS NULL OR IN ('NEW','UNCHANGED',
+                              'CHANGED','DUPLICATE_IN_FILE','CONFLICT','REVIEW_REQUIRED')
 ```
 
 As with the existing CHECKs, they are PostgreSQL-only (SQLite cannot add
@@ -2818,6 +2837,89 @@ guard and the Domain Actions enforce the same rules on every driver. The
 uploaded file itself is not stored in these tables. No National ID is
 copied anywhere outside `raw_payload`. Retention/purging of staging data
 follows PDD-017 (open).
+
+---
+
+# 83b. Import Family-Key Resolutions Table
+
+Approved 2026-09-29 (migration `2026_10_09_090000`; docs/02 §88b, docs/03 §96a).
+
+```text
+import_family_key_resolutions
+  id BIGINT PK
+  import_batch_id BIGINT NOT NULL
+  clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT
+  source_family_key VARCHAR(150) NOT NULL
+  decision VARCHAR(30) NOT NULL
+  branch_id BIGINT NULL
+  reference_source_key VARCHAR(150) NULL
+  resolved_by BIGINT NULL FK users.id ON DELETE SET NULL
+  resolved_at TIMESTAMP NOT NULL
+  created_at, updated_at
+  FK fk_key_resolution_batch_clan (import_batch_id, clan_id)
+     → import_batches (id, clan_id) ON DELETE RESTRICT
+  FK fk_key_resolution_branch_clan (branch_id, clan_id)
+     → branches (id, clan_id) ON DELETE RESTRICT      -- MATCH SIMPLE: NULL (NO_BRANCH) not checked
+  UNIQUE uq_key_resolution_batch_key (import_batch_id, source_family_key)
+  INDEX (branch_id)
+
+import_batches (added)
+  UNIQUE (id, clan_id)                                -- composite FK target
+```
+
+```sql
+-- PostgreSQL CHECKs
+chk_key_resolution_decision  decision IN ('MATCH_EXISTING_BRANCH','CREATE_NEW_BRANCH',
+                             'SAME_BRANCH_AS_KEY','NO_BRANCH')
+chk_key_resolution_branch    (decision = 'NO_BRANCH') = (branch_id IS NULL)
+chk_key_resolution_reference (decision = 'SAME_BRANCH_AS_KEY') = (reference_source_key IS NOT NULL)
+```
+
+The composite foreign keys make "a resolved Branch belongs to the batch's
+Clan" a database invariant. A Branch referenced by a decision cannot be
+deleted, and neither can a batch that has decisions. No row = UNRESOLVED.
+Additive; `import_rows` is not changed.
+
+---
+
+# 83c. Import Row Reconciliations Table
+
+Approved 2026-09-29 (migration `2026_10_10_090000`; docs/02 §88c, docs/03 §96a).
+
+```text
+import_row_reconciliations
+  id BIGINT PK
+  import_row_id BIGINT NOT NULL UNIQUE FK import_rows.id ON DELETE CASCADE
+  import_batch_id BIGINT NOT NULL FK import_batches.id ON DELETE RESTRICT
+  head_match VARCHAR(30) NOT NULL
+  head_person_id BIGINT NULL FK persons.id ON DELETE SET NULL
+  family_match VARCHAR(30) NOT NULL
+  family_id BIGINT NULL FK families.id ON DELETE SET NULL
+  spouse_matches JSONB NULL
+  differences JSONB NULL
+  issues JSONB NULL
+  created_at, updated_at
+  INDEX (import_batch_id, head_match)
+
+import_batches (added)
+  reconciled_at TIMESTAMP NULL
+  reconciled_by BIGINT NULL FK users.id ON DELETE SET NULL
+  reconciliation_fingerprint CHAR(64) NULL
+```
+
+```sql
+-- PostgreSQL CHECKs
+chk_row_reconciliation_head_match    head_match IN (…six values…)
+chk_row_reconciliation_family_match  family_match IN (…five values…)
+chk_row_reconciliation_family        EXISTING_FAMILY ⇔ family_id IS NOT NULL
+                                     (except OTHER_CLAN_FAMILY / PERSON_NOT_HEAD)
+```
+
+Evidence is staging data: it disappears with its staged row. The migration
+recreates `uq_import_batch_clan_checksum` with its `WHERE status <> 'FAILED'`
+predicate after altering `import_batches`, because SQLite rebuilds the table
+for a foreign-key change and would otherwise drop the predicate (PostgreSQL
+is unaffected). Additive.
 
 ---
 
@@ -3775,6 +3877,10 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.20 | 2026-09-29 | Approved | §83c `import_row_reconciliations` (migration `2026_10_10_090000`), batch reconciliation columns, CHECKs; partial checksum index preserved on SQLite rebuild |
+| 1.2.19 | 2026-09-29 | Approved | §83b `import_family_key_resolutions` (migration `2026_10_09_090000`): composite FKs to `import_batches (id, clan_id)` and `branches (id, clan_id)`, unique (batch, key), decision/branch/reference CHECKs; `import_batches` UNIQUE (id, clan_id) |
+| 1.2.18 | 2026-09-29 | Approved | §83a Import Wizard (migration `2026_10_08_090000`): `import_batches.import_mode` NOT NULL + `chk_import_batch_mode`, `source_size_bytes`, private `source_file_path`, `worksheet_name`, structure-only `inspection`, `column_mapping` + `mapping_confirmed_at` (`chk_import_batch_mapping_confirmed`); reserved `import_rows.reconciliation_status` (`chk_import_row_reconciliation`); additive; up() refuses if mode-less batches exist |
+| 1.2.17 | 2026-09-29 | Approved | §83a Initial Family Import Phase 2A (migration `2026_10_07_090000`): `import_batches.clan_id` NOT NULL FK RESTRICT + index, `uq_import_batch_clan_checksum` (one live batch per file and Clan), `import_rows.normalized_payload` JSONB and `source_family_key` VARCHAR(150) with `(import_batch_id, source_family_key)` index; additive; up() refuses if clan-less batches exist |
 | 1.2.16 | 2026-09-29 | Approved | §12a: Branch Group optional — `branches.branch_group_id` nullable (migration `2026_10_06_090000`), composite FKs unchanged (MATCH SIMPLE), branch create moves to `POST /clans/{clan}/branches`, `branch_group_id` assign/move/ungroup on update, `ungrouped_branches` in the tree |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §25a `family_household_declarations` (one current per Family, count/source CHECKs), §82 Registered Household Size never stored, §83a `import_batches` / `import_rows` staging tables; additive migrations only, no existing column or row changed |
 | 1.2.14 | 2026-09-28 | Approved | §31: cross-family assessment registry API (`GET /assessments`, status and exact-family filters, whole-registry summary); read-only, no schema change |

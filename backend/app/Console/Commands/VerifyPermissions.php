@@ -40,8 +40,9 @@ class VerifyPermissions extends Command
             'lacks' => ['person.national-id.view'],
         ],
         'SUPER_ADMIN' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access'],
-            'lacks' => ['person.national-id.view'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review'],
+            // import.apply is not assigned until the Apply phase (AUTH-ADR-060).
+            'lacks' => ['person.national-id.view', 'import.apply'],
         ],
     ];
 

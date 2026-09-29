@@ -96,6 +96,8 @@ class ClanStructureController extends Controller
         $data = $request->validate([
             'code' => [...self::CODE, Rule::unique('clans', 'code')],
             'name' => ['required', 'string', 'max:150'],
+            // Optional; a new Clan is active unless explicitly created inactive.
+            'is_active' => ['sometimes', 'boolean'],
         ], $this->messages());
 
         return (new ClanResource($action->createClan($data)))->response()->setStatusCode(201);

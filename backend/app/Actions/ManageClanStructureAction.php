@@ -20,10 +20,15 @@ use Illuminate\Validation\ValidationException;
  */
 class ManageClanStructureAction
 {
-    /** @param array{code: string, name: string} $data */
+    /**
+     * Only the Clan: never Branch Groups or Branches (also used by the Import
+     * Wizard's "create Clan" step). Active unless explicitly created inactive.
+     *
+     * @param  array{code: string, name: string, is_active?: bool}  $data
+     */
     public function createClan(array $data): Clan
     {
-        return DB::transaction(fn () => Clan::create([...$data, 'is_active' => true]));
+        return DB::transaction(fn () => Clan::create([...$data, 'is_active' => $data['is_active'] ?? true]));
     }
 
     /** @param array<string, mixed> $data name / is_active */

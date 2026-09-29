@@ -14,7 +14,9 @@ use InvalidArgumentException;
  *
  * sanitize() is for the parser: it drops excluded fields from a source
  * row. assertClean() is the persistence guard (ImportRow::saving): an
- * excluded field reaching storage is a programming error, not data.
+ * excluded field reaching storage is a programming error, not data. Both
+ * recognise an excluded field as an array key or as the "header" of a
+ * positional cell entry ({"header": "…", "value": …}).
  *
  * Header comparison tolerates cosmetic variants (spacing, tatweel,
  * diacritics, alef/yeh/teh-marbuta forms). It is used only to recognise
@@ -38,6 +40,10 @@ final class ImportRawPayload
             if (is_string($key) && self::isExcluded($key)) {
                 continue;
             }
+            // Positional cells ({header, value}) of an excluded column.
+            if (is_array($value) && self::describesExcludedColumn($value)) {
+                continue;
+            }
             $clean[$key] = is_array($value) ? self::sanitize($value) : $value;
         }
 
@@ -52,7 +58,7 @@ final class ImportRawPayload
     public static function assertClean(array $payload): void
     {
         foreach ($payload as $key => $value) {
-            if (is_string($key) && self::isExcluded($key)) {
+            if ((is_string($key) && self::isExcluded($key)) || (is_array($value) && self::describesExcludedColumn($value))) {
                 // Never echo the value; the header is not sensitive.
                 throw new InvalidArgumentException('Excluded import source field may not be persisted.');
             }
@@ -60,6 +66,12 @@ final class ImportRawPayload
                 self::assertClean($value);
             }
         }
+    }
+
+    /** A positional cell entry ({"header": "…", …}) naming an excluded column. */
+    private static function describesExcludedColumn(array $entry): bool
+    {
+        return isset($entry['header']) && is_string($entry['header']) && self::isExcluded($entry['header']);
     }
 
     public static function isExcluded(string $header): bool

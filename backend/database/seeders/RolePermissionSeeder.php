@@ -40,7 +40,8 @@ use Spatie\Permission\PermissionRegistrar;
  * access and Staff user administration by AUTH-ADR-057 (§59c). Membership
  * corrections (family-membership.update; .end without DATA_ENTRY) and
  * masked National ID view / correction were assigned by AUTH-ADR-059
- * (§45, §39).
+ * (§45, §39). SUPER_ADMIN received import.upload / validate / review by
+ * AUTH-ADR-060 (§61); import.apply remains unassigned.
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -374,6 +375,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard.view-operational',
             // Reports V1 (§59b V1 Role Assignment, AUTH-ADR-056)
             'report.view',
+            // Initial Family Import staging and review (§61 V1 Role
+            // Assignment, AUTH-ADR-060). import.apply stays unassigned.
+            'import.upload',
+            'import.validate',
+            'import.review',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
             'system.settings.update',

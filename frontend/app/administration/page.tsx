@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ExternalLink, Network, UserCog } from "lucide-react";
+import { ChevronLeft, ExternalLink, FileSpreadsheet, Network, UserCog } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/auth-context";
 
@@ -31,6 +31,22 @@ export default function AdministrationPage() {
                 <CardDescription>
                   إدارة العشائر والعائلات ومجموعات الفروع والفروع: الإضافة والتعديل
                   والتفعيل وإلغاء التفعيل والترتيب.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
+        {(can("import.upload") || can("import.review")) && (
+          <Link href="/administration/imports" className="group">
+            <Card className="transition-colors group-hover:bg-muted/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="size-5 text-muted-foreground" />
+                  الاستيراد الأولي وتحديث بيانات الأسر
+                  <ChevronLeft className="ms-auto size-4 text-muted-foreground" />
+                </CardTitle>
+                <CardDescription>
+                  معالج من ست خطوات: العشيرة ونوع العملية، الملف، تعيين الأعمدة، مفاتيح الأسر، المراجعة — دون أي تطبيق على السجل.
                 </CardDescription>
               </CardHeader>
             </Card>

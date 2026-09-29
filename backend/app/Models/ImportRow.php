@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ImportReconciliationStatus;
 use App\Enums\ImportRowStatus;
 use App\Support\ImportRawPayload;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,9 +11,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One staged source row (docs/02 §88a). raw_payload may contain National
- * IDs (RESTRICTED): it is hidden from serialization and must only ever be
- * exposed through an authorized API Resource.
+ * One staged source row (docs/02 §88a). raw_payload and normalized_payload
+ * may contain National IDs (RESTRICTED): they are hidden from serialization
+ * and must only ever be exposed through an authorized API Resource.
  */
 class ImportRow extends Model
 {
@@ -22,12 +23,16 @@ class ImportRow extends Model
         'import_batch_id',
         'row_number',
         'raw_payload',
+        'normalized_payload',
+        'source_family_key',
         'status',
+        'reconciliation_status',
         'issues',
         'family_id',
     ];
 
-    protected $hidden = ['raw_payload'];
+    // Both payloads may hold National IDs (RESTRICTED).
+    protected $hidden = ['raw_payload', 'normalized_payload'];
 
     protected static function booted(): void
     {
@@ -35,6 +40,8 @@ class ImportRow extends Model
         // (هويتك, الديانة) are never persisted, whatever the parser does.
         static::saving(function (ImportRow $row) {
             ImportRawPayload::assertClean($row->raw_payload ?? []);
+            ImportRawPayload::assertClean($row->normalized_payload ?? []);
+            ImportRawPayload::assertClean($row->issues ?? []);
         });
     }
 
@@ -43,7 +50,10 @@ class ImportRow extends Model
         return [
             'row_number' => 'integer',
             'raw_payload' => 'array',
+            'normalized_payload' => 'array',
             'status' => ImportRowStatus::class,
+            // Reserved for future reconciliation; NULL = not reconciled.
+            'reconciliation_status' => ImportReconciliationStatus::class,
             'issues' => 'array',
         ];
     }
