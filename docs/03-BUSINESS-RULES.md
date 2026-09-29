@@ -567,6 +567,33 @@ Family Portal access
 Audit
 ```
 
+## V1 implementation (2026-09-29)
+
+`RecordPersonDeathAction` is the only write path to `DECEASED`
+(permission `person.record-death`, docs/06 §96). Family registration and
+member creation always create ALIVE Persons.
+
+```text
+life_status   → DECEASED
+death_date    → the given date, or NULL when the exact date is unknown (§29)
+```
+
+- A supplied date must be a valid calendar date, not in the future and not
+  before `birth_date` (§28; also a PostgreSQL CHECK). With an unknown
+  birth date only the "not in the future" rule applies.
+- A Person already `DECEASED` is refused (409). Correcting a recorded
+  death is a separate operation, not built in V1.
+- Nothing else changes: memberships, `is_household_head`, other Persons
+  (no spouse is made WIDOWED or household head automatically) and
+  `is_active` (§27: life status is independent of record status). A
+  deceased active head is surfaced by the Data Quality check
+  `HOUSEHOLD_HEAD_DECEASED` for Household Head review (§16).
+- Transactional; records `PERSON_DEATH_RECORDED` (§97a) on the Person's
+  current Family, subject = the Person, no metadata (never the date). A
+  Person without a current Family records no activity.
+- V1 exposes no staff endpoint yet; callers are the controlled import and,
+  later, the staff operation and the DEATH_REPORT Change Request (§31).
+
 ---
 
 # 31. Family User Death Report
@@ -1354,6 +1381,11 @@ should normally be derived from canonical data.
 
 Manual duplicated counters should be avoided.
 
+This rule governs the **Registered Household Size** and every other count
+of registered Persons: they are always derived. **Declared Household
+Statistics** (§55c) are source declarations, not duplicated counters, and
+never replace these derived figures.
+
 ---
 
 # 55a. Operational Dashboard (V1)
@@ -1561,6 +1593,48 @@ The download is authenticated, `no-store, private`, has no public URL and a
 value-free filename (`{report}-report-{date}.xlsx`), and contains no
 internal ids, National IDs, phone numbers, health details, notes,
 descriptions, reasons, verification values or snapshot data.
+
+---
+
+# 55c. Declared Household Statistics
+
+Approved 2026-09-29 (Initial Family Import foundation, Phase 1). Fields in
+docs/02 §20a.
+
+```text
+Registered Household Size   derived from ACTIVE, non-DECEASED memberships;
+                            never stored (§55)
+Declared Household Size     declared by a source at a point in time; stored
+Declared Living Sons        declared by a source; stored
+Declared Living Daughters   declared by a source; stored
+```
+
+Rules:
+
+- A declaration is a dated historical record. Recording a new one makes it
+  the Family's current declaration and keeps the previous one unchanged as
+  history (`is_current = false`). At most one current declaration per
+  Family (database-enforced). Declarations are never edited in place or
+  deleted.
+- Declared values are stored as declared: counts are integers `>= 0`,
+  `NULL` means "not declared" and at least one value is present. They are
+  never invented and never back-filled from registered records.
+- A declaration **never creates Persons**. No placeholder or fake children
+  are created to make the registered count match a declared size.
+- Declared values never replace registered SON/DAUGHTER membership counts,
+  never silently override calculated figures in reports, the dashboard,
+  targeting or exports, and are never treated as verified individual
+  records. Registered ≠ Declared is expected and is not an error.
+- Consistency between declared and registered data (e.g. a declared size
+  of 0, a size below 1 + registered spouses, sons + daughters above the
+  declared size) is a **review finding**, not a refusal.
+- Written only through `RecordHouseholdDeclarationAction`, which records
+  `HOUSEHOLD_DECLARATION_RECORDED` (§97a) with no metadata — never the
+  declared counts.
+- Using declared figures in targeting, nominations, eligibility or reports
+  is a later, explicit decision; any such use must label them "Declared".
+  Current V1 figures (targeting family size, `member_count`,
+  `family_members_count`) remain registered figures.
 
 ---
 
@@ -2332,6 +2406,107 @@ Controlled Application
 
 ---
 
+# 96a. Import Staging and the Initial Family Import
+
+Approved 2026-09-29. Phase 1 (foundation) is implemented; Phase 2 (parser,
+normalization, validation, duplicate detection, branch matching, preview,
+review, apply) is not.
+
+## Staging (implemented)
+
+```text
+UPLOAD → PARSE → VALIDATE → DUPLICATE DETECTION → BRANCH MATCHING
+       → PREVIEW → REVIEW → APPLY (Domain Actions only)
+```
+
+- Source files are staged as `import_batches` / `import_rows` (docs/02
+  §88a, docs/04 §83a). Staging is never canonical data; canonical tables
+  are written only by the existing Domain Actions (RegisterFamilyAction,
+  AddFamilyMemberAction, RecordPersonDeathAction,
+  RecordHouseholdDeclarationAction) with `NationalIdGuard`.
+- Permissions are the existing `import.upload`, `import.validate`,
+  `import.review` and `import.apply` (docs/06 §61, §84). There is no public
+  import endpoint.
+- `raw_payload` is RESTRICTED (it may hold National IDs).
+- **Excluded source fields are never persisted** — not in `raw_payload`,
+  not anywhere: `هويتك` and `الديانة`. The parser drops them
+  (`ImportRawPayload::sanitize`) and the `ImportRow` model refuses any
+  write that still contains them.
+
+## Initial Family Excel import — approved mapping (Phase 2 target)
+
+```text
+هويتك              ignored completely (never a National ID, never a Person,
+                   never used for duplicate detection, never persisted)
+الديانة            ignored completely (outside the approved dataset)
+رقم الهوية         head persons.national_id (read as text)
+الاسم              head persons.full_name (as written); branch source
+الميلاد            head persons.birth_date (NULL when unknown/partial)
+الجنس              head persons.gender
+الحالة الاجتماعية  head persons.marital_status (unmapped → flagged)
+المدينة            family_residences.original_residence_text — the ORIGINAL
+                   city; never city, never current residence, never
+                   displacement status or location
+حالة الوفاة        حي → ALIVE, متوفي → DECEASED (via RecordPersonDeathAction)
+الوفاة             head persons.death_date (never invented)
+أفراد الأسرة       declared_household_size          (§55c)
+أبناء ذكور أحياء   declared_living_sons              (§55c)
+أبناء إناث أحياء   declared_living_daughters         (§55c)
+الجوال             head persons.mobile
+هوية الزوجة/الزوجة  ×4  one Person per non-empty slot + SPOUSE membership
+```
+
+- **Family:** `registration_source = IMPORT`; `registration_date` = the
+  date the batch is actually APPLIED (never a date invented from unrelated
+  source values); the file stays traceable through `import_rows.family_id`.
+- **Household head:** Person + active membership with HEAD and
+  `is_household_head = true`.
+- **Wives:** each non-empty slot becomes an independent Person with an
+  active SPOUSE membership (`is_household_head = false`) in the same
+  Family — never `wife_1…wife_4` columns. `gender = FEMALE` from the
+  column meaning. Birth date, mobile, marital status and life status are
+  not inferred; the validator handles the missing wife life status
+  explicitly.
+- **No fake children:** the declared figures go to a declaration only.
+- **Residence:** only `original_residence_text` is populated from this
+  source; current-address fields and `displacement_status` stay NULL
+  (not collected).
+- **Life status:**
+
+```text
+ALIVE + no death date              valid
+DECEASED + valid death date        valid
+DECEASED + no death date           valid (death_date NULL)
+ALIVE + death date                 FLAGGED
+blank death status                 FLAGGED (never defaulted to ALIVE/UNKNOWN)
+unknown / unmapped death status    FLAGGED
+death date without DECEASED        FLAGGED
+```
+
+- **Branch:** derived from the END of the head's full name against the
+  canonical `branches` names only: Arabic-normalized comparison (أ/إ/آ → ا,
+  ى → ي, no tatweel, no diacritics, normalized whitespace and separators
+  such as "-"; ة handled conservatively), whole-token suffix match,
+  longest match wins, compound names supported. No match, an ambiguous or a
+  conflicting match → `branch_id` NULL and the row FLAGGED. Branches are
+  never created automatically and never derived from a wife's name.
+- **National IDs:** read as strings (never Excel numbers); Arabic/Western
+  digits and formatting noise normalized for comparison only; duplicates
+  detected inside the batch and against existing Persons; the canonical
+  write always goes through `NationalIdGuard`. A missing head National ID
+  is allowed by the schema but FLAGGED.
+- **Flag, never resolve silently:** the same ID on several rows; the same
+  wife ID more than once; a head ID equal to a wife ID; an ID already in
+  Famboook; a wife appearing elsewhere as a household head; duplicate
+  spouse entries; the same spouse name with missing or different IDs.
+  Persons are never merged, and an existing Person is never overwritten or
+  attached because an ID matched.
+- **Household size flags (not rejections):** declared size 0 or blank;
+  declared size below 1 + imported spouses; sons + daughters inconsistent
+  with the declared size. Registered ≠ Declared is expected.
+
+---
+
 # 97. Audit
 
 Critical operations must be audited.
@@ -2396,6 +2571,8 @@ PERSON_UPDATED          basic Person data correction (current family)
 MEMBERSHIP_RELATIONSHIP_CORRECTED  member relationship corrected (§93b)
 MEMBERSHIP_ENDED        incorrect membership ended; Person kept (§93b)
 NATIONAL_ID_CORRECTED   administrative National ID correction (§93b)
+PERSON_DEATH_RECORDED   official death recorded (§30); subject = Person
+HOUSEHOLD_DECLARATION_RECORDED  Declared Household Statistics recorded (§55c); subject = Family
 RESIDENCE_UPDATED       current-address correction
 DISPLACEMENT_UPDATED    displacement-field correction
 HEALTH_RECORD_CREATED
@@ -3413,6 +3590,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §30 V1 `RecordPersonDeathAction`; §55 Registered Household Size stays derived; §55c Declared Household Statistics; §96a import staging, excluded source fields (هويتك / الديانة) and the approved initial-family Excel mapping for Phase 2; §97a events `PERSON_DEATH_RECORDED`, `HOUSEHOLD_DECLARATION_RECORDED` (no metadata) |
 | 1.2.14 | 2026-09-27 | Approved | Added §93b: relationship correction, ending an incorrect membership, National ID correction and masking, correction activity privacy, optional governorate/city residence decision and remaining limitations; three §97a events |
 | 1.2.13 | 2026-09-26 | Approved | Added §93a: server-side Family/People registry search, exact National ID duplicate prevention (no merge, advisory-lock concurrency, remaining limitation), optional date of birth and UNKNOWN age |
 | 1.2.12 | 2026-09-26 | Approved | §116: V1 Staff authentication rules (login, logout, inactive accounts, one Staff role, Filament scope, safe seeding, local-only dev login) |

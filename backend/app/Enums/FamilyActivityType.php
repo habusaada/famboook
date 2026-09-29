@@ -15,6 +15,11 @@ enum FamilyActivityType: string
     case MEMBERSHIP_RELATIONSHIP_CORRECTED = 'MEMBERSHIP_RELATIONSHIP_CORRECTED';
     case MEMBERSHIP_ENDED = 'MEMBERSHIP_ENDED';
     case NATIONAL_ID_CORRECTED = 'NATIONAL_ID_CORRECTED';
+    // Official death recorded (docs/03 §30). No metadata: never the date.
+    case PERSON_DEATH_RECORDED = 'PERSON_DEATH_RECORDED';
+    // Declared Household Statistics recorded (docs/03 §55c). No metadata:
+    // never the declared counts.
+    case HOUSEHOLD_DECLARATION_RECORDED = 'HOUSEHOLD_DECLARATION_RECORDED';
     case RESIDENCE_UPDATED = 'RESIDENCE_UPDATED';
     case DISPLACEMENT_UPDATED = 'DISPLACEMENT_UPDATED';
     case HEALTH_RECORD_CREATED = 'HEALTH_RECORD_CREATED';

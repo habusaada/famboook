@@ -2317,6 +2317,14 @@ Apply
 
 Different permissions may be assigned to each stage.
 
+Staged import rows (`import_rows.raw_payload`, docs/02 §88a) may contain
+National IDs and are RESTRICTED: they follow the same access philosophy as
+`persons.national_id` (§39) and are exposed only through authorized API
+Resources, never through a public endpoint. Holding an import permission
+does not grant `person.national-id.*`. The excluded source fields هويتك and
+الديانة are never stored (docs/03 §96a). No new permission is introduced;
+the four permissions above (§61) are unchanged.
+
 ---
 
 # 85. API Authorization
@@ -3856,6 +3864,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.16 | 2026-09-29 | Approved | §84: staged import rows are RESTRICTED (may hold National IDs; same philosophy as `persons.national_id`), excluded source fields never stored; no new permission |
 | 1.2.15 | 2026-09-27 | Approved | AUTH-ADR-059: §45 V1 assignment of `family-membership.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) and `family-membership.end` (SUPER_ADMIN, ADMINISTRATOR); §39 V1 assignment of `person.national-id.view-masked` / `.update` (SUPER_ADMIN, ADMINISTRATOR), central masking, dedicated correction endpoint; three rows in §140 |
 | 1.2.14 | 2026-09-26 | Approved | AUTH-ADR-058: registry search permissions and the exact National ID pre-check (person.create / family.create, rate limited, no new permission) |
 | 1.2.13 | 2026-09-26 | Approved | §59c: Staff authentication (login, logout, `/me`, rate limiting, `is_active`), one Staff role per user, Filament Staff user administration and escalation rules, ADMINISTRATOR user-administration grants, two rows in §140, PAUTH-028 V1 resolution, AUTH-ADR-057 |

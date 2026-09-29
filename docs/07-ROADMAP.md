@@ -2283,6 +2283,17 @@ Exports audited
 Sensitive exports protected
 ```
 
+## Progress
+
+2026-09-29: **Initial Family Import — Phase 1 (foundation)** delivered
+(docs/03 §96a): `import_batches` / `import_rows` staging tables with the
+excluded-source-field guard (هويتك / الديانة never persisted), Declared
+Household Statistics (`family_household_declarations`, docs/03 §55c) and
+`RecordPersonDeathAction` (docs/03 §30). No file is parsed and no registry
+data is imported. **Still open (Phase 2):** Excel parser, normalization,
+validation, duplicate detection, branch matching, preview/review UI and API,
+controlled apply; then exports and import audit.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4693,6 +4704,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.13 | 2026-09-29 | Approved | Phase 23 progress note: Initial Family Import Phase 1 foundation (staging tables, Declared Household Statistics, RecordPersonDeathAction) |
 | 1.2.12 | 2026-09-28 | Approved | Phase 13 progress note: Assessments Pilot Workspace (cross-family Assessment List and registry API, Assessment Detail, Draft Editor and New Assessment) |
 | 1.2.11 | 2026-09-27 | Approved | Phase 29 progress note: Pilot Readiness Slice D (production Pilot environment preparation; server-side steps outstanding) |
 | 1.2.10 | 2026-09-27 | Approved | Phase 9 progress note: Pilot Readiness Slice C (data-entry corrections: relationship, membership ending, National ID correction and masking, optional governorate/city) |

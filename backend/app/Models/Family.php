@@ -79,6 +79,18 @@ class Family extends Model
         return $this->hasMany(FamilyNeed::class);
     }
 
+    /** Declared Household Statistics history (docs/02 §20a). */
+    public function householdDeclarations(): HasMany
+    {
+        return $this->hasMany(FamilyHouseholdDeclaration::class);
+    }
+
+    /** The current declaration; the Registered Household Size is derived, never this. */
+    public function currentHouseholdDeclaration(): HasOne
+    {
+        return $this->hasOne(FamilyHouseholdDeclaration::class)->where('is_current', true);
+    }
+
     public function householdHeadMembership(): HasOne
     {
         return $this->hasOne(FamilyMembership::class)

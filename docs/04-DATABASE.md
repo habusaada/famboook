@@ -142,7 +142,8 @@ Registry
 ├── family_memberships
 ├── relationship_types
 ├── person_relationships
-└── family_residences
+├── family_residences
+└── family_household_declarations
 
 Person Information
 ├── marital_statuses
@@ -169,6 +170,10 @@ Case Management
 ├── assistance_records
 ├── person_notes
 └── case_notes
+
+Import Staging
+├── import_batches
+└── import_rows
 
 Platform
 ├── audit infrastructure
@@ -853,6 +858,59 @@ WHERE is_current = TRUE;
 ```
 
 Changing residence should execute transactionally.
+
+---
+
+# 25a. Family Household Declarations Table
+
+Approved 2026-09-29. Declared Household Statistics (docs/02 §20a, docs/03
+§55c): source-declared, dated, historical — **not** the Registered
+Household Size, which stays derived (§82).
+
+```text
+family_household_declarations
+```
+
+```text
+id BIGINT PK
+
+family_id BIGINT NOT NULL FK families.id ON DELETE RESTRICT
+
+declared_household_size   SMALLINT NULL
+declared_living_sons      SMALLINT NULL
+declared_living_daughters SMALLINT NULL
+
+declared_at DATE NULL
+source VARCHAR NOT NULL          -- PAPER_FORM | MANUAL_ENTRY | IMPORT | VERIFIED_SOURCE
+is_current BOOLEAN DEFAULT TRUE
+notes TEXT NULL
+
+created_by BIGINT NULL FK users.id ON DELETE SET NULL
+updated_by BIGINT NULL FK users.id ON DELETE SET NULL
+
+created_at
+updated_at
+```
+
+Constraints and indexes:
+
+```sql
+CREATE UNIQUE INDEX uq_family_current_household_declaration
+ON family_household_declarations (family_id)
+WHERE is_current = TRUE;
+
+-- PostgreSQL CHECKs (mirrored by RecordHouseholdDeclarationAction):
+chk_household_declaration_counts     each declared count IS NULL OR >= 0
+chk_household_declaration_not_empty  at least one declared count IS NOT NULL
+chk_household_declaration_source     source IN (the four values above)
+
+INDEX (family_id)
+```
+
+The values are deliberately **not** columns on `families`: a new
+declaration closes the current one (`is_current = false`) and inserts a
+new row in one transaction, so earlier declarations survive for past
+eligibility and assistance decisions.
 
 ---
 
@@ -2638,6 +2696,11 @@ should normally be derived.
 
 If later cached/materialized for performance, the cache is not the canonical source of truth.
 
+In particular the **Registered Household Size** is never stored.
+`family_household_declarations` (§25a) stores **Declared** Household
+Statistics — separate source facts, not a cached count — and never feeds
+or replaces a derived count.
+
 ---
 
 # 83. Import Architecture
@@ -2663,6 +2726,85 @@ Domain Layer
   ↓
 Canonical Tables
 ```
+
+---
+
+# 83a. Import Staging Tables
+
+Approved 2026-09-29 (Initial Family Import foundation, Phase 1). Field
+meanings in docs/02 §88a; rules in docs/03 §96a.
+
+```text
+import_batches
+```
+
+```text
+id BIGINT PK
+uuid UUID UNIQUE
+
+source_filename VARCHAR NOT NULL
+source_checksum CHAR(64) NOT NULL   -- lower-case hex SHA-256; indexed, not unique
+status VARCHAR NOT NULL
+row_count INTEGER NOT NULL DEFAULT 0
+failure_reason TEXT NULL
+
+uploaded_by BIGINT NULL FK users.id ON DELETE SET NULL
+applied_by  BIGINT NULL FK users.id ON DELETE SET NULL
+applied_at  TIMESTAMP NULL
+
+created_at
+updated_at
+```
+
+```sql
+-- PostgreSQL CHECKs
+chk_import_batch_status    status IN ('UPLOADED','VALIDATING','READY_FOR_REVIEW',
+                           'READY_TO_APPLY','APPLYING','APPLIED','FAILED')
+chk_import_batch_row_count row_count >= 0
+chk_import_batch_checksum  source_checksum ~ '^[0-9a-f]{64}$'
+chk_import_batch_applied   status <> 'APPLIED' OR applied_at IS NOT NULL
+
+INDEX (status), INDEX (source_checksum)
+```
+
+```text
+import_rows
+```
+
+```text
+id BIGINT PK
+
+import_batch_id BIGINT NOT NULL FK import_batches.id ON DELETE RESTRICT
+row_number INTEGER NOT NULL           -- 1-based source row
+raw_payload JSONB NOT NULL            -- sanitized; RESTRICTED (may hold National IDs)
+status VARCHAR NOT NULL
+issues JSONB NULL
+family_id BIGINT NULL FK families.id ON DELETE RESTRICT
+
+created_at
+updated_at
+```
+
+```sql
+UNIQUE (import_batch_id, row_number)
+INDEX (import_batch_id, status)
+
+CREATE UNIQUE INDEX uq_import_row_family
+ON import_rows (family_id) WHERE family_id IS NOT NULL;
+
+-- PostgreSQL CHECKs
+chk_import_row_status         status IN ('PENDING','VALID','FLAGGED','REJECTED',
+                              'APPLIED','SKIPPED')
+chk_import_row_number         row_number >= 1
+chk_import_row_applied_family (status = 'APPLIED') = (family_id IS NOT NULL)
+```
+
+As with the existing CHECKs, they are PostgreSQL-only (SQLite cannot add
+them after creation); the model enum casts, the `ImportRow` excluded-field
+guard and the Domain Actions enforce the same rules on every driver. The
+uploaded file itself is not stored in these tables. No National ID is
+copied anywhere outside `raw_payload`. Retention/purging of staging data
+follows PDD-017 (open).
 
 ---
 
@@ -3620,6 +3762,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §25a `family_household_declarations` (one current per Family, count/source CHECKs), §82 Registered Household Size never stored, §83a `import_batches` / `import_rows` staging tables; additive migrations only, no existing column or row changed |
 | 1.2.14 | 2026-09-28 | Approved | §31: cross-family assessment registry API (`GET /assessments`, status and exact-family filters, whole-registry summary); read-only, no schema change |
 | 1.2.13 | 2026-09-27 | Approved | §19: membership ending / relationship correction are in-place UPDATEs with row locks; no schema change (Pilot Readiness Slice C) |
 | 1.2.12 | 2026-09-26 | Approved | §19: registry search API, `pg_trgm` trigram indexes (measured), National ID advisory-lock duplicate enforcement |

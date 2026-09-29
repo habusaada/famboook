@@ -591,6 +591,10 @@ The system must never invent a death date.
 
 A Family User death report does not directly populate this canonical field.
 
+`life_status = DECEASED` and `death_date` are written only by
+`RecordPersonDeathAction` (docs/03 §30); family registration and member
+creation always create ALIVE Persons.
+
 ---
 
 ### mobile
@@ -1044,6 +1048,72 @@ Create new residence
 ```
 
 rather than overwrite historical information.
+
+---
+
+# 20a. Declared Household Statistics
+
+Approved 2026-09-29 (Initial Family Import foundation, Phase 1).
+
+## Entity
+
+```text
+family_household_declarations
+```
+
+## Purpose
+
+Household figures **as declared by a source** (paper form, import file,
+verified source) at a point in time. They are useful for assistance
+targeting, nominations, eligibility, prioritization and reports while the
+individual members are not (yet) registered.
+
+## Terminology
+
+These four terms are distinct and must not be blurred in the API, UI,
+reports or exports:
+
+| Term | Meaning | Stored? |
+|---|---|---|
+| Registered Household Size | Number of Persons with an ACTIVE membership in the Family who are not DECEASED — calculated from canonical records | **Never stored** — derived on read (§75) |
+| Declared Household Size | Household size as declared by a source at a point in time | `declared_household_size` |
+| Declared Living Sons | Living sons as declared by a source | `declared_living_sons` |
+| Declared Living Daughters | Living daughters as declared by a source | `declared_living_daughters` |
+
+A difference between the Registered and the Declared Household Size is
+**expected** (for example declared 7, registered 2 when only the head and
+the wife have detailed records) and is not itself an error.
+
+## Fields
+
+| Field | Required | Meaning |
+|---|---|---|
+| `family_id` | yes | The Family the declaration is about |
+| `declared_household_size` | no | Declared size; `NULL` = not declared (never `0` as a placeholder); `>= 0` |
+| `declared_living_sons` | no | Declared living sons; `NULL` = not declared; `>= 0` |
+| `declared_living_daughters` | no | Declared living daughters; `NULL` = not declared; `>= 0` |
+| `declared_at` | no | When the source made the declaration; `NULL` = not known; never in the future |
+| `source` | yes | `PAPER_FORM`, `MANUAL_ENTRY`, `IMPORT` or `VERIFIED_SOURCE` (same values as `families.registration_source`) |
+| `is_current` | yes | The Family's current declaration |
+| `notes` | no | Free text |
+| `created_by` / `updated_by` | no | Acting users |
+
+At least one of the three declared values must be present.
+
+## Rules
+
+- At most **one current** declaration per Family; earlier declarations are
+  kept as history (`is_current = false`) and never rewritten, so the values
+  behind past eligibility and assistance decisions survive.
+- Declarations are **declarations only**. They never create Person records
+  (no placeholder children), never replace registered SON/DAUGHTER
+  membership counts, never silently override calculated figures and are
+  never treated as verified individual records.
+- Declared values are stored as declared. Consistency with registered
+  members (e.g. declared size below 1 + registered spouses, or sons +
+  daughters exceeding the declared size) is a review finding, not a
+  rejection.
+- Written only through `RecordHouseholdDeclarationAction` (docs/03 §55c).
 
 ---
 
@@ -2825,6 +2895,19 @@ Female Count
 
 They should be calculated from canonical records unless a justified performance strategy requires otherwise.
 
+## Registered vs Declared figures (2026-09-29)
+
+This rule applies to the **Registered Household Size** and to every count
+of registered Persons (children, adults, males, females): they stay derived
+and are never stored.
+
+**Declared Household Statistics** (§20a) are not a redundant copy of a
+derived value: they are separate, source-declared, dated historical facts
+("the source declared 7 on this date"). Storing them does not relax this
+rule. A declared figure never substitutes for, overwrites or is summed into
+a registered figure; where both are shown they are labelled "Declared" and
+"Registered".
+
 ## Age Bands (approved for Dashboard / Reports V1)
 
 ```text
@@ -3125,6 +3208,78 @@ Source Traceability
 ```
 
 Imports must not bypass domain constraints.
+
+---
+
+# 88a. Import Staging
+
+Approved 2026-09-29 (Initial Family Import foundation, Phase 1). Staging
+data is **not** canonical registry data (docs/04 §83a).
+
+## import_batches
+
+One uploaded source file.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `uuid` | yes | Public identifier |
+| `source_filename` | yes | Original file name |
+| `source_checksum` | yes | Lower-case hex SHA-256 of the file (traceability; not unique — a re-upload is legitimate) |
+| `status` | yes | See below |
+| `row_count` | yes | Number of staged rows (`>= 0`) |
+| `failure_reason` | no | Why the batch FAILED (operational text, never row data) |
+| `uploaded_by` | no | Uploading user |
+| `applied_by` / `applied_at` | no | Who applied the batch and when; `applied_at` is required once APPLIED |
+
+Batch statuses:
+
+```text
+UPLOADED          file received, not yet validated
+VALIDATING        parsing / validation / duplicate detection in progress
+READY_FOR_REVIEW  staged rows need human review (FLAGGED rows exist)
+READY_TO_APPLY    review done; may be applied (import.apply)
+APPLYING          apply in progress
+APPLIED           rows reached the canonical tables through Domain Actions
+FAILED            technical/operational failure (failure_reason)
+```
+
+## import_rows
+
+One staged source row.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `import_batch_id` | yes | The batch |
+| `row_number` | yes | 1-based row number in the source sheet; unique within the batch |
+| `raw_payload` | yes | The **sanitized** source values (JSON) needed for validation and traceability |
+| `status` | yes | See below |
+| `issues` | no | Validation / review findings (JSON); `NULL` = none recorded |
+| `family_id` | no | The Family this row created; present exactly when `APPLIED`; a Family is created by at most one row |
+
+Row statuses:
+
+```text
+PENDING   staged, not yet validated
+VALID     no findings
+FLAGGED   needs human review before it may be applied
+REJECTED  cannot be applied
+APPLIED   applied through Domain Actions (family_id set)
+SKIPPED   deliberately not applied
+```
+
+## Privacy
+
+- `raw_payload` may contain National IDs and is **RESTRICTED** (§63), with
+  the same access philosophy as `persons.national_id`. It is hidden from
+  model serialization and may only be exposed through an authorized API
+  Resource.
+- Source fields outside the approved dataset are **never persisted** —
+  not in `raw_payload`, not anywhere (docs/03 §96a):
+
+```text
+هويتك     no role in the import
+الديانة   religion is outside the approved Famboook dataset
+```
 
 ---
 
@@ -3596,6 +3751,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §20a Declared Household Statistics (`family_household_declarations`; Registered vs Declared terminology), §75 Registered-vs-Declared clarification (registered counts stay derived), §88a Import Staging (`import_batches`, `import_rows`, excluded source fields هويتك / الديانة never persisted) |
 | 1.2.14 | 2026-09-27 | Approved | §14: V1 `end_reason` (required free-text correction reason); §19: governorate / city optional (NULL = not recorded); §61a: correction events carry no metadata |
 | 1.2.13 | 2026-09-26 | Approved | §10: `birth_date` optional at creation (NULL = unknown, no placeholder, UNKNOWN age band) |
 | 1.2.12 | 2026-09-26 | Approved | §40: V1 `users` fields including `is_active`; one Staff role per user |
