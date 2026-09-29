@@ -74,10 +74,11 @@ export function useUpdateBranchGroup() {
   );
 }
 
+// A Branch belongs to its Clan; the Branch Group is optional.
 export function useCreateBranch() {
   return useStructureMutation(
-    ({ groupId, ...payload }: CreateBranchPayload & { groupId: string }) =>
-      apiClient.post<{ data: Branch }>(`/api/v1/branch-groups/${groupId}/branches`, payload)
+    ({ clanId, ...payload }: CreateBranchPayload & { clanId: string }) =>
+      apiClient.post<{ data: Branch }>(`/api/v1/clans/${clanId}/branches`, payload)
   );
 }
 

@@ -11,7 +11,8 @@ use Illuminate\Validation\ValidationException;
  * A Family's Clan (required) and Branch (optional) — docs/03 §7a.
  *
  * - A newly selected Clan or Branch must be active (a Branch also needs an
- *   active group and Clan). An unchanged, since-deactivated value stays.
+ *   active Clan and, when grouped, an active group). An unchanged,
+ *   since-deactivated value stays.
  * - A Branch must belong to the Family's Clan (also enforced by the
  *   families (branch_id, clan_id) composite foreign key).
  * - Changing the Clan never keeps an incompatible Branch: the request must
@@ -61,12 +62,13 @@ class FamilyLineage
                 'code' => $branch->code,
                 'name' => $branch->name,
                 'is_active' => $branch->is_active,
-                'group' => [
+                // null for an ungrouped Branch (the Group is optional).
+                'group' => $group ? [
                     'code' => $group->code,
                     // null for an unnamed administrative container.
                     'name' => $group->name,
                     'display_name' => $group->displayName(),
-                ],
+                ] : null,
             ] : null,
         ];
     }

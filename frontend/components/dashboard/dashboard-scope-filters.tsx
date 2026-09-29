@@ -45,6 +45,8 @@ export function DashboardScopeFilters({
   const groups = clan?.branch_groups ?? [];
   const group = groups.find((g) => g.code === value.group);
   const branchGroups = group ? [group] : groups;
+  // Ungrouped Branches (the group is optional) are offered unless a group is chosen.
+  const ungrouped = group ? [] : (clan?.ungrouped_branches ?? []);
 
   function changeGroup(code: string) {
     const next = code === ALL ? "" : code;
@@ -125,6 +127,16 @@ export function DashboardScopeFilters({
                   ))}
                 </SelectGroup>
               ))}
+            {ungrouped.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>بدون مجموعة</SelectLabel>
+                {ungrouped.map((b) => (
+                  <SelectItem key={b.code} value={b.code}>
+                    {b.is_active ? b.name : `${b.name} (غير مفعّل)`}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
       </div>

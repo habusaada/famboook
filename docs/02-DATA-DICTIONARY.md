@@ -286,8 +286,8 @@ assigned to the Clan `AL_BREEM` (عائلة البريم) when the column was ad
 
 The Branch (§7c) within the Family's Clan. **Optional:** NULL means unknown
 or not yet assigned — never guessed. When set, the Branch must belong to the
-Family's Clan. The Family's Branch Group is derived from the Branch and is
-not stored on `families`.
+Family's Clan. The Family's Branch Group, if any, is derived from the Branch
+(an ungrouped Branch has none) and is not stored on `families`.
 
 API payloads use `clan_code` / `branch_code`; responses expose code, name,
 active state and group context, never internal ids.
@@ -300,11 +300,28 @@ Hierarchy (Clan ≠ Family):
 
 ```text
 Clan            (العشيرة / العائلة — e.g. عائلة البريم)
-  └─ Branch Group   (مجموعة الفروع — organizational; may be unnamed)
-       └─ Branch        (الفرع — named)
-            └─ Family       (الأسرة — the existing household entity)
-                 └─ Person      (via Family Membership)
+  └─ Branch         (الفرع — named; belongs to the Clan)
+  │    ·· optionally classified under a Branch Group
+  │       (مجموعة الفروع — organizational; may be unnamed)
+  └─ Family         (الأسرة — the existing household entity; optional Branch)
+       └─ Person        (via Family Membership)
 ```
+
+**A Branch Group is an optional organizational classification of Branches**
+(2026-09-29). `Clan → Branch` is valid on its own; `Clan → Branch Group →
+Branch` is an optional classification on top of it. Intended workflow:
+
+```text
+Clan exists
+  → Branches may initially be ungrouped (بدون مجموعة)
+  → an administrator may later create Branch Groups
+  → Branches may then be assigned to, moved between (same Clan only) or
+    removed from Branch Groups
+```
+
+The family import must **not** depend on Branch Groups: Branches are
+matched/created per Clan, and grouping is an administrative step after
+import.
 
 ## Entity
 
@@ -353,8 +370,9 @@ branch_groups
 
 ## Purpose
 
-An organizational container of Branches within a Clan. **A Branch Group may
-be unnamed**; it is then displayed by the names of its Branches.
+An optional organizational classification of Branches within a Clan. A
+Branch does not need a Branch Group. **A Branch Group may be unnamed**; it is
+then displayed by the names of its Branches.
 
 ## Fields
 
@@ -387,15 +405,17 @@ branches
 
 ## Purpose
 
-A named Branch within a Branch Group.
+A named Branch of a Clan, optionally classified under one of the Clan's
+Branch Groups.
 
 ## Fields
 
 ```text
 id
 uuid
-branch_group_id   required
-clan_id           equal to the group's Clan (kept for integrity)
+branch_group_id   OPTIONAL — NULL = ungrouped (بدون مجموعة); when set, a
+                  Branch Group of the same Clan
+clan_id           required; the Branch's Clan (never changes)
 code              unique within the Clan, immutable
 name              required
 sort_order
@@ -404,8 +424,14 @@ created_at
 updated_at
 ```
 
-A Branch is newly selectable only when it, its group and its Clan are active.
-Deactivating never removes it from existing Families.
+A Branch may be created without a group and later be assigned to, moved
+between or removed from Branch Groups **of its own Clan**; its Clan and code
+never change. Cross-Clan grouping is impossible (application validation and
+the composite foreign key).
+
+A Branch is newly selectable when it and its Clan are active and — only when
+it is grouped — its Branch Group is active. An active ungrouped Branch is
+selectable. Deactivating never removes it from existing Families.
 
 ---
 
@@ -3751,6 +3777,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.16 | 2026-09-29 | Approved | §7a–§7c: Branch Group is an optional organizational classification of Branches — `branches.branch_group_id` nullable (ungrouped = بدون مجموعة), assign/move/remove within the same Clan only, ungrouped active Branches selectable; import must not depend on Branch Groups |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §20a Declared Household Statistics (`family_household_declarations`; Registered vs Declared terminology), §75 Registered-vs-Declared clarification (registered counts stay derived), §88a Import Staging (`import_batches`, `import_rows`, excluded source fields هويتك / الديانة never persisted) |
 | 1.2.14 | 2026-09-27 | Approved | §14: V1 `end_reason` (required free-text correction reason); §19: governorate / city optional (NULL = not recorded); §61a: correction events carry no metadata |
 | 1.2.13 | 2026-09-26 | Approved | §10: `birth_date` optional at creation (NULL = unknown, no placeholder, UNKNOWN age band) |

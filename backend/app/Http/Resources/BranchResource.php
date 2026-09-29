@@ -16,11 +16,12 @@ class BranchResource extends JsonResource
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
             'family_count' => $this->whenCounted('families'),
-            'group' => $this->whenLoaded('group', fn () => [
+            // null = ungrouped (a Branch Group is optional).
+            'group' => $this->whenLoaded('group', fn () => $this->group ? [
                 'id' => $this->group->uuid,
                 'code' => $this->group->code,
                 'name' => $this->group->name,
-            ]),
+            ] : null),
         ];
     }
 }

@@ -20,6 +20,8 @@ class ClanResource extends JsonResource
             'is_active' => $this->is_active,
             'family_count' => $this->whenCounted('families'),
             'branch_groups' => BranchGroupResource::collection($this->whenLoaded('branchGroups')),
+            // Branches without a Branch Group (the Group is optional).
+            'ungrouped_branches' => BranchResource::collection($this->whenLoaded('ungroupedBranches')),
         ];
     }
 }

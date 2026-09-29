@@ -1593,7 +1593,8 @@ exposes no personal data. `reference-data.view` was not reused because
 SOCIAL_WORKER, who holds `family.update`, does not have it.
 
 `clan.manage` creates, renames, reorders and activates/deactivates Clans,
-Branch Groups and Branches, and reads the full tree including inactive items
+Branch Groups and Branches, creates Branches with or without a Branch Group
+and assigns, moves (same Clan only) or ungroups them, and reads the full tree including inactive items
 (`include_inactive=1`). `reference-data.create/update` was not reused because
 it is SUPER_ADMIN-only while ADMINISTRATOR must manage this structure.
 
@@ -3864,6 +3865,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.17 | 2026-09-29 | Approved | §56a: `clan.manage` also covers creating ungrouped Branches and assigning/moving/ungrouping Branches within the same Clan; no new permission |
 | 1.2.16 | 2026-09-29 | Approved | §84: staged import rows are RESTRICTED (may hold National IDs; same philosophy as `persons.national_id`), excluded source fields never stored; no new permission |
 | 1.2.15 | 2026-09-27 | Approved | AUTH-ADR-059: §45 V1 assignment of `family-membership.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY) and `family-membership.end` (SUPER_ADMIN, ADMINISTRATOR); §39 V1 assignment of `person.national-id.view-masked` / `.update` (SUPER_ADMIN, ADMINISTRATOR), central masking, dedicated correction endpoint; three rows in §140 |
 | 1.2.14 | 2026-09-26 | Approved | AUTH-ADR-058: registry search permissions and the exact National ID pre-check (person.create / family.create, rate limited, no new permission) |

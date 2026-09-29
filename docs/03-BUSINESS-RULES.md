@@ -164,13 +164,20 @@ Family lifecycle changes require authorization and audit.
 
 ```text
 Clan            (العشيرة / العائلة — e.g. عائلة البريم)
-  └─ Branch Group   (مجموعة الفروع — organizational; may be unnamed)
-       └─ Branch        (الفرع — named)
-            └─ Family       (الأسرة — the existing household entity)
-                 └─ Person      (via Family Membership)
+  └─ Branch         (الفرع — named; belongs to the Clan)
+  │    ·· optionally classified under a Branch Group
+  │       (مجموعة الفروع — organizational; may be unnamed)
+  └─ Family         (الأسرة — the existing household entity; optional Branch)
+       └─ Person        (via Family Membership)
 ```
 
 A Clan is not a Family; "Family" remains the household.
+
+**A Branch Group is an optional organizational classification of Branches**
+(2026-09-29). Branches may initially be ungrouped ("بدون مجموعة"); an
+administrator may later create Branch Groups and assign, move (within the
+same Clan) or remove Branches. Family registration and the family import
+never depend on Branch Groups.
 
 Rules:
 
@@ -180,8 +187,9 @@ CB-2  A Family's Branch is optional; NULL = unknown / not yet assigned.
       Branches are never inferred (not from names, forms or members).
 CB-3  A Family's Branch must belong to the Family's Clan (enforced in the
       Domain Action and by a composite foreign key).
-CB-4  Only an active Clan, and a Branch whose Branch, Group and Clan are all
-      active, can be newly selected.
+CB-4  Only an active Clan, and an active Branch of an active Clan, can be
+      newly selected; a grouped Branch additionally needs an active Group.
+      An active ungrouped Branch is selectable.
 CB-5  An existing Family keeps and displays a since-deactivated Clan/Branch;
       unrelated edits do not clear it. Once changed away, it cannot be
       re-selected while inactive.
@@ -189,8 +197,11 @@ CB-6  Changing the Clan never keeps an incompatible Branch: the request must
       name a Branch of the new Clan or clear it. Choosing a Branch never
       moves the Family to another Clan.
 CB-7  A Branch Group may be unnamed. Its Branches keep their own names.
-CB-8  Codes are immutable after creation. Groups do not move between Clans,
-      Branches do not move between Groups (V1).
+      A Branch needs no Branch Group (branch_group_id NULL = ungrouped).
+CB-8  Codes are immutable after creation. Groups do not move between Clans.
+      A Branch never changes Clan; it may be assigned to, moved between or
+      removed from Groups of its own Clan only (cross-Clan grouping is
+      refused by validation and the composite foreign key).
 CB-9  Clans, Groups and Branches are deactivated, never hard-deleted; the
       database refuses to delete a referenced structure.
 CB-10 A Clan/Branch change is a correction of the Family record and is
@@ -2490,6 +2501,14 @@ death date without DECEASED        FLAGGED
   longest match wins, compound names supported. No match, an ambiguous or a
   conflicting match → `branch_id` NULL and the row FLAGGED. Branches are
   never created automatically and never derived from a wife's name.
+  *Update 2026-09-29 (not implemented):* the source will carry a dedicated
+  `مفتاح العائلة` column intended to create/match Branches of the target
+  Clan. How it combines with or replaces name-suffix matching, and whether
+  and how Branches may be created from it, is a Phase 2 decision (it must
+  be reconciled with CB-2 and the "never created automatically" rule
+  above). Either way, the import matches or creates Branches **per Clan
+  only and never depends on Branch Groups** (§7a); grouping is an
+  administrative step after import.
 - **National IDs:** read as strings (never Excel numbers); Arabic/Western
   digits and formatting noise normalized for comparison only; duplicates
   detected inside the batch and against existing Persons; the canonical
@@ -3590,6 +3609,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.16 | 2026-09-29 | Approved | §7a: Branch Group is an optional organizational classification (CB-4 selectability for ungrouped Branches, CB-7, CB-8 assign/move/remove within the same Clan); §96a: import never depends on Branch Groups, `مفتاح العائلة` noted as an open Phase 2 decision |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §30 V1 `RecordPersonDeathAction`; §55 Registered Household Size stays derived; §55c Declared Household Statistics; §96a import staging, excluded source fields (هويتك / الديانة) and the approved initial-family Excel mapping for Phase 2; §97a events `PERSON_DEATH_RECORDED`, `HOUSEHOLD_DECLARATION_RECORDED` (no metadata) |
 | 1.2.14 | 2026-09-27 | Approved | Added §93b: relationship correction, ending an incorrect membership, National ID correction and masking, correction activity privacy, optional governorate/city residence decision and remaining limitations; three §97a events |
 | 1.2.13 | 2026-09-26 | Approved | Added §93a: server-side Family/People registry search, exact National ID duplicate prevention (no merge, advisory-lock concurrency, remaining limitation), optional date of birth and UNKNOWN age |

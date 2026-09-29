@@ -16,6 +16,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -222,8 +223,8 @@ class ClanStructureTest extends TestCase
         $this->actingAs($admin)->postJson("/api/v1/clans/$clanUuid/branch-groups", ['code' => 'G02', 'name' => 'مجموعة'])
             ->assertCreated()->assertJsonPath('data.sort_order', 2);
 
-        $branchUuid = $this->actingAs($admin)->postJson("/api/v1/branch-groups/$groupUuid/branches", ['code' => 'B1', 'name' => 'فرع اصطناعي'])
-            ->assertCreated()->assertJsonPath('data.sort_order', 1)->json('data.id');
+        $branchUuid = $this->actingAs($admin)->postJson("/api/v1/clans/$clanUuid/branches", ['code' => 'B1', 'name' => 'فرع اصطناعي', 'branch_group_id' => $groupUuid])
+            ->assertCreated()->assertJsonPath('data.sort_order', 1)->assertJsonPath('data.group.id', $groupUuid)->json('data.id');
 
         $branch = Branch::where('uuid', $branchUuid)->firstOrFail();
         $this->assertSame(Clan::where('uuid', $clanUuid)->value('id'), $branch->clan_id);
@@ -257,20 +258,26 @@ class ClanStructureTest extends TestCase
         $this->actingAs($admin)->postJson("/api/v1/clans/{$this->other->uuid}/branch-groups", ['code' => 'G02'])
             ->assertCreated();
 
-        // Branch codes are unique per Clan (across its groups).
-        $this->actingAs($admin)->postJson("/api/v1/branch-groups/{$this->unnamedGroup->uuid}/branches", ['code' => 'BR_A', 'name' => 'x'])
+        // Branch codes are unique per Clan (across its groups and ungrouped).
+        $this->actingAs($admin)->postJson("/api/v1/clans/{$this->alBreem->uuid}/branches", ['code' => 'BR_A', 'name' => 'x', 'branch_group_id' => $this->unnamedGroup->uuid])
             ->assertUnprocessable()->assertJsonValidationErrors('code');
-        $this->actingAs($admin)->postJson("/api/v1/branch-groups/{$this->unnamedGroup->uuid}/branches", ['code' => 'BR_C'])
+        $this->actingAs($admin)->postJson("/api/v1/clans/{$this->alBreem->uuid}/branches", ['code' => 'BR_A', 'name' => 'x'])
+            ->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->actingAs($admin)->postJson("/api/v1/clans/{$this->alBreem->uuid}/branches", ['code' => 'BR_C'])
             ->assertUnprocessable()->assertJsonValidationErrors('name');
 
-        // Codes are immutable; structures do not move.
+        // Codes are immutable; a Branch never changes Clan; a Group is
+        // referenced by its public id, never an internal id.
         $this->actingAs($admin)->patchJson("/api/v1/clans/{$this->alBreem->uuid}", ['code' => 'RENAMED'])
             ->assertUnprocessable()->assertJsonValidationErrors('code');
         $this->actingAs($admin)->patchJson("/api/v1/branches/{$this->branchA->uuid}", ['code' => 'RENAMED'])
             ->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->actingAs($admin)->patchJson("/api/v1/branches/{$this->branchA->uuid}", ['clan_id' => $this->other->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('clan_id');
         $this->actingAs($admin)->patchJson("/api/v1/branches/{$this->branchA->uuid}", ['branch_group_id' => $this->unnamedGroup->id])
-            ->assertUnprocessable();
-        $this->assertSame('BR_A', $this->branchA->fresh()->code);
+            ->assertUnprocessable()->assertJsonValidationErrors('branch_group_id');
+        $fresh = $this->branchA->fresh();
+        $this->assertSame(['BR_A', $this->alBreem->id, $this->namedGroup->id], [$fresh->code, $fresh->clan_id, $fresh->branch_group_id]);
     }
 
     public function test_structures_cannot_be_deleted(): void
@@ -476,7 +483,7 @@ class ClanStructureTest extends TestCase
         // Back to the pre-slice schema: families without clan columns.
         $migration = require database_path('migrations/2026_10_01_090001_add_clan_and_branch_to_families.php');
         $migration->down();
-        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('families', 'clan_id'));
+        $this->assertFalse(Schema::hasColumn('families', 'clan_id'));
         $before = DB::table('families')->orderBy('id')->get(['id', 'family_code', 'registration_date', 'status', 'deleted_at']);
 
         $migration->up();

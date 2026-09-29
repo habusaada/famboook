@@ -434,7 +434,14 @@ Where these operations form one initial registration transaction, partial invali
 
 Registration requires selecting the Family's Clan; the Branch is optional
 (docs/03 §7a). Branch options are limited to the selected Clan and grouped by
-Branch Group. Changing the Clan clears a Branch that does not belong to it.
+Branch Group; ungrouped Branches are listed under "بدون مجموعة" and are
+selectable (a Branch Group is optional and never required for registration).
+Changing the Clan clears a Branch that does not belong to it.
+
+Structure administration (`clan.manage`): a Branch may be created directly
+under a Clan without a Branch Group; Branch Groups may be created later and a
+Branch assigned to, moved between (same Clan only) or returned from a Group
+to "بدون مجموعة".
 
 A later correction may change the Branch within the Clan, or change the Clan
 together with a compatible Branch (or no Branch). It is recorded as
@@ -2967,3 +2974,4 @@ Date: 2026-09-24
 | 1.2.3 | 2026-09-24 | Approved | §40: Assistance V1-A workflow (definition, opening, targeting preview, nomination) |
 | 1.2.4 | 2026-09-24 | Approved | §40: Assistance V1-B approval, INTERNAL delivery/reversal, EXTERNAL list issuance, completion |
 | 1.2.5 | 2026-09-25 | Approved | §22: V1 Clan (required) and Branch (optional) selection at registration and correction |
+| 1.2.6 | 2026-09-29 | Approved | §22: Branch Group optional — ungrouped Branches ("بدون مجموعة") selectable; Branches created without a Group and later assigned/moved/ungrouped within the same Clan |

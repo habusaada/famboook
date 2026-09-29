@@ -31,7 +31,10 @@ function scopePath(clans: Clan[], value: { clan: string; group: string; branch: 
   const parts = [clan.name];
   const group = clan.branch_groups?.find((g) => g.code === value.group);
   if (group) parts.push(groupLabel(group));
-  const branch = (group ? [group] : clan.branch_groups ?? []).flatMap((g) => g.branches ?? []).find((b) => b.code === value.branch);
+  const branch = [
+    ...(group ? [group] : clan.branch_groups ?? []).flatMap((g) => g.branches ?? []),
+    ...(group ? [] : clan.ungrouped_branches ?? []),
+  ].find((b) => b.code === value.branch);
   if (branch) parts.push(branch.name);
   return parts;
 }

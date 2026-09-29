@@ -231,6 +231,13 @@ class ReportController extends Controller
                 $organization[] = [$label, $branch['name'], $branch['families'], $branch['people']];
             }
         }
+        if ($data['organization']['ungrouped'] ?? null) {
+            $ungrouped = $data['organization']['ungrouped'];
+            $organization[] = ['بدون مجموعة', 'إجمالي الفروع بدون مجموعة', $ungrouped['families'], $ungrouped['people']];
+            foreach ($ungrouped['branches'] as $branch) {
+                $organization[] = ['بدون مجموعة', $branch['name'], $branch['families'], $branch['people']];
+            }
+        }
         if ($data['organization']['unassigned'] ?? null) {
             $organization[] = ['غير محدد', 'غير محدد', $data['organization']['unassigned']['families'], $data['organization']['unassigned']['people']];
         }

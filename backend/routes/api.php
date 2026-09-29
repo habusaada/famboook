@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\V1\AssistanceController;
 use App\Http\Controllers\Api\V1\AssistanceExecutionController;
 use App\Http\Controllers\Api\V1\AssistanceExportController;
 use App\Http\Controllers\Api\V1\AssistanceNomineeController;
+use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ClanStructureController;
+use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
 use App\Http\Controllers\Api\V1\FamilyController;
@@ -14,10 +17,7 @@ use App\Http\Controllers\Api\V1\HealthRecordController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\ReferenceController;
-use App\Http\Controllers\Api\V1\ClanStructureController;
-use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ReportController;
-use App\Http\Controllers\Api\V1\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -290,7 +290,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/clans/{clan}', [ClanStructureController::class, 'updateClan']);
         Route::post('/clans/{clan}/branch-groups', [ClanStructureController::class, 'storeGroup']);
         Route::patch('/branch-groups/{branchGroup}', [ClanStructureController::class, 'updateGroup']);
-        Route::post('/branch-groups/{branchGroup}/branches', [ClanStructureController::class, 'storeBranch']);
+        Route::post('/clans/{clan}/branches', [ClanStructureController::class, 'storeBranch']);
         Route::patch('/branches/{branch}', [ClanStructureController::class, 'updateBranch']);
     });
 });

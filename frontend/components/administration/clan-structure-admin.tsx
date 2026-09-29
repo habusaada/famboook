@@ -28,10 +28,24 @@ import {
 } from "@/lib/api/clans";
 import type { Branch, BranchGroup, Clan } from "@/lib/types/api/clan";
 
-const EMPTY: StructureValues = { code: "", name: "", sortOrder: "" };
+const EMPTY: StructureValues = { code: "", name: "", sortOrder: "", groupId: "" };
+
+type GroupOption = { id: string; label: string };
 
 function sortOrder(values: StructureValues): { sort_order?: number } {
   return values.sortOrder === "" ? {} : { sort_order: Number(values.sortOrder) };
+}
+
+// "" = بدون مجموعة (the Branch Group is optional).
+function groupPayload(values: StructureValues): { branch_group_id: string | null } {
+  return { branch_group_id: values.groupId ? values.groupId : null };
+}
+
+function groupOptionsOf(clan: Clan): GroupOption[] {
+  return (clan.branch_groups ?? []).map((g) => {
+    const label = g.name ?? g.display_name ?? g.code;
+    return { id: g.id, label: g.is_active ? label : `${label} (غير مفعّلة)` };
+  });
 }
 
 function ActiveBadge({ active }: { active: boolean }) {
@@ -71,7 +85,18 @@ function errorMessage(error: unknown): string {
   return "تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.";
 }
 
-function BranchRow({ branch, onError }: { branch: Branch; onError: (e: unknown) => void }) {
+function BranchRow({
+  branch,
+  groupId,
+  groupOptions,
+  onError,
+}: {
+  branch: Branch;
+  // The Branch's current group id; "" when ungrouped.
+  groupId: string;
+  groupOptions: GroupOption[];
+  onError: (e: unknown) => void;
+}) {
   const update = useUpdateBranch();
   const edit = useUpdateBranch();
 
@@ -97,13 +122,14 @@ function BranchRow({ branch, onError }: { branch: Branch; onError: (e: unknown) 
             </Button>
           }
           title="تعديل الفرع"
-          description={`الرمز ${branch.code} ثابت ولا يتغيّر.`}
-          initial={{ code: branch.code, name: branch.name, sortOrder: String(branch.sort_order) }}
+          description={`الرمز ${branch.code} ثابت ولا يتغيّر. يمكن نقل الفرع بين مجموعات العشيرة / العائلة نفسها أو إبقاؤه بدون مجموعة.`}
+          initial={{ code: branch.code, name: branch.name, sortOrder: String(branch.sort_order), groupId }}
           withCode={false}
           nameRequired
           withSortOrder
+          groupOptions={groupOptions}
           mutation={edit}
-          toPayload={(v) => ({ id: branch.id, name: v.name.trim(), ...sortOrder(v) })}
+          toPayload={(v) => ({ id: branch.id, name: v.name.trim(), ...sortOrder(v), ...groupPayload(v) })}
         />
         <ToggleActive
           active={branch.is_active}
@@ -115,7 +141,17 @@ function BranchRow({ branch, onError }: { branch: Branch; onError: (e: unknown) 
   );
 }
 
-function GroupBlock({ group, onError }: { group: BranchGroup; onError: (e: unknown) => void }) {
+function GroupBlock({
+  clanId,
+  group,
+  groupOptions,
+  onError,
+}: {
+  clanId: string;
+  group: BranchGroup;
+  groupOptions: GroupOption[];
+  onError: (e: unknown) => void;
+}) {
   const update = useUpdateBranchGroup();
   const edit = useUpdateBranchGroup();
   const createBranch = useCreateBranch();
@@ -145,12 +181,13 @@ function GroupBlock({ group, onError }: { group: BranchGroup; onError: (e: unkno
             }
             title="إضافة فرع"
             description={`فرع جديد داخل ${group.name ?? "مجموعة بدون اسم"} (${group.code}).`}
-            initial={EMPTY}
+            initial={{ ...EMPTY, groupId: group.id }}
             withCode
             nameRequired
             withSortOrder
+            groupOptions={groupOptions}
             mutation={createBranch}
-            toPayload={(v) => ({ groupId: group.id, code: v.code, name: v.name.trim(), ...sortOrder(v) })}
+            toPayload={(v) => ({ clanId, code: v.code, name: v.name.trim(), ...sortOrder(v), ...groupPayload(v) })}
           />
           <StructureDialog
             id={`edit-group-${group.id}`}
@@ -180,7 +217,7 @@ function GroupBlock({ group, onError }: { group: BranchGroup; onError: (e: unkno
       ) : (
         <ul className="divide-y ps-8">
           {branches.map((branch) => (
-            <BranchRow key={branch.id} branch={branch} onError={onError} />
+            <BranchRow key={branch.id} branch={branch} groupId={group.id} groupOptions={groupOptions} onError={onError} />
           ))}
         </ul>
       )}
@@ -192,7 +229,10 @@ function ClanCard({ clan, onError }: { clan: Clan; onError: (e: unknown) => void
   const update = useUpdateClan();
   const edit = useUpdateClan();
   const createGroup = useCreateBranchGroup();
+  const createBranch = useCreateBranch();
   const groups = clan.branch_groups ?? [];
+  const ungrouped = clan.ungrouped_branches ?? [];
+  const groupOptions = groupOptionsOf(clan);
 
   return (
     <Card>
@@ -205,9 +245,27 @@ function ClanCard({ clan, onError }: { clan: Clan; onError: (e: unknown) => void
           <ActiveBadge active={clan.is_active} />
         </CardTitle>
         <CardDescription>
-          {groups.length} مجموعة فروع — {clan.family_count ?? 0} أسرة مسجّلة
+          {groups.length} مجموعة فروع — {ungrouped.length} فرع بدون مجموعة — {clan.family_count ?? 0} أسرة مسجّلة
         </CardDescription>
         <CardAction className="flex items-center gap-1">
+          <StructureDialog
+            id={`add-branch-${clan.id}`}
+            trigger={
+              <Button variant="outline" size="sm">
+                <Plus className="size-4" />
+                فرع
+              </Button>
+            }
+            title="إضافة فرع"
+            description={`فرع جديد في ${clan.name}. مجموعة الفروع اختيارية ويمكن تعيينها لاحقًا.`}
+            initial={EMPTY}
+            withCode
+            nameRequired
+            withSortOrder
+            groupOptions={groupOptions}
+            mutation={createBranch}
+            toPayload={(v) => ({ clanId: clan.id, code: v.code, name: v.name.trim(), ...sortOrder(v), ...groupPayload(v) })}
+          />
           <StructureDialog
             id={`add-group-${clan.id}`}
             trigger={
@@ -249,12 +307,28 @@ function ClanCard({ clan, onError }: { clan: Clan; onError: (e: unknown) => void
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {groups.length === 0 ? (
+        {groups.length === 0 && ungrouped.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            لم تُضف مجموعات فروع بعد. يمكن تسجيل الأسر في هذه العشيرة / العائلة بدون فرع.
+            لم تُضف فروع بعد. يمكن تسجيل الأسر في هذه العشيرة / العائلة بدون فرع.
           </p>
-        ) : (
-          groups.map((group) => <GroupBlock key={group.id} group={group} onError={onError} />)
+        )}
+        {groups.map((group) => (
+          <GroupBlock key={group.id} clanId={clan.id} group={group} groupOptions={groupOptions} onError={onError} />
+        ))}
+        {ungrouped.length > 0 && (
+          <div className="rounded-md border border-dashed p-3" data-group="UNGROUPED">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-semibold">بدون مجموعة</span>
+              <span className="text-xs text-muted-foreground">
+                فروع غير مصنّفة في مجموعة؛ عدّل الفرع لتعيين مجموعة له.
+              </span>
+            </div>
+            <ul className="divide-y ps-8">
+              {ungrouped.map((branch) => (
+                <BranchRow key={branch.id} branch={branch} groupId="" groupOptions={groupOptions} onError={onError} />
+              ))}
+            </ul>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -262,9 +336,11 @@ function ClanCard({ clan, onError }: { clan: Clan; onError: (e: unknown) => void
 }
 
 /**
- * Administration of the Clan → Branch Group → Branch structure
- * (docs/05, permission clan.manage). Nothing is deleted: deactivation
- * only prevents new selection; families keep their Clan/Branch.
+ * Administration of the Clan → Branch structure (docs/05, permission
+ * clan.manage). A Branch Group is an optional classification: Branches may
+ * stay "بدون مجموعة" and be assigned or moved later within the same Clan.
+ * Nothing is deleted: deactivation only prevents new selection; families
+ * keep their Clan/Branch.
  */
 export function ClanStructureAdmin() {
   const { data, isLoading, error } = useClanTree();
@@ -286,7 +362,7 @@ export function ClanStructureAdmin() {
           <div>
             <h2 className="text-xl font-semibold tracking-tight">العشائر والعائلات</h2>
             <p className="text-sm text-muted-foreground">
-              العشيرة / العائلة ← مجموعات الفروع ← الفروع ← الأسر. العشيرة / العائلة ليست أسرة.
+              العشيرة / العائلة ← الفروع ← الأسر. مجموعات الفروع تصنيف تنظيمي اختياري. العشيرة / العائلة ليست أسرة.
             </p>
           </div>
           <StructureDialog

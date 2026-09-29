@@ -46,6 +46,12 @@ export interface PopulationReport extends ReportEnvelope {
       people: number;
       branches: { code: string; name: string; is_active: boolean; families: number; people: number }[];
     }[];
+    // Branches without a Branch Group (Clan scope only); null when none.
+    ungrouped: {
+      families: number;
+      people: number;
+      branches: { code: string; name: string; is_active: boolean; families: number; people: number }[];
+    } | null;
     unassigned: { families: number; people: number } | null;
   } | null;
   top_locations: { location: string; families: number }[];

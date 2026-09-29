@@ -21,7 +21,8 @@ const NO_BRANCH = "__none__";
 /**
  * Clan (required) + Branch (optional) selectors for a Family
  * (docs/03 §7a). Branches are limited to the selected Clan and grouped by
- * Branch Group; unnamed groups are shown without a heading. Changing the
+ * Branch Group; unnamed groups are shown without a heading and ungrouped
+ * Branches under "بدون مجموعة" (a Branch Group is optional). Changing the
  * Clan clears a Branch that does not belong to it. Only active items can
  * be newly chosen; a Family's current (since-deactivated) Clan or Branch
  * stays visible so an unrelated edit does not drop it.
@@ -58,7 +59,12 @@ export function ClanBranchFields({
 
   const selectedClan = clans.find((c) => c.code === clanCode);
   const groups = (selectedClan?.branch_groups ?? []).filter((g) => (g.branches ?? []).length > 0);
-  const activeBranchCodes = new Set(groups.flatMap((g) => (g.branches ?? []).map((b) => b.code)));
+  // Branches without a Branch Group are selectable too (the group is optional).
+  const ungrouped = selectedClan?.ungrouped_branches ?? [];
+  const activeBranchCodes = new Set([
+    ...groups.flatMap((g) => (g.branches ?? []).map((b) => b.code)),
+    ...ungrouped.map((b) => b.code),
+  ]);
 
   // The Family's current Branch when it is no longer selectable.
   const keptBranch =
@@ -76,6 +82,7 @@ export function ClanBranchFields({
     const next = clans.find((c) => c.code === code);
     const belongs =
       (next?.branch_groups ?? []).some((g) => (g.branches ?? []).some((b) => b.code === branchCode)) ||
+      (next?.ungrouped_branches ?? []).some((b) => b.code === branchCode) ||
       (current?.clan?.code === code && current.branch?.code === branchCode);
     if (!belongs) onBranchChange("");
   }
@@ -135,9 +142,19 @@ export function ClanBranchFields({
                 ))}
               </SelectGroup>
             ))}
+            {ungrouped.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>بدون مجموعة</SelectLabel>
+                {ungrouped.map((branch) => (
+                  <SelectItem key={branch.code} value={branch.code}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
-        {clanCode && selectedClan && groups.length === 0 && !keptBranch && (
+        {clanCode && selectedClan && groups.length === 0 && ungrouped.length === 0 && !keptBranch && (
           <p className="text-xs text-muted-foreground">لا توجد فروع مفعّلة لهذه العشيرة / العائلة بعد.</p>
         )}
         <FieldError message={branchError} />

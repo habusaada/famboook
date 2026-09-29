@@ -44,6 +44,12 @@ class Clan extends Model
         return $this->hasMany(Branch::class);
     }
 
+    /** Branches not (yet) organized into a Branch Group. */
+    public function ungroupedBranches(): HasMany
+    {
+        return $this->hasMany(Branch::class)->whereNull('branch_group_id')->orderBy('sort_order')->orderBy('id');
+    }
+
     public function families(): HasMany
     {
         return $this->hasMany(Family::class);

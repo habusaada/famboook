@@ -1,10 +1,17 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -26,20 +33,28 @@ const schema = z.object({
   code: z.string(),
   name: z.string().max(150, "الاسم طويل جدًا"),
   sortOrder: z.string().regex(/^\d*$/, "الترتيب يجب أن يكون رقمًا صحيحًا"),
+  // A Branch's optional Branch Group (public id); "" = بدون مجموعة.
+  groupId: z.string().optional(),
 });
 
 export type StructureValues = z.infer<typeof schema>;
+
+// Radix Select cannot use "" as an item value.
+const NO_GROUP = "__none__";
 
 const apiFieldToFormField = {
   code: "code",
   name: "name",
   sort_order: "sortOrder",
+  branch_group_id: "groupId",
 } as const;
 
 /**
  * Create/edit dialog for a Clan, Branch Group or Branch. The code is
  * entered only at creation (it is immutable afterwards). A Branch Group's
- * name may be left empty (unnamed administrative container).
+ * name may be left empty (unnamed administrative container). With
+ * `groupOptions` (Branches only), the optional Branch Group of the same
+ * Clan can be chosen, including "بدون مجموعة".
  */
 export function StructureDialog<TPayload>({
   id,
@@ -52,6 +67,7 @@ export function StructureDialog<TPayload>({
   withSortOrder,
   mutation,
   toPayload,
+  groupOptions,
 }: {
   id: string;
   trigger: React.ReactNode;
@@ -64,9 +80,11 @@ export function StructureDialog<TPayload>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mutation: UseMutationResult<any, Error, TPayload>;
   toPayload: (values: StructureValues) => TPayload;
+  groupOptions?: { id: string; label: string }[];
 }) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setError,
@@ -145,6 +163,40 @@ export function StructureDialog<TPayload>({
             )}
             <FieldError message={errors.name?.message} />
           </div>
+
+          {groupOptions && (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor={`${id}-group`} optional>
+                مجموعة الفروع
+              </FieldLabel>
+              <Controller
+                control={control}
+                name="groupId"
+                render={({ field }) => (
+                  <Select
+                    value={field.value || NO_GROUP}
+                    onValueChange={(v) => field.onChange(v === NO_GROUP ? "" : v)}
+                  >
+                    <SelectTrigger id={`${id}-group`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_GROUP}>بدون مجموعة</SelectItem>
+                      {groupOptions.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                المجموعة تصنيف تنظيمي اختياري؛ يمكن تعيينها أو تغييرها لاحقًا.
+              </p>
+              <FieldError message={errors.groupId?.message} />
+            </div>
+          )}
 
           {withSortOrder && (
             <div className="flex flex-col gap-1.5">

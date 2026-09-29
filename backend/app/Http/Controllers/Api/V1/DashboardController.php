@@ -28,7 +28,7 @@ class DashboardController extends Controller
         return ClanResource::collection(
             Clan::query()
                 ->where('is_active', true)
-                ->with('branchGroups.branches')
+                ->with(['branchGroups.branches', 'ungroupedBranches'])
                 ->orderBy('name')
                 ->get()
         );

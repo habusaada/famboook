@@ -130,6 +130,18 @@ export function PopulationReport({ scope, canExport }: { scope: ReportParams; ca
                       {data.organization.groups.map((g) => (
                         <GroupRows key={g.code} group={g} defaultOpen={data.organization?.level === "BRANCH_GROUP"} />
                       ))}
+                      {data.organization.ungrouped && (
+                        <GroupRows
+                          group={{
+                            code: "UNGROUPED",
+                            name: "بدون مجموعة",
+                            display_name: null,
+                            is_active: true,
+                            ...data.organization.ungrouped,
+                          }}
+                          defaultOpen={false}
+                        />
+                      )}
                       {data.organization.unassigned && (
                         <TableRow data-group="UNASSIGNED" className="border-stroke-subtle">
                           <TableCell className="ps-5 font-semibold whitespace-normal">

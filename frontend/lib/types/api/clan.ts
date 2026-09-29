@@ -1,8 +1,9 @@
 // Types mirroring backend/app/Http/Resources/ClanResource.php,
 // BranchGroupResource.php and BranchResource.php.
 //
-// Hierarchy (docs/02 §7a–§7c): Clan (UI: العشيرة / العائلة) → Branch Groups →
-// Branches → Families (households) → Persons. A Clan is NOT a Family.
+// Hierarchy (docs/02 §7a–§7c): Clan (UI: العشيرة / العائلة) → Branches (optionally
+// classified under a Branch Group) →
+// Families (households) → Persons. A Clan is NOT a Family.
 // `id` is the public UUID; internal ids are never exposed.
 
 export interface Branch {
@@ -12,7 +13,8 @@ export interface Branch {
   sort_order: number;
   is_active: boolean;
   family_count?: number;
-  group?: { id: string; code: string; name: string | null };
+  // null = ungrouped (a Branch Group is optional).
+  group?: { id: string; code: string; name: string | null } | null;
 }
 
 export interface BranchGroup {
@@ -34,6 +36,8 @@ export interface Clan {
   is_active: boolean;
   family_count?: number;
   branch_groups?: BranchGroup[];
+  // Branches not organized into a Branch Group; never hidden.
+  ungrouped_branches?: Branch[];
 }
 
 // The Clan/Branch representation embedded in FamilyDetail.
@@ -47,7 +51,8 @@ export interface FamilyBranchRef {
   code: string;
   name: string;
   is_active: boolean;
-  group: { code: string; name: string | null; display_name: string | null };
+  // null = the Branch is ungrouped.
+  group: { code: string; name: string | null; display_name: string | null } | null;
 }
 
 export interface CreateClanPayload {
@@ -72,14 +77,18 @@ export interface UpdateBranchGroupPayload {
   is_active?: boolean;
 }
 
+// branch_group_id: a Branch Group's public id (same Clan) or null = ungrouped.
 export interface CreateBranchPayload {
   code: string;
   name: string;
   sort_order?: number;
+  branch_group_id?: string | null;
 }
 
+// branch_group_id omitted = unchanged; a group id = assign/move; null = ungroup.
 export interface UpdateBranchPayload {
   name?: string;
   sort_order?: number;
   is_active?: boolean;
+  branch_group_id?: string | null;
 }

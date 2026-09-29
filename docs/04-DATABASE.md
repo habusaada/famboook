@@ -353,7 +353,8 @@ Additional indexes should be based on actual query patterns.
 
 # 12a. Clan Structure Tables (V1, 2026-09-25)
 
-Clan → Branch Groups → Branches → Families (docs/02 §7a–§7c; Clan ≠ Family).
+Clan → Branches → Families, with Branch Groups as an optional classification
+of Branches (docs/02 §7a–§7c; Clan ≠ Family).
 
 ```text
 clans
@@ -379,7 +380,7 @@ branch_groups
 branches
   id BIGINT PK
   uuid UUID UNIQUE
-  branch_group_id BIGINT NOT NULL
+  branch_group_id BIGINT NULL                -- optional (migration 2026_10_06_090000); NULL = ungrouped
   clan_id BIGINT NOT NULL FK clans.id ON DELETE RESTRICT
   code VARCHAR(50) NOT NULL
   name VARCHAR(150) NOT NULL
@@ -387,7 +388,7 @@ branches
   is_active BOOLEAN NOT NULL DEFAULT true
   created_at, updated_at
   FK fk_branches_group_clan (branch_group_id, clan_id)
-     → branch_groups (id, clan_id) ON DELETE RESTRICT
+     → branch_groups (id, clan_id) ON DELETE RESTRICT   -- MATCH SIMPLE: NULL group not checked
   UNIQUE (clan_id, code)
   UNIQUE (id, clan_id)                       -- composite FK target
 
@@ -399,9 +400,18 @@ families (added)
   INDEX (clan_id, branch_id)
 ```
 
-The composite foreign keys make "a Branch belongs to its Group's Clan" and
-"a Family's Branch belongs to the Family's Clan" database invariants.
-`branch_group_id` is intentionally **not** stored on `families`.
+The composite foreign keys make "a grouped Branch's Group belongs to the
+Branch's Clan" and "a Family's Branch belongs to the Family's Clan" database
+invariants. Both are MATCH SIMPLE: a NULL `branch_group_id` (ungrouped
+Branch) or a NULL `branch_id` (Family without Branch) is not checked, while
+any non-NULL value must match within the same Clan — cross-Clan grouping is
+impossible. `branch_group_id` is intentionally **not** stored on `families`.
+
+Migration `2026_10_06_090000` (Branch Group optional) only drops the
+NOT NULL on `branches.branch_group_id`; `fk_branches_group_clan`,
+`fk_families_branch_clan` and `branches.clan_id NOT NULL` are unchanged and
+no row is modified. Its rollback restores NOT NULL and refuses (without
+changing data) while ungrouped Branches exist.
 
 Migration `2026_10_01_090001` inserts `AL_BREEM` / عائلة البريم if missing,
 backfills `clan_id` on every existing family (soft-deleted included), then
@@ -417,12 +427,15 @@ POST  /api/v1/clans                                clan.manage
 PATCH /api/v1/clans/{clan}                         clan.manage
 POST  /api/v1/clans/{clan}/branch-groups           clan.manage
 PATCH /api/v1/branch-groups/{group}                clan.manage
-POST  /api/v1/branch-groups/{group}/branches       clan.manage
+POST  /api/v1/clans/{clan}/branches                clan.manage (branch_group_id optional)
 PATCH /api/v1/branches/{branch}                    clan.manage
 ```
 
-Route keys are UUIDs. Updates change name, sort_order and is_active only;
-codes are immutable. There is no DELETE endpoint. Family registration/update
+Route keys are UUIDs. Updates change name, sort_order and is_active; a
+Branch update may also set `branch_group_id` (a Group's public UUID of the
+same Clan to assign/move, or null to ungroup; omitted = unchanged). Codes are
+immutable and a Branch never changes Clan. The Clan tree includes each
+Clan's `ungrouped_branches`. There is no DELETE endpoint. Family registration/update
 accept `clan_code` (required on create) and `branch_code` (nullable).
 
 ---
@@ -3762,6 +3775,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.16 | 2026-09-29 | Approved | §12a: Branch Group optional — `branches.branch_group_id` nullable (migration `2026_10_06_090000`), composite FKs unchanged (MATCH SIMPLE), branch create moves to `POST /clans/{clan}/branches`, `branch_group_id` assign/move/ungroup on update, `ungrouped_branches` in the tree |
 | 1.2.15 | 2026-09-29 | Approved | Initial Family Import foundation (Phase 1): §25a `family_household_declarations` (one current per Family, count/source CHECKs), §82 Registered Household Size never stored, §83a `import_batches` / `import_rows` staging tables; additive migrations only, no existing column or row changed |
 | 1.2.14 | 2026-09-28 | Approved | §31: cross-family assessment registry API (`GET /assessments`, status and exact-family filters, whole-registry summary); read-only, no schema change |
 | 1.2.13 | 2026-09-27 | Approved | §19: membership ending / relationship correction are in-place UPDATEs with row locks; no schema change (Pilot Readiness Slice C) |

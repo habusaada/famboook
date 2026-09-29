@@ -74,14 +74,16 @@ final class PopulationReport
             ? collect([$this->scope->group->loadMissing('branches')])
             : $this->scope->clan->branchGroups()->with('branches')->get();
 
-        $rows = $groups->map(function (BranchGroup $group) use ($families, $people, $count) {
-            $branches = $group->branches->map(fn ($b) => [
-                'code' => $b->code,
-                'name' => $b->name,
-                'is_active' => $b->is_active,
-                'families' => $count($families, $b->id),
-                'people' => $count($people, $b->id),
-            ])->values();
+        $branchRows = fn ($branches) => $branches->map(fn ($b) => [
+            'code' => $b->code,
+            'name' => $b->name,
+            'is_active' => $b->is_active,
+            'families' => $count($families, $b->id),
+            'people' => $count($people, $b->id),
+        ])->values();
+
+        $rows = $groups->map(function (BranchGroup $group) use ($branchRows) {
+            $branches = $branchRows($group->branches);
 
             return [
                 'code' => $group->code,
@@ -94,9 +96,22 @@ final class PopulationReport
             ];
         })->values()->all();
 
+        // Branches without a Branch Group: their own rows at Clan scope, so
+        // their families are never lost from the breakdown.
+        $ungrouped = null;
+        if ($this->scope->level() === 'CLAN') {
+            $branches = $branchRows($this->scope->clan->ungroupedBranches()->get());
+            $ungrouped = $branches->isEmpty() ? null : [
+                'families' => $branches->sum('families'),
+                'people' => $branches->sum('people'),
+                'branches' => $branches->all(),
+            ];
+        }
+
         return [
             'level' => $this->scope->level(),
             'groups' => $rows,
+            'ungrouped' => $ungrouped,
             // Families without a Branch: a separate row at Clan scope only,
             // never attributed to a group.
             'unassigned' => $this->scope->level() === 'CLAN' ? [
