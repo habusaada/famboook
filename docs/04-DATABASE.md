@@ -2923,6 +2923,64 @@ is unaffected). Additive.
 
 ---
 
+# 83d. Import Apply Foundation (Lifecycle and Provenance)
+
+Approved 2026-09-29 (migration `2026_10_11_090000`; docs/02 §88d, docs/03
+§96b). Schema only — no Apply exists and nothing writes these rows yet.
+
+```text
+import_batches (changed)
+  status adds PARTIALLY_APPLIED
+  apply_started_at TIMESTAMP NULL
+
+import_rows (added)
+  UNIQUE INDEX uq_import_rows_id_batch (id, import_batch_id)
+
+import_apply_records            -- append-only, no updated_at
+  id BIGINT PK
+  import_batch_id BIGINT NOT NULL FK import_batches.id ON DELETE RESTRICT
+  import_row_id BIGINT NOT NULL
+  effect_key VARCHAR(40) NOT NULL
+  entity_type VARCHAR(40) NOT NULL        -- PERSON | FAMILY | MEMBERSHIP | HOUSEHOLD_DECLARATION | RESIDENCE
+  entity_id BIGINT NULL                   -- no FK (see below)
+  role VARCHAR(10) NULL                   -- HEAD | SPOUSE
+  spouse_slot SMALLINT NULL               -- 1..4
+  outcome VARCHAR(10) NOT NULL
+  reason_code VARCHAR(60) NULL
+  applied_by BIGINT NOT NULL FK users.id ON DELETE RESTRICT
+  created_at TIMESTAMP NOT NULL
+  FK (import_row_id, import_batch_id) → import_rows (id, import_batch_id) ON DELETE RESTRICT
+  UNIQUE (import_row_id, effect_key)
+  UNIQUE (entity_type, entity_id) WHERE outcome = 'CREATED'
+  INDEX (import_batch_id, outcome), INDEX (entity_type, entity_id)
+```
+
+```sql
+-- PostgreSQL CHECKs
+chk_import_batch_status          status IN (… 8 values incl. PARTIALLY_APPLIED …)
+chk_import_batch_apply_started   (apply_started_at IS NOT NULL) = (status IN ('APPLYING','PARTIALLY_APPLIED','APPLIED'))
+chk_import_apply_shape           effect_key ⇒ exact entity_type, role, spouse_slot (13 combinations)
+chk_import_apply_outcome         outcome IN ('CREATED','REUSED','OMITTED','BLOCKED')
+chk_import_apply_entity          CREATED/REUSED ⇒ entity_id NOT NULL; OMITTED ⇒ entity_id NULL
+chk_import_apply_reason          reason_code ~ '^[A-Z][A-Z0-9_]{1,59}$'; OMITTED/BLOCKED ⇒ reason_code NOT NULL
+```
+
+- **Idempotency key**: `(import_row_id, effect_key)`, both NOT NULL — unique
+  semantics never depend on NULLs. A spouse slot's Person and membership
+  are different effects (`SPOUSE_n_PERSON`, `SPOUSE_n_MEMBERSHIP`).
+- **Entity references**: stable `entity_type` codes plus `entity_id`, with
+  no foreign key: one column cannot reference five tables, and provenance
+  must never be cascade-deleted. Registry rows are soft-deleted or protected
+  by RESTRICT foreign keys, so the id stays resolvable.
+- **Checksum protection**: `uq_import_batch_clan_checksum` (`WHERE status <>
+  'FAILED'`) is unchanged; because a started Apply can never be FAILED, a
+  partly applied file stays protected.
+- The model mirrors every CHECK so the invariants also hold on SQLite
+  (tests). `down()` recreates the checksum index predicate after SQLite
+  rebuilds `import_batches`. Additive; no existing row is transitioned.
+
+---
+
 # 84. Export Architecture
 
 Exports should be generated from authorized queries.
@@ -3877,6 +3935,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.21 | 2026-09-29 | Approved | §83d Import Apply foundation: import_batches PARTIALLY_APPLIED + apply_started_at with CHECK (started Apply never FAILED), import_apply_records (append-only provenance, unique (import_row_id, effect_key), composite row/batch FK, created-entity uniqueness, shape/outcome/entity/reason CHECKs, no polymorphic FK) |
 | 1.2.20 | 2026-09-29 | Approved | §83c `import_row_reconciliations` (migration `2026_10_10_090000`), batch reconciliation columns, CHECKs; partial checksum index preserved on SQLite rebuild |
 | 1.2.19 | 2026-09-29 | Approved | §83b `import_family_key_resolutions` (migration `2026_10_09_090000`): composite FKs to `import_batches (id, clan_id)` and `branches (id, clan_id)`, unique (batch, key), decision/branch/reference CHECKs; `import_batches` UNIQUE (id, clan_id) |
 | 1.2.18 | 2026-09-29 | Approved | §83a Import Wizard (migration `2026_10_08_090000`): `import_batches.import_mode` NOT NULL + `chk_import_batch_mode`, `source_size_bytes`, private `source_file_path`, `worksheet_name`, structure-only `inspection`, `column_mapping` + `mapping_confirmed_at` (`chk_import_batch_mapping_confirmed`); reserved `import_rows.reconciliation_status` (`chk_import_row_reconciliation`); additive; up() refuses if mode-less batches exist |

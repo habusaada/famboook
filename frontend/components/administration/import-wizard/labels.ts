@@ -136,6 +136,7 @@ export const BATCH_STATUS_LABELS: Record<ImportBatchStatus, string> = {
   READY_FOR_REVIEW: "جاهزة للمراجعة",
   READY_TO_APPLY: "جاهزة للاعتماد",
   APPLYING: "قيد التطبيق",
+  PARTIALLY_APPLIED: "مطبّقة جزئيًا",
   APPLIED: "مطبّقة",
   FAILED: "فاشلة",
 };

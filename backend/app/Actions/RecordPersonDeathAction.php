@@ -5,15 +5,18 @@ namespace App\Actions;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
 use App\Models\Person;
+use App\Support\DeathDate;
 use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 /**
- * Records a Person's official death (docs/03 §28-§30; permission
- * person.record-death, docs/06 §96). The only write path to DECEASED.
- * Callers: the future staff endpoint, the DEATH_REPORT Change Request
- * application (docs/03 §31) and the controlled import.
+ * Records the official death of an EXISTING Person (docs/03 §28-§30;
+ * permission person.record-death, docs/06 §96): a lifecycle change after
+ * registration. Callers: the future staff endpoint and the DEATH_REPORT
+ * Change Request application (docs/03 §31). A Person who is ALREADY
+ * deceased when first registered (e.g. an imported deceased household head)
+ * is created DECEASED by CreatePersonAction instead — no misleading
+ * "death after registration" event. Both use the same DeathDate rules.
  *
  * - life_status becomes DECEASED; death_date is the given date or NULL
  *   when the exact date is unknown (docs/03 §29) — never invented.
@@ -40,15 +43,7 @@ class RecordPersonDeathAction
 
             abort_if($person->life_status === LifeStatus::DECEASED, 409, 'وفاة هذا الشخص مسجّلة مسبقًا.');
 
-            $rules = ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'];
-            if ($person->birth_date !== null) {
-                $rules[] = 'after_or_equal:'.$person->birth_date->toDateString();
-            }
-            Validator::make(['death_date' => $deathDate], ['death_date' => $rules], [
-                'death_date.date_format' => 'تاريخ الوفاة غير صالح.',
-                'death_date.before_or_equal' => 'تاريخ الوفاة لا يمكن أن يكون في المستقبل.',
-                'death_date.after_or_equal' => 'تاريخ الوفاة لا يمكن أن يسبق تاريخ الميلاد.',
-            ])->validate();
+            DeathDate::validate($deathDate, $person->birth_date?->toDateString());
 
             $person->life_status = LifeStatus::DECEASED;
             $person->death_date = $deathDate;

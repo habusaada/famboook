@@ -3390,6 +3390,39 @@ fingerprint means the result is STALE).
 
 ---
 
+# 88d. Import Apply Provenance
+
+Approved 2026-09-29 (Phase 4B.1 foundation, docs/03 §96b). Nothing writes
+these records yet — Apply is not implemented.
+
+`import_batches.status` gains `PARTIALLY_APPLIED` (some rows committed, a
+later row failed; resumable). `import_batches.apply_started_at` is set exactly
+while the batch is APPLYING / PARTIALLY_APPLIED / APPLIED; a started Apply is
+never FAILED.
+
+```text
+import_apply_records
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `import_batch_id` | yes | The batch |
+| `import_row_id` | yes | The source row (must belong to the batch) |
+| `effect_key` | yes | The intended effect: `HEAD_PERSON`, `FAMILY`, `HEAD_MEMBERSHIP`, `HOUSEHOLD_DECLARATION`, `RESIDENCE`, `SPOUSE_n_PERSON`, `SPOUSE_n_MEMBERSHIP` (n = wife slot 1–4); unique per row |
+| `entity_type` | yes | `PERSON`, `FAMILY`, `MEMBERSHIP`, `HOUSEHOLD_DECLARATION`, `RESIDENCE` (derived from the effect) |
+| `entity_id` | no | The registry entity — present for CREATED / REUSED, absent for OMITTED |
+| `role` | no | `HEAD` / `SPOUSE` for person and membership effects |
+| `spouse_slot` | no | Source wife slot 1–4 |
+| `outcome` | yes | `CREATED`, `REUSED`, `OMITTED`, `BLOCKED` |
+| `reason_code` | no | Stable upper-case code; required for OMITTED / BLOCKED (e.g. why a SPOUSE membership was omitted) |
+| `applied_by` | yes | The user who applied |
+| `created_at` | yes | When |
+
+Records contain ids and codes only — never a National ID, name or source
+value. They are append-only (never updated or deleted).
+
+---
+
 # 89. Export Data
 
 Exports are generated representations of authorized canonical data.
@@ -3858,6 +3891,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.21 | 2026-09-29 | Approved | §88d `import_apply_records` (Apply provenance: effect, entity reference, role, spouse slot, outcome, reason code, applier) and batch status PARTIALLY_APPLIED / apply_started_at; not yet written by any flow |
 | 1.2.20 | 2026-09-29 | Approved | §88c `import_row_reconciliations` (HEAD Person vs Family evidence, spouse candidates, differences, issues) and batch `reconciled_at` / `reconciled_by` / `reconciliation_fingerprint`; `import_rows.reconciliation_status` now populated |
 | 1.2.19 | 2026-09-29 | Approved | §88b `import_family_key_resolutions`: one decision per batch + exact source key (MATCH_EXISTING_BRANCH / CREATE_NEW_BRANCH / SAME_BRANCH_AS_KEY / NO_BRANCH), final `branch_id` in the batch's Clan, `reference_source_key`, `resolved_by` / `resolved_at`; no record = UNRESOLVED |
 | 1.2.18 | 2026-09-29 | Approved | §88a Import Wizard: `import_batches.import_mode` (INITIAL / INCREMENTAL), `source_size_bytes`, private `source_file_path`, `worksheet_name`, structure-only `inspection`, `column_mapping` + `mapping_confirmed_at`; reserved `import_rows.reconciliation_status`; upload ≠ staging |

@@ -2331,6 +2331,14 @@ classifies each row NEW / UNCHANGED / CHANGED / DUPLICATE_IN_FILE / CONFLICT
 Step 6 is gated on a current result. **Still open:** review decisions for
 CHANGED / duplicate / conflict rows, Apply.
 
+2026-09-29: **Import Apply foundation (Phase 4B.1)** delivered (docs/03
+§96b): Apply lifecycle (PARTIALLY_APPLIED, apply_started_at; a started
+Apply is never FAILED), append-only `import_apply_records` provenance,
+canonical Person creation (explicit ALIVE / DECEASED / UNKNOWN) and Family
+creation reused by staff registration, strict HEAD/SPOUSE lookup. **Still
+open:** Apply planner and Dry Run, INITIAL Apply (row transactions, resume,
+progress), enabling `import.apply` (SUPER_ADMIN), then INCREMENTAL Apply.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4741,6 +4749,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.18 | 2026-09-29 | Approved | Phase 23 progress note: Import Apply foundation (Phase 4B.1) — lifecycle, provenance, shared Person/Family creation; Apply not yet implemented |
 | 1.2.17 | 2026-09-29 | Approved | Phase 23 progress note: record reconciliation (Phase 3) |
 | 1.2.16 | 2026-09-29 | Approved | Phase 23 progress note: family-key resolution (Phase 2B) |
 | 1.2.15 | 2026-09-29 | Approved | Phase 23 progress note: Import Wizard (INITIAL / INCREMENTAL, mapping-based staging, review; no Apply) |

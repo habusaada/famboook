@@ -2826,6 +2826,136 @@ death date without DECEASED        FLAGGED
 
 ---
 
+# 96b. Import Apply — Foundation and Contract (Phase 4B.1)
+
+Approved 2026-09-29 (Phase 4A design, Phase 4B.1 foundation). **Apply itself
+is NOT implemented**: there is no Apply action, endpoint, job, button or Dry
+Run, and no import writes to registry tables. This section records what the
+foundation provides (IMPLEMENTED) and the approved contract a future Apply
+must follow (PLANNED). INITIAL Apply will be implemented before INCREMENTAL.
+
+## Apply lifecycle (IMPLEMENTED — schema and invariants only)
+
+```text
+READY_FOR_REVIEW ──(future Dry Run / approval)──► APPLYING ──► APPLIED
+                                                     │
+                                                     └─► PARTIALLY_APPLIED  (some rows committed, a later row failed; resumable)
+FAILED = a PRE-Apply failure (upload / staging) only
+```
+
+- `import_batches.apply_started_at` is set exactly when the status is
+  APPLYING, PARTIALLY_APPLIED or APPLIED (PostgreSQL CHECK, mirrored by the
+  model). A batch whose Apply started can therefore **never become FAILED**.
+- The source-checksum index excludes only FAILED, so a batch that is
+  APPLYING / PARTIALLY_APPLIED / APPLIED keeps its file protected: the same
+  file cannot be uploaded again for the same Clan and applied twice.
+- No separate APPLY_FAILED state: a failure before any row committed returns
+  the batch to its pre-Apply state (nothing reached the registry); a failure
+  after a committed row is PARTIALLY_APPLIED.
+- Every Wizard step (worksheet, workbook, mapping, family keys, reconcile)
+  accepts only UPLOADED / READY_FOR_REVIEW, so a started batch is frozen.
+
+## Provenance (IMPLEMENTED — table and invariants; nothing writes it yet)
+
+`import_apply_records` is the authoritative, append-only provenance of every
+intended effect of an import row. One record per `(import_row_id,
+effect_key)` — both NOT NULL — so a retried or resumed Apply can never record
+the same effect twice.
+
+```text
+effect_key   HEAD_PERSON | FAMILY | HEAD_MEMBERSHIP | HOUSEHOLD_DECLARATION | RESIDENCE
+             | SPOUSE_n_PERSON | SPOUSE_n_MEMBERSHIP   (n = source wife slot 1..4)
+outcome      CREATED | REUSED  → references the entity (entity_type, entity_id)
+             OMITTED | BLOCKED → carries a reason_code (stable code, never a value)
+```
+
+It answers: which row / batch produced an entity; created or reused; HEAD or
+SPOUSE and which slot; why a spouse membership was omitted; who applied it
+and when. A registry entity is CREATED by at most one effect. Records hold
+ids and codes only — never a National ID, name or source value. Activity-log
+metadata may later carry safe import identifiers (batch / row / outcome)
+through its allow-list only.
+
+## Person creation (IMPLEMENTED — CreatePersonAction)
+
+One canonical path creates every Person (staff registration, adding a
+member, future Apply): person code, National ID guard (exact value; NULL
+allowed, never a fake value), and an **explicit** life status:
+
+```text
+ALIVE     no death date
+UNKNOWN   no death date
+DECEASED  death date optional (NULL = unknown, never invented); when given:
+          a real date, not in the future, not before the birth date
+```
+
+A Person known to be deceased when first registered (e.g. an imported
+deceased household head) is **created DECEASED** — no "death recorded after
+registration" event. RecordPersonDeathAction remains the lifecycle change of
+an existing Person; both use the same death-date rules. Staff registration
+and add-member still always create ALIVE Persons and never accept a client
+life status.
+
+## Family creation (IMPLEMENTED — CreateFamilyAction)
+
+One canonical path creates the Family row: family code, required Clan,
+optional Branch of that Clan (selectable), status ACTIVE, registration
+source and date, FAMILY_CREATED activity. RegisterFamilyAction uses it.
+
+## Relationship types (IMPLEMENTED)
+
+Flows that must record HEAD / SPOUSE resolve them strictly; a missing or
+inactive type fails before any write. Family registration requires an
+active HEAD type (a missing seed fails explicitly and nothing is written);
+the future Apply will require HEAD and SPOUSE. `relationship_type_id` stays
+nullable in the schema.
+
+## Approved contract for the future Apply (PLANNED — not implemented)
+
+- One source household row = one Apply unit = one database transaction;
+  committed rows stay committed; resume skips rows already linked
+  (`import_rows.family_id`) and effects already recorded.
+- Family: one per accepted row; Clan from the batch; Branch from the
+  resolved key (NO_BRANCH → none); never creates or infers a Branch; status
+  ACTIVE; registration source IMPORT; registration date = Apply date.
+- Head Person: reuse the single exact-National-ID Person without an active
+  membership (no field updates in INITIAL); a soft-deleted or ambiguous match
+  blocks the row; never by name, never a merge.
+- **Deceased head**: the Family is still created with that Person as its
+  HEAD (created DECEASED); the Family carries the non-blocking review
+  evidence `HOUSEHOLD_HEAD_DECEASED`; no replacement head is invented.
+- Spouse Person ≠ spouse membership: every exact spouse National ID becomes
+  (or reuses) ONE Person; an active SPOUSE membership is created only when
+  deterministic and allowed by one-active-membership-per-Person.
+- **Female head + spouse column**: in this import format a populated spouse
+  slot of a FEMALE head is her MALE spouse (importer-specific source
+  semantics, not a global rule). A male head's spouse slot is FEMALE.
+- A spouse who heads her own accepted row: Person yes, SPOUSE membership in
+  the other Family no (OMITTED, evidence kept).
+- A spouse referenced by two DECEASED heads with no current household:
+  Person once, SPOUSE membership in neither (both relationships kept as
+  OMITTED evidence).
+- Declared statistics become a household declaration (source IMPORT) — never
+  fake Persons, never recalculated; المدينة only fills
+  `original_residence_text`.
+- Source spouse references are evidence, not Family Membership (§17).
+- `import.apply` will be SUPER_ADMIN-only when Apply is enabled; it stays
+  unassigned until then.
+
+## Freshness during Apply (PLANNED algorithm)
+
+Before Apply starts, the normal rule applies: reconciliation must be CURRENT.
+Once Apply starts the batch is frozen, so the stored
+`reconciliation_fingerprint` is the approved starting fingerprint (no new
+column needed). On resume, recompute the fingerprint's registry markers
+**excluding the entities this batch CREATED** (`import_apply_records`,
+outcome CREATED) and compare with the stored value: equal → the only registry
+changes are this batch's own effects; different → an unrelated registry
+change happened and the batch must stop for review. Reconciliation freshness
+itself is never weakened.
+
+---
+
 # 97. Audit
 
 Critical operations must be audited.
@@ -3909,6 +4039,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.24 | 2026-09-29 | Approved | Added §96b Import Apply foundation (Phase 4B.1): Apply lifecycle with PARTIALLY_APPLIED and apply_started_at (a started Apply is never FAILED, so the file stays checksum-protected), append-only import_apply_records provenance, canonical Person creation with explicit ALIVE / DECEASED / UNKNOWN (created-deceased ≠ recorded death), canonical Family creation, strict HEAD/SPOUSE lookup (registration now requires an active HEAD type); approved PLANNED Apply contract (deceased head stays HEAD with HOUSEHOLD_HEAD_DECEASED evidence, female-head spouse slot = male spouse for this importer, spouse Person ≠ spouse membership, two-deceased-heads spouse gets no membership, resume freshness algorithm, import.apply SUPER_ADMIN-only when enabled, INITIAL before INCREMENTAL); Apply itself not implemented |
 | 1.2.23 | 2026-09-29 | Approved | §96a polygamous-household correction: wife-slot position is source evidence only and never decides Family membership; the cross-role is accepted for any wife slot (including the last) when the husband is MALE, ALIVE and "متعدد الزوجات" and both rows reference each other by exact National ID with no other review reason; deceased husband → not this rule; unknown life status, ordinary married, missing reciprocal → REVIEW_REQUIRED; future-Apply one-active-membership constraint recorded |
 | 1.2.22 | 2026-09-29 | Approved | §96a polygamous-household rule: wife-slot order is marriage order (last non-empty slot = latest wife, stays with the male head); an earlier wife of a "متعدد الزوجات" head heading her own row is accepted (informational) when linked by exact ID and neither row has another review reason; latest-wife HEAD ↔ SPOUSE, ordinary married and unknown statuses stay REVIEW_REQUIRED; no inference from row order or from several women naming one man |
 | 1.2.21 | 2026-09-29 | Approved | §96a spouse-reuse correction: a spouse National ID repeated across household rows is accepted automatically only when every other head of the group is DECEASED (widow remarriage); two or more living heads or an unknown head status → REVIEW_REQUIRED; group evaluation, no row-order chronology, one Person candidate per exact ID |

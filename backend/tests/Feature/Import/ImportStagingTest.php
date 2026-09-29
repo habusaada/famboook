@@ -48,7 +48,8 @@ class ImportStagingTest extends TestCase
         $this->assertTrue($batch->clan->is($clan));
         $this->assertNull($batch->applier);
 
-        $batch->update(['status' => ImportBatchStatus::APPLIED, 'applied_by' => $applier->id, 'applied_at' => now()]);
+        // A started Apply always carries apply_started_at (docs/03 §96b).
+        $batch->update(['status' => ImportBatchStatus::APPLIED, 'apply_started_at' => now(), 'applied_by' => $applier->id, 'applied_at' => now()]);
         $this->assertTrue($batch->fresh()->applier->is($applier));
         $this->assertNotNull($batch->fresh()->applied_at);
     }

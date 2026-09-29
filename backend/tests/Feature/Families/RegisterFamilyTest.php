@@ -4,10 +4,12 @@ namespace Tests\Feature\Families;
 
 use App\Actions\RegisterFamilyAction;
 use App\Models\Family;
+use App\Models\FamilyActivity;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\User;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +18,13 @@ use Tests\TestCase;
 class RegisterFamilyTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Registration requires an active HEAD relationship type (docs/03 §96b).
+        $this->seed(RelationshipTypeSeeder::class);
+    }
 
     private function validPayload(): array
     {
@@ -127,6 +136,8 @@ class RegisterFamilyTest extends TestCase
         $this->assertSame(0, Person::count());
         $this->assertSame(0, FamilyMembership::count());
         $this->assertSame(0, FamilyResidence::count());
+        // FAMILY_CREATED was written with the Family and rolls back with it.
+        $this->assertSame(0, FamilyActivity::count());
     }
 
     public function test_registration_fails_validation_with_missing_required_fields(): void

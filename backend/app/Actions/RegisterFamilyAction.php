@@ -3,18 +3,13 @@
 namespace App\Actions;
 
 use App\Enums\DisplacementStatus;
-use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
-use App\Models\Person;
-use App\Models\RelationshipType;
-use App\Support\BusinessIdentifier;
-use App\Support\FamilyActivityLog;
-use App\Support\FamilyLineage;
 use App\Support\NationalIdGuard;
+use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -29,6 +24,11 @@ use Illuminate\Support\Facades\DB;
  */
 class RegisterFamilyAction
 {
+    public function __construct(
+        private readonly CreateFamilyAction $families = new CreateFamilyAction,
+        private readonly CreatePersonAction $persons = new CreatePersonAction,
+    ) {}
+
     /**
      * @param  array{
      *     registration_date: string,
@@ -63,61 +63,38 @@ class RegisterFamilyAction
     {
         return DB::transaction(function () use ($data, $actingUserId) {
             // Clan/Branch are validated before anything is written.
-            $lineage = new Family;
-            FamilyLineage::apply($lineage, $data);
-            // Never a second Person with the same National ID (docs/03 §21).
+            $this->families->lineage($data);
+            // Never a second Person with the same National ID (docs/03 §21);
+            // checked before the Family id is reserved so codes never skip.
             NationalIdGuard::assertAvailable($data['household_head']['national_id'] ?? null, 'household_head.national_id');
+            // The household head carries the canonical HEAD relationship type
+            // (docs/02 §15); a missing or inactive seed fails here, before any
+            // registry write (MissingRelationshipTypeException).
+            $headTypeId = RelationshipTypes::required(RelationshipTypes::HEAD);
 
-            $familyId = BusinessIdentifier::nextId('families');
-
-            // forceCreate, not create: `id` is deliberately not fillable, so
-            // create() would silently drop the id reserved above; the INSERT
-            // would then draw a second sequence value and the public code
-            // would no longer match the row id (and codes would skip).
-            $family = Family::forceCreate([
-                'id' => $familyId,
-                'family_code' => BusinessIdentifier::format('FAM', $familyId),
-                'clan_id' => $lineage->clan_id,
-                'branch_id' => $lineage->branch_id,
-                'status' => 'ACTIVE',
-                'registration_date' => $data['registration_date'],
-                'registration_source' => $data['registration_source'],
-                'paper_form_no' => $data['paper_form_no'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
-
-            $personId = BusinessIdentifier::nextId('persons');
+            // Same transaction: a failure in any later step rolls back the
+            // Family and its FAMILY_CREATED activity too.
+            $family = $this->families->handle($data, $actingUserId);
 
             $head = $data['household_head'];
-            // forceCreate keeps the reserved id (see above).
-            $person = Person::forceCreate([
-                'id' => $personId,
-                'person_code' => BusinessIdentifier::format('PER', $personId),
+            $person = $this->persons->handle([
                 'full_name' => $head['full_name'],
                 'national_id' => $head['national_id'] ?? null,
                 'gender' => $head['gender'],
                 'marital_status' => $head['marital_status'] ?? MaritalStatus::UNKNOWN->value,
-                // NULL = unknown; never a placeholder (docs/03 §26).
                 'birth_date' => $head['birth_date'] ?? null,
+                // Staff registration always creates a living head; a client
+                // never chooses the life status here.
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $head['mobile'] ?? null,
                 'alternate_mobile' => $head['alternate_mobile'] ?? null,
                 'alternate_mobile_owner_relation' => $head['alternate_mobile_owner_relation'] ?? null,
-                'is_active' => true,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
+            ], $actingUserId, 'household_head.national_id');
 
             $membership = FamilyMembership::create([
                 'family_id' => $family->id,
                 'person_id' => $person->id,
-                // Household head carries the canonical HEAD relationship
-                // type (docs/02-DATA-DICTIONARY.md §15). Falls back to
-                // null gracefully if relationship_types hasn't been
-                // seeded yet, rather than failing family registration.
-                'relationship_type_id' => RelationshipType::where('code', 'HEAD')->value('id'),
+                'relationship_type_id' => $headTypeId,
                 'is_household_head' => true,
                 'started_at' => $data['registration_date'],
                 'is_active' => true,
@@ -151,8 +128,7 @@ class RegisterFamilyAction
 
             unset($membership);
 
-            FamilyActivityLog::record($family->id, FamilyActivityType::FAMILY_CREATED, $family, $actingUserId);
-
+            // FAMILY_CREATED is recorded by CreateFamilyAction.
             return $family->fresh([
                 'householdHeadMembership.person',
                 'memberships.person',

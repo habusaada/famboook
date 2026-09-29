@@ -12,6 +12,7 @@ use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\User;
 use Database\Seeders\ClanSeeder;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +47,8 @@ class ClanStructureTest extends TestCase
         parent::setUp();
 
         $this->seed(RolePermissionSeeder::class);
+        // Registration requires an active HEAD relationship type (docs/03 §96b).
+        $this->seed(RelationshipTypeSeeder::class);
         // AL_BREEM comes from the backfill migration. The approved taxonomy
         // (ClanSeeder) is not loaded here so these synthetic fixtures stay
         // isolated; ClanSeederTest covers the seed data.

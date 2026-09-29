@@ -11,6 +11,7 @@ use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\User;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,6 +46,8 @@ class UngroupedBranchTest extends TestCase
     {
         parent::setUp();
         $this->seed(RolePermissionSeeder::class);
+        // Registration requires an active HEAD relationship type (docs/03 §96b).
+        $this->seed(RelationshipTypeSeeder::class);
 
         $this->clan = Clan::where('code', Clan::AL_BREEM)->firstOrFail();
         $this->groupA = BranchGroup::create(['clan_id' => $this->clan->id, 'code' => 'GA', 'name' => 'مجموعة أ', 'sort_order' => 1]);

@@ -1925,6 +1925,10 @@ import.review     SUPER_ADMIN
 import.apply      (unassigned until the apply phase)
 ```
 
+Approved for the Apply phase (not yet assigned): `import.apply` will be
+held by SUPER_ADMIN only. It stays unassigned — and `famboook:verify-permissions`
+keeps treating it as a critical failure — until Apply itself is delivered.
+
 Import Wizard (docs/03 §96a):
 
 ```text
@@ -3906,6 +3910,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.22 | 2026-09-29 | Approved | §61 `import.apply` approved as SUPER_ADMIN-only for the future Apply phase; still unassigned, verifier unchanged |
 | 1.2.21 | 2026-09-29 | Approved | §61 reconciliation endpoints: run with `import.validate`, read with `import.review`; no new permission; `import.apply` still unassigned |
 | 1.2.20 | 2026-09-29 | Approved | §61 family-key resolution endpoints: decisions with `import.review`; Branch creation during resolution additionally requires `clan.manage`; no new permission |
 | 1.2.19 | 2026-09-29 | Approved | §61 Import Wizard endpoints: `import.upload` (upload, replace workbook, worksheet), `import.validate` (columns, confirm mapping = staging), `import.review` (batch, keys, problem rows); Clan creation in the Wizard via `clan.manage`; no new permission, `import.apply` still unassigned |

@@ -10,6 +10,7 @@ export type ImportBatchStatus =
   | "READY_FOR_REVIEW"
   | "READY_TO_APPLY"
   | "APPLYING"
+  | "PARTIALLY_APPLIED"
   | "APPLIED"
   | "FAILED";
 

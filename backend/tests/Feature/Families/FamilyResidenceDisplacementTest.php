@@ -9,6 +9,7 @@ use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\User;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -20,6 +21,13 @@ use Tests\TestCase;
 class FamilyResidenceDisplacementTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Registration requires an active HEAD relationship type (docs/03 §96b).
+        $this->seed(RelationshipTypeSeeder::class);
+    }
 
     private function authorizedUser(): User
     {

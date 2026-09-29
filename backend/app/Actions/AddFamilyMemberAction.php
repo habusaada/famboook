@@ -7,10 +7,7 @@ use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
-use App\Models\Person;
-use App\Support\BusinessIdentifier;
 use App\Support\FamilyActivityLog;
-use App\Support\NationalIdGuard;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +21,8 @@ use Illuminate\Support\Facades\DB;
  */
 class AddFamilyMemberAction
 {
+    public function __construct(private readonly CreatePersonAction $persons = new CreatePersonAction) {}
+
     /**
      * @param  array{
      *     full_name: string,
@@ -39,18 +38,10 @@ class AddFamilyMemberAction
     {
         return DB::transaction(function () use ($family, $data, $actingUserId) {
             // Never a second Person with the same National ID (docs/03 §21):
-            // no new Person, no attaching the existing one, no merge.
-            NationalIdGuard::assertAvailable($data['national_id'] ?? null, 'national_id');
-
-            $personId = BusinessIdentifier::nextId('persons');
-
-            // forceCreate, not create: `id` is deliberately not fillable, so
-            // create() would silently drop the id reserved above; the INSERT
-            // would then draw a second sequence value and the public code
-            // would no longer match the row id (and codes would skip).
-            $person = Person::forceCreate([
-                'id' => $personId,
-                'person_code' => BusinessIdentifier::format('PER', $personId),
+            // no new Person, no attaching the existing one, no merge
+            // (enforced by CreatePersonAction). Staff always add a living
+            // member; a client never chooses the life status here.
+            $person = $this->persons->handle([
                 'full_name' => $data['full_name'],
                 'national_id' => $data['national_id'] ?? null,
                 'gender' => $data['gender'],
@@ -59,10 +50,7 @@ class AddFamilyMemberAction
                 'life_status' => LifeStatus::ALIVE->value,
                 'mobile' => $data['mobile'] ?? null,
                 'alternate_mobile' => $data['alternate_mobile'] ?? null,
-                'is_active' => true,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
+            ], $actingUserId);
 
             $membership = FamilyMembership::create([
                 'family_id' => $family->id,
