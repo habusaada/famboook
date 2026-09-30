@@ -2979,6 +2979,27 @@ chk_import_apply_reason          reason_code ~ '^[A-Z][A-Z0-9_]{1,59}$'; OMITTED
   (tests). `down()` recreates the checksum index predicate after SQLite
   rebuilds `import_batches`. Additive; no existing row is transitioned.
 
+Phase 4B.4a (migration `2026_10_12_090000`):
+
+```text
+import_batches (added)
+  apply_plan_fingerprint CHAR(64) NULL
+  apply_error_code VARCHAR(60) NULL
+  apply_error_row_number INTEGER NULL
+```
+
+```sql
+chk_import_batch_apply_plan    (apply_plan_fingerprint IS NOT NULL) = (apply_started_at IS NOT NULL)
+                               AND apply_plan_fingerprint ~ '^[0-9a-f]{64}$' when present
+chk_import_batch_apply_error   apply_error_code ~ '^[A-Z][A-Z0-9_]{1,59}$' when present;
+                               apply_error_row_number only with a code, >= 1
+```
+
+Together with `chk_import_batch_apply_started`, the approved plan exists
+exactly while Apply has started. Errors are structured codes, never
+exception text. Mirrored by the model; `down()` restores the checksum index
+predicate after the SQLite rebuild. Additive.
+
 ---
 
 # 84. Export Architecture
@@ -3935,6 +3956,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.22 | 2026-09-30 | Approved | §83d Apply execution fields: import_batches.apply_plan_fingerprint (present exactly while Apply has started) and structured apply_error_code / apply_error_row_number, with CHECKs |
 | 1.2.21 | 2026-09-29 | Approved | §83d Import Apply foundation: import_batches PARTIALLY_APPLIED + apply_started_at with CHECK (started Apply never FAILED), import_apply_records (append-only provenance, unique (import_row_id, effect_key), composite row/batch FK, created-entity uniqueness, shape/outcome/entity/reason CHECKs, no polymorphic FK) |
 | 1.2.20 | 2026-09-29 | Approved | §83c `import_row_reconciliations` (migration `2026_10_10_090000`), batch reconciliation columns, CHECKs; partial checksum index preserved on SQLite rebuild |
 | 1.2.19 | 2026-09-29 | Approved | §83b `import_family_key_resolutions` (migration `2026_10_09_090000`): composite FKs to `import_batches (id, clan_id)` and `branches (id, clan_id)`, unique (batch, key), decision/branch/reference CHECKs; `import_batches` UNIQUE (id, clan_id) |

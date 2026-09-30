@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   CircleCheckBig,
   CircleX,
+  FileDown,
   FilePlus2,
   FileSpreadsheet,
   HandHeart,
@@ -36,6 +37,7 @@ export const familyActivityPresentation: Record<
   { label: string; icon: LucideIcon }
 > = {
   FAMILY_CREATED: { label: "تم إنشاء سجل الأسرة", icon: FilePlus2 },
+  FAMILY_IMPORTED: { label: "تم إنشاء سجل الأسرة من ملف استيراد", icon: FileDown },
   FAMILY_UPDATED: { label: "تم تعديل بيانات الأسرة", icon: FilePen },
   FAMILY_MEMBER_ADDED: { label: "تمت إضافة فرد إلى الأسرة", icon: UserPlus },
   PERSON_UPDATED: { label: "تم تعديل بيانات أحد أفراد الأسرة", icon: UserPen },

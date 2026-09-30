@@ -3001,17 +3001,58 @@ only provenance-level REUSE links do, and a future Apply records those once
 both sides have executed — so execution order and resume stay safe, even for
 mutually referencing polygamous households.
 
-## Freshness during Apply (PLANNED algorithm)
+## Apply execution primitives (IMPLEMENTED — Phase 4B.4a; no Apply yet)
 
-Before Apply starts, the normal rule applies: reconciliation must be CURRENT.
-Once Apply starts the batch is frozen, so the stored
-`reconciliation_fingerprint` is the approved starting fingerprint (no new
-column needed). On resume, recompute the fingerprint's registry markers
-**excluding the entities this batch CREATED** (`import_apply_records`,
-outcome CREATED) and compare with the stored value: equal → the only registry
-changes are this batch's own effects; different → an unrelated registry
-change happened and the batch must stop for review. Reconciliation freshness
-itself is never weakened.
+- **Approved plan.** `import_batches.apply_plan_fingerprint` (SHA-256 of the
+  plan) is present exactly while Apply has started (APPLYING /
+  PARTIALLY_APPLIED / APPLIED) and absent before — PostgreSQL CHECK mirrored
+  by the model. It covers the row order, every effect's key, intent and
+  reason, existing entity and cross-row owner references, Clan, resolved
+  Branch, execution values, execution-semantic warnings and the stored
+  reconciliation fingerprint; never presentation fields. Computing it
+  reserves no identifier and writes nothing.
+- **Structured Apply errors.** `apply_error_code` (a stable upper-case code)
+  and `apply_error_row_number` (a source row number, only with a code) —
+  never exception text or row data.
+- **CreateFamilyMembershipAction** attaches an EXISTING Person to an
+  EXISTING Family (never creates a Person): required relationship type by
+  code, Family and Person locked and re-checked, optional expected Clan, one
+  active membership per Person, one active head per Family; the unique
+  indexes remain the backstop. RegisterFamilyAction uses it for the head.
+- **CreateFamilyResidenceAction** creates a Family's first current residence
+  (one current residence per Family; displacement location only when
+  DISPLACED; `source` a RegistrationSource). RegisterFamilyAction uses it
+  unchanged; the import form is `original_residence_text` + `source` IMPORT
+  + the Apply start date, every current-location / displacement field NULL.
+  Changing a residence stays UpdateFamilyResidenceAction.
+- **Registration date of imported Families** (approved): the DATE of
+  `apply_started_at`, identical for every row, chunk and resume.
+- **FAMILY_IMPORTED** (approved, not emitted yet): recorded next to
+  FAMILY_CREATED by the future Apply; its metadata is exactly
+  `import_batch_id` and `source_row_number` (positive integers) — no other
+  key is accepted for it, and those keys are refused on every other event.
+
+## Freshness during Apply (APPROVED rule; primitive IMPLEMENTED)
+
+Before Apply starts, the normal rule applies: reconciliation must be CURRENT
+and the Dry Run plan is what gets approved. Once Apply starts, Apply's own
+writes move the registry markers and a started batch cannot be re-reconciled,
+so freshness becomes **plan equality**: the SAME planner runs in its
+**as-of-Apply-start** context — the Persons and memberships this batch's
+provenance proves it CREATED are treated as its own expected changes and
+ignored; every other registry fact (other Persons with the batch's IDs,
+active memberships, Branch selectability, relationship types, the Clan) is
+read live — and the resulting fingerprint must equal
+`apply_plan_fingerprint` (`ImportApplyPlanner::matchesApprovedPlan`). Any
+external change that alters a planning decision changes the fingerprint and
+blocks resume; changes that alter no decision do not. Normal Dry Run
+planning and reconciliation freshness are unchanged.
+
+Owner-only Person creation (approved): a REUSED provenance record is written
+only when the real person_id is known — by the reusing row if the owner
+already ran, otherwise by the owner's transaction afterwards. The final
+completion pass VERIFIES completeness; it never invents missing provenance,
+and a batch cannot become APPLIED while an expected effect lacks its record.
 
 ---
 
@@ -3073,6 +3114,8 @@ V1 events:
 
 ```text
 FAMILY_CREATED          family registration
+FAMILY_IMPORTED         Family created from an import row (with FAMILY_CREATED;
+                        metadata import_batch_id + source_row_number only)
 FAMILY_UPDATED          family registration-metadata correction
 FAMILY_MEMBER_ADDED     new member (Person + membership)
 PERSON_UPDATED          basic Person data correction (current family)
@@ -4098,6 +4141,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.26 | 2026-09-30 | Approved | §96b Apply execution primitives (Phase 4B.4a): apply_plan_fingerprint and structured apply error fields, CreateFamilyMembershipAction and CreateFamilyResidenceAction (used by registration), registration date = Apply start date, approved plan-equality resume freshness via the planner's as-of-Apply-start context, owner-only Person creation with verified (never invented) provenance; §97a FAMILY_IMPORTED (import_batch_id, source_row_number only; not emitted yet) |
 | 1.2.25 | 2026-09-30 | Approved | §96b Apply planner and read-only Dry Run (Phase 4B.2): preconditions, CREATE / REUSE / OMIT / BLOCK intents with reason codes, head / family / membership / declaration / residence rules, source-specific spouse gender, spouse Person ≠ spouse membership, one owning effect per exact National ID (cross-row coordination), no identifier reservation or writes during planning |
 | 1.2.24 | 2026-09-29 | Approved | Added §96b Import Apply foundation (Phase 4B.1): Apply lifecycle with PARTIALLY_APPLIED and apply_started_at (a started Apply is never FAILED, so the file stays checksum-protected), append-only import_apply_records provenance, canonical Person creation with explicit ALIVE / DECEASED / UNKNOWN (created-deceased ≠ recorded death), canonical Family creation, strict HEAD/SPOUSE lookup (registration now requires an active HEAD type); approved PLANNED Apply contract (deceased head stays HEAD with HOUSEHOLD_HEAD_DECEASED evidence, female-head spouse slot = male spouse for this importer, spouse Person ≠ spouse membership, two-deceased-heads spouse gets no membership, resume freshness algorithm, import.apply SUPER_ADMIN-only when enabled, INITIAL before INCREMENTAL); Apply itself not implemented |
 | 1.2.23 | 2026-09-29 | Approved | §96a polygamous-household correction: wife-slot position is source evidence only and never decides Family membership; the cross-role is accepted for any wife slot (including the last) when the husband is MALE, ALIVE and "متعدد الزوجات" and both rows reference each other by exact National ID with no other review reason; deceased husband → not this rule; unknown life status, ordinary married, missing reciprocal → REVIEW_REQUIRED; future-Apply one-active-membership constraint recorded |

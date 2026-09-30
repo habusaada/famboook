@@ -49,7 +49,7 @@ class ApplyFoundationTest extends TestCase
 
     private function started(ImportBatchStatus $status, array $attributes = []): ImportBatch
     {
-        return ImportBatch::factory()->create(['status' => $status, 'apply_started_at' => now(), ...$attributes]);
+        return ImportBatch::factory()->create(['status' => $status, 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan'), ...$attributes]);
     }
 
     private function row(ImportBatch $batch, int $number = 2): ImportRow

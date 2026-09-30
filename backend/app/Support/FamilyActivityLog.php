@@ -28,7 +28,16 @@ class FamilyActivityLog
     ];
 
     /**
-     * @param  array<string, string>  $metadata
+     * Events with their OWN metadata contract: only these keys, each a
+     * positive integer identifier (never a National ID, name or source
+     * value). These keys are rejected on every other event.
+     */
+    public const EVENT_METADATA = [
+        'FAMILY_IMPORTED' => ['import_batch_id', 'source_row_number'],
+    ];
+
+    /**
+     * @param  array<string, string|int>  $metadata
      */
     public static function record(
         int $familyId,
@@ -41,9 +50,17 @@ class FamilyActivityLog
             throw new LogicException('Family activity must be recorded inside the Domain Action transaction.');
         }
 
-        $unexpected = array_diff(array_keys($metadata), self::ALLOWED_METADATA);
+        $eventKeys = self::EVENT_METADATA[$type->value] ?? null;
+        $unexpected = array_diff(array_keys($metadata), $eventKeys ?? self::ALLOWED_METADATA);
         if ($unexpected !== []) {
             throw new InvalidArgumentException('Metadata key not allowed: '.implode(', ', $unexpected));
+        }
+        if ($eventKeys !== null) {
+            foreach ($metadata as $key => $value) {
+                if (! is_int($value) || $value < 1) {
+                    throw new InvalidArgumentException("Metadata {$key} must be a positive integer identifier.");
+                }
+            }
         }
 
         return FamilyActivity::create([

@@ -3421,6 +3421,11 @@ import_apply_records
 Records contain ids and codes only — never a National ID, name or source
 value. They are append-only (never updated or deleted).
 
+`import_batches` also carries (Phase 4B.4a): `apply_plan_fingerprint` — the
+approved Apply plan, present exactly while Apply has started; and
+`apply_error_code` / `apply_error_row_number` — the last Apply failure as a
+stable code and a source row number (never exception text).
+
 ---
 
 # 89. Export Data
@@ -3891,6 +3896,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.22 | 2026-09-30 | Approved | §88d `apply_plan_fingerprint`, `apply_error_code`, `apply_error_row_number` on import_batches |
 | 1.2.21 | 2026-09-29 | Approved | §88d `import_apply_records` (Apply provenance: effect, entity reference, role, spouse slot, outcome, reason code, applier) and batch status PARTIALLY_APPLIED / apply_started_at; not yet written by any flow |
 | 1.2.20 | 2026-09-29 | Approved | §88c `import_row_reconciliations` (HEAD Person vs Family evidence, spouse candidates, differences, issues) and batch `reconciled_at` / `reconciled_by` / `reconciliation_fingerprint`; `import_rows.reconciliation_status` now populated |
 | 1.2.19 | 2026-09-29 | Approved | §88b `import_family_key_resolutions`: one decision per batch + exact source key (MATCH_EXISTING_BRANCH / CREATE_NEW_BRANCH / SAME_BRANCH_AS_KEY / NO_BRANCH), final `branch_id` in the batch's Clan, `reference_source_key`, `resolved_by` / `resolved_at`; no record = UNRESOLVED |

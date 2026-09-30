@@ -438,7 +438,7 @@ class DryRunTest extends TestCase
     {
         foreach ([ImportBatchStatus::PARTIALLY_APPLIED, ImportBatchStatus::APPLIED] as $n => $status) {
             $id = $this->batch([2 => $this->row(['id' => 910000210 + $n, 'key' => "مفتاح {$n}"])]);
-            $this->model($id)->update(['status' => $status, 'apply_started_at' => now(), 'applied_at' => now()]);
+            $this->model($id)->update(['status' => $status, 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan'), 'applied_at' => now()]);
 
             $this->assertContains('APPLY_ALREADY_STARTED', $this->codes($this->plan($id)['preconditions']));
         }

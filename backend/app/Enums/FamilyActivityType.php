@@ -7,6 +7,10 @@ namespace App\Enums;
 enum FamilyActivityType: string
 {
     case FAMILY_CREATED = 'FAMILY_CREATED';
+    // The Family came from an import row (docs/03 §96b); recorded next to
+    // FAMILY_CREATED by the future Apply. Metadata: import_batch_id and
+    // source_row_number only (FamilyActivityLog::EVENT_METADATA).
+    case FAMILY_IMPORTED = 'FAMILY_IMPORTED';
     case FAMILY_UPDATED = 'FAMILY_UPDATED';
     case FAMILY_MEMBER_ADDED = 'FAMILY_MEMBER_ADDED';
     case PERSON_UPDATED = 'PERSON_UPDATED';

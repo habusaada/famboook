@@ -43,6 +43,9 @@ class ImportBatch extends Model
         'applied_by',
         'applied_at',
         'apply_started_at',
+        'apply_plan_fingerprint',
+        'apply_error_code',
+        'apply_error_row_number',
     ];
 
     // The private storage path is internal.
@@ -61,19 +64,35 @@ class ImportBatch extends Model
             'reconciled_at' => 'datetime',
             'applied_at' => 'datetime',
             'apply_started_at' => 'datetime',
+            'apply_error_row_number' => 'integer',
         ];
     }
 
     /**
-     * Mirrors chk_import_batch_apply_started on every driver: a started Apply
-     * is APPLYING / PARTIALLY_APPLIED / APPLIED and nothing else — in particular
-     * never FAILED, which would release the file from checksum protection.
+     * Mirrors the PostgreSQL CHECKs on every driver:
+     * - chk_import_batch_apply_started: a started Apply is APPLYING /
+     *   PARTIALLY_APPLIED / APPLIED and nothing else — in particular never
+     *   FAILED, which would release the file from checksum protection;
+     * - chk_import_batch_apply_plan: the approved plan fingerprint (64 hex)
+     *   is present exactly while Apply has started;
+     * - chk_import_batch_apply_error: a failure is a stable code (never
+     *   exception text) with an optional source row number.
      */
     protected static function booted(): void
     {
         static::saving(function (self $batch) {
-            if (($batch->apply_started_at !== null) !== ($batch->status?->applyStarted() ?? false)) {
+            $started = $batch->status?->applyStarted() ?? false;
+            if (($batch->apply_started_at !== null) !== $started) {
                 throw new LogicException('apply_started_at is set exactly when the batch is APPLYING, PARTIALLY_APPLIED or APPLIED.');
+            }
+            $fingerprint = $batch->apply_plan_fingerprint;
+            if (($fingerprint !== null) !== $started || ($fingerprint !== null && ! preg_match('/^[0-9a-f]{64}$/', $fingerprint))) {
+                throw new LogicException('apply_plan_fingerprint is a SHA-256 hex present exactly while Apply has started.');
+            }
+            $code = $batch->apply_error_code;
+            $row = $batch->apply_error_row_number;
+            if (($code !== null && ! preg_match('/^[A-Z][A-Z0-9_]{1,59}$/', $code)) || ($row !== null && ($code === null || $row < 1))) {
+                throw new LogicException('An Apply error is a stable code with an optional source row number — never exception text.');
             }
         });
     }

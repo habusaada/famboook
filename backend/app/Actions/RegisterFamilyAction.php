@@ -2,12 +2,9 @@
 
 namespace App\Actions;
 
-use App\Enums\DisplacementStatus;
 use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
 use App\Models\Family;
-use App\Models\FamilyMembership;
-use App\Models\FamilyResidence;
 use App\Support\NationalIdGuard;
 use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +24,8 @@ class RegisterFamilyAction
     public function __construct(
         private readonly CreateFamilyAction $families = new CreateFamilyAction,
         private readonly CreatePersonAction $persons = new CreatePersonAction,
+        private readonly CreateFamilyMembershipAction $memberships = new CreateFamilyMembershipAction,
+        private readonly CreateFamilyResidenceAction $residences = new CreateFamilyResidenceAction,
     ) {}
 
     /**
@@ -70,7 +69,7 @@ class RegisterFamilyAction
             // The household head carries the canonical HEAD relationship type
             // (docs/02 §15); a missing or inactive seed fails here, before any
             // registry write (MissingRelationshipTypeException).
-            $headTypeId = RelationshipTypes::required(RelationshipTypes::HEAD);
+            RelationshipTypes::required(RelationshipTypes::HEAD);
 
             // Same transaction: a failure in any later step rolls back the
             // Family and its FAMILY_CREATED activity too.
@@ -91,42 +90,10 @@ class RegisterFamilyAction
                 'alternate_mobile_owner_relation' => $head['alternate_mobile_owner_relation'] ?? null,
             ], $actingUserId, 'household_head.national_id');
 
-            $membership = FamilyMembership::create([
-                'family_id' => $family->id,
-                'person_id' => $person->id,
-                'relationship_type_id' => $headTypeId,
-                'is_household_head' => true,
-                'started_at' => $data['registration_date'],
-                'is_active' => true,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
+            $this->memberships->handle($family, $person, RelationshipTypes::HEAD, true, $data['registration_date'], $actingUserId);
 
-            $residence = $data['residence'];
-            $isDisplaced = ($residence['displacement_status'] ?? null) === DisplacementStatus::DISPLACED->value;
-            FamilyResidence::create([
-                'family_id' => $family->id,
-                'residence_type' => $residence['residence_type'] ?? null,
-                'governorate' => $residence['governorate'] ?? null,
-                'city' => $residence['city'] ?? null,
-                'area' => $residence['area'] ?? null,
-                'neighborhood' => $residence['neighborhood'] ?? null,
-                'address_text' => $residence['address_text'] ?? null,
-                'original_residence_text' => $residence['original_residence_text'] ?? null,
-                'latitude' => $residence['latitude'] ?? null,
-                'longitude' => $residence['longitude'] ?? null,
-                'displacement_status' => $residence['displacement_status'] ?? null,
-                // A displacement location only exists for a displaced family.
-                'displacement_location_text' => $isDisplaced
-                    ? ($residence['displacement_location_text'] ?? null)
-                    : null,
-                'started_at' => $data['registration_date'],
-                'is_current' => true,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
-
-            unset($membership);
+            // Staff registration never states a residence source (NULL, as before).
+            $this->residences->handle($family, [...$data['residence'], 'source' => null], $data['registration_date'], $actingUserId);
 
             // FAMILY_CREATED is recorded by CreateFamilyAction.
             return $family->fresh([

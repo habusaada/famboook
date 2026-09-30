@@ -38,11 +38,30 @@ final class ImportApplyPlanner
     /** Placeholder: the date is taken when Apply executes (never predicted). */
     public const EXECUTION_DATE = 'EXECUTION_DATE';
 
-    public function plan(ImportBatch $batch): ImportBatchApplyPlan
+    /**
+     * The plan in a context: current() (default — Dry Run, Apply start) or
+     * asOfApplyStart() (resume / completion: reconstructs the approved plan).
+     */
+    public function plan(ImportBatch $batch, ?ImportApplyPlanningContext $context = null): ImportBatchApplyPlan
     {
-        $failures = $this->preconditions($batch);
+        $context ??= ImportApplyPlanningContext::current();
+        $failures = $this->preconditions($batch, $context);
 
-        return new ImportBatchApplyPlan($batch->id, $batch->reconciliation_fingerprint, $failures, $failures === [] ? $this->planRows($batch) : []);
+        return new ImportBatchApplyPlan($batch->id, $batch->reconciliation_fingerprint, $failures, $failures === [] ? $this->planRows($batch, $context) : []);
+    }
+
+    /**
+     * Resume / completion primitive: does the plan reconstructed as of Apply
+     * start still equal the approved plan stored when Apply started?
+     */
+    public function matchesApprovedPlan(ImportBatch $batch): bool
+    {
+        if ($batch->apply_plan_fingerprint === null) {
+            return false;
+        }
+        $plan = $this->plan($batch, ImportApplyPlanningContext::asOfApplyStart($batch));
+
+        return $plan->preconditionsMet() && hash_equals($batch->apply_plan_fingerprint, $plan->fingerprint());
     }
 
     /**
@@ -51,8 +70,9 @@ final class ImportApplyPlanner
      *
      * @return list<array{code: string, count?: int}>
      */
-    public function preconditions(ImportBatch $batch): array
+    public function preconditions(ImportBatch $batch, ?ImportApplyPlanningContext $context = null): array
     {
+        $asOfStart = ($context ?? ImportApplyPlanningContext::current())->asOfApplyStart;
         $failures = [];
         $fail = function (string $code, ?int $count = null) use (&$failures) {
             $failures[] = $count === null ? ['code' => $code] : ['code' => $code, 'count' => $count];
@@ -61,7 +81,12 @@ final class ImportApplyPlanner
         if ($batch->import_mode !== ImportMode::INITIAL) {
             $fail('BATCH_NOT_INITIAL');
         }
-        if ($batch->apply_started_at !== null || $batch->status->applyStarted()) {
+        if ($asOfStart) {
+            // Reconstructing the approved plan requires a started Apply.
+            if ($batch->apply_started_at === null || ! $batch->status->applyStarted()) {
+                $fail('APPLY_NOT_STARTED');
+            }
+        } elseif ($batch->apply_started_at !== null || $batch->status->applyStarted()) {
             $fail('APPLY_ALREADY_STARTED');
         } elseif ($batch->status !== ImportBatchStatus::READY_FOR_REVIEW) {
             $fail('BATCH_NOT_READY_FOR_REVIEW');
@@ -81,7 +106,9 @@ final class ImportApplyPlanner
 
         if ($batch->reconciled_at === null) {
             $fail('RECONCILIATION_NOT_RUN');
-        } elseif ($batch->reconciliation_fingerprint !== ImportReconciler::fingerprint($batch)) {
+        } elseif (! $asOfStart && $batch->reconciliation_fingerprint !== ImportReconciler::fingerprint($batch)) {
+            // Before Apply only: Apply's own writes move the registry markers;
+            // after it starts, plan equality is the freshness rule.
             $fail('RECONCILIATION_STALE');
         }
         // INITIAL Apply plans NEW rows only; every other state needs review first.
@@ -91,10 +118,10 @@ final class ImportApplyPlanner
             }
         }
 
-        if (($linked = (clone $rows)->whereNotNull('family_id')->count()) > 0) {
+        if (! $asOfStart && ($linked = (clone $rows)->whereNotNull('family_id')->count()) > 0) {
             $fail('ROWS_ALREADY_APPLIED', $linked);
         }
-        if (($records = DB::table('import_apply_records')->where('import_batch_id', $batch->id)->count()) > 0) {
+        if (! $asOfStart && ($records = DB::table('import_apply_records')->where('import_batch_id', $batch->id)->count()) > 0) {
             $fail('APPLY_RECORDS_EXIST', $records);
         }
         if (! DB::table('clans')->where('id', $batch->clan_id)->value('is_active')) {
@@ -123,8 +150,9 @@ final class ImportApplyPlanner
      *
      * @return list<ImportRowApplyPlan>
      */
-    public function planRows(ImportBatch $batch): array
+    public function planRows(ImportBatch $batch, ?ImportApplyPlanningContext $context = null): array
     {
+        $context ??= ImportApplyPlanningContext::current();
         $rows = DB::table('import_rows')->where('import_batch_id', $batch->id)->orderBy('row_number')
             ->get(['id', 'row_number', 'status', 'source_family_key', 'normalized_payload'])
             ->map(function ($r) {
@@ -154,7 +182,10 @@ final class ImportApplyPlanner
         $registry = [];
         foreach (array_chunk(array_values(array_unique([...array_keys($headRows), ...array_keys($spouseRefs)])), 1000) as $chunk) {
             foreach (DB::table('persons')->whereIn('national_id', $chunk)->orderBy('id')->get(['id', 'person_code', 'national_id', 'gender', 'birth_date', 'life_status', 'deleted_at']) as $p) {
-                $registry[$p->national_id][] = $p;
+                // As of Apply start, a Person this batch created did not exist yet.
+                if (! $context->ownsPerson((int) $p->id)) {
+                    $registry[$p->national_id][] = $p;
+                }
             }
         }
         $liveIds = [];
@@ -167,8 +198,11 @@ final class ImportApplyPlanner
         }
         $active = [];
         foreach (array_chunk($liveIds, 1000) as $chunk) {
-            foreach (DB::table('family_memberships')->whereIn('person_id', $chunk)->where('is_active', true)->pluck('person_id') as $pid) {
-                $active[$pid] = true;
+            foreach (DB::table('family_memberships')->whereIn('person_id', $chunk)->where('is_active', true)->get(['id', 'person_id']) as $m) {
+                // …nor a membership this batch created (e.g. a reused head's HEAD).
+                if (! $context->ownsMembership((int) $m->id)) {
+                    $active[$m->person_id] = true;
+                }
             }
         }
 

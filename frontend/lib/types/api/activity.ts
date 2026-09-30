@@ -8,6 +8,7 @@ import type { HealthRecordType } from "@/lib/types/api/health";
 // wording lives in lib/utils/activity.ts, never in the stored event.
 export type FamilyActivityType =
   | "FAMILY_CREATED"
+  | "FAMILY_IMPORTED"
   | "FAMILY_UPDATED"
   | "FAMILY_MEMBER_ADDED"
   | "PERSON_UPDATED"
