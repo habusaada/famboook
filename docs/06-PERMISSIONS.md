@@ -1947,9 +1947,12 @@ POST /api/v1/imports/initial-families/{batch}/family-keys/resolution/clear  impo
 POST /api/v1/imports/initial-families/{batch}/family-keys/bulk              import.review (+ clan.manage for bulk Branch creation)
 POST /api/v1/imports/initial-families/{batch}/reconcile                     import.validate (compare with the registry; never a registry write)
 GET  /api/v1/imports/initial-families/{batch}/reconciliation                import.review   (rows: masked IDs, codes, differences)
+GET  /api/v1/imports/initial-families/{batch}/dry-run                       import.review   (step 6: Apply plan summary; read only)
+GET  /api/v1/imports/initial-families/{batch}/dry-run/rows                  import.review   (row plans: intents, reason codes, masked IDs)
 ```
 
-Reconciliation is not Apply and never uses `import.apply`.
+Reconciliation is not Apply and never uses `import.apply`. The Dry Run is
+read only and also uses `import.review` — never `import.apply`.
 
 Family-key decisions use `import.review`. Creating a Branch while resolving
 additionally requires `clan.manage`, checked in the Domain Action (403
@@ -3910,6 +3913,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.23 | 2026-09-30 | Approved | §61 Dry Run endpoints (`dry-run`, `dry-run/rows`) require `import.review`; `import.apply` still unassigned |
 | 1.2.22 | 2026-09-29 | Approved | §61 `import.apply` approved as SUPER_ADMIN-only for the future Apply phase; still unassigned, verifier unchanged |
 | 1.2.21 | 2026-09-29 | Approved | §61 reconciliation endpoints: run with `import.validate`, read with `import.review`; no new permission; `import.apply` still unassigned |
 | 1.2.20 | 2026-09-29 | Approved | §61 family-key resolution endpoints: decisions with `import.review`; Branch creation during resolution additionally requires `clan.manage`; no new permission |

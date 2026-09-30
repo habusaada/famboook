@@ -215,3 +215,75 @@ export interface ProblemRowsPage {
   data: ProblemRow[];
   meta: { current_page: number; last_page: number; total: number };
 }
+
+// ---- Step 6 Dry Run (docs/03 §96b): the pure Apply plan, read only ----------
+
+export type ApplyIntent = "CREATE" | "REUSE" | "OMIT" | "BLOCK";
+
+export type DryRunState = "READY" | "ROWS_BLOCKED" | "PRECONDITIONS_FAILED";
+
+export type DryRunFilter = "all" | "executable" | "blocked" | "warnings";
+
+export type DryRunEffectGroup =
+  | "families"
+  | "head_persons"
+  | "head_memberships"
+  | "spouse_persons"
+  | "spouse_memberships"
+  | "declarations"
+  | "residences";
+
+export interface DryRunCounts {
+  source_rows: number;
+  executable_rows: number;
+  blocked_rows: number;
+  warning_rows: number;
+  effects: Record<DryRunEffectGroup, Record<ApplyIntent, number>>;
+  spouse_slots: number;
+  spouse_person_reuse: { existing: number; planned: number };
+  persons: { create: number; reuse_existing: number };
+  // Every effect reason (omissions and blocks) → occurrences.
+  reasons: Record<string, number>;
+  // Rows per non-blocking warning code.
+  warnings: Record<string, number>;
+}
+
+export interface DryRunSummary {
+  state: DryRunState;
+  preconditions: { code: string; count?: number }[];
+  plan_fingerprint: string;
+  // Always false in this phase: final execution is not enabled.
+  execution_enabled: boolean;
+  counts: DryRunCounts | null;
+}
+
+/** One planned effect: intent, reason and safe references only (no names, no IDs). */
+export interface DryRunEffect {
+  intent: ApplyIntent | null;
+  reason: string | null;
+  person_code?: string;
+  owner?: { row_number: number; effect: string };
+  gender?: string;
+  life_status?: string;
+  branch?: string | null;
+}
+
+export interface DryRunRow {
+  row_number: number;
+  source_family_key: string | null;
+  national_id_masked: string | null;
+  executable: boolean;
+  block_reasons: string[];
+  warnings: string[];
+  head_person: DryRunEffect;
+  family: DryRunEffect;
+  head_membership: DryRunEffect;
+  declaration: DryRunEffect;
+  residence: DryRunEffect;
+  spouses: { slot: number; national_id_masked: string | null; person: DryRunEffect; membership: DryRunEffect }[];
+}
+
+export interface DryRunRowsPage {
+  data: DryRunRow[];
+  meta: { current_page: number; last_page: number; total: number };
+}

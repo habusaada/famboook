@@ -14,7 +14,8 @@ import { useImportBatch, useImportBatches } from "@/lib/api/imports";
 import { StepClan } from "@/components/administration/import-wizard/step-clan";
 import { StepFile } from "@/components/administration/import-wizard/step-file";
 import { StepMapping } from "@/components/administration/import-wizard/step-mapping";
-import { StepApply, StepReview } from "@/components/administration/import-wizard/step-review";
+import { StepReview } from "@/components/administration/import-wizard/step-review";
+import { StepDryRun } from "@/components/administration/import-wizard/step-dry-run";
 import { StepFamilyKeys } from "@/components/administration/import-wizard/step-family-keys";
 import { STEP_TITLES, WizardStepper, type StepState } from "@/components/administration/import-wizard/wizard-parts";
 import { BATCH_STATUS_LABELS, MODE_LABELS, fmt } from "@/components/administration/import-wizard/labels";
@@ -22,7 +23,8 @@ import type { ImportBatchDetail, ImportMode } from "@/lib/types/api/imports";
 
 /**
  * Import Wizard (docs/03 §96a): 1 Clan + mode → 2 workbook → 3 column mapping
- * (confirming stages the rows) → 4 family keys → 5 review → 6 apply (shell).
+ * (confirming stages the rows) → 4 family keys → 5 review → 6 Dry Run
+ * (read-only preview of the Apply plan; no execution in this phase).
  * The batch id lives in the URL (?batch=) so a refresh or reopen restores the
  * context; a step opens only when its prerequisites hold. Nothing here writes
  * the registry.
@@ -172,7 +174,7 @@ export function ImportWizard() {
           {current === 3 && batch && <StepMapping batch={batch} />}
           {current === 4 && batch && <StepFamilyKeys batch={batch} />}
           {current === 5 && batch && <StepReview batch={batch} />}
-          {current === 6 && batch && <StepApply batch={batch} />}
+          {current === 6 && batch && <StepDryRun batch={batch} />}
 
           <div className="flex items-center justify-between gap-2">
             <Button variant="outline" disabled={current <= 1} onClick={() => setStep(current - 1)}>

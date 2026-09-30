@@ -16,6 +16,8 @@ use App\Http\Requests\Api\V1\CreateImportBatchRequest;
 use App\Http\Resources\ImportBatchResource;
 use App\Models\Clan;
 use App\Models\ImportBatch;
+use App\Support\Import\Apply\DryRunReport;
+use App\Support\Import\Apply\ImportApplyPlanner;
 use App\Support\Import\ImportBatchWorkbook;
 use App\Support\Import\InitialFamilyImportSummary;
 use App\Support\Import\InitialFamilyWorkbook;
@@ -204,6 +206,30 @@ class InitialFamilyImportController extends Controller
             : $action->bulkNoBranch($importBatch, array_column($data['items'], 'source_family_key'), $request->user());
 
         return $this->familyKeys($request, $importBatch->fresh());
+    }
+
+    /**
+     * Step 6 Dry Run: what a future Apply WOULD do — computed by the pure
+     * planner, never written (import.review; no import.apply). Summary only.
+     */
+    public function dryRun(ImportBatch $importBatch, ImportApplyPlanner $planner): JsonResponse
+    {
+        return response()->json(['data' => DryRunReport::summary($planner->plan($importBatch))]);
+    }
+
+    /** Paginated row plans of the Dry Run: intents, reason codes, masked IDs. */
+    public function dryRunRows(Request $request, ImportBatch $importBatch, ImportApplyPlanner $planner): JsonResponse
+    {
+        $data = $request->validate([
+            'filter' => ['sometimes', Rule::in(DryRunReport::FILTERS)],
+            'reason' => ['sometimes', 'nullable', 'string', 'max:60', 'regex:/^[A-Z][A-Z0-9_]*$/'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+        $plan = $planner->plan($importBatch);
+        abort_unless($plan->preconditionsMet(), 422, 'لا يمكن إعداد المعاينة قبل استيفاء الشروط.');
+
+        return response()->json(DryRunReport::rows($plan, $data['filter'] ?? 'all', $data['reason'] ?? null, $data['search'] ?? null, (int) ($data['page'] ?? 1)));
     }
 
     public function problemRows(Request $request, ImportBatch $importBatch): JsonResponse

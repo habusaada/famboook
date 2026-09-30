@@ -318,6 +318,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/{importBatch}/family-keys', [InitialFamilyImportController::class, 'familyKeys']);
             Route::get('/{importBatch}/rows', [InitialFamilyImportController::class, 'problemRows']);
             Route::get('/{importBatch}/reconciliation', [InitialFamilyImportController::class, 'reconciliationRows']);
+            // Step 6 Dry Run: the pure Apply plan, read only (never import.apply).
+            Route::get('/{importBatch}/dry-run', [InitialFamilyImportController::class, 'dryRun']);
+            Route::get('/{importBatch}/dry-run/rows', [InitialFamilyImportController::class, 'dryRunRows']);
             // Step 4 decisions (creating a Branch additionally needs clan.manage,
             // enforced in ResolveFamilyKeyAction). Keys travel in the body.
             Route::put('/{importBatch}/family-keys/resolution', [InitialFamilyImportController::class, 'resolveFamilyKey']);

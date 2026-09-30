@@ -3,6 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type {
+  DryRunFilter,
+  DryRunRowsPage,
+  DryRunSummary,
   FamilyKeyDecision,
   FamilyKeysPayload,
   ImportBatch,
@@ -149,6 +152,28 @@ export function useReconciliationRows(id: string | null, status: ReconciliationS
   return useQuery({
     queryKey: [...KEY, id, "reconciliation", status, page],
     queryFn: () => apiClient.get<ReconciliationRowsPage>(`${BASE}/${id}/reconciliation?page=${page}${status ? `&status=${status}` : ""}`),
+    enabled: id !== null && enabled,
+  });
+}
+
+// Step 6 Dry Run (import.review): the pure Apply plan — read only, never a write.
+export function useDryRun(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...KEY, id, "dry-run"],
+    queryFn: () => apiClient.get<{ data: DryRunSummary }>(`${BASE}/${id}/dry-run`),
+    enabled: id !== null && enabled,
+    // A plan reflects the registry at request time; always re-run on demand.
+    staleTime: 0,
+  });
+}
+
+export function useDryRunRows(id: string | null, params: { filter: DryRunFilter; reason: string; search: string; page: number }, enabled: boolean) {
+  const query = new URLSearchParams({ filter: params.filter, page: String(params.page) });
+  if (params.reason) query.set("reason", params.reason);
+  if (params.search) query.set("search", params.search);
+  return useQuery({
+    queryKey: [...KEY, id, "dry-run", "rows", params],
+    queryFn: () => apiClient.get<DryRunRowsPage>(`${BASE}/${id}/dry-run/rows?${query.toString()}`),
     enabled: id !== null && enabled,
   });
 }

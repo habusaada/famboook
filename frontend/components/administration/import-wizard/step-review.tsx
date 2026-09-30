@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardCheck, Rocket } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Panel, SectionHeader } from "@/components/shared/page-layout";
 import { useImportProblemRows } from "@/lib/api/imports";
 import { FIELD_LABELS, MODE_LABELS, ROW_STATUS_LABELS, fmt, issueLabel } from "@/components/administration/import-wizard/labels";
-import { NotAppliedNote, StagingCounts } from "@/components/administration/import-wizard/wizard-parts";
-import { ReconciliationCounts, ReconciliationPanel } from "@/components/administration/import-wizard/step-reconciliation";
+import { StagingCounts } from "@/components/administration/import-wizard/wizard-parts";
+import { ReconciliationPanel } from "@/components/administration/import-wizard/step-reconciliation";
 import type { ImportBatchDetail, ProblemRowFilter } from "@/lib/types/api/imports";
 
 /** Backend issue breakdown (rows per issue code) — never recounted here. */
@@ -173,26 +173,5 @@ export function StepReview({ batch }: { batch: ImportBatchDetail }) {
       {/* Reserved for future reconciliation — no counts are fabricated. */}
       <ReconciliationPanel batch={batch} />
     </div>
-  );
-}
-
-/** Shell only: no Apply action; shows the (current) reconciliation result. */
-export function StepApply({ batch }: { batch: ImportBatchDetail }) {
-  return (
-    <Panel className="flex flex-col gap-4">
-      <SectionHeader icon={Rocket} title="الاعتماد والاستيراد" description="هذه الخطوة غير مفعّلة في المرحلة الحالية." />
-      <p className="font-medium">تمت مراجعة الملف وتجهيزه، ولم يتم تطبيق البيانات على السجل بعد.</p>
-      <ReconciliationCounts batch={batch} />
-      <div className="flex flex-col gap-1.5 text-sm text-muted-foreground">
-        <p>ستلخّص هذه الخطوة لاحقًا:</p>
-        <ul className="list-inside list-disc">
-          <li>إضافة سجلات جديدة</li>
-          <li>تجاهل السجلات غير المتغيرة</li>
-          <li>مراجعة التغييرات</li>
-          <li>معالجة التعارضات</li>
-        </ul>
-      </div>
-      <NotAppliedNote />
-    </Panel>
   );
 }

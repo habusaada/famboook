@@ -2339,6 +2339,12 @@ creation reused by staff registration, strict HEAD/SPOUSE lookup. **Still
 open:** Apply planner and Dry Run, INITIAL Apply (row transactions, resume,
 progress), enabling `import.apply` (SUPER_ADMIN), then INCREMENTAL Apply.
 
+2026-09-30: **Apply planner + Dry Run (Phase 4B.2)** delivered (docs/03 §96b):
+a pure planner decides every effect of every row (CREATE / REUSE / OMIT /
+BLOCK with reason codes, one owning effect per exact National ID) and Step 6
+"المعاينة قبل الاستيراد" presents it read only. **Still open:** INITIAL Apply
+execution of the same plan, enabling `import.apply`, INCREMENTAL Apply.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4749,6 +4755,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.19 | 2026-09-30 | Approved | Phase 23 progress note: Apply planner + read-only Dry Run (Phase 4B.2) |
 | 1.2.18 | 2026-09-29 | Approved | Phase 23 progress note: Import Apply foundation (Phase 4B.1) — lifecycle, provenance, shared Person/Family creation; Apply not yet implemented |
 | 1.2.17 | 2026-09-29 | Approved | Phase 23 progress note: record reconciliation (Phase 3) |
 | 1.2.16 | 2026-09-29 | Approved | Phase 23 progress note: family-key resolution (Phase 2B) |
