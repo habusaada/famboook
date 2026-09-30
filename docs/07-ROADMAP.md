@@ -2351,6 +2351,12 @@ residence creation actions, the planner's as-of-Apply-start mode for resume
 freshness, and the FAMILY_IMPORTED activity contract. **Still open:** row
 executor, chunked runner, Apply API, Step 6 Apply UI, local Batch 21 Apply.
 
+2026-09-30: **Row executor (Phase 4B.4b)** delivered (docs/03 §96b): one
+approved import row executed in one transaction with full provenance and
+cross-row Person coordination (internal only). **Still open:** chunked
+runner and failure/resume states, Apply API (`import.apply`), Step 6 Apply
+UI, local Batch 21 Apply.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4761,6 +4767,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.21 | 2026-09-30 | Approved | Phase 23 progress note: Row executor (Phase 4B.4b) |
 | 1.2.20 | 2026-09-30 | Approved | Phase 23 progress note: Apply execution primitives (Phase 4B.4a) |
 | 1.2.19 | 2026-09-30 | Approved | Phase 23 progress note: Apply planner + read-only Dry Run (Phase 4B.2) |
 | 1.2.18 | 2026-09-29 | Approved | Phase 23 progress note: Import Apply foundation (Phase 4B.1) — lifecycle, provenance, shared Person/Family creation; Apply not yet implemented |

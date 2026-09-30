@@ -3032,6 +3032,58 @@ mutually referencing polygamous households.
   `import_batch_id` and `source_row_number` (positive integers) — no other
   key is accepted for it, and those keys are refused on every other event.
 
+## Row executor (IMPLEMENTED — Phase 4B.4b; internal only, no runner or endpoint)
+
+`ApplyImportRowAction` executes ONE planned row. **One source row = one
+database transaction**: the Persons, Family, memberships, declaration,
+residence, activities (FAMILY_CREATED, FAMILY_IMPORTED, the declaration
+event), provenance and the row's `APPLIED` + `family_id` commit together;
+on any failure nothing of the row remains (PER / FAM sequence values may be
+skipped — codes never repeat).
+
+- **Only an approved plan executes.** It accepts an `ApprovedApplyPlan`,
+  which can only be built when the plan's fingerprint equals the batch's
+  `apply_plan_fingerprint`; inside the transaction it re-checks the batch
+  (APPLYING / PARTIALLY_APPLIED, same fingerprint), locks the row, matches
+  it to its row plan, refuses any BLOCK and any missing mandatory effect.
+- **The planner decides, the executor executes** — through the canonical
+  actions (CreatePersonAction, CreateFamilyAction,
+  CreateFamilyMembershipAction, RecordHouseholdDeclarationAction,
+  CreateFamilyResidenceAction) with the plan's values only; the Apply start
+  date is the registration / membership / residence date; a deceased head
+  is created DECEASED (FAMILY provenance reason `HOUSEHOLD_HEAD_DECEASED`, no
+  death event). A REUSED registry Person is re-checked (exists, not deleted,
+  same person code; a HEAD still unlinked) and never updated.
+- **Owner-only Persons.** A Person planned in another row is never created
+  here. If its owner already ran, the REUSED record is written with the real
+  person_id; otherwise the effect stays pending — allowed only when nothing
+  in this row writes to that Person (a pending Person backing a membership
+  CREATE fails `CROSS_ROW_PERSON_NOT_MATERIALIZED`). When an owner creates a
+  Person, its transaction writes the REUSED records of dependent rows that
+  are already APPLIED; they roll back with it.
+- **Identity evidence.** Every Person REUSE in the plan carries an internal
+  keyed fingerprint (HMAC-SHA256 with the application key) of the exact
+  National ID the planner matched on; it is covered by the plan fingerprint.
+  Before reusing a registry Person, before an immediate cross-row reuse and
+  before an owner completes a dependent link, the executor recomputes it from
+  the Person's current National ID; a difference fails
+  `PERSON_IDENTITY_CHANGED` (no re-matching). The evidence is never
+  presented, stored in provenance or activity, logged or put in a message.
+- **Provenance** is written next to each effect by
+  `RecordImportApplyEffectAction`: an identical existing record is returned,
+  anything else is `PROVENANCE_CONFLICT` — never overwritten.
+- **Completeness before APPLIED**: every planned effect has its record except
+  allowed pending cross-row reuses. An already APPLIED row is verified
+  (Family, records, entities) and reported `ALREADY_APPLIED`, or refused
+  `ROW_ALREADY_APPLIED_INCONSISTENT` — never repaired.
+- **Structured failures** (`ImportApplyExecutionException`: stable code +
+  row number, cause kept only for server logs), e.g. ROW_PLAN_MISMATCH,
+  ROW_PLAN_BLOCKED, MANDATORY_EFFECT_MISSING, HEAD_PERSON_MISSING,
+  HEAD_PERSON_NOW_LINKED, SPOUSE_PERSON_NOW_LINKED, NATIONAL_ID_TAKEN,
+  BRANCH_NOT_SELECTABLE, RELATIONSHIP_TYPE_UNAVAILABLE, PROVENANCE_CONFLICT,
+  ROW_EFFECT_INCOMPLETE, PERSON_IDENTITY_CHANGED, UNEXPECTED_ERROR. Batch error state and
+  PARTIALLY_APPLIED transitions belong to the future runner.
+
 ## Freshness during Apply (APPROVED rule; primitive IMPLEMENTED)
 
 Before Apply starts, the normal rule applies: reconciliation must be CURRENT
@@ -4141,6 +4193,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.27 | 2026-09-30 | Approved | §96b Row executor (Phase 4B.4b): one source row = one transaction, approved-plan-only execution through the canonical actions, Apply start date, owner-only Persons with pending cross-row REUSE and owner-side link completion, identical-or-conflict provenance writer, already-applied verification without repair, keyed National ID identity evidence on every Person REUSE (PERSON_IDENTITY_CHANGED), structured execution failure codes; no runner or endpoint |
 | 1.2.26 | 2026-09-30 | Approved | §96b Apply execution primitives (Phase 4B.4a): apply_plan_fingerprint and structured apply error fields, CreateFamilyMembershipAction and CreateFamilyResidenceAction (used by registration), registration date = Apply start date, approved plan-equality resume freshness via the planner's as-of-Apply-start context, owner-only Person creation with verified (never invented) provenance; §97a FAMILY_IMPORTED (import_batch_id, source_row_number only; not emitted yet) |
 | 1.2.25 | 2026-09-30 | Approved | §96b Apply planner and read-only Dry Run (Phase 4B.2): preconditions, CREATE / REUSE / OMIT / BLOCK intents with reason codes, head / family / membership / declaration / residence rules, source-specific spouse gender, spouse Person ≠ spouse membership, one owning effect per exact National ID (cross-row coordination), no identifier reservation or writes during planning |
 | 1.2.24 | 2026-09-29 | Approved | Added §96b Import Apply foundation (Phase 4B.1): Apply lifecycle with PARTIALLY_APPLIED and apply_started_at (a started Apply is never FAILED, so the file stays checksum-protected), append-only import_apply_records provenance, canonical Person creation with explicit ALIVE / DECEASED / UNKNOWN (created-deceased ≠ recorded death), canonical Family creation, strict HEAD/SPOUSE lookup (registration now requires an active HEAD type); approved PLANNED Apply contract (deceased head stays HEAD with HOUSEHOLD_HEAD_DECEASED evidence, female-head spouse slot = male spouse for this importer, spouse Person ≠ spouse membership, two-deceased-heads spouse gets no membership, resume freshness algorithm, import.apply SUPER_ADMIN-only when enabled, INITIAL before INCREMENTAL); Apply itself not implemented |

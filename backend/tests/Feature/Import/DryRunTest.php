@@ -14,6 +14,7 @@ use App\Models\RelationshipType;
 use App\Models\User;
 use App\Support\Import\Apply\ImportApplyPlanner;
 use App\Support\Import\Apply\ImportRowApplyPlan;
+use App\Support\NationalIdFingerprint;
 use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use DateTimeImmutable;
@@ -188,7 +189,9 @@ class DryRunTest extends TestCase
         $id = $this->batch([2 => $this->row(['id' => 910000041])]);
 
         $head = $this->rowPlan($id, 2)->effect(E::HEAD_PERSON);
-        $this->assertSame(['REUSE', $person->id, $person->person_code, []], [$head->intent->value, $head->existingId, $head->existingCode, $head->values]);
+        // No field values for a REUSE — only the internal identity evidence (never the raw ID).
+        $this->assertSame(['REUSE', $person->id, $person->person_code, ['identity' => NationalIdFingerprint::of('910000041')]], [$head->intent->value, $head->existingId, $head->existingCode, $head->values]);
+        $this->assertNotSame('910000041', $head->values['identity']);
         $this->assertContains('HEAD_PERSON_REUSED', $this->rowPlan($id, 2)->warnings);
         $this->assertSame(1, $this->plan($id)['counts']['persons']['reuse_existing']);
         $this->assertSame('اسم في السجل', $person->fresh()->full_name);
@@ -456,6 +459,20 @@ class DryRunTest extends TestCase
         }
         $row = $this->apiRow($id, 2);
         $this->assertSame(['*****0221', '*****0222'], [$row['national_id_masked'], $row['spouses'][0]['national_id_masked']]);
+    }
+
+    public function test_the_api_never_exposes_the_internal_identity_evidence(): void
+    {
+        Person::factory()->create(['national_id' => '910000251', 'gender' => 'MALE', 'birth_date' => '1980-01-15']);
+        Person::factory()->create(['national_id' => '910000252', 'gender' => 'FEMALE']);
+        $id = $this->batch([2 => $this->row(['id' => 910000251], [[910000252, 'زوجة']])]);
+        $this->assertArrayHasKey('identity', $this->rowPlan($id, 2)->effect(E::HEAD_PERSON)->values);
+
+        $json = $this->actingAs($this->admin)->getJson(self::BASE."/{$id}/dry-run/rows")->assertOk()->getContent()
+            .$this->actingAs($this->admin)->getJson(self::BASE."/{$id}/dry-run")->getContent();
+        foreach (['910000251', '910000252', NationalIdFingerprint::of('910000251'), NationalIdFingerprint::of('910000252'), '"identity"'] as $secret) {
+            $this->assertStringNotContainsString($secret, $json);
+        }
     }
 
     public function test_the_dry_run_requires_import_review_and_not_import_apply(): void

@@ -16,6 +16,7 @@ use App\Support\Import\InitialFamilyImportSummary;
 use App\Support\Import\InitialFamilyRow;
 use App\Support\Import\InitialFamilyWorkbook;
 use App\Support\Import\SourceValues;
+use App\Support\NationalIdFingerprint;
 use App\Support\NationalIdMask;
 use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
@@ -316,7 +317,7 @@ final class ImportApplyPlanner
                     $warnings[] = 'HOUSEHOLD_HEAD_DECEASED';
                 }
 
-                return new ImportApplyEffectPlan(E::HEAD_PERSON, I::REUSE, existingId: (int) $p->id, existingCode: $p->person_code);
+                return new ImportApplyEffectPlan(E::HEAD_PERSON, I::REUSE, existingId: (int) $p->id, existingCode: $p->person_code, values: ['identity' => NationalIdFingerprint::of($id)]);
             }
         } else {
             // Allowed (docs/03 §19), but never deduplicated by name.
@@ -500,22 +501,24 @@ final class ImportApplyPlanner
             };
         }
 
+        // Internal identity evidence of every REUSE of this exact ID (never presented).
+        $identity = ['identity' => NationalIdFingerprint::of($sid)];
         $out = [];
         foreach ($refs as $ref) {
             $key = $ref['row'].':'.$ref['slot'];
             $effect = E::spousePerson($ref['slot']);
             $person = match (true) {
                 $personBlock !== null => new ImportApplyEffectPlan($effect, I::BLOCK, $personBlock),
-                $existing !== null => new ImportApplyEffectPlan($effect, I::REUSE, existingId: (int) $existing->id, existingCode: $existing->person_code),
+                $existing !== null => new ImportApplyEffectPlan($effect, I::REUSE, existingId: (int) $existing->id, existingCode: $existing->person_code, values: $identity),
                 // The HEAD occurrence owns the identity; this occurrence reuses it.
                 $headRow !== null => $head[$headRow]->blocked() || ($rowBlocked[$headRow] && $headRow !== $ref['row'])
                     ? new ImportApplyEffectPlan($effect, I::BLOCK, 'SPOUSE_OWNER_BLOCKED')
                     : ($head[$headRow]->intent === I::REUSE
-                        ? new ImportApplyEffectPlan($effect, I::REUSE, existingId: $head[$headRow]->existingId, existingCode: $head[$headRow]->existingCode)
-                        : new ImportApplyEffectPlan($effect, I::REUSE, ownerRow: $headRow, ownerEffect: E::HEAD_PERSON)),
+                        ? new ImportApplyEffectPlan($effect, I::REUSE, existingId: $head[$headRow]->existingId, existingCode: $head[$headRow]->existingCode, values: $identity)
+                        : new ImportApplyEffectPlan($effect, I::REUSE, ownerRow: $headRow, ownerEffect: E::HEAD_PERSON, values: $identity)),
                 $key === $ownerKey => $ownerPlan,
                 $ownerPlan->blocked() || ($rowBlocked[$ownerRow] && $ownerRow !== $ref['row']) => new ImportApplyEffectPlan($effect, I::BLOCK, $ownerPlan->blocked() ? $ownerPlan->reason : 'SPOUSE_OWNER_BLOCKED'),
-                default => new ImportApplyEffectPlan($effect, I::REUSE, ownerRow: $ownerRow, ownerEffect: E::spousePerson($ownerSlot)),
+                default => new ImportApplyEffectPlan($effect, I::REUSE, ownerRow: $ownerRow, ownerEffect: E::spousePerson($ownerSlot), values: $identity),
             };
             [$intent, $reason] = $membership[$key];
             if ($person->blocked()) {
