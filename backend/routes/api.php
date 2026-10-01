@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\FamilyController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
 use App\Http\Controllers\Api\V1\HealthRecordController;
+use App\Http\Controllers\Api\V1\ImportApplyController;
 use App\Http\Controllers\Api\V1\InitialFamilyImportController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
@@ -321,11 +322,20 @@ Route::middleware('auth:sanctum')->group(function () {
             // Step 6 Dry Run: the pure Apply plan, read only (never import.apply).
             Route::get('/{importBatch}/dry-run', [InitialFamilyImportController::class, 'dryRun']);
             Route::get('/{importBatch}/dry-run/rows', [InitialFamilyImportController::class, 'dryRunRows']);
+            // Apply progress, read only (never import.apply; no failing row number).
+            Route::get('/{importBatch}/apply', [ImportApplyController::class, 'show']);
             // Step 4 decisions (creating a Branch additionally needs clan.manage,
             // enforced in ResolveFamilyKeyAction). Keys travel in the body.
             Route::put('/{importBatch}/family-keys/resolution', [InitialFamilyImportController::class, 'resolveFamilyKey']);
             Route::post('/{importBatch}/family-keys/resolution/clear', [InitialFamilyImportController::class, 'clearFamilyKey']);
             Route::post('/{importBatch}/family-keys/bulk', [InitialFamilyImportController::class, 'bulkResolveFamilyKeys']);
+        });
+        // Step 7 Apply (docs/03 §96b): import.apply — SUPER_ADMIN only, and only
+        // while the Apply activation gate is open (config/import.php, docs/08).
+        Route::middleware('can:import.apply')->group(function () {
+            Route::post('/{importBatch}/apply/start', [ImportApplyController::class, 'start']);
+            Route::post('/{importBatch}/apply/run', [ImportApplyController::class, 'run']);
+            Route::post('/{importBatch}/apply/resume', [ImportApplyController::class, 'resume']);
         });
     });
 });

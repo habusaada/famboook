@@ -79,7 +79,7 @@ Key production values: `APP_ENV=production`, `APP_DEBUG=false`,
 `ADMIN_DOMAIN=admin.famboook.com`, `SESSION_SECURE_COOKIE=true`,
 `SESSION_ENCRYPT=true`, `LOG_CHANNEL=daily`, `LOG_LEVEL=info`,
 `QUEUE_CONNECTION=sync`, `CACHE_STORE=database`, `MAIL_MAILER=log` (no mail
-is sent in V1).
+is sent in V1), `IMPORT_APPLY_ENABLED=false` (Import Apply stays off; §7a).
 
 ---
 
@@ -191,9 +191,53 @@ catalog permission exists, and asserts explicitly:
 - ADMINISTRATOR and SUPER_ADMIN have `family-membership.end` and
   `person.national-id.update`; nobody has `person.national-id.view`.
 
+It also enforces the Import Apply gate (§7a): with the gate closed no role
+may hold `import.apply`; with it open SUPER_ADMIN must and no other role may;
+in both modes no user may hold it directly. It prints the gate state.
+
 It prints role names and counts only (no users) and exits non-zero on any
 drift, which stops `deploy-backend.sh`. Covered by
 `VerifyPermissionsCommandTest`.
+
+---
+
+# 7a. Import Apply activation
+
+Import Apply (docs/03 §96b) is deployed **disabled**. `IMPORT_APPLY_ENABLED`
+defaults to false, and while it is false no role holds `import.apply` and the
+Apply actions refuse every user. A normal deployment never activates it.
+
+Activate only after the Step 6 Apply UI phase and the final end-to-end
+review have been approved — never by editing roles or permissions in the
+database by hand. On the server, as `deploy`:
+
+```text
+# 1. backend/.env
+IMPORT_APPLY_ENABLED=true
+
+# 2. drop the cached configuration so the seeder sees the new value
+php artisan config:clear
+
+# 3. apply the gated baseline: import.apply → SUPER_ADMIN only
+php artisan db:seed --class=RolePermissionSeeder --force
+
+# 4. must print "Import Apply gate: ENABLED (SUPER_ADMIN only)" and pass
+php artisan famboook:verify-permissions
+
+# 5. rebuild caches
+php artisan optimize
+```
+
+`config:clear` is required: `deploy-backend.sh` seeds before `optimize`, so
+the seeder would otherwise read the previous cached value (it then fails
+closed — the grant is not added and the verifier reports it). Deactivation is
+the same procedure with `IMPORT_APPLY_ENABLED=false`; the seeder revokes the
+grant and the actions refuse immediately after the configuration is reloaded.
+
+Operational invariant: PostgreSQL **persistent connections must stay
+disabled** (no `PDO::ATTR_PERSISTENT` in `config/database.php`). The Apply
+runner lock is a session-level advisory lock released at the end of each
+request; a persistent connection could carry a session across requests.
 
 ---
 
@@ -477,5 +521,6 @@ Never do this once real data has been entered.
 
 | Version | Date | Status | Description |
 |---|---|---|---|
+| 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
 | 1.1 | 2026-09-27 | Approved for Pilot preparation | §2a owner decisions; §12 retention wording; §17 approved smoke Family; §17a rebuild after smoke test; checklist order (backup/restore after rebuild) |
 | 1.0 | 2026-09-27 | Approved for Pilot preparation | Slice D: topology, audit, environment templates, cookie/Sanctum/CORS decision, database initialization, pg_trgm, permission verification, dev-surface gating, HTTPS, permissions, backup/restore, APP_KEY, logging, queues, smoke test, Staff setup, checklist |

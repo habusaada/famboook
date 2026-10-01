@@ -6,6 +6,7 @@ use App\Enums\ImportBatchStatus;
 use App\Exceptions\ImportApplyExecutionException;
 use App\Models\ImportBatch;
 use App\Models\User;
+use App\Support\Import\Apply\ImportApplyGate;
 use App\Support\Import\Apply\ImportApplyPlanner;
 use App\Support\Import\Apply\ImportApplyProgress;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -25,8 +26,8 @@ class StartImportApplyAction
 
     public function handle(ImportBatch $batch, User $user, string $approvedFingerprint): ImportApplyProgress
     {
-        // import.apply is SUPER_ADMIN-only once assigned (not assigned yet).
-        if (! $user->can('import.apply')) {
+        // import.apply: SUPER_ADMIN only, and only while the Apply gate is open (config/import.php).
+        if (! ImportApplyGate::allows($user)) {
             throw new AuthorizationException('لا تملك صلاحية اعتماد الاستيراد.');
         }
 

@@ -312,11 +312,50 @@ class RolePermissionSeederTest extends TestCase
         //      + dashboard.view-operational (AUTH-ADR-055)
         //      + report.view (AUTH-ADR-056)
         //      + family-membership.update/end, person.national-id.view-masked/update (AUTH-ADR-059)
-        //      + import.upload/validate/review (AUTH-ADR-060; import.apply stays unassigned).
+        //      + import.upload/validate/review (AUTH-ADR-060; import.apply only
+        //        through the Apply activation gate, closed by default).
         $this->assertSame(78, $superAdmin->getAllPermissions()->count());
         foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
             $this->assertTrue($superAdmin->hasPermissionTo($permission));
         }
+    }
+
+    public function test_import_apply_is_granted_only_to_super_admin_and_only_while_the_gate_is_open(): void
+    {
+        // Closed by default: deploying the Apply code grants nothing.
+        $this->assertFalse(config('import.apply_enabled'));
+        $this->seed(RolePermissionSeeder::class);
+        foreach (RolePermissionSeeder::ROLES as $roleName) {
+            $this->assertFalse(Role::findByName($roleName, 'web')->hasPermissionTo('import.apply'), $roleName);
+        }
+        $this->assertSame(['SUPER_ADMIN' => ['import.apply']], RolePermissionSeeder::GATED_ROLE_PERMISSIONS);
+
+        // Open: SUPER_ADMIN only; ADMINISTRATOR and every other role never.
+        config(['import.apply_enabled' => true]);
+        $this->seed(RolePermissionSeeder::class);
+        foreach (RolePermissionSeeder::ROLES as $roleName) {
+            $this->assertSame($roleName === 'SUPER_ADMIN', Role::findByName($roleName, 'web')->hasPermissionTo('import.apply'), $roleName);
+        }
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole('SUPER_ADMIN');
+        $this->assertSame(79, $superAdmin->getAllPermissions()->count());
+
+        // Closing the gate again and re-seeding (every deployment) revokes it.
+        config(['import.apply_enabled' => false]);
+        $this->seed(RolePermissionSeeder::class);
+        $this->assertFalse($superAdmin->fresh()->hasPermissionTo('import.apply'));
+        $this->assertSame(78, $superAdmin->fresh()->getAllPermissions()->count());
+    }
+
+    public function test_only_a_strict_boolean_opens_the_apply_gate(): void
+    {
+        foreach (['true', '1', 1, 'yes', null] as $value) {
+            config(['import.apply_enabled' => $value]);
+            $this->assertNotContains('import.apply', RolePermissionSeeder::rolePermissions('SUPER_ADMIN'), var_export($value, true));
+        }
+        config(['import.apply_enabled' => true]);
+        $this->assertContains('import.apply', RolePermissionSeeder::rolePermissions('SUPER_ADMIN'));
+        $this->assertNotContains('import.apply', RolePermissionSeeder::rolePermissions('ADMINISTRATOR'));
     }
 
     public function test_documented_role_permission_assignments_work(): void

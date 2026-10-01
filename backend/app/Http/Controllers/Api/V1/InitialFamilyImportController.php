@@ -32,7 +32,7 @@ use Illuminate\Validation\ValidationException;
  *   upload / replace workbook / select worksheet   import.upload
  *   columns (+ masked samples) / confirm mapping    import.validate (staging)
  *   list / show / family keys / problem rows        import.review
- * No row payloads are returned and there is NO Apply endpoint.
+ * No row payloads are returned. Apply lives in ImportApplyController.
  */
 class InitialFamilyImportController extends Controller
 {

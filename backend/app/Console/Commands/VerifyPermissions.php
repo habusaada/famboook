@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -17,6 +18,10 @@ use Spatie\Permission\PermissionRegistrar;
  *
  * The Pilot Gate found a database seeded before a permission change still
  * granting DATA_ENTRY family-membership.end; this makes that drift loud.
+ *
+ * `import.apply` is gated (config import.apply_enabled, docs/08): while the
+ * gate is closed no role may hold it; while open, exactly SUPER_ADMIN must.
+ * In both modes no other role, and no user directly, may ever hold it.
  */
 class VerifyPermissions extends Command
 {
@@ -41,15 +46,21 @@ class VerifyPermissions extends Command
         ],
         'SUPER_ADMIN' => [
             'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review'],
-            // import.apply is not assigned until the Apply phase (AUTH-ADR-060).
-            'lacks' => ['person.national-id.view', 'import.apply'],
+            // import.apply is gated: see the explicit check in handle().
+            'lacks' => ['person.national-id.view'],
         ],
     ];
+
+    /** The single gated permission and the only role that may ever hold it. */
+    public const APPLY_PERMISSION = 'import.apply';
+
+    public const APPLY_ROLE = 'SUPER_ADMIN';
 
     public function handle(): int
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $problems = [];
+        $applyEnabled = config('import.apply_enabled') === true;
 
         $missingPermissions = array_diff(RolePermissionSeeder::PERMISSIONS, Permission::pluck('name')->all());
         foreach ($missingPermissions as $name) {
@@ -65,7 +76,7 @@ class VerifyPermissions extends Command
                 continue;
             }
 
-            $expected = RolePermissionSeeder::ROLE_PERMISSIONS[$roleName];
+            $expected = RolePermissionSeeder::rolePermissions($roleName);
             $actual = $role->permissions()->pluck('name')->all();
             foreach (array_diff($actual, $expected) as $extra) {
                 $problems[] = "{$roleName} has unexpected permission: {$extra}";
@@ -85,8 +96,27 @@ class VerifyPermissions extends Command
                 }
             }
 
+            $mayApply = $applyEnabled && $roleName === self::APPLY_ROLE;
+            if ($mayApply && ! in_array(self::APPLY_PERMISSION, $actual, true)) {
+                $problems[] = "CRITICAL: {$roleName} must have ".self::APPLY_PERMISSION.' (Apply gate is enabled)';
+            }
+            if (! $mayApply && in_array(self::APPLY_PERMISSION, $actual, true)) {
+                $problems[] = "CRITICAL: {$roleName} must NOT have ".self::APPLY_PERMISSION.($applyEnabled ? '' : ' (Apply gate is disabled)');
+            }
+
             $rows[] = [$roleName, count($actual), count($expected)];
         }
+
+        // Apply is never granted to a user directly — only through the gated role.
+        $directApplyGrants = DB::table(config('permission.table_names.model_has_permissions'))
+            ->join(config('permission.table_names.permissions').' as p', 'p.id', '=', config('permission.column_names.permission_pivot_key') ?? 'permission_id')
+            ->where('p.name', self::APPLY_PERMISSION)
+            ->count();
+        if ($directApplyGrants > 0) {
+            $problems[] = 'CRITICAL: '.self::APPLY_PERMISSION.' is granted directly to a model; it may only come from the '.self::APPLY_ROLE.' role';
+        }
+
+        $this->line('Import Apply gate: '.($applyEnabled ? 'ENABLED ('.self::APPLY_ROLE.' only)' : 'DISABLED (no role holds '.self::APPLY_PERMISSION.')'));
 
         $this->table(['Role', 'Permissions in DB', 'Expected'], $rows);
 

@@ -1922,12 +1922,17 @@ Uploading a file must not imply permission to apply data to the canonical regist
 import.upload     SUPER_ADMIN
 import.validate   SUPER_ADMIN
 import.review     SUPER_ADMIN
-import.apply      (unassigned until the apply phase)
+import.apply      SUPER_ADMIN — only while the Apply activation gate is open
 ```
 
-Approved for the Apply phase (not yet assigned): `import.apply` will be
-held by SUPER_ADMIN only. It stays unassigned — and `famboook:verify-permissions`
-keeps treating it as a critical failure — until Apply itself is delivered.
+`import.apply` is held by SUPER_ADMIN only, and only while the Apply
+activation gate is open (`IMPORT_APPLY_ENABLED`, config
+`import.apply_enabled`; **closed by default**). It is a gated grant
+(`RolePermissionSeeder::GATED_ROLE_PERMISSIONS`), never part of the static
+baseline: deploying the Apply code grants nothing. The Apply actions also
+check the gate at runtime, so a stale or direct grant cannot run Apply while
+it is closed. ADMINISTRATOR and every other role never hold it, and it is
+never granted directly to a user. Activation: docs/08 §7a.
 
 Import Wizard (docs/03 §96a):
 
@@ -1949,6 +1954,10 @@ POST /api/v1/imports/initial-families/{batch}/reconcile                     impo
 GET  /api/v1/imports/initial-families/{batch}/reconciliation                import.review   (rows: masked IDs, codes, differences)
 GET  /api/v1/imports/initial-families/{batch}/dry-run                       import.review   (step 6: Apply plan summary; read only)
 GET  /api/v1/imports/initial-families/{batch}/dry-run/rows                  import.review   (row plans: intents, reason codes, masked IDs)
+POST /api/v1/imports/initial-families/{batch}/apply/start                   import.apply    (gated; body: plan_fingerprint only)
+POST /api/v1/imports/initial-families/{batch}/apply/run                     import.apply    (gated; one server-budgeted chunk)
+POST /api/v1/imports/initial-families/{batch}/apply/resume                  import.apply    (gated; PARTIALLY_APPLIED only)
+GET  /api/v1/imports/initial-families/{batch}/apply                         import.review   (Apply progress; no failing row number)
 ```
 
 Reconciliation is not Apply and never uses `import.apply`. The Dry Run is
@@ -1961,8 +1970,11 @@ batch's Clan or choose NO_BRANCH.
 
 No endpoint returns row payloads, full National IDs or phone numbers,
 names in bulk, or the excluded source values (their headers are listed as
-excluded columns only); samples are masked. There is no apply endpoint. `famboook:verify-permissions` treats SUPER_ADMIN holding
-`import.apply` as a critical failure.
+excluded columns only); samples are masked. Apply responses carry counts,
+statuses and stable codes only (docs/03 §96b). `famboook:verify-permissions`
+fails when the gate is closed and any role holds `import.apply`, when it is
+open and SUPER_ADMIN lacks it, whenever any other role holds it, and
+whenever a user holds it directly.
 
 ---
 
@@ -3913,6 +3925,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.24 | 2026-10-01 | Approved | §61 Apply endpoints (Phase 4B.4d): start / run / resume require `import.apply`, progress requires `import.review`; `import.apply` granted to SUPER_ADMIN only through the Apply activation gate (closed by default), checked at runtime too; verifier enforces both modes and forbids direct grants |
 | 1.2.23 | 2026-09-30 | Approved | §61 Dry Run endpoints (`dry-run`, `dry-run/rows`) require `import.review`; `import.apply` still unassigned |
 | 1.2.22 | 2026-09-29 | Approved | §61 `import.apply` approved as SUPER_ADMIN-only for the future Apply phase; still unassigned, verifier unchanged |
 | 1.2.21 | 2026-09-29 | Approved | §61 reconciliation endpoints: run with `import.validate`, read with `import.review`; no new permission; `import.apply` still unassigned |

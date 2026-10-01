@@ -9,6 +9,7 @@ use App\Models\ImportRow;
 use App\Models\User;
 use App\Support\Import\Apply\ApplyChunkBudget;
 use App\Support\Import\Apply\ApplyRunnerLock;
+use App\Support\Import\Apply\ImportApplyGate;
 use App\Support\Import\Apply\ImportApplyLifecycle;
 use App\Support\Import\Apply\ImportApplyProgress;
 use App\Support\Import\Apply\ImportRowApplyResult;
@@ -87,8 +88,8 @@ class RunImportApplyChunkAction
 
     private function authorize(User $user): void
     {
-        // import.apply is SUPER_ADMIN-only once assigned (not assigned yet).
-        if (! $user->can('import.apply')) {
+        // import.apply: SUPER_ADMIN only, and only while the Apply gate is open (config/import.php).
+        if (! ImportApplyGate::allows($user)) {
             throw new AuthorizationException('لا تملك صلاحية اعتماد الاستيراد.');
         }
     }

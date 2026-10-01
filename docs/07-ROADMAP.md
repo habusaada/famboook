@@ -2363,6 +2363,17 @@ database-backed verification. **Still open:** PostgreSQL rehearsal on a
 disposable database, Apply API (`import.apply`), Step 6 Apply UI, local
 Batch 21 Apply.
 
+2026-10-01: **Apply API and activation gate (Phase 4B.4d)** delivered
+(docs/03 §96b, docs/06 §61): start / run / resume / progress endpoints with
+safe error mapping and logging; `import.apply` exists only behind the Apply
+activation gate (SUPER_ADMIN only, closed by default). **Still open:** Step 6
+Apply UI (Phase 4B.4e), final end-to-end review, then activation (docs/08
+§7a) and local Batch 21 Apply. **Test cleanup follow-up** (pre-existing, not
+PostgreSQL-portable; pass on SQLite): `ImportStagingTest` compares
+`raw_payload` with key order (jsonb reorders keys), `PublicIdentifierTest`
+uses `sqlite_sequence`, and a `FamilyActivityLogTest` health fixture violates
+`chk_health_record_shape`.
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4773,6 +4784,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.23 | 2026-10-01 | Approved | Phase 23 progress note: Apply API and activation gate (Phase 4B.4d) |
 | 1.2.22 | 2026-09-30 | Approved | Phase 23 progress note: Apply runner (Phase 4B.4c) |
 | 1.2.21 | 2026-09-30 | Approved | Phase 23 progress note: Row executor (Phase 4B.4b) |
 | 1.2.20 | 2026-09-30 | Approved | Phase 23 progress note: Apply execution primitives (Phase 4B.4a) |

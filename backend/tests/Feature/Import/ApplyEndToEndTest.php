@@ -61,11 +61,11 @@ class ApplyEndToEndTest extends TestCase
     public function test_a_synthetic_initial_import_applies_exactly_as_planned(): void
     {
         Storage::fake('local');
+        config(['import.apply_enabled' => true]); // this test only: SUPER_ADMIN receives import.apply
         $this->seed(RolePermissionSeeder::class);
         $this->seed(RelationshipTypeSeeder::class);
         $admin = User::factory()->create();
         $admin->assignRole('SUPER_ADMIN');
-        $admin->givePermissionTo('import.apply');
         Clan::create(['code' => 'SYN_TARGET', 'name' => 'عشيرة الهدف']);
 
         $path = SyntheticXlsx::write(['Sheet1' => [1 => self::HEADERS] + [

@@ -400,7 +400,8 @@ class FamilyKeyResolutionTest extends TestCase
         $this->assertSame(1, $keys->json('meta.resolution.unresolved_keys'));
         $this->assertSame(1, ImportFamilyKeyResolution::count());
 
-        $this->actingAs($this->admin)->postJson(self::BASE."/{$this->batch}/apply")->assertNotFound();
+        // The Apply gate is closed by default: even SUPER_ADMIN is refused.
+        $this->actingAs($this->admin)->postJson(self::BASE."/{$this->batch}/apply/start", ['plan_fingerprint' => str_repeat('a', 64)])->assertForbidden();
         foreach (Role::all() as $role) {
             $this->assertFalse($role->hasPermissionTo('import.apply'), $role->name);
         }

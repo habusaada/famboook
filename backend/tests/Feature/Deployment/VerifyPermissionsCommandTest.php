@@ -54,6 +54,56 @@ class VerifyPermissionsCommandTest extends TestCase
         $this->artisan('famboook:verify-permissions')->assertFailed();
     }
 
+    public function test_the_apply_gate_closed_means_no_role_holds_import_apply(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $this->artisan('famboook:verify-permissions')
+            ->expectsOutputToContain('Import Apply gate: DISABLED')
+            ->assertSuccessful();
+
+        // A stale SUPER_ADMIN grant (e.g. seeded while the gate was open) fails.
+        Role::findByName('SUPER_ADMIN', 'web')->givePermissionTo('import.apply');
+        $this->artisan('famboook:verify-permissions')
+            ->expectsOutputToContain('CRITICAL: SUPER_ADMIN must NOT have import.apply (Apply gate is disabled)')
+            ->assertFailed();
+    }
+
+    public function test_the_apply_gate_open_requires_super_admin_and_only_super_admin(): void
+    {
+        // Gate opened but the seeder not re-run: SUPER_ADMIN lacks it → fail.
+        $this->seed(RolePermissionSeeder::class);
+        config(['import.apply_enabled' => true]);
+        $this->artisan('famboook:verify-permissions')
+            ->expectsOutputToContain('CRITICAL: SUPER_ADMIN must have import.apply (Apply gate is enabled)')
+            ->assertFailed();
+
+        $this->seed(RolePermissionSeeder::class);
+        $this->artisan('famboook:verify-permissions')
+            ->expectsOutputToContain('Import Apply gate: ENABLED (SUPER_ADMIN only)')
+            ->assertSuccessful();
+
+        Role::findByName('ADMINISTRATOR', 'web')->givePermissionTo('import.apply');
+        $this->artisan('famboook:verify-permissions')
+            ->expectsOutputToContain('CRITICAL: ADMINISTRATOR must NOT have import.apply')
+            ->assertFailed();
+    }
+
+    public function test_import_apply_is_never_granted_directly_to_a_user(): void
+    {
+        foreach ([false, true] as $enabled) {
+            config(['import.apply_enabled' => $enabled]);
+            $this->seed(RolePermissionSeeder::class);
+            $user = User::factory()->create();
+            $user->givePermissionTo('import.apply');
+
+            $this->artisan('famboook:verify-permissions')
+                ->expectsOutputToContain('CRITICAL: import.apply is granted directly to a model')
+                ->assertFailed();
+            $user->revokePermissionTo('import.apply');
+        }
+        $this->artisan('famboook:verify-permissions')->assertSuccessful();
+    }
+
     public function test_never_prints_user_data(): void
     {
         $this->seed(RolePermissionSeeder::class);

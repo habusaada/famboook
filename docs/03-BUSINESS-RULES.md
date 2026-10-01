@@ -2745,8 +2745,9 @@ No alias intelligence, no fuzzy matching.
 `import.review` (steps 4–5, including key decisions) — SUPER_ADMIN only
 (AUTH-ADR-060). Creating a Clan (step 1) or a Branch (step 4) additionally
 requires `clan.manage`; a reviewer without it may still map to existing
-Branches or choose NO_BRANCH. `import.apply` stays unassigned; there is no
-Apply endpoint.
+Branches or choose NO_BRANCH. Apply (§96b) uses `import.apply` —
+SUPER_ADMIN only, and only while the Apply activation gate is open (closed
+by default; docs/08 §7a).
 
 ## Initial Family Excel import — approved mapping (Phase 2 target)
 
@@ -2828,11 +2829,12 @@ death date without DECEASED        FLAGGED
 
 # 96b. Import Apply — Foundation and Contract (Phase 4B.1)
 
-Approved 2026-09-29 (Phase 4A design, Phase 4B.1 foundation). **Apply itself
-is NOT implemented**: there is no Apply action, endpoint, job or button, and
-no import writes to registry tables (the read-only Dry Run below only plans). This section records what the
-foundation provides (IMPLEMENTED) and the approved contract a future Apply
-must follow (PLANNED). INITIAL Apply will be implemented before INCREMENTAL.
+Approved 2026-09-29 (Phase 4A design, Phase 4B.1 foundation). INITIAL Apply
+is implemented in the backend (runner Phase 4B.4c, API Phase 4B.4d) but is
+**not activated**: the Apply activation gate is closed by default, so nobody
+holds `import.apply`, and there is no Apply button or job. The sections below
+record what is IMPLEMENTED and the approved contract (PLANNED) for what is
+not yet. INITIAL Apply is implemented before INCREMENTAL.
 
 ## Apply lifecycle (IMPLEMENTED — schema and invariants only)
 
@@ -2939,8 +2941,8 @@ nullable in the schema.
   fake Persons, never recalculated; المدينة only fills
   `original_residence_text`.
 - Source spouse references are evidence, not Family Membership (§17).
-- `import.apply` will be SUPER_ADMIN-only when Apply is enabled; it stays
-  unassigned until then.
+- `import.apply` is SUPER_ADMIN-only and exists only while the Apply
+  activation gate is open (see "Apply API and activation gate" below).
 
 ## Apply planner and Dry Run (IMPLEMENTED — Phase 4B.2, read only)
 
@@ -3121,6 +3123,46 @@ One execution path for future HTTP and CLI callers — orchestration only
   never re-executed or repaired.
 - **Progress** comes from the database (rows total / applied / remaining,
   pending links, safe error code and row) — no personal data.
+
+## Apply API and activation gate (IMPLEMENTED — Phase 4B.4d; gate CLOSED)
+
+Thin endpoints around the runner (no completion endpoint: completion is
+internal to a chunk). The actions re-check authorization themselves.
+
+```text
+POST /api/v1/imports/initial-families/{batch}/apply/start   import.apply   body {plan_fingerprint} only
+POST /api/v1/imports/initial-families/{batch}/apply/run     import.apply   one chunk (server-side budget)
+POST /api/v1/imports/initial-families/{batch}/apply/resume  import.apply   PARTIALLY_APPLIED → one chunk
+GET  /api/v1/imports/initial-families/{batch}/apply         import.review  progress, read only
+```
+
+- **Input**: start takes only the reviewed Dry Run `plan_fingerprint`
+  (exactly 64 lowercase hex characters, else 422). No row selection, chunk
+  size, date or other execution control is accepted from the client; any
+  extra body field is ignored.
+- **Responses**: `{data: {batch_id (UUID), outcome, status, total_rows,
+  applied_rows, remaining_rows, executed_in_chunk, skipped_already_applied,
+  pending_links, completed, error_code, error_row_number}}`. A row failure
+  inside a chunk is a normal **200** with `outcome` FAILED and the batch's
+  safe code/row. The GET progress omits `error_row_number` (and the
+  chunk-only fields) — least exposure for reviewers.
+- **Refusals** (`{message, code, row_number}`, fixed Arabic message per code):
+  409 `APPLY_IN_PROGRESS`, `APPLY_STATE_INVALID`, `APPLY_PLAN_CHANGED`,
+  `APPLY_INTEGRITY_INVALID`; 422 `APPLY_PRECONDITIONS_FAILED`,
+  `APPLY_PLAN_BLOCKED`; 500 `UNEXPECTED_ERROR` (any other cause, wrapped);
+  403 without authorization; 401 unauthenticated.
+- **Privacy**: no response or log carries row payloads, names, National IDs,
+  phones, the plan fingerprint, identity fingerprints, provenance internals
+  or exception messages. A refused/failed request logs only the code, row
+  number, batch UUID and the cause's class name; Laravel's default reporting
+  (message, trace, previous-exception chain) is replaced.
+- **Activation gate**: `config('import.apply_enabled')`
+  (`IMPORT_APPLY_ENABLED`, default false). Only while it is true does
+  `RolePermissionSeeder` grant `import.apply` — to SUPER_ADMIN only — and do
+  the actions accept it (a stale or direct grant cannot run Apply while the
+  gate is closed). `famboook:verify-permissions` enforces both modes and
+  forbids direct user grants. Activation is an explicit operational step
+  (docs/08 §7a), only after the Apply UI phase and a final end-to-end review.
 
 ## Freshness during Apply (APPROVED rule; primitive IMPLEMENTED)
 
@@ -4231,6 +4273,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.29 | 2026-10-01 | Approved | §96b Apply API and activation gate (Phase 4B.4d): start / run / resume (`import.apply`) and read-only progress (`import.review`), fixed-message error mapping (409/422/500, in-chunk failure = 200 FAILED), safe logging; Apply gated by `IMPORT_APPLY_ENABLED` (default off, SUPER_ADMIN only) |
 | 1.2.28 | 2026-09-30 | Approved | §96b Apply runner (Phase 4B.4c): start against the operator's Dry Run fingerprint, one runner per batch (advisory lock), chunks of 100 rows / ~10 s with row transactions and normal pause, failure by database truth (READY_FOR_REVIEW before any committed row, PARTIALLY_APPLIED after), resume with the same plan and start date, database-backed completion that verifies and never invents provenance; no endpoint or UI |
 | 1.2.27 | 2026-09-30 | Approved | §96b Row executor (Phase 4B.4b): one source row = one transaction, approved-plan-only execution through the canonical actions, Apply start date, owner-only Persons with pending cross-row REUSE and owner-side link completion, identical-or-conflict provenance writer, already-applied verification without repair, keyed National ID identity evidence on every Person REUSE (PERSON_IDENTITY_CHANGED), structured execution failure codes; no runner or endpoint |
 | 1.2.26 | 2026-09-30 | Approved | §96b Apply execution primitives (Phase 4B.4a): apply_plan_fingerprint and structured apply error fields, CreateFamilyMembershipAction and CreateFamilyResidenceAction (used by registration), registration date = Apply start date, approved plan-equality resume freshness via the planner's as-of-Apply-start context, owner-only Person creation with verified (never invented) provenance; §97a FAMILY_IMPORTED (import_batch_id, source_row_number only; not emitted yet) |

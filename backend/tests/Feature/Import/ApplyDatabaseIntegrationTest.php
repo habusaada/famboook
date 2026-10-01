@@ -138,6 +138,14 @@ class ApplyDatabaseIntegrationTest extends TestCase
 
     // ================================================== both drivers
 
+    public function test_postgres_persistent_connections_stay_disabled(): void
+    {
+        // Operational invariant (docs/08 §7a): the runner lock is a session
+        // advisory lock; a persistent connection could carry it across requests.
+        $options = config('database.connections.pgsql.options') ?? [];
+        $this->assertFalse((bool) ($options[\PDO::ATTR_PERSISTENT] ?? false));
+    }
+
     public function test_the_provenance_writer_recovers_from_a_unique_conflict_inside_its_savepoint(): void
     {
         $row = $this->startedRow();

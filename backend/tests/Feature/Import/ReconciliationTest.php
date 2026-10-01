@@ -750,7 +750,8 @@ class ReconciliationTest extends TestCase
             $this->actingAs($user)->postJson(self::BASE."/{$id}/reconcile")->assertForbidden();
             $this->actingAs($user)->getJson(self::BASE."/{$id}/reconciliation")->assertForbidden();
         }
-        $this->actingAs($this->admin)->postJson(self::BASE."/{$id}/apply")->assertNotFound();
+        // The Apply gate is closed by default: even SUPER_ADMIN is refused.
+        $this->actingAs($this->admin)->postJson(self::BASE."/{$id}/apply/start", ['plan_fingerprint' => str_repeat('a', 64)])->assertForbidden();
         foreach (Role::all() as $role) {
             $this->assertFalse($role->hasPermissionTo('import.apply'), $role->name);
         }

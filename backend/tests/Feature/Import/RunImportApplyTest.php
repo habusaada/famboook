@@ -63,12 +63,13 @@ class RunImportApplyTest extends TestCase
     {
         parent::setUp();
         Storage::fake('local');
+        // The Apply activation gate is opened for this test only: the seeder
+        // then grants import.apply to SUPER_ADMIN (and to no other role).
+        config(['import.apply_enabled' => true]);
         $this->seed(RolePermissionSeeder::class);
         $this->seed(RelationshipTypeSeeder::class);
         $this->admin = User::factory()->create();
         $this->admin->assignRole('SUPER_ADMIN');
-        // Granted to this synthetic user only; the role stays without it.
-        $this->admin->givePermissionTo('import.apply');
         Clan::create(['code' => 'SYN_TARGET', 'name' => 'عشيرة الهدف']);
         Carbon::setTestNow('2026-09-20 09:00:00');
     }
@@ -216,10 +217,11 @@ class RunImportApplyTest extends TestCase
         app(StartImportApplyAction::class)->handle($ok, $this->admin, $fp);
         $this->expectCode('APPLY_STATE_INVALID', fn () => app(StartImportApplyAction::class)->handle($ok, $this->admin, $fp));
 
-        $viewer = User::factory()->create();
-        $viewer->assignRole('SUPER_ADMIN'); // the role alone does not hold import.apply
+        // Only SUPER_ADMIN holds import.apply, and only while the gate is open.
+        $administrator = User::factory()->create();
+        $administrator->assignRole('ADMINISTRATOR');
         $this->expectException(AuthorizationException::class);
-        app(StartImportApplyAction::class)->handle($unresolved, $viewer, $fp);
+        app(StartImportApplyAction::class)->handle($unresolved, $administrator, $fp);
     }
 
     // ================================================== chunks

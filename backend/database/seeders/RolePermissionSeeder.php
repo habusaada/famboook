@@ -41,7 +41,9 @@ use Spatie\Permission\PermissionRegistrar;
  * corrections (family-membership.update; .end without DATA_ENTRY) and
  * masked National ID view / correction were assigned by AUTH-ADR-059
  * (§45, §39). SUPER_ADMIN received import.upload / validate / review by
- * AUTH-ADR-060 (§61); import.apply remains unassigned.
+ * AUTH-ADR-060 (§61); import.apply is SUPER_ADMIN-only and granted solely
+ * through the Apply activation gate (GATED_ROLE_PERMISSIONS, config
+ * import.apply_enabled; off by default — docs/08).
  *
  * SUPER_ADMIN is not given a blanket bypass and does not receive every
  * catalog permission. Its grants here are limited to what §140 and the
@@ -376,7 +378,7 @@ class RolePermissionSeeder extends Seeder
             // Reports V1 (§59b V1 Role Assignment, AUTH-ADR-056)
             'report.view',
             // Initial Family Import staging and review (§61 V1 Role
-            // Assignment, AUTH-ADR-060). import.apply stays unassigned.
+            // Assignment, AUTH-ADR-060). import.apply only via GATED_ROLE_PERMISSIONS.
             'import.upload',
             'import.validate',
             'import.review',
@@ -614,6 +616,31 @@ class RolePermissionSeeder extends Seeder
         ],
     ];
 
+    /**
+     * Grants that exist only while an explicit operational gate is open
+     * (docs/03 §96b, docs/06 §61, docs/08). `import.apply` may only ever be
+     * held by SUPER_ADMIN; it is part of the baseline only while
+     * config('import.apply_enabled') is true, so deploying the Apply code
+     * activates nothing. No other role may appear here.
+     */
+    public const GATED_ROLE_PERMISSIONS = [
+        'SUPER_ADMIN' => ['import.apply'],
+    ];
+
+    /**
+     * The effective baseline of one role: ROLE_PERMISSIONS, plus its gated
+     * grants while the Apply gate is open. Used by run() and by
+     * famboook:verify-permissions, so both always agree.
+     *
+     * @return list<string>
+     */
+    public static function rolePermissions(string $roleName): array
+    {
+        $gated = config('import.apply_enabled') === true ? (self::GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
+
+        return [...self::ROLE_PERMISSIONS[$roleName], ...$gated];
+    }
+
     public function run(): void
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -631,7 +658,7 @@ class RolePermissionSeeder extends Seeder
                 'guard_name' => 'web',
             ]);
 
-            $role->syncPermissions(self::ROLE_PERMISSIONS[$roleName]);
+            $role->syncPermissions(self::rolePermissions($roleName));
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

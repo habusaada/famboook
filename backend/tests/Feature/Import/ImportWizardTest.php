@@ -711,8 +711,9 @@ class ImportWizardTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->getJson(self::BASE)->assertUnauthorized();
 
-        // No Apply endpoint, and nobody holds import.apply.
-        $this->actingAs($this->admin)->postJson(self::BASE."/{$id}/apply")->assertNotFound();
+        // The Apply gate is closed by default: even SUPER_ADMIN is refused,
+        // and nobody holds import.apply.
+        $this->actingAs($this->admin)->postJson(self::BASE."/{$id}/apply/start", ['plan_fingerprint' => str_repeat('a', 64)])->assertForbidden();
         $this->assertFalse($this->admin->hasPermissionTo('import.apply'));
         foreach (Role::all() as $role) {
             $this->assertFalse($role->hasPermissionTo('import.apply'), $role->name);
