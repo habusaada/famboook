@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, KeyRound } from "lucide-react";
+import { AlertTriangle, Info, KeyRound } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Panel, SectionHeader } from "@/components/shared/page-layout";
 import { useAuth } from "@/components/auth/auth-context";
 import { ApiError } from "@/lib/api/client";
 import { useBulkResolveFamilyKeys, useClearFamilyKey, useImportFamilyKeys, useResolveFamilyKey } from "@/lib/api/imports";
-import { DECISION_LABELS, fmt } from "@/components/administration/import-wizard/labels";
+import { DECISION_LABELS, fmt, isApplyStarted } from "@/components/administration/import-wizard/labels";
 import type { FamilyKeyDecision, FamilyKeyDiscovery, FamilyKeysPayload, ImportBatchDetail } from "@/lib/types/api/imports";
 
 type Filter = "all" | "unresolved" | "resolved" | "existing" | "new" | "none";
@@ -351,7 +351,9 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
     );
   }, [payload, filter, search, sort]);
   const selectedItems = (payload?.data ?? []).filter((k) => selected.has(k.key));
-  const canResolve = can("import.review");
+  // Once Apply has started, decisions are history: no edit controls at all.
+  const locked = isApplyStarted(batch.status);
+  const canResolve = can("import.review") && !locked;
   const toggle = (key: string) =>
     setSelected((s) => {
       const next = new Set(s);
@@ -385,6 +387,14 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
           </div>
           {progress.unresolved_keys > 0 && <p className="text-xs text-muted-foreground">لا يمكن الانتقال إلى مراجعة البيانات قبل حسم كل المفاتيح. «بدون فرع» قرار صريح يُحتسب محسومًا.</p>}
         </div>
+      )}
+
+      {locked && (
+        <Alert data-keys-read-only>
+          <Info className="size-4" />
+          <AlertTitle>للاطلاع فقط</AlertTitle>
+          <AlertDescription>بدأ تطبيق هذه الدفعة؛ قرارات مفاتيح الأسر محفوظة كما اعتُمدت ولا يمكن تعديلها.</AlertDescription>
+        </Alert>
       )}
 
       {batch.summary.formula_family_key > 0 && (
@@ -434,7 +444,7 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-8 ps-3"><span className="sr-only">تحديد</span></TableHead>
+                {canResolve && <TableHead className="w-8 ps-3"><span className="sr-only">تحديد</span></TableHead>}
                 <TableHead>مفتاح العائلة</TableHead>
                 <TableHead className="text-end">عدد الصفوف</TableHead>
                 <TableHead className="text-end">منها بمعادلة</TableHead>
@@ -447,9 +457,11 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
             <TableBody>
               {visible.map((k) => (
                 <TableRow key={k.key} data-resolved={!!k.resolution}>
-                  <TableCell className="ps-3">
-                    <input type="checkbox" className="size-4 accent-brand-600" checked={selected.has(k.key)} onChange={() => toggle(k.key)} aria-label={`تحديد ${k.key}`} />
-                  </TableCell>
+                  {canResolve && (
+                    <TableCell className="ps-3">
+                      <input type="checkbox" className="size-4 accent-brand-600" checked={selected.has(k.key)} onChange={() => toggle(k.key)} aria-label={`تحديد ${k.key}`} />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">{k.key}</TableCell>
                   <TableCell className="text-end tabular-nums">{fmt(k.row_count)}</TableCell>
                   <TableCell className="text-end tabular-nums text-muted-foreground">{fmt(k.formula_rows)}</TableCell>
@@ -475,10 +487,10 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
         </div>
       )}
 
-      {editing && payload && (
+      {canResolve && editing && payload && (
         <DecisionDialog batchId={batch.id} item={payload.data.find((k) => k.key === editing)!} payload={payload} onClose={() => setEditing(null)} />
       )}
-      {bulk === "create" && payload && (
+      {canResolve && bulk === "create" && payload && (
         <BulkCreateDialog
           batchId={batch.id}
           items={selectedItems}
@@ -489,7 +501,7 @@ export function StepFamilyKeys({ batch }: { batch: ImportBatchDetail }) {
           }}
         />
       )}
-      {bulk === "none" && payload && (
+      {canResolve && bulk === "none" && payload && (
         <BulkNoBranchDialog
           batchId={batch.id}
           items={selectedItems}

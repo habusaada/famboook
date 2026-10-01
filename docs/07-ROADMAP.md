@@ -2374,6 +2374,14 @@ PostgreSQL-portable; pass on SQLite): `ImportStagingTest` compares
 uses `sqlite_sequence`, and a `FamilyActivityLogTest` health fixture violates
 `chk_health_record_shape`.
 
+2026-10-01: **Step 6 Apply UI (Phase 4B.4e)** delivered (docs/03 §96b):
+confirmation with derived counts, persisted progress, pause / continue /
+resume, another-session handling and read-only Steps 4–5 after Apply
+starts; Dry Run `execution_enabled` is server-derived. Verified in an
+isolated walkthrough against the disposable test database only. The Apply
+gate stays closed. **Still open:** final end-to-end review, then activation
+(docs/08 §7a) and the controlled local Batch 21 Apply (Phase 4B.4f).
+
 ---
 
 # 36. Phase 24 — Notifications & Background Processing
@@ -4784,6 +4792,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.24 | 2026-10-01 | Approved | Phase 23 progress note: Step 6 Apply UI (Phase 4B.4e) |
 | 1.2.23 | 2026-10-01 | Approved | Phase 23 progress note: Apply API and activation gate (Phase 4B.4d) |
 | 1.2.22 | 2026-09-30 | Approved | Phase 23 progress note: Apply runner (Phase 4B.4c) |
 | 1.2.21 | 2026-09-30 | Approved | Phase 23 progress note: Row executor (Phase 4B.4b) |

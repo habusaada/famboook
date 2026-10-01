@@ -18,6 +18,7 @@ import {
   RECON_ISSUE_LABELS,
   RECON_STATUS_LABELS,
   fmt,
+  isApplyStarted,
 } from "@/components/administration/import-wizard/labels";
 import { ProcessList } from "@/components/administration/import-wizard/wizard-parts";
 import type { ImportBatchDetail, ReconciliationIssue, ReconciliationRow, ReconciliationStatus } from "@/lib/types/api/imports";
@@ -202,6 +203,9 @@ export function ReconciliationPanel({ batch }: { batch: ImportBatchDetail }) {
   const run = useReconcileImportBatch(batch.id);
   const r = batch.summary.reconciliation;
   const stats = r.stats;
+  // Once Apply has started, reconciliation is history: Apply's own writes make
+  // it stale by design, and it can no longer be re-run.
+  const locked = isApplyStarted(batch.status);
   const error = run.error instanceof ApiError && run.error.status === 422 ? Object.values(run.error.validationErrors ?? {})[0]?.[0] : run.error ? "تعذّر تنفيذ المطابقة. الرجاء المحاولة مرة أخرى." : null;
 
   return (
@@ -213,9 +217,11 @@ export function ReconciliationPanel({ batch }: { batch: ImportBatchDetail }) {
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button disabled={run.isPending || !can("import.validate") || !batch.summary.key_resolution.complete} onClick={() => run.mutate()}>
-          {run.isPending ? "جارٍ المطابقة…" : r.state === "NOT_RUN" ? "مطابقة البيانات مع السجل الحالي" : "إعادة المطابقة"}
-        </Button>
+        {!locked && (
+          <Button disabled={run.isPending || !can("import.validate") || !batch.summary.key_resolution.complete} onClick={() => run.mutate()}>
+            {run.isPending ? "جارٍ المطابقة…" : r.state === "NOT_RUN" ? "مطابقة البيانات مع السجل الحالي" : "إعادة المطابقة"}
+          </Button>
+        )}
         {r.reconciled_at && (
           <span className="text-xs text-muted-foreground">آخر مطابقة: {new Date(r.reconciled_at).toLocaleString("ar", { dateStyle: "medium", timeStyle: "short" })}</span>
         )}
@@ -225,7 +231,14 @@ export function ReconciliationPanel({ batch }: { batch: ImportBatchDetail }) {
       )}
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      {r.state === "STALE" && (
+      {locked && (
+        <Alert data-reconciliation-read-only>
+          <AlertTitle>للاطلاع فقط</AlertTitle>
+          <AlertDescription>بدأ تطبيق هذه الدفعة؛ تُعرض نتائج المطابقة كما كانت عند اعتماد المعاينة، ولا يمكن إعادة المطابقة.</AlertDescription>
+        </Alert>
+      )}
+
+      {r.state === "STALE" && !locked && (
         <Alert>
           <AlertTriangle className="size-4" />
           <AlertTitle>نتائج المطابقة قديمة</AlertTitle>
@@ -261,7 +274,7 @@ export function ReconciliationPanel({ batch }: { batch: ImportBatchDetail }) {
           )}
           <ReconciliationRows batchId={batch.id} />
           <p className="text-xs text-muted-foreground">
-            المطابقة بالهوية فقط ولا تتم بالاسم. غياب أسرة أو شخص عن الملف لا يعني حذفه أو تعطيله. لم يتم تطبيق البيانات على السجل بعد.
+            المطابقة بالهوية فقط ولا تتم بالاسم. غياب أسرة أو شخص عن الملف لا يعني حذفه أو تعطيله.{locked ? "" : " لم يتم تطبيق البيانات على السجل بعد."}
           </p>
         </>
       )}

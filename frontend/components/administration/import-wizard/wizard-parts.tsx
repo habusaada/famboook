@@ -7,7 +7,7 @@ import type { ImportCounts } from "@/lib/types/api/imports";
 
 export type StepState = "completed" | "current" | "locked" | "available" | "warning" | "error";
 
-export const STEP_TITLES = ["العشيرة", "ملف البيانات", "تعيين الأعمدة", "مفاتيح الأسر", "مراجعة البيانات", "المعاينة قبل الاستيراد"];
+export const STEP_TITLES = ["العشيرة", "ملف البيانات", "تعيين الأعمدة", "مفاتيح الأسر", "مراجعة البيانات", "المعاينة والتطبيق"];
 
 /** Six-step RTL stepper: completed / current / locked / warning / error. */
 export function WizardStepper({

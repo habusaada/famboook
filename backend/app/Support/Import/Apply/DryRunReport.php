@@ -4,6 +4,7 @@ namespace App\Support\Import\Apply;
 
 use App\Enums\ImportApplyEffect as E;
 use App\Models\Branch;
+use App\Models\User;
 
 /**
  * Presents an ImportBatchApplyPlan for the Dry Run (docs/03 §96b, docs/06
@@ -15,15 +16,24 @@ final class DryRunReport
 {
     public const FILTERS = ['all', 'executable', 'blocked', 'warnings'];
 
-    /** @return array<string, mixed> */
-    public static function summary(ImportBatchApplyPlan $plan): array
+    /**
+     * execution_enabled is server-derived: true only when this plan could be
+     * started now (READY: every precondition — including READY_FOR_REVIEW and
+     * no started Apply — holds and no row is blocked) AND the user passes the
+     * Apply activation gate (ImportApplyGate). The UI offers the Apply
+     * confirmation only then; the Apply endpoints re-check everything.
+     *
+     * @return array<string, mixed>
+     */
+    public static function summary(ImportBatchApplyPlan $plan, ?User $user = null): array
     {
+        $state = ! $plan->preconditionsMet() ? 'PRECONDITIONS_FAILED' : ($plan->executable() ? 'READY' : 'ROWS_BLOCKED');
+
         return [
-            'state' => ! $plan->preconditionsMet() ? 'PRECONDITIONS_FAILED' : ($plan->executable() ? 'READY' : 'ROWS_BLOCKED'),
+            'state' => $state,
             'preconditions' => $plan->preconditionFailures,
             'plan_fingerprint' => $plan->fingerprint(),
-            // Final execution is not available in this phase.
-            'execution_enabled' => false,
+            'execution_enabled' => $state === 'READY' && ImportApplyGate::allows($user),
             'counts' => $plan->preconditionsMet() ? $plan->summary() : null,
         ];
     }

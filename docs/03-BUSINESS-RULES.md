@@ -2664,7 +2664,9 @@ future Apply. Final Apply eligibility is decided in the Apply phase.
 declarations and the Clan's Branches). A different current fingerprint marks
 the result `STALE`; a re-confirmed mapping, a new workbook or a new worksheet
 discards it (`NOT_RUN`). A future Apply must refuse a result that is not
-`CURRENT`. Step 6 opens only for a `CURRENT` reconciliation.
+`CURRENT`. Before Apply, Step 6 opens only for a `CURRENT` reconciliation;
+once Apply has started, Step 6 stays reachable as the Apply status screen
+(Apply's own writes make the result stale by design — see §96b).
 
 **INITIAL and INCREMENTAL** use the same engine. INCREMENTAL is **not
 synchronization**: a Person or Family absent from a later workbook is
@@ -3163,6 +3165,48 @@ GET  /api/v1/imports/initial-families/{batch}/apply         import.review  progr
   gate is closed). `famboook:verify-permissions` enforces both modes and
   forbids direct user grants. Activation is an explicit operational step
   (docs/08 §7a), only after the Apply UI phase and a final end-to-end review.
+
+## Step 6 Apply UI (IMPLEMENTED — Phase 4B.4e; gate CLOSED)
+
+The operator flow of the approved design, in Wizard step 6 ("المعاينة
+والتطبيق"). Everything shown is persisted backend state; the browser only
+drives the chunk loop and the backend decides everything.
+
+- **When Apply is offered**: the Dry Run's `execution_enabled` is derived on
+  the server — true only when the plan is READY (every precondition holds,
+  including READY_FOR_REVIEW and no started Apply, and no row is blocked)
+  AND `ImportApplyGate::allows(user)` (gate open + `import.apply`). Only then
+  does Step 6 show "بدء الاستيراد". With the gate closed it is false for
+  everyone, SUPER_ADMIN included.
+- **Confirmation** (approved wording): «سيتم إنشاء {families} أسرة و{persons}
+  أشخاص في السجل اعتمادًا على هذه المعاينة. بعد بدء الاستيراد قد يتم حفظ
+  البيانات على دفعات، ولا يتوفر تراجع تلقائي عن السجلات التي تم إنشاؤها. هل
+  تريد بدء الاستيراد؟» — {families} = Families the plan CREATES, {persons} =
+  Persons the plan CREATES (reused Persons excluded); always derived, never
+  fixed. Confirming sends only that Dry Run's `plan_fingerprint`, held in
+  memory (never stored in browser storage, the URL or the page).
+- **Refused start**: `APPLY_PLAN_CHANGED`, `APPLY_PRECONDITIONS_FAILED` or
+  `APPLY_PLAN_BLOCKED` → nothing started; the same Dry Run cannot be
+  confirmed again — the operator must run a fresh Dry Run. Never retried
+  automatically.
+- **Chunk loop**: after start the page sends `apply/run` while the outcome is
+  PAUSED; COMPLETED, ALREADY_APPLIED, FAILED (a 200 with the persisted error)
+  or any refusal ends it. Chunk size and time budget stay server-side.
+- **Pause**: stops issuing further chunk requests; a chunk already running
+  is not cancelled and finishes first (stated in the UI). Closing or leaving
+  the page has the same effect. Reopening rebuilds the screen from the
+  backend; "متابعة التطبيق" continues an APPLYING batch.
+- **Another session** (`APPLY_IN_PROGRESS`): the page stops sending
+  mutations, says Apply is active in another session and keeps polling the
+  read-only progress; it never retries the mutation by itself.
+- **Outcomes**: APPLIED (verified complete); PARTIALLY_APPLIED (Arabic
+  label for the stored code, the row number when the page received it, and
+  "استئناف التطبيق" — resume re-verifies the approved plan first); a stop
+  before any saved row returns to the Dry Run with the persisted code shown.
+  Known codes have Arabic labels; the stable code stays visible for
+  diagnosis. No names, National IDs, payloads, SQL or fingerprints appear.
+- **After Apply starts**: reopening a batch opens Step 6; Steps 4–5 are read
+  only (no decision or reconciliation controls) and Steps 1–3 are closed.
 
 ## Freshness during Apply (APPROVED rule; primitive IMPLEMENTED)
 
@@ -4273,6 +4317,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.30 | 2026-10-01 | Approved | §96b Step 6 Apply UI (Phase 4B.4e): server-derived Dry Run `execution_enabled` (gate + permission + READY plan), approved confirmation wording with derived counts, browser-driven chunk loop with pause / continue / resume, APPLY_IN_PROGRESS read-only behaviour, fresh Dry Run required after a refused start, Steps 4–5 read only after Apply starts; §96a Step 6 reachable after Apply starts; gate still closed |
 | 1.2.29 | 2026-10-01 | Approved | §96b Apply API and activation gate (Phase 4B.4d): start / run / resume (`import.apply`) and read-only progress (`import.review`), fixed-message error mapping (409/422/500, in-chunk failure = 200 FAILED), safe logging; Apply gated by `IMPORT_APPLY_ENABLED` (default off, SUPER_ADMIN only) |
 | 1.2.28 | 2026-09-30 | Approved | §96b Apply runner (Phase 4B.4c): start against the operator's Dry Run fingerprint, one runner per batch (advisory lock), chunks of 100 rows / ~10 s with row transactions and normal pause, failure by database truth (READY_FOR_REVIEW before any committed row, PARTIALLY_APPLIED after), resume with the same plan and start date, database-backed completion that verifies and never invents provenance; no endpoint or UI |
 | 1.2.27 | 2026-09-30 | Approved | §96b Row executor (Phase 4B.4b): one source row = one transaction, approved-plan-only execution through the canonical actions, Apply start date, owner-only Persons with pending cross-row REUSE and owner-side link completion, identical-or-conflict provenance writer, already-applied verification without repair, keyed National ID identity evidence on every Person REUSE (PERSON_IDENTITY_CHANGED), structured execution failure codes; no runner or endpoint |

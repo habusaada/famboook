@@ -487,6 +487,33 @@ class DryRunTest extends TestCase
         $this->actingAs($this->admin)->getJson(self::BASE."/{$id}/dry-run")->assertOk();
     }
 
+    public function test_execution_enabled_is_derived_from_the_apply_gate_the_user_and_the_state(): void
+    {
+        $id = $this->batch([2 => $this->row(['id' => 910000241])]);
+        $administrator = User::factory()->create();
+        $administrator->assignRole('ADMINISTRATOR');
+        $administrator->givePermissionTo('import.review'); // may read the Dry Run, still never Apply
+        $enabled = fn (User $u) => $this->actingAs($u)->getJson(self::BASE."/{$id}/dry-run")->assertOk()->json('data.execution_enabled');
+
+        // Gate closed (default): false, even for SUPER_ADMIN on a READY plan.
+        $this->assertSame('READY', $this->plan($id)['state']);
+        $this->assertFalse($enabled($this->admin));
+
+        // Gate open: SUPER_ADMIN true while startable; ADMINISTRATOR never.
+        config(['import.apply_enabled' => true]);
+        $this->seed(RolePermissionSeeder::class);
+        $this->assertTrue($enabled($this->admin->fresh()));
+        $this->assertFalse($enabled($administrator->fresh()));
+
+        // A blocked plan is not startable.
+        $blocked = $this->batch([2 => $this->row(['id' => 910000242, 'gender' => '', 'key' => 'ب'], [[910000243, 'زوج أو زوجة']])]);
+        $this->assertSame(['ROWS_BLOCKED', false], [$this->plan($blocked)['state'], $this->plan($blocked)['execution_enabled']]);
+
+        // Once Apply has started the plan is no longer startable.
+        $this->model($id)->update(['status' => ImportBatchStatus::APPLYING, 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan')]);
+        $this->assertSame(['PRECONDITIONS_FAILED', false], [$this->plan($id)['state'], $this->plan($id)['execution_enabled']]);
+    }
+
     public function test_row_filters_and_search(): void
     {
         $id = $this->batch([

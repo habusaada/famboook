@@ -260,3 +260,47 @@ export const DRY_RUN_FILTER_LABELS: Record<string, string> = {
   blocked: "متعذرة",
   warnings: "بها ملاحظات",
 };
+
+// ---- Step 6 Apply (docs/03 §96b). Codes are stable backend values; the code
+// itself is kept for diagnosis, the operator reads the Arabic label. ---------
+
+export const APPLY_STARTED_STATUSES: ReadonlySet<ImportBatchStatus> = new Set(["APPLYING", "PARTIALLY_APPLIED", "APPLIED"]);
+
+/** Apply has started on this batch: earlier steps become read-only history. */
+export function isApplyStarted(status: ImportBatchStatus | undefined | null): boolean {
+  return status != null && APPLY_STARTED_STATUSES.has(status);
+}
+
+export const APPLY_ERROR_LABELS: Record<string, string> = {
+  // start / runner
+  APPLY_IN_PROGRESS: "عملية تطبيق أخرى قيد التنفيذ لهذه الدفعة في جلسة أخرى",
+  APPLY_STATE_INVALID: "حالة الدفعة لا تسمح بهذه العملية الآن",
+  APPLY_PLAN_CHANGED: "تغيّرت خطة التطبيق منذ المعاينة",
+  APPLY_PLAN_NOT_APPROVED: "لا توجد خطة معتمدة مطابقة لهذه الدفعة",
+  APPLY_PRECONDITIONS_FAILED: "شروط التطبيق غير مستوفاة لهذه الدفعة",
+  APPLY_PLAN_BLOCKED: "خطة التطبيق تحتوي صفوفًا متعذرة",
+  APPLY_INTEGRITY_INVALID: "تعذّر التحقق من سلامة ما طُبّق سابقًا — يلزم فحص إداري",
+  APPLY_COMPLETION_INCOMPLETE: "لم يكتمل التحقق النهائي من التطبيق",
+  BATCH_NOT_APPLYING: "الدفعة ليست قيد التطبيق",
+  UNEXPECTED_ERROR: "حدث خطأ غير متوقع أثناء التطبيق",
+  // row execution
+  ROW_PLAN_MISMATCH: "الصف لم يعد مطابقًا للخطة المعتمدة",
+  ROW_PLAN_BLOCKED: "الصف متعذر في الخطة",
+  ROW_EFFECT_INCOMPLETE: "لم تكتمل عناصر الصف",
+  ROW_ALREADY_APPLIED_INCONSISTENT: "صف مطبّق سابقًا بسجلات غير متسقة",
+  MANDATORY_EFFECT_MISSING: "عنصر إلزامي مفقود في خطة الصف",
+  HEAD_PERSON_MISSING: "شخص رب الأسرة غير موجود",
+  HEAD_PERSON_NOW_LINKED: "رب الأسرة أصبح عضوًا في أسرة أخرى",
+  SPOUSE_PERSON_MISSING: "شخص الزوج/الزوجة غير موجود",
+  SPOUSE_PERSON_NOW_LINKED: "الزوج/الزوجة أصبح عضوًا في أسرة أخرى",
+  CROSS_ROW_PERSON_NOT_MATERIALIZED: "شخص مرتبط بصف آخر لم يُنشأ بعد",
+  NATIONAL_ID_TAKEN: "رقم الهوية مستخدم لشخص آخر في السجل",
+  PERSON_IDENTITY_CHANGED: "تغيّرت بيانات هوية شخص موجود منذ المعاينة",
+  BRANCH_NOT_SELECTABLE: "الفرع المستهدف غير متاح",
+  RELATIONSHIP_TYPE_UNAVAILABLE: "نوع الصلة غير متاح في السجل المرجعي",
+  PROVENANCE_CONFLICT: "تعارض في سجلات تتبع التطبيق",
+};
+
+export function applyErrorLabel(code: string): string {
+  return APPLY_ERROR_LABELS[code] ?? "تعذّر إكمال التطبيق (رمز غير مصنّف)";
+}

@@ -1,8 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import type {
+  ApplyProgress,
+  ApplyStatus,
   DryRunFilter,
   DryRunRowsPage,
   DryRunSummary,
@@ -183,4 +185,42 @@ export function useConfirmImportMapping(id: string) {
   return useBatchMutation(({ mapping, ignored }: { mapping: Record<string, string | null>; ignored: string[] }) =>
     apiClient.post<Detail>(`${BASE}/${id}/mapping`, { mapping, ignored })
   );
+}
+
+// ---- Step 6 Apply (docs/03 §96b). The browser drives the chunk loop; the
+// backend decides everything (gate, permission, state, plan, budget).
+
+/** Persisted Apply progress (import.review, read only); optionally polled. */
+export function useApplyStatus(id: string | null, enabled: boolean, pollMs: number | false = false) {
+  return useQuery({
+    queryKey: [...KEY, id, "apply"],
+    queryFn: () => apiClient.get<{ data: ApplyStatus }>(`${BASE}/${id}/apply`),
+    enabled: id !== null && enabled,
+    staleTime: 0,
+    refetchInterval: pollMs,
+  });
+}
+
+/**
+ * Apply requests (import.apply). Start sends ONLY the Dry Run plan
+ * fingerprint, held in memory — never stored or shown. Run and resume send
+ * nothing: chunk size and time budget are server-side.
+ */
+export const applyRequests = {
+  start: (id: string, planFingerprint: string) =>
+    apiClient.post<{ data: ApplyProgress }>(`${BASE}/${id}/apply/start`, { plan_fingerprint: planFingerprint }),
+  run: (id: string) => apiClient.post<{ data: ApplyProgress }>(`${BASE}/${id}/apply/run`, {}),
+  resume: (id: string) => apiClient.post<{ data: ApplyProgress }>(`${BASE}/${id}/apply/resume`, {}),
+};
+
+/**
+ * After Apply requests: refresh the persisted progress, the batch detail
+ * (status, step reachability) and the recent list. The Dry Run is NOT
+ * refreshed — a new plan is only ever computed on the operator's request.
+ */
+export function refreshApplyState(queryClient: QueryClient, id: string, progressOnly = false) {
+  queryClient.invalidateQueries({ queryKey: [...KEY, id, "apply"] });
+  if (progressOnly) return;
+  queryClient.invalidateQueries({ queryKey: [...KEY, id], exact: true });
+  queryClient.invalidateQueries({ queryKey: KEY, exact: true });
 }

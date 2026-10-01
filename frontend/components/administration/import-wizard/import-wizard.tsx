@@ -18,18 +18,21 @@ import { StepReview } from "@/components/administration/import-wizard/step-revie
 import { StepDryRun } from "@/components/administration/import-wizard/step-dry-run";
 import { StepFamilyKeys } from "@/components/administration/import-wizard/step-family-keys";
 import { STEP_TITLES, WizardStepper, type StepState } from "@/components/administration/import-wizard/wizard-parts";
-import { BATCH_STATUS_LABELS, MODE_LABELS, fmt } from "@/components/administration/import-wizard/labels";
+import { BATCH_STATUS_LABELS, MODE_LABELS, fmt, isApplyStarted } from "@/components/administration/import-wizard/labels";
 import type { ImportBatchDetail, ImportMode } from "@/lib/types/api/imports";
 
 /**
- * Import Wizard (docs/03 §96a): 1 Clan + mode → 2 workbook → 3 column mapping
- * (confirming stages the rows) → 4 family keys → 5 review → 6 Dry Run
- * (read-only preview of the Apply plan; no execution in this phase).
+ * Import Wizard (docs/03 §96a/§96b): 1 Clan + mode → 2 workbook → 3 column
+ * mapping (confirming stages the rows) → 4 family keys → 5 review → 6 Dry Run,
+ * then (only when the backend allows it) explicit confirmation and Apply.
  * The batch id lives in the URL (?batch=) so a refresh or reopen restores the
- * context; a step opens only when its prerequisites hold. Nothing here writes
- * the registry.
+ * context from the backend; a step opens only when its prerequisites hold.
+ * Once Apply has started, Step 6 is the persistent Apply status screen (it
+ * stays reachable although Apply's own writes make reconciliation stale),
+ * Steps 4–5 are read only and Steps 1–3 are closed.
  */
 function reachable(step: number, batch: ImportBatchDetail | null, clanCode: string, mode: string): boolean {
+  if (isApplyStarted(batch?.status)) return step >= 4;
   switch (step) {
     case 1:
       return true;
@@ -64,10 +67,11 @@ function stepStates(batch: ImportBatchDetail | null, clanCode: string, mode: str
         return s && s.key_resolution.unresolved_keys > 0 ? "warning" : "completed";
       case 5:
         if (!s) return "available";
+        if (isApplyStarted(batch?.status)) return "completed";
         if (s.counts.rejected > 0 || (s.reconciliation.counts?.CONFLICT ?? 0) > 0) return "error";
         return s.reconciliation.state !== "CURRENT" || (s.reconciliation.requires_review ?? 0) > 0 || s.counts.needs_review > 0 ? "warning" : "completed";
       default:
-        return "available";
+        return batch?.status === "APPLIED" ? "completed" : batch?.status === "PARTIALLY_APPLIED" ? "error" : batch?.status === "APPLYING" ? "warning" : "available";
     }
   });
 }
@@ -112,10 +116,11 @@ export function ImportWizard() {
   const [openedFor, setOpenedFor] = useState<string | null>(null);
 
   // Reopening a batch restores its context at the furthest valid step
-  // (adjusted during render when the opened batch changes — no effect).
+  // (adjusted during render when the opened batch changes — no effect). A
+  // batch whose Apply has started always opens on Step 6.
   if (batch && openedFor !== batch.id) {
     setOpenedFor(batch.id);
-    setStep(batch.staged ? (batch.summary.key_resolution.complete ? 5 : 4) : batch.worksheet_name ? 3 : 2);
+    setStep(isApplyStarted(batch.status) ? 6 : batch.staged ? (batch.summary.key_resolution.complete ? 5 : 4) : batch.worksheet_name ? 3 : 2);
   }
 
   function openBatch(id: string) {
@@ -134,7 +139,7 @@ export function ImportWizard() {
   const states = stepStates(batch, clanCode, mode);
   const canGo = (s: number) => s >= 1 && s <= 6 && reachable(s, batch, clanCode, mode);
   // A step whose prerequisite was lost (e.g. mapping invalidated) falls back.
-  const current = canGo(step) ? step : [5, 4, 3, 2, 1].find((s) => canGo(s))!;
+  const current = canGo(step) ? step : [6, 5, 4, 3, 2, 1].find((s) => canGo(s))!;
 
   return (
     <div className="flex flex-col gap-5">
@@ -147,7 +152,7 @@ export function ImportWizard() {
         </Button>
         <PageHeader
           title="الاستيراد الأولي وتحديث بيانات الأسر"
-          description="تجهيز ملفات أرباب الأسر ومراجعتها للعشيرة المختارة. لا تُطبَّق أي بيانات على السجل في هذه المرحلة."
+          description="تجهيز ملفات أرباب الأسر ومراجعتها للعشيرة المختارة. لا يُطبَّق شيء على السجل إلا بعد المعاينة وتأكيد صريح."
           actions={batch ? <Button variant="outline" onClick={newImport}>بدء عملية استيراد جديدة</Button> : undefined}
         />
       </div>
@@ -177,7 +182,7 @@ export function ImportWizard() {
           {current === 6 && batch && <StepDryRun batch={batch} />}
 
           <div className="flex items-center justify-between gap-2">
-            <Button variant="outline" disabled={current <= 1} onClick={() => setStep(current - 1)}>
+            <Button variant="outline" disabled={!canGo(current - 1)} onClick={() => setStep(current - 1)}>
               السابق
             </Button>
             {current < 6 && (

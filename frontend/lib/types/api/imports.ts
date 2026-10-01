@@ -252,7 +252,8 @@ export interface DryRunSummary {
   state: DryRunState;
   preconditions: { code: string; count?: number }[];
   plan_fingerprint: string;
-  // Always false in this phase: final execution is not enabled.
+  // Server-derived: this user may start Apply on this plan now (Apply gate
+  // open, import.apply, READY plan). Never decided in the browser.
   execution_enabled: boolean;
   counts: DryRunCounts | null;
 }
@@ -286,4 +287,44 @@ export interface DryRunRow {
 export interface DryRunRowsPage {
   data: DryRunRow[];
   meta: { current_page: number; last_page: number; total: number };
+}
+
+// ---- Step 6 Apply (docs/03 §96b, Phase 4B.4e). Counts, statuses and stable
+// codes only — never names, National IDs, payloads or fingerprints.
+
+export type ApplyOutcome = "STARTED" | "PAUSED" | "COMPLETED" | "ALREADY_APPLIED" | "FAILED";
+
+/** POST apply/start | run | resume — progress read from the database. */
+export interface ApplyProgress {
+  batch_id: string;
+  outcome: ApplyOutcome;
+  status: ImportBatchStatus;
+  total_rows: number;
+  applied_rows: number;
+  remaining_rows: number;
+  executed_in_chunk: number;
+  skipped_already_applied: number;
+  pending_links: number | null;
+  completed: boolean;
+  error_code: string | null;
+  error_row_number: number | null;
+}
+
+/** GET apply (import.review) — read-only; no failing row number. */
+export interface ApplyStatus {
+  batch_id: string;
+  outcome: "STATUS";
+  status: ImportBatchStatus;
+  total_rows: number;
+  applied_rows: number;
+  remaining_rows: number;
+  completed: boolean;
+  error_code: string | null;
+}
+
+/** Body of a refused Apply request: fixed message, stable code, row number. */
+export interface ApplyErrorPayload {
+  message: string;
+  code: string;
+  row_number: number | null;
 }

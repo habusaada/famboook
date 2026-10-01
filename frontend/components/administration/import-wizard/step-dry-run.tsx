@@ -10,26 +10,33 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Panel, SectionHeader } from "@/components/shared/page-layout";
 import { useAuth } from "@/components/auth/auth-context";
-import { useDryRun, useDryRunRows } from "@/lib/api/imports";
+import { useApplyStatus, useDryRun, useDryRunRows } from "@/lib/api/imports";
 import {
   DRY_RUN_FILTER_LABELS,
   EFFECT_GROUP_LABELS,
   INTENT_LABELS,
   OMIT_REASON_CODES,
   PRECONDITION_LABELS,
+  applyErrorLabel,
   fmt,
+  isApplyStarted,
   planReasonLabel,
 } from "@/components/administration/import-wizard/labels";
 import { ProcessList } from "@/components/administration/import-wizard/wizard-parts";
+import { ApplyConfirmDialog, ApplyRequestFailure, ApplyStatusPanel, type ApplyRunner, useApplyRunner } from "@/components/administration/import-wizard/step-apply";
 import type { ApplyIntent, DryRunCounts, DryRunEffect, DryRunFilter, DryRunRow, ImportBatchDetail } from "@/lib/types/api/imports";
 
 /**
- * Step 6 — "المعاينة قبل الاستيراد" (docs/03 §96b): shows what a future Apply
- * WOULD do, computed by the backend planner. Read only: nothing is created
- * or changed, and there is no execution action in this phase.
+ * Step 6 — "المعاينة قبل الاستيراد" (docs/03 §96b): shows what Apply WOULD do,
+ * computed by the backend planner (read only). When the backend says this
+ * user may start Apply on this plan (execution_enabled: gate + permission +
+ * READY), the operator can confirm; once Apply has started, Step 6 is the
+ * persistent Apply status screen (step-apply.tsx).
  */
 
 const INTENTS: ApplyIntent[] = ["CREATE", "REUSE", "OMIT", "BLOCK"];
+// Start refusals meaning the Dry Run on screen no longer holds.
+const STALE_PLAN_CODES = new Set(["APPLY_PLAN_CHANGED", "APPLY_PRECONDITIONS_FAILED", "APPLY_PLAN_BLOCKED"]);
 const INTENT_TONE: Record<ApplyIntent, string> = {
   CREATE: "text-brand-700",
   REUSE: "text-success",
@@ -295,13 +302,54 @@ function RowPlans({ batchId, reason, onReason }: { batchId: string; reason: stri
 }
 
 export function StepDryRun({ batch }: { batch: ImportBatchDetail }) {
+  const runner = useApplyRunner(batch.id);
+  // The latest known state: this page's last Apply response, else the batch.
+  const status = runner.last?.status ?? batch.status;
+
+  return isApplyStarted(status) ? <ApplyStatusPanel batch={batch} runner={runner} /> : <DryRunView batch={batch} runner={runner} />;
+}
+
+/** A persisted stop before any row was saved (the batch is back to review). */
+function PreviousApplyStop({ batchId }: { batchId: string }) {
+  const status = useApplyStatus(batchId, true);
+  const code = status.data?.data.error_code;
+  if (!code || status.data?.data.status !== "READY_FOR_REVIEW") return null;
+  return (
+    <Alert data-apply-previous-stop>
+      <AlertTriangle className="size-4" />
+      <AlertTitle>توقف تطبيق سابق قبل حفظ أي صف</AlertTitle>
+      <AlertDescription>
+        {applyErrorLabel(code)} <span className="font-mono text-xs text-muted-foreground" dir="ltr">{code}</span> — لم يُحفظ أي شيء في السجل. أعد تشغيل المعاينة قبل البدء من جديد.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function DryRunView({ batch, runner }: { batch: ImportBatchDetail; runner: ApplyRunner }) {
   const { can } = useAuth();
   const [started, setStarted] = useState(false);
   const [reason, setReason] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  // A start refused because the plan or its preconditions no longer hold:
+  // this Dry Run result may not be confirmed again; a fresh Dry Run (operator
+  // action) is required. Never retried automatically.
+  const [planRejectedAt, setPlanRejectedAt] = useState<number | null>(null);
   const dry = useDryRun(batch.id, started);
   const result = dry.data?.data;
   const counts = result?.counts ?? null;
   const running = dry.isFetching;
+  const planRejected = planRejectedAt !== null && dry.dataUpdatedAt <= planRejectedAt;
+  const canConfirm =
+    result?.state === "READY" && result.execution_enabled && counts !== null && batch.status === "READY_FOR_REVIEW" && !running && !planRejected && runner.phase === "idle";
+
+  async function confirm() {
+    // The fingerprint of the result shown on screen, from memory only.
+    const fingerprint = result!.plan_fingerprint;
+    const shownAt = dry.dataUpdatedAt;
+    setConfirming(false);
+    const refusal = await runner.start(fingerprint);
+    if (refusal && STALE_PLAN_CODES.has(refusal.code)) setPlanRejectedAt(shownAt);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -311,12 +359,35 @@ export function StepDryRun({ batch }: { batch: ImportBatchDetail }) {
           <Info className="size-4" />
           <AlertDescription className="font-medium">هذه معاينة فقط ولن يتم إنشاء أو تعديل أي سجل.</AlertDescription>
         </Alert>
+        <PreviousApplyStop batchId={batch.id} />
         <div className="flex flex-wrap items-center gap-3">
-          <Button disabled={running || !can("import.review")} onClick={() => (started ? dry.refetch() : setStarted(true))}>
+          <Button variant={canConfirm ? "outline" : "default"} disabled={running || runner.phase !== "idle" || !can("import.review")} onClick={() => (started ? dry.refetch() : setStarted(true))}>
             {running ? "جارٍ إعداد المعاينة…" : started ? "إعادة تشغيل المعاينة" : "تشغيل المعاينة"}
           </Button>
-          <span className="text-xs text-muted-foreground">التنفيذ النهائي غير مفعّل في هذه المرحلة.</span>
+          {canConfirm && (
+            <Button onClick={() => setConfirming(true)} data-apply-start>
+              بدء الاستيراد
+            </Button>
+          )}
+          {runner.phase === "starting" && <span className="text-sm text-muted-foreground">جارٍ بدء الاستيراد…</span>}
+          {result?.state === "READY" && !result.execution_enabled && (
+            <span className="text-xs text-muted-foreground" data-apply-unavailable>تطبيق الدفعة على السجل غير متاح لهذا الحساب أو غير مفعّل حاليًا.</span>
+          )}
         </div>
+        {planRejected && runner.failure?.code === "APPLY_PLAN_CHANGED" && (
+          <Alert variant="destructive" data-apply-plan-changed>
+            <AlertTriangle className="size-4" />
+            <AlertTitle>تغيّرت خطة التطبيق منذ هذه المعاينة</AlertTitle>
+            <AlertDescription>لم يبدأ الاستيراد ولم يُحفظ أي شيء. أعد تشغيل المعاينة وراجعها قبل التأكيد من جديد.</AlertDescription>
+          </Alert>
+        )}
+        {runner.failure && runner.failure.code !== "APPLY_PLAN_CHANGED" && <ApplyRequestFailure failure={runner.failure} />}
+        {planRejected && runner.failure?.code !== "APPLY_PLAN_CHANGED" && (
+          <p className="text-sm text-muted-foreground" data-apply-needs-fresh-dry-run>لم يبدأ الاستيراد. أعد تشغيل المعاينة قبل التأكيد من جديد.</p>
+        )}
+        {confirming && counts && (
+          <ApplyConfirmDialog families={counts.effects.families.CREATE} persons={counts.persons.create} onConfirm={confirm} onClose={() => setConfirming(false)} />
+        )}
         {running && <ProcessList items={[{ label: "حساب خطة كل صف: الأشخاص والأسر والعضويات والإقرارات والإقامة (دون أي كتابة)", state: "active" }]} />}
         {dry.error && <p className="text-sm text-danger">تعذّر إعداد المعاينة. الرجاء المحاولة مرة أخرى.</p>}
 

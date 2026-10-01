@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Panel, SectionHeader } from "@/components/shared/page-layout";
 import { useImportProblemRows } from "@/lib/api/imports";
-import { FIELD_LABELS, MODE_LABELS, ROW_STATUS_LABELS, fmt, issueLabel } from "@/components/administration/import-wizard/labels";
+import { FIELD_LABELS, MODE_LABELS, ROW_STATUS_LABELS, fmt, isApplyStarted, issueLabel } from "@/components/administration/import-wizard/labels";
 import { StagingCounts } from "@/components/administration/import-wizard/wizard-parts";
 import { ReconciliationPanel } from "@/components/administration/import-wizard/step-reconciliation";
 import type { ImportBatchDetail, ProblemRowFilter } from "@/lib/types/api/imports";
@@ -119,7 +119,9 @@ export function StepReview({ batch }: { batch: ImportBatchDetail }) {
       <Panel className="flex flex-col gap-5">
         <SectionHeader icon={ClipboardCheck} title="مراجعة البيانات" description="مراجعة نتائج تجهيز الملف قبل أي تطبيق على السجل." />
         <Alert>
-          <AlertDescription className="font-medium">لم يتم تطبيق البيانات على السجل بعد.</AlertDescription>
+          <AlertDescription className="font-medium">
+            {isApplyStarted(batch.status) ? "بدأ تطبيق هذه الدفعة — تابع الحالة في خطوة «المعاينة والتطبيق». هذه الصفحة للاطلاع فقط." : "لم يتم تطبيق البيانات على السجل بعد."}
+          </AlertDescription>
         </Alert>
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div className="flex justify-between gap-2"><dt className="text-muted-foreground">العشيرة المستهدفة</dt><dd className="font-medium">{batch.clan?.name}</dd></div>
@@ -146,7 +148,7 @@ export function StepReview({ batch }: { batch: ImportBatchDetail }) {
 
       {/* Family-key decisions (backend counts). Decisions are not an import. */}
       <Panel className="flex flex-col gap-3" data-section="key-resolution">
-        <SectionHeader title="مفاتيح الأسر" description="قرارات حسم مفاتيح العائلة لهذه الدفعة — لم تُنشأ أي أسرة بعد." />
+        <SectionHeader title="مفاتيح الأسر" description={isApplyStarted(batch.status) ? "قرارات حسم مفاتيح العائلة كما اعتُمدت لهذه الدفعة." : "قرارات حسم مفاتيح العائلة لهذه الدفعة — لم تُنشأ أي أسرة بعد."} />
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           {[
             ["إجمالي المفاتيح", batch.summary.key_resolution.distinct_keys],

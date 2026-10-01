@@ -209,12 +209,13 @@ class InitialFamilyImportController extends Controller
     }
 
     /**
-     * Step 6 Dry Run: what a future Apply WOULD do — computed by the pure
-     * planner, never written (import.review; no import.apply). Summary only.
+     * Step 6 Dry Run: what Apply WOULD do — computed by the pure planner,
+     * never written (import.review). Summary only; execution_enabled tells
+     * whether this user may start Apply on this plan now (gate + state).
      */
-    public function dryRun(ImportBatch $importBatch, ImportApplyPlanner $planner): JsonResponse
+    public function dryRun(Request $request, ImportBatch $importBatch, ImportApplyPlanner $planner): JsonResponse
     {
-        return response()->json(['data' => DryRunReport::summary($planner->plan($importBatch))]);
+        return response()->json(['data' => DryRunReport::summary($planner->plan($importBatch), $request->user())]);
     }
 
     /** Paginated row plans of the Dry Run: intents, reason codes, masked IDs. */
