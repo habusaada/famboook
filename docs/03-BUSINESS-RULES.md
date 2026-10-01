@@ -1646,6 +1646,14 @@ Rules:
   is a later, explicit decision; any such use must label them "Declared".
   Current V1 figures (targeting family size, `member_count`,
   `family_members_count`) remain registered figures.
+- **Display (Family list and profile).** The Family API returns the current
+  declaration beside the registered figure, never instead of it:
+  `declared_household_size` in the list, plus `declared_living_sons` and
+  `declared_living_daughters` in the profile; all NULL when nothing was
+  declared. `member_count` keeps its meaning (ACTIVE memberships). The UI
+  labels the declared figure "المعلن" and the registered one "المسجلون
+  تفصيليًا"; no figure is derived from, summed with or reconciled against
+  another.
 
 ---
 
@@ -4349,6 +4357,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.32 | 2026-10-01 | Approved | §55: the Family list and profile show the declared household statistics beside the registered `member_count` (labelled "المعلن"); nothing derived or reconciled |
 | 1.2.31 | 2026-10-01 | Approved | §96a INITIAL import: one explicit action resolves every unresolved family key from the workbook — exact existing Branch name → MATCH_EXISTING_BRANCH, otherwise a new ungrouped Branch; canonical permanent Branch code `BR_` + reserved id; formula keys included; missing keys stay blocking; re-run is a no-op; Step 4 Branches persist independently of the batch |
 | 1.2.30 | 2026-10-01 | Approved | §96b Step 6 Apply UI (Phase 4B.4e): server-derived Dry Run `execution_enabled` (gate + permission + READY plan), approved confirmation wording with derived counts, browser-driven chunk loop with pause / continue / resume, APPLY_IN_PROGRESS read-only behaviour, fresh Dry Run required after a refused start, Steps 4–5 read only after Apply starts; §96a Step 6 reachable after Apply starts; gate still closed |
 | 1.2.29 | 2026-10-01 | Approved | §96b Apply API and activation gate (Phase 4B.4d): start / run / resume (`import.apply`) and read-only progress (`import.review`), fixed-message error mapping (409/422/500, in-chunk failure = 200 FAILED), safe logging; Apply gated by `IMPORT_APPLY_ENABLED` (default off, SUPER_ADMIN only) |

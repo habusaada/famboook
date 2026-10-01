@@ -50,6 +50,7 @@ class UpdateFamilyAction
                 'memberships.person',
                 'memberships.relationshipType',
                 'currentResidence',
+                'currentHouseholdDeclaration',
                 'clan',
                 'branch.group.branches',
             ]);

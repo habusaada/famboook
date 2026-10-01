@@ -101,6 +101,7 @@ class RegisterFamilyAction
                 'memberships.person',
                 'memberships.relationshipType',
                 'currentResidence',
+                'currentHouseholdDeclaration',
             ]);
         });
     }

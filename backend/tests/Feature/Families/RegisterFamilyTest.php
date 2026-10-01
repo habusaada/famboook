@@ -51,6 +51,24 @@ class RegisterFamilyTest extends TestCase
         ];
     }
 
+    public function test_a_newly_registered_family_has_no_declared_household_statistics(): void
+    {
+        $user = $this->authorizedUser();
+        $response = $this->actingAs($user)->postJson('/api/v1/families', $this->validPayload())->assertCreated();
+        // The action hands the resource a Family with the declaration relation loaded (empty).
+        $second = $this->validPayload();
+        $second['household_head']['national_id'] = null; // a different household
+        $registered = app(RegisterFamilyAction::class)->handle($second, $user->id);
+        $this->assertTrue($registered->relationLoaded('currentHouseholdDeclaration'));
+
+        // Registered members are counted; nothing is declared, and nothing is derived.
+        $response->assertJsonPath('data.member_count', 1);
+        foreach (['declared_household_size', 'declared_living_sons', 'declared_living_daughters'] as $key) {
+            $this->assertArrayHasKey($key, $response->json('data'));
+            $this->assertNull($response->json("data.{$key}"));
+        }
+    }
+
     private function authorizedUser(string $role = 'SUPER_ADMIN'): User
     {
         $this->seed(RolePermissionSeeder::class);

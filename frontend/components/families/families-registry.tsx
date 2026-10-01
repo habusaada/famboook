@@ -278,7 +278,8 @@ export function FamiliesRegistry() {
                       <TableRow className="border-stroke-subtle hover:bg-transparent">
                         <TableHead className={`${head} ps-5`}>الأسرة</TableHead>
                         <TableHead className={head}>رب الأسرة</TableHead>
-                        <TableHead className={`${head} text-center`}>الأفراد</TableHead>
+                        <TableHead className={`${head} text-center`}>أفراد الأسرة (المعلن)</TableHead>
+                        <TableHead className={`${head} text-center`}>المسجلون تفصيليًا</TableHead>
                         <TableHead className={head}>الفرع</TableHead>
                         <TableHead className={head}>الحالة</TableHead>
                         <TableHead className={head}>آخر تحديث</TableHead>
@@ -301,7 +302,10 @@ export function FamiliesRegistry() {
                           <TableCell>
                             <HeadName family={family} />
                           </TableCell>
-                          <TableCell className="text-center font-semibold tabular-nums">{fmt(family.member_count)}</TableCell>
+                          <TableCell className="text-center font-semibold tabular-nums">
+                            {family.declared_household_size == null ? <span className="font-normal text-subtle-foreground">—</span> : fmt(family.declared_household_size)}
+                          </TableCell>
+                          <TableCell className="text-center tabular-nums text-muted-foreground">{fmt(family.member_count)}</TableCell>
                           <TableCell className="max-w-56">
                             <Branch family={family} />
                           </TableCell>
@@ -348,8 +352,16 @@ export function FamiliesRegistry() {
                             </div>
                             <HeadName family={family} className="truncate" />
                             <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                              {family.declared_household_size != null && (
+                                <>
+                                  <span>
+                                    أفراد الأسرة (المعلن) <bdi className="font-semibold text-foreground tabular-nums">{fmt(family.declared_household_size)}</bdi>
+                                  </span>
+                                  <span aria-hidden>·</span>
+                                </>
+                              )}
                               <span>
-                                <bdi className="font-semibold text-foreground tabular-nums">{fmt(family.member_count)}</bdi> أفراد
+                                المسجلون تفصيليًا <bdi className="font-semibold text-foreground tabular-nums">{fmt(family.member_count)}</bdi>
                               </span>
                               <span aria-hidden>·</span>
                               <span className={family.branch_name ? undefined : "text-subtle-foreground"}>{family.branch_name ?? "بدون فرع"}</span>

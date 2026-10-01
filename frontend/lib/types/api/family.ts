@@ -29,7 +29,10 @@ export interface FamilySummary {
   // Compact lineage display (docs/02 §7a–§7c); branch null = not set.
   clan_name: string | null;
   branch_name: string | null;
+  // Persons registered individually (ACTIVE memberships) — not the household size.
   member_count: number;
+  // The household's DECLARED total (current declaration); null = nothing declared.
+  declared_household_size: number | null;
   registration_date: string | null;
   updated_at: string | null;
 }
@@ -73,7 +76,13 @@ export interface FamilyDetail {
     displacement_status: DisplacementStatus | null;
     displacement_location_text: string | null;
   } | null;
+  // Persons registered individually (ACTIVE memberships) — not the household size.
   member_count: number;
+  // Declared Household Statistics (current declaration): independent source
+  // facts — never derived from the registered members or from each other.
+  declared_household_size: number | null;
+  declared_living_sons: number | null;
+  declared_living_daughters: number | null;
   male_count: number;
   female_count: number;
   members: FamilyMemberDetail[];

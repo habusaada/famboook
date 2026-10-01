@@ -76,6 +76,7 @@ class UpdateFamilyResidenceAction
                 'memberships.person',
                 'memberships.relationshipType',
                 'currentResidence',
+                'currentHouseholdDeclaration',
             ]);
         });
     }

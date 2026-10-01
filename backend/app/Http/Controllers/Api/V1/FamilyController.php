@@ -48,7 +48,7 @@ class FamilyController extends Controller
         $term = trim((string) ($validated['search'] ?? ''));
 
         $families = Family::query()
-            ->with(['householdHeadMembership.person', 'clan:id,name', 'branch:id,name'])
+            ->with(['householdHeadMembership.person', 'clan:id,name', 'branch:id,name', 'currentHouseholdDeclaration'])
             // Current members only; ended memberships are history.
             ->withCount(['memberships' => fn ($q) => $q->where('is_active', true)])
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('families.status', $status))
@@ -84,7 +84,7 @@ class FamilyController extends Controller
 
     public function show(Family $family): FamilyDetailResource
     {
-        $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence', 'clan', 'branch.group.branches']);
+        $family->load(['memberships.person', 'memberships.relationshipType', 'currentResidence', 'currentHouseholdDeclaration', 'clan', 'branch.group.branches']);
 
         return new FamilyDetailResource($family);
     }

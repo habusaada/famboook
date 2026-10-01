@@ -17,6 +17,10 @@ class FamilyDetailResource extends JsonResource
         // Current members only. Ended memberships stay in the database as
         // history but are not part of the Family as it is today.
         $members = $this->memberships->where('is_active', true)->values();
+        // Declared Household Statistics (docs/02 §20a): independent source
+        // facts, never derived from — or reconciled with — the registered
+        // members or with each other. NULL when nothing was declared.
+        $declaration = $this->currentHouseholdDeclaration;
 
         return [
             'family_code' => $this->family_code,
@@ -41,6 +45,9 @@ class FamilyDetailResource extends JsonResource
                 'displacement_location_text' => $this->currentResidence->displacement_location_text,
             ]),
             'member_count' => $members->count(),
+            'declared_household_size' => $declaration?->declared_household_size,
+            'declared_living_sons' => $declaration?->declared_living_sons,
+            'declared_living_daughters' => $declaration?->declared_living_daughters,
             'male_count' => $members->filter(
                 fn ($m) => $m->person->gender?->value === 'MALE'
             )->count(),

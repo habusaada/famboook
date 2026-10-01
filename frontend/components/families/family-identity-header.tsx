@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ClipboardCheck, HeartHandshake, HeartPulse, Network, Tent, Users } from "lucide-react";
+import { ChevronLeft, ClipboardCheck, HeartHandshake, HeartPulse, Network, Tent, Users, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-context";
 import { AppCard } from "@/components/shared/app-card";
@@ -70,12 +70,27 @@ function QuickFacts({ family, snapshot }: { family: FamilyDetail; snapshot: Fami
   const displaced = residence?.displacement_status === "DISPLACED";
   const { health, needs, assessment } = snapshot;
 
+  // Declared figures are independent source facts: shown as stated, never
+  // summed, reconciled or compared with the registered members.
+  const declaredChildren = [
+    family.declared_living_sons != null ? `الأبناء الذكور ${fmt(family.declared_living_sons)}` : null,
+    family.declared_living_daughters != null ? `البنات ${fmt(family.declared_living_daughters)}` : null,
+  ].filter((part): part is string => part !== null);
+
   const facts: React.ReactNode[] = [
+    <Fact
+      key="declared"
+      icon={UsersRound}
+      tone="text-brand-700"
+      label="عدد أفراد الأسرة (المعلن)"
+      value={family.declared_household_size == null ? "غير معلن" : <span className="tabular-nums">{fmt(family.declared_household_size)}</span>}
+      context={declaredChildren.length > 0 ? declaredChildren.join(" · ") : undefined}
+    />,
     <Fact
       key="members"
       icon={Users}
       tone="text-brand-700"
-      label="الأفراد الحاليون"
+      label="المسجلون تفصيليًا"
       value={<span className="tabular-nums">{fmt(family.member_count)}</span>}
       context={`${fmt(family.male_count)} ذكور · ${fmt(family.female_count)} إناث`}
     />,
@@ -143,7 +158,7 @@ function QuickFacts({ family, snapshot }: { family: FamilyDetail; snapshot: Fami
     <div
       className={cn(
         "grid grid-cols-2 border-t border-stroke-subtle bg-surface-2/60 md:grid-cols-3",
-        facts.length >= 5 ? "xl:grid-cols-5" : facts.length === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3",
+        facts.length >= 6 ? "xl:grid-cols-6" : facts.length === 5 ? "xl:grid-cols-5" : facts.length === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3",
         // Hairline separators between cells, RTL-safe (logical borders).
         "[&>*]:border-stroke-subtle [&>*:not(:last-child)]:border-e max-md:[&>*:nth-child(2n)]:border-e-0 max-md:[&>*:nth-child(n+3)]:border-t max-md:[&>*:last-child:nth-child(odd)]:col-span-2 md:max-xl:[&>*:nth-child(3n)]:border-e-0 md:max-xl:[&>*:nth-child(n+4)]:border-t"
       )}
