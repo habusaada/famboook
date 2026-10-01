@@ -23,14 +23,26 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite" force="true"/>
-        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <!-- Dedicated, DISPOSABLE PostgreSQL test database (must end in _test;
+             Tests\TestCase refuses anything else before RefreshDatabase runs).
+             Never the development database. -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="famboook_test" force="true"/>
         <env name="DB_URL" value="" force="true"/>
-        <!-- Laravel reads $_SERVER before $_ENV: force both, so an inherited
-             environment can never point this suite at a persistent database. -->
-        <server name="DB_CONNECTION" value="sqlite" force="true"/>
-        <server name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_CONNECTION" value="pgsql" force="true"/>
+        <server name="DB_DATABASE" value="famboook_test" force="true"/>
         <server name="DB_URL" value="" force="true"/>
+        <!-- The isolated TEST instance (port 5433), never the development server.
+             DB_PASSWORD is forced EMPTY: libpq then reads the password from the
+             local pgpass.conf (or PGPASSWORD) — never from the repository or .env. -->
+        <env name="DB_HOST" value="127.0.0.1" force="true"/>
+        <server name="DB_HOST" value="127.0.0.1" force="true"/>
+        <env name="DB_PORT" value="5433" force="true"/>
+        <server name="DB_PORT" value="5433" force="true"/>
+        <env name="DB_USERNAME" value="postgres" force="true"/>
+        <server name="DB_USERNAME" value="postgres" force="true"/>
+        <env name="DB_PASSWORD" value="" force="true"/>
+        <server name="DB_PASSWORD" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

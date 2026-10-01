@@ -42,7 +42,8 @@ class RecordImportApplyEffectAction
         }
     }
 
-    private function existing(ImportRow $row, ImportApplyEffect $effect): ?ImportApplyRecord
+    /** Protected so a test can simulate a concurrent writer (the savepoint path). */
+    protected function existing(ImportRow $row, ImportApplyEffect $effect): ?ImportApplyRecord
     {
         return ImportApplyRecord::query()->where('import_row_id', $row->id)->where('effect_key', $effect->value)->first();
     }

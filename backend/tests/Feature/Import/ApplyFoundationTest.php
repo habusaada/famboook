@@ -49,7 +49,12 @@ class ApplyFoundationTest extends TestCase
 
     private function started(ImportBatchStatus $status, array $attributes = []): ImportBatch
     {
-        return ImportBatch::factory()->create(['status' => $status, 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan'), ...$attributes]);
+        // Valid under every PostgreSQL CHECK (an APPLIED batch carries applied_at).
+        return ImportBatch::factory()->create([
+            'status' => $status, 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan'),
+            ...($status === ImportBatchStatus::APPLIED ? ['applied_at' => now()] : []),
+            ...$attributes,
+        ]);
     }
 
     private function row(ImportBatch $batch, int $number = 2): ImportRow
@@ -91,7 +96,8 @@ class ApplyFoundationTest extends TestCase
 
     public function test_a_started_batch_is_frozen_for_every_wizard_step(): void
     {
-        $batch = $this->started(ImportBatchStatus::PARTIALLY_APPLIED, ['mapping_confirmed_at' => now()]);
+        // A confirmed mapping always has its column_mapping (chk_import_batch_mapping_confirmed).
+        $batch = $this->started(ImportBatchStatus::PARTIALLY_APPLIED, ['mapping_confirmed_at' => now(), 'column_mapping' => ['fields' => [], 'ignored' => []]]);
 
         $this->assertFalse($batch->isStaged());
         $this->actingAs($this->admin)->postJson("/api/v1/imports/initial-families/{$batch->uuid}/reconcile")->assertStatus(422);

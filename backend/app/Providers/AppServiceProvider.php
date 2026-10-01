@@ -9,9 +9,13 @@ use App\Models\FamilyNeed;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
+use App\Support\Import\Apply\ApplyRunnerLock;
+use App\Support\Import\Apply\PostgresApplyRunnerLock;
+use App\Support\Import\Apply\ProcessApplyRunnerLock;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,7 +26,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One Apply runner per batch (docs/03 §96b): a real advisory lock on
+        // PostgreSQL; an in-process equivalent for the SQLite test suite.
+        $this->app->singleton(ApplyRunnerLock::class, fn () => DB::getDriverName() === 'pgsql'
+            ? new PostgresApplyRunnerLock
+            : new ProcessApplyRunnerLock);
     }
 
     /**

@@ -3084,6 +3084,44 @@ skipped — codes never repeat).
   ROW_EFFECT_INCOMPLETE, PERSON_IDENTITY_CHANGED, UNEXPECTED_ERROR. Batch error state and
   PARTIALLY_APPLIED transitions belong to the future runner.
 
+## Apply runner (IMPLEMENTED — Phase 4B.4c; internal only, no endpoint or UI)
+
+One execution path for future HTTP and CLI callers — orchestration only
+(the planner decides, the row executor writes):
+
+- **Start** (`StartImportApplyAction`, one short transaction, no row
+  executed): requires `import.apply`, READY_FOR_REVIEW with no started
+  Apply, the planner's full preconditions and no blocked row; the operator's
+  Dry Run fingerprint must equal a fresh plan (`APPLY_PLAN_CHANGED`
+  otherwise). Sets APPLYING, `apply_started_at` (the registration date of
+  every Family of the run, also after resume), `applied_by` and
+  `apply_plan_fingerprint`; clears old errors.
+- **Chunk** (`RunImportApplyChunkAction`): one runner per batch
+  (`ApplyRunnerLock` — a non-blocking PostgreSQL advisory lock; an
+  in-process equivalent for the SQLite tests; always released) or
+  `APPLY_IN_PROGRESS`. The approved plan is reconstructed as of Apply start
+  and must match; rows run in source order (row number, then id), each in its
+  own transaction, until 100 rows / ~10 s, a failure or the end. Stopping
+  between chunks is a **normal pause** (APPLYING, no error).
+- **Failure**: by database truth — nothing committed → back to
+  READY_FOR_REVIEW (approval cleared, the stable error code and row number
+  kept); anything committed → PARTIALLY_APPLIED (start and plan kept), no
+  later row runs. Never FAILED. Only codes and row numbers are stored; causes
+  are logged by class name only.
+- **Resume** (PARTIALLY_APPLIED only): same stored plan and start date, never
+  re-reconciled; the plan must still match and the applied rows must be
+  consistent (an allowed pending cross-row link is fine; a link whose owner
+  already ran is not) — then APPLYING through the same chunk path.
+- **Completion** (`CompleteImportApplyAction`, batch locked): APPLIED only
+  when every planned row is APPLIED with an existing Family, every planned
+  effect has exactly one matching record (outcome, entity), nothing is
+  unexpected, no cross-row link is pending and the plan still matches. It
+  verifies and never writes missing provenance. An APPLIED batch is
+  re-verified (`ALREADY_APPLIED`) or refused (`APPLY_INTEGRITY_INVALID`),
+  never re-executed or repaired.
+- **Progress** comes from the database (rows total / applied / remaining,
+  pending links, safe error code and row) — no personal data.
+
 ## Freshness during Apply (APPROVED rule; primitive IMPLEMENTED)
 
 Before Apply starts, the normal rule applies: reconciliation must be CURRENT
@@ -4193,6 +4231,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.28 | 2026-09-30 | Approved | §96b Apply runner (Phase 4B.4c): start against the operator's Dry Run fingerprint, one runner per batch (advisory lock), chunks of 100 rows / ~10 s with row transactions and normal pause, failure by database truth (READY_FOR_REVIEW before any committed row, PARTIALLY_APPLIED after), resume with the same plan and start date, database-backed completion that verifies and never invents provenance; no endpoint or UI |
 | 1.2.27 | 2026-09-30 | Approved | §96b Row executor (Phase 4B.4b): one source row = one transaction, approved-plan-only execution through the canonical actions, Apply start date, owner-only Persons with pending cross-row REUSE and owner-side link completion, identical-or-conflict provenance writer, already-applied verification without repair, keyed National ID identity evidence on every Person REUSE (PERSON_IDENTITY_CHANGED), structured execution failure codes; no runner or endpoint |
 | 1.2.26 | 2026-09-30 | Approved | §96b Apply execution primitives (Phase 4B.4a): apply_plan_fingerprint and structured apply error fields, CreateFamilyMembershipAction and CreateFamilyResidenceAction (used by registration), registration date = Apply start date, approved plan-equality resume freshness via the planner's as-of-Apply-start context, owner-only Person creation with verified (never invented) provenance; §97a FAMILY_IMPORTED (import_batch_id, source_row_number only; not emitted yet) |
 | 1.2.25 | 2026-09-30 | Approved | §96b Apply planner and read-only Dry Run (Phase 4B.2): preconditions, CREATE / REUSE / OMIT / BLOCK intents with reason codes, head / family / membership / declaration / residence rules, source-specific spouse gender, spouse Person ≠ spouse membership, one owning effect per exact National ID (cross-row coordination), no identifier reservation or writes during planning |
