@@ -39,8 +39,8 @@ class BusinessIdentifier
         return (int) DB::table($table)->max('id') + 1;
     }
 
-    public static function format(string $prefix, int $id): string
+    public static function format(string $prefix, int $id, string $separator = '-'): string
     {
-        return sprintf('%s-%06d', $prefix, $id);
+        return sprintf('%s%s%06d', $prefix, $separator, $id);
     }
 }

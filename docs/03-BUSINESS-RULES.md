@@ -2695,10 +2695,12 @@ NO_BRANCH              "بدون فرع"                 explicit: families may 
 (no decision)          "لم يُحسم"                 UNRESOLVED — NOT the same as NO_BRANCH
 ```
 
-- **Nothing is inferred or automatic**: never from a Person's name or
-  surname, gender, marital or widow status, or row frequency. An exact
+- **Nothing is inferred**: never from a Person's name or surname, gender,
+  marital or widow status, or row frequency. In the per-key tools an exact
   Branch-name match in the target Clan is shown as a **suggestion only** and
-  is never saved without the administrator's confirmation. There is no fuzzy
+  is never saved without the administrator's confirmation; the one exception
+  is the explicit automatic action below, which reuses exact matches by
+  design. There is no fuzzy
   matching and no automatic merging of spelling variants (أ/ا, ة/ه, ى/ي,
   "ال", …): the administrator decides, e.g. by resolving "ابو سعادة" to the
   same Branch as "أبو سعادة" (SAME_BRANCH_AS_KEY). A key that appears once is
@@ -2718,6 +2720,36 @@ NO_BRANCH              "بدون فرع"                 explicit: families may 
   which each name and code is reviewed (a helper can fill blank codes with a
   neutral numbered sequence, still editable); it is all or nothing.
   Explicitly selected keys can also be set to NO_BRANCH in bulk.
+- **INITIAL import: Branches from the workbook ("إنشاء الفروع من مفاتيح
+  Excel").** For an INITIAL batch the workbook's family keys are the
+  authoritative source of the Clan's Branches, and Branches need not exist
+  beforehand. One explicit administrator action (`import.review` +
+  `clan.manage`, after a confirmation stating the count) resolves EVERY
+  still-unresolved distinct key, atomically, in first-appearance (row
+  number) order:
+  - a Branch of the batch's Clan whose name equals the key exactly (after
+    whitespace normalization only) → **MATCH_EXISTING_BRANCH**; it must be
+    selectable and unique, otherwise the whole action is refused — never a
+    duplicate Branch, never a guess;
+  - otherwise → **CREATE_NEW_BRANCH**: one new ungrouped Branch named after
+    the key, with the permanent server-generated code `BR_000123` (below).
+  Spelling variants stay separate keys (no fuzzy matching). Keys taken from
+  an Excel formula's cached value are included; their warning stays visible.
+  Rows without a key are untouched and stay blocking (FAMILY_KEY_MISSING).
+  Keys already decided are never changed, so running it again is a no-op.
+  The per-key and bulk tools remain for exceptions. INCREMENTAL batches and
+  batches no longer under review are refused.
+- **Permanent Branch code (canonical).** A Branch created by the automatic
+  action gets `BR_` + its reserved database id zero-padded to six digits
+  (`BR_000001`, `BR_000002`, …) — the BusinessIdentifier strategy of
+  `FAM-` / `PER-` codes, with `_` because Branch codes allow only
+  `[A-Z0-9_]`. The id is reserved from the `branches` sequence before the
+  insert, so the code is unique and never derived from Arabic text; it never
+  changes. Branches created by hand keep their administrator-chosen code.
+- **Branches are Clan master data immediately.** A Branch created in Step 4
+  (manually or automatically) belongs to the Clan from that moment and
+  persists independently of the batch: abandoning, failing or deleting the
+  batch never deletes it.
 - **SAME_BRANCH_AS_KEY stores the final Branch directly** (the other key is
   kept for audit only), so there are no chains or loops; changing the other
   key later does not cascade.
@@ -4317,6 +4349,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.31 | 2026-10-01 | Approved | §96a INITIAL import: one explicit action resolves every unresolved family key from the workbook — exact existing Branch name → MATCH_EXISTING_BRANCH, otherwise a new ungrouped Branch; canonical permanent Branch code `BR_` + reserved id; formula keys included; missing keys stay blocking; re-run is a no-op; Step 4 Branches persist independently of the batch |
 | 1.2.30 | 2026-10-01 | Approved | §96b Step 6 Apply UI (Phase 4B.4e): server-derived Dry Run `execution_enabled` (gate + permission + READY plan), approved confirmation wording with derived counts, browser-driven chunk loop with pause / continue / resume, APPLY_IN_PROGRESS read-only behaviour, fresh Dry Run required after a refused start, Steps 4–5 read only after Apply starts; §96a Step 6 reachable after Apply starts; gate still closed |
 | 1.2.29 | 2026-10-01 | Approved | §96b Apply API and activation gate (Phase 4B.4d): start / run / resume (`import.apply`) and read-only progress (`import.review`), fixed-message error mapping (409/422/500, in-chunk failure = 200 FAILED), safe logging; Apply gated by `IMPORT_APPLY_ENABLED` (default off, SUPER_ADMIN only) |
 | 1.2.28 | 2026-09-30 | Approved | §96b Apply runner (Phase 4B.4c): start against the operator's Dry Run fingerprint, one runner per batch (advisory lock), chunks of 100 rows / ~10 s with row transactions and normal pause, failure by database truth (READY_FOR_REVIEW before any committed row, PARTIALLY_APPLIED after), resume with the same plan and start date, database-backed completion that verifies and never invents provenance; no endpoint or UI |

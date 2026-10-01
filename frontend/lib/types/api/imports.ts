@@ -199,6 +199,8 @@ export interface FamilyKeysPayload {
     // Selectable Branches of the batch's target Clan only.
     branches: ImportBranchRef[];
     can_create_branch: boolean;
+    // Only in the response of the automatic Branch action.
+    auto_branches?: { created: number; matched: number };
   };
 }
 

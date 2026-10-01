@@ -90,6 +90,12 @@ export function useClearFamilyKey(id: string) {
   );
 }
 
+// INITIAL: every unresolved key → an exact existing Branch or a new BR_ Branch
+// (server-side codes; import.review + clan.manage). All or nothing.
+export function useAutoCreateBranches(id: string) {
+  return useKeyMutation(id, () => apiClient.post<FamilyKeysPayload>(`${BASE}/${id}/family-keys/auto-branches`, {}));
+}
+
 // Explicitly selected keys only; all or nothing.
 export function useBulkResolveFamilyKeys(id: string) {
   return useKeyMutation(

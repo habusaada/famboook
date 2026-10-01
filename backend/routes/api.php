@@ -329,6 +329,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/{importBatch}/family-keys/resolution', [InitialFamilyImportController::class, 'resolveFamilyKey']);
             Route::post('/{importBatch}/family-keys/resolution/clear', [InitialFamilyImportController::class, 'clearFamilyKey']);
             Route::post('/{importBatch}/family-keys/bulk', [InitialFamilyImportController::class, 'bulkResolveFamilyKeys']);
+            // INITIAL: every unresolved key → existing exact Branch or a new BR_ Branch.
+            Route::post('/{importBatch}/family-keys/auto-branches', [InitialFamilyImportController::class, 'autoCreateBranches']);
         });
         // Step 7 Apply (docs/03 §96b): import.apply — SUPER_ADMIN only, and only
         // while the Apply activation gate is open (config/import.php, docs/08).

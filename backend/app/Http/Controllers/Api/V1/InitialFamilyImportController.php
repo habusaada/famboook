@@ -160,6 +160,21 @@ class InitialFamilyImportController extends Controller
         ]);
     }
 
+    /**
+     * INITIAL only: every unresolved key → its Branch in one explicit, atomic
+     * decision (import.review; clan.manage enforced in the action). Exact
+     * existing names are reused, the rest get new ungrouped Branches with
+     * BR_ codes. Returns the refreshed keys plus the created / reused counts.
+     */
+    public function autoCreateBranches(Request $request, ImportBatch $importBatch, ResolveFamilyKeyAction $action): JsonResponse
+    {
+        $counts = $action->autoCreateBranches($importBatch, $request->user());
+        $payload = $this->familyKeys($request, $importBatch->fresh())->getData(true);
+        $payload['meta']['auto_branches'] = $counts;
+
+        return response()->json($payload);
+    }
+
     /** One decision for one exact source key (import.review; creating a Branch also needs clan.manage). */
     public function resolveFamilyKey(Request $request, ImportBatch $importBatch, ResolveFamilyKeyAction $action): JsonResponse
     {

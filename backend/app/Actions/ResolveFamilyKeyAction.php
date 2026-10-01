@@ -4,11 +4,13 @@ namespace App\Actions;
 
 use App\Enums\FamilyKeyDecision;
 use App\Enums\ImportBatchStatus;
+use App\Enums\ImportMode;
 use App\Models\Branch;
 use App\Models\Clan;
 use App\Models\ImportBatch;
 use App\Models\ImportFamilyKeyResolution;
 use App\Models\User;
+use App\Support\BusinessIdentifier;
 use App\Support\Import\InitialFamilyRow;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -33,8 +35,15 @@ use Illuminate\Validation\ValidationException;
  * No decision = UNRESOLVED. The staged source key is never rewritten, nothing
  * is inferred (names, frequency, spelling), nothing is copied from other
  * batches, and no Family, Person, Membership or Branch Group is created.
- * Changing or clearing a decision never deletes a Branch it had created.
+ * Changing or clearing a decision never deletes a Branch it had created:
+ * Branches are Clan master data from the moment they are created.
  * Every mutation locks the batch row, so concurrent decisions serialize.
+ *
+ * autoCreateBranches() is ONE explicit administrator decision for every
+ * still-unresolved key of an INITIAL batch (the workbook is the source of
+ * the Clan's Branches): an existing Branch of the Clan with exactly the same
+ * normalized name is reused (MATCH_EXISTING_BRANCH), otherwise one ungrouped
+ * Branch is created per key with the permanent code BR_ + its reserved id.
  */
 class ResolveFamilyKeyAction
 {
@@ -91,6 +100,86 @@ class ResolveFamilyKeyAction
             }
 
             return count($items);
+        });
+    }
+
+    /**
+     * Every unresolved key of an INITIAL batch → its Branch, all or nothing,
+     * in first-appearance (row number) order. An existing Branch of the Clan
+     * whose normalized name equals the key exactly is reused; anything else
+     * gets a new ungrouped Branch named after the key, code BR_000123 from
+     * the reserved Branch id. No fuzzy matching, no spelling normalization;
+     * an exact match that is not selectable, or matches several Branches,
+     * stops the whole request (never a guess, never a duplicate). Already
+     * resolved keys are untouched, so a re-run is a no-op.
+     *
+     * @return array{created: int, matched: int}
+     */
+    public function autoCreateBranches(ImportBatch $batch, User $user): array
+    {
+        if (! $user->can('clan.manage')) {
+            throw new AuthorizationException('إنشاء الفروع يتطلب صلاحية إدارة العشائر.');
+        }
+
+        return DB::transaction(function () use ($batch, $user) {
+            $batch = $this->lockResolvable($batch);
+            if ($batch->import_mode !== ImportMode::INITIAL) {
+                throw ValidationException::withMessages(['batch' => 'إنشاء الفروع تلقائيًا متاح للاستيراد الأولي فقط.']);
+            }
+            /** @var Clan $clan */
+            $clan = Clan::findOrFail($batch->clan_id);
+            if (! $clan->is_active) {
+                throw ValidationException::withMessages(['batch' => 'العشيرة المستهدفة غير مفعّلة.']);
+            }
+
+            $resolved = ImportFamilyKeyResolution::where('import_batch_id', $batch->id)->pluck('source_family_key')->all();
+            $keys = DB::table('import_rows')
+                ->where('import_batch_id', $batch->id)
+                ->whereNotNull('source_family_key')
+                ->whereNotIn('source_family_key', $resolved ?: [''])
+                ->groupBy('source_family_key')
+                ->selectRaw('source_family_key, min(row_number) as first_row')
+                ->orderBy('first_row')->orderBy('source_family_key')
+                ->pluck('source_family_key')->all();
+
+            $byName = [];
+            foreach (Branch::where('clan_id', $clan->id)->get() as $branch) {
+                $byName[(string) InitialFamilyRow::normalizeKey($branch->name)][] = $branch;
+            }
+
+            $created = 0;
+            $matched = 0;
+            foreach ($keys as $key) {
+                $existing = $byName[$key] ?? [];
+                if (count($existing) > 1) {
+                    throw ValidationException::withMessages(['batch' => "يوجد أكثر من فرع باسم «{$key}» في هذه العشيرة؛ احسم هذا المفتاح يدويًا."]);
+                }
+                if (count($existing) === 1) {
+                    if (! $existing[0]->isSelectable()) {
+                        throw ValidationException::withMessages(['batch' => "الفرع «{$key}» موجود لكنه غير مفعّل؛ فعّله أو احسم هذا المفتاح يدويًا."]);
+                    }
+                    $this->save($batch, $key, FamilyKeyDecision::MATCH_EXISTING_BRANCH, $existing[0]->id, null, $user);
+                    $matched++;
+
+                    continue;
+                }
+
+                $id = BusinessIdentifier::nextId('branches');
+                try {
+                    $branch = $this->clans->createBranch($clan, null, [
+                        'id' => $id,
+                        'code' => BusinessIdentifier::format('BR', $id, '_'),
+                        'name' => $key,
+                    ]);
+                } catch (UniqueConstraintViolationException) {
+                    throw ValidationException::withMessages(['batch' => 'تعذّر إنشاء رمز فرع فريد؛ لم يُنشأ أي فرع.']);
+                }
+                $byName[$key] = [$branch];
+                $this->save($batch, $key, FamilyKeyDecision::CREATE_NEW_BRANCH, $branch->id, null, $user);
+                $created++;
+            }
+
+            return ['created' => $created, 'matched' => $matched];
         });
     }
 

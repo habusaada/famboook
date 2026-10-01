@@ -76,14 +76,18 @@ class ManageClanStructureAction
         $this->assertGroupOfClan($group, $clan->id);
 
         return DB::transaction(function () use ($clan, $group, $data) {
-            return Branch::create([
+            $attributes = [
                 'branch_group_id' => $group?->id,
                 'clan_id' => $clan->id,
                 'code' => $data['code'],
                 'name' => $data['name'],
                 'sort_order' => $data['sort_order'] ?? ((int) $this->siblings($clan->id, $group)->max('sort_order') + 1),
                 'is_active' => true,
-            ]);
+            ];
+
+            // A caller that derives the code from the id reserves it first
+            // (BusinessIdentifier); `id` is deliberately not fillable.
+            return isset($data['id']) ? Branch::forceCreate(['id' => $data['id'], ...$attributes]) : Branch::create($attributes);
         });
     }
 

@@ -2,16 +2,20 @@
 
 namespace Tests\Feature\Import;
 
+use App\Actions\ManageClanStructureAction;
 use App\Enums\FamilyKeyDecision;
 use App\Models\Branch;
 use App\Models\BranchGroup;
 use App\Models\Clan;
 use App\Models\Family;
 use App\Models\FamilyMembership;
+use App\Models\ImportBatch;
 use App\Models\ImportFamilyKeyResolution;
 use App\Models\ImportRow;
 use App\Models\Person;
 use App\Models\User;
+use App\Support\Import\Apply\ImportApplyPlanner;
+use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -369,6 +373,157 @@ class FamilyKeyResolutionTest extends TestCase
     }
 
     // ------------------------------------------------ staging interplay
+
+    // ------------------------------------------------ automatic Branches (INITIAL)
+
+    private function auto(?User $as = null, ?string $batch = null): TestResponse
+    {
+        return $this->actingAs($as ?? $this->admin)->postJson(self::BASE.'/'.($batch ?? $this->batch).'/family-keys/auto-branches');
+    }
+
+    public function test_auto_creates_one_ungrouped_branch_per_unresolved_key_with_permanent_br_codes(): void
+    {
+        $before = $this->sourceKeys();
+
+        $response = $this->auto()->assertOk();
+
+        $this->assertSame(['created' => 4, 'matched' => 0], $response->json('meta.auto_branches'));
+        $this->assertSame(0, $response->json('meta.resolution.unresolved_keys'));
+        // First-appearance order; the spelling variant stays its own Branch.
+        $branches = Branch::where('clan_id', $this->clan->id)->orderBy('id')->get();
+        $this->assertSame(['البريم', 'أبو سعادة', 'ابو سعادة', 'قديح'], $branches->pluck('name')->all());
+        foreach ($branches as $branch) {
+            $this->assertSame(sprintf('BR_%06d', $branch->id), $branch->code);
+            $this->assertNull($branch->branch_group_id);
+            $this->assertTrue($branch->is_active);
+            $this->assertSame(FamilyKeyDecision::CREATE_NEW_BRANCH->value, $this->resolutionOf($branch->name)['decision']);
+            $this->assertSame($branch->uuid, $this->resolutionOf($branch->name)['branch']['id']);
+        }
+        // Nothing else is created; the source keys are untouched.
+        $this->assertSame(0, BranchGroup::count());
+        $this->assertSame([0, 0, 0], [Family::count(), Person::count(), FamilyMembership::count()]);
+        $this->assertSame($before, $this->sourceKeys());
+
+        // A re-run is a no-op: no new Branch, no changed decision.
+        $resolutions = ImportFamilyKeyResolution::orderBy('id')->get(['source_family_key', 'decision', 'branch_id'])->toArray();
+        $this->assertSame(['created' => 0, 'matched' => 0], $this->auto()->assertOk()->json('meta.auto_branches'));
+        $this->assertSame(4, Branch::count());
+        $this->assertSame($resolutions, ImportFamilyKeyResolution::orderBy('id')->get(['source_family_key', 'decision', 'branch_id'])->toArray());
+    }
+
+    public function test_auto_reuses_an_exact_existing_branch_and_never_duplicates_it(): void
+    {
+        $existing = $this->branch('EXISTING_ONE', '  البريم ');           // same name after whitespace normalization
+        $this->branch('OTHER_CLAN', 'قديح', $this->other);                 // another Clan never matches
+        $this->resolve(['source_family_key' => 'أبو سعادة', 'decision' => 'NO_BRANCH'])->assertOk();
+
+        $this->assertSame(['created' => 2, 'matched' => 1], $this->auto()->assertOk()->json('meta.auto_branches'));
+
+        $this->assertSame(['decision' => 'MATCH_EXISTING_BRANCH', 'code' => 'EXISTING_ONE'], [
+            'decision' => $this->resolutionOf('البريم')['decision'], 'code' => $this->resolutionOf('البريم')['branch']['code'],
+        ]);
+        // A manual decision is never overridden.
+        $this->assertSame('NO_BRANCH', $this->resolutionOf('أبو سعادة')['decision']);
+        $this->assertSame(1, Branch::where('clan_id', $this->clan->id)->where('id', $existing->id)->count());
+        $this->assertSame(
+            ['  البريم ', 'ابو سعادة', 'قديح'],
+            Branch::where('clan_id', $this->clan->id)->orderBy('id')->pluck('name')->all(),
+        );
+    }
+
+    public function test_auto_refuses_an_inactive_or_ambiguous_exact_match_atomically(): void
+    {
+        $this->branch('OLD_QUDAIH', 'قديح', null, ['is_active' => false]);
+        $this->auto()->assertUnprocessable()->assertJsonValidationErrors('batch');
+        // Earlier keys were not kept: all or nothing.
+        $this->assertSame(1, Branch::count());
+        $this->assertSame(0, ImportFamilyKeyResolution::count());
+
+        Branch::where('code', 'OLD_QUDAIH')->update(['is_active' => true]);
+        $this->branch('TWIN_A', 'البريم');
+        $this->branch('TWIN_B', 'البريم');
+        $this->auto()->assertUnprocessable()->assertJsonValidationErrors('batch');
+        $this->assertSame([3, 0], [Branch::count(), ImportFamilyKeyResolution::count()]);
+    }
+
+    public function test_auto_rolls_back_everything_when_a_branch_cannot_be_created(): void
+    {
+        // The second reserved id's code is already taken by hand.
+        $taken = $this->branch('PLACEHOLDER', 'فرع يدوي');
+        $taken->update(['code' => sprintf('BR_%06d', $taken->id + 2)]);
+
+        $this->auto()->assertUnprocessable()->assertJsonValidationErrors('batch');
+
+        $this->assertSame([1, 0], [Branch::count(), ImportFamilyKeyResolution::count()]);
+    }
+
+    public function test_auto_requires_import_review_and_clan_manage(): void
+    {
+        $reviewer = $this->user('DATA_ENTRY');
+        $reviewer->givePermissionTo('import.review');   // may decide keys, may not create Branches
+        $this->auto($reviewer)->assertForbidden();
+
+        $this->auto($this->user('ADMINISTRATOR'))->assertForbidden();  // no import.review
+
+        $this->assertSame([0, 0], [Branch::count(), ImportFamilyKeyResolution::count()]);
+    }
+
+    public function test_auto_is_for_initial_batches_still_under_review_only(): void
+    {
+        $incremental = $this->stage([2 => ['البريم', 900000101, 'رب أسرة']], mode: 'INCREMENTAL');
+        $this->auto(batch: $incremental)->assertUnprocessable()->assertJsonValidationErrors('batch');
+
+        ImportBatch::where('uuid', $this->batch)->update([
+            'status' => 'APPLYING', 'apply_started_at' => now(), 'apply_plan_fingerprint' => hash('sha256', 'synthetic-plan'),
+        ]);
+        $this->auto()->assertUnprocessable()->assertJsonValidationErrors('batch');
+
+        $this->assertSame([0, 0], [Branch::count(), ImportFamilyKeyResolution::count()]);
+    }
+
+    public function test_auto_includes_formula_keys_and_keeps_their_warning(): void
+    {
+        $batch = $this->stage([
+            2 => [['formula' => 'TEXT(C2)', 'cached' => 'شراب'], 900000201, 'رب أسرة'],
+            3 => ['شراب', 900000202, 'رب أسرة'],
+        ]);
+
+        $this->assertSame(['created' => 1, 'matched' => 0], $this->auto(batch: $batch)->assertOk()->json('meta.auto_branches'));
+
+        $key = collect($this->keys($batch)->json('data'))->firstWhere('key', 'شراب');
+        $this->assertSame(1, $key['formula_rows']);          // still visible to the operator
+        $this->assertSame('CREATE_NEW_BRANCH', $key['resolution']['decision']);
+    }
+
+    public function test_auto_leaves_rows_without_a_key_blocking(): void
+    {
+        $this->auto()->assertOk();
+        // Blank keys are not keys: nothing is resolved or created for them.
+        $this->assertSame(0, ImportFamilyKeyResolution::whereNull('source_family_key')->count());
+        $this->assertSame(4, ImportFamilyKeyResolution::count());
+
+        // The planner still blocks the row without a key.
+        $this->seed(RelationshipTypeSeeder::class);
+        $this->actingAs($this->admin)->postJson(self::BASE."/{$this->batch}/reconcile")->assertOk();
+        $batch = ImportBatch::where('uuid', $this->batch)->firstOrFail();
+        $plan = app(ImportApplyPlanner::class)->plan($batch);
+        $this->assertSame([], $plan->preconditionFailures);
+        $row = collect($plan->rows)->firstWhere('rowNumber', 9);
+        $this->assertNotNull($row);
+        $this->assertContains('FAMILY_KEY_MISSING', $row->blockReasons());
+    }
+
+    public function test_auto_branch_ids_keep_the_id_sequence_consistent(): void
+    {
+        $this->auto()->assertOk();
+        $last = (int) Branch::max('id');
+
+        // A Branch created the ordinary way afterwards gets the next id — the
+        // reserved ids were consumed from the same sequence (PostgreSQL).
+        $next = app(ManageClanStructureAction::class)->createBranch($this->clan, null, ['code' => 'MANUAL_AFTER', 'name' => 'فرع لاحق']);
+        $this->assertGreaterThan($last, $next->id);
+        $this->assertSame(5, Branch::count());
+    }
 
     public function test_restaging_keeps_decisions_for_keys_that_remain(): void
     {

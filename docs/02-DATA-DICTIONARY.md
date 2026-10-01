@@ -416,7 +416,9 @@ uuid
 branch_group_id   OPTIONAL — NULL = ungrouped (بدون مجموعة); when set, a
                   Branch Group of the same Clan
 clan_id           required; the Branch's Clan (never changes)
-code              unique within the Clan, immutable
+code              unique within the Clan, immutable; a Branch created by the
+                  INITIAL import's automatic action gets BR_ + its reserved
+                  id (BR_000001 …; docs/03 §96a), never text-derived
 name              required
 sort_order
 is_active
@@ -3896,6 +3898,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.23 | 2026-10-01 | Approved | §7c: canonical permanent code of Branches created by the INITIAL import (`BR_` + reserved id) |
 | 1.2.22 | 2026-09-30 | Approved | §88d `apply_plan_fingerprint`, `apply_error_code`, `apply_error_row_number` on import_batches |
 | 1.2.21 | 2026-09-29 | Approved | §88d `import_apply_records` (Apply provenance: effect, entity reference, role, spouse slot, outcome, reason code, applier) and batch status PARTIALLY_APPLIED / apply_started_at; not yet written by any flow |
 | 1.2.20 | 2026-09-29 | Approved | §88c `import_row_reconciliations` (HEAD Person vs Family evidence, spouse candidates, differences, issues) and batch `reconciled_at` / `reconciled_by` / `reconciliation_fingerprint`; `import_rows.reconciliation_status` now populated |
