@@ -407,9 +407,10 @@ FAMILY_USER
 
 # 14a. COORDINATOR (planned role)
 
-Approved 2026-10-02 (AUTH-ADR-061). **Documented, not seeded**: the role
-does not exist in `RolePermissionSeeder` and must not be added before
-PWA-1. It is neither one of the six Staff roles nor an external role like
+Approved 2026-10-02 (AUTH-ADR-061). **Seeded by PWA-1C** (AUTH-ADR-064)
+in `RolePermissionSeeder::ROLES` with a single permission,
+`coordinator-space.access`. Seeding the role enables nothing: Coordinator
+Space and scope authorization are PWA-1H. It is neither one of the six Staff roles nor an external role like
 FAMILY_USER; it is a scope-bound operational role defined in §22a. In
 Family Portal V1 a COORDINATOR does not use the Staff Login (AUTH-ADR-062).
 
@@ -742,7 +743,8 @@ The Initial Role Matrix (§140) is unchanged until these are seeded.
 # 22b. PWA-1 Identity and Access Authorization (PWA-1B)
 
 Approved 2026-10-02 (AUTH-ADR-063). Architecture: `11-FAMILY-PORTAL.md`
-§30a. **Documented, not seeded and not enforced yet.**
+§30a. **Seeded by PWA-1C (AUTH-ADR-064); not enforced yet** — no endpoint
+reads these permissions and the role checks below are PWA-1D.
 
 ## Account sides
 
@@ -782,14 +784,14 @@ User active · User-Person Link ACTIVE · Person not deleted and active ·
 `life_status = ALIVE` · active household-head membership · Family ACTIVE
 and not deleted. `UNKNOWN` is not eligible (docs/03 §89b).
 
-## PWA-1 permissions — names FINAL, not seeded
+## PWA-1 permissions — seeded in PWA-1C
 
 | Permission | Purpose | Initial holders |
 |---|---|---|
 | `family-portal.access` | Use the Family Portal in the family context | FAMILY_USER |
 | `coordinator-space.access` | Enter Coordinator Space; effective only with an active scope assignment | COORDINATOR |
 | `person-mobile-trust.view` | See a Person's mobile trust state and history | SUPER_ADMIN, ADMINISTRATOR |
-| `person-mobile-trust.assist` | Open or assist a mobile verification | SUPER_ADMIN, ADMINISTRATOR; COORDINATOR within scope |
+| `person-mobile-trust.assist` | Open or assist a mobile verification | SUPER_ADMIN, ADMINISTRATOR. COORDINATOR: **deferred to PWA-1H** (staged activation, below) |
 | `person-mobile-trust.grant` | Grant final TRUSTED status | SUPER_ADMIN, ADMINISTRATOR only |
 | `person-mobile-trust.revoke` | Revoke a trusted mobile | SUPER_ADMIN, ADMINISTRATOR |
 | `user-person-link.view` | See family-side accounts and Links | SUPER_ADMIN, ADMINISTRATOR |
@@ -805,8 +807,36 @@ and not deleted. `UNKNOWN` is not eligible (docs/03 §89b).
   verified by the activation system process.
 - Authentication and security events are read with the existing
   `audit.view` / `audit.view-sensitive` (§57).
-- The Initial Role Matrix (§140) changes only when these are seeded
-  (PWA-1C and PWA-1H).
+- The Initial Role Matrix (§140) is a capability summary and is not
+  changed by these administrative permissions.
+
+## Seeded mapping (PWA-1C)
+
+```text
+SUPER_ADMIN, ADMINISTRATOR   person-mobile-trust.view / assist / grant / revoke
+                             user-person-link.view / manage
+                             coordinator-scope.view / manage
+FAMILY_USER                  family-portal.access   (plus its §53 change-request set)
+COORDINATOR                  coordinator-space.access
+DATA_ENTRY, REVIEWER,
+SOCIAL_WORKER, REPORTS_VIEWER   none of the ten
+```
+
+## Staged permission activation (AUTH-ADR-064)
+
+`person-mobile-trust.assist` exists and is held by SUPER_ADMIN and
+ADMINISTRATOR, but it is **intentionally not granted to COORDINATOR in
+PWA-1C**. Coordinator scope authorization does not exist until PWA-1H, and
+a family-side session shares the session guard with the Staff API: a
+permission-only endpoint would accept a coordinator who held the
+permission, with no scope check. COORDINATOR receives
+`person-mobile-trust.assist` in PWA-1H, once scope authorization is
+enforced. It never receives `grant` or `revoke`.
+
+`famboook:verify-permissions` enforces this on every deployment: COORDINATOR
+must hold `coordinator-space.access` and must NOT hold
+`person-mobile-trust.assist`, `.grant` or `.revoke`; REVIEWER must NOT hold
+`person-mobile-trust.grant`; SUPER_ADMIN and ADMINISTRATOR must hold it.
 
 ---
 
@@ -3796,6 +3826,9 @@ In Family Portal V1 a COORDINATOR does not use the Staff Login: a coordinator au
 
 ### AUTH-ADR-063
 PWA-1 identity and access authorization (§22b). Staff-side and family-side accounts are disjoint; FAMILY_USER and COORDINATOR coexist on one family-side account; a V1 COORDINATOR must be an eligible household head; role checks never depend on role order; authentication, family context, coordinator scope and Staff authorization are separate layers; the ten PWA-1 permission names are final (documented, not seeded); only SUPER_ADMIN and ADMINISTRATOR hold `person-mobile-trust.grant`.
+
+### AUTH-ADR-064
+PWA-1C seeded the COORDINATOR role and the ten PWA-1 permissions (§22b). Staged permission activation: `person-mobile-trust.assist` is held by SUPER_ADMIN and ADMINISTRATOR only and is deliberately withheld from COORDINATOR until coordinator scope authorization is enforced in PWA-1H, because family-side and Staff sessions share one guard. `famboook:verify-permissions` requires COORDINATOR to lack assist, grant and revoke and REVIEWER to lack grant. Seeding the role makes no coordinator functionality available.
 ```
 
 ---
@@ -4164,6 +4197,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1B (AUTH-ADR-063): §22b account sides, role checks, authorization layers, eligibility and the final PWA-1 permission names (not seeded); §59c refined — Staff-side and family-side accounts disjoint; §22a V1 coordinator must be an eligible head, multiple scopes; PAUTH-003 decided for V1. Documentation only |
 | 1.2.26 | 2026-10-02 | Approved | PWA-0 (AUTH-ADR-061): §14a COORDINATOR planned role; §22a Family Portal program authorization (scope-bound coordinator, contexts, PROPOSED permission names — pending review, not seeded; coordinator signs in through the Family Portal, not the Staff Login — AUTH-ADR-062); §59c single-role rule amended for FAMILY_USER + COORDINATOR; §123 amended (health submission allowed, reading minimum-necessary); PAUTH-001/002 decided in direction. Documentation only |
 | 1.2.25 | 2026-10-01 | Approved | §61 `family-keys/auto-branches` (INITIAL): `import.review` + `clan.manage` (checked in the Domain Action); no new permission |

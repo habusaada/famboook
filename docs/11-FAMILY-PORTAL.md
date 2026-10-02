@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.1
+**Version:** 1.2
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design (documentation only; nothing in this document is implemented)
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation only (§30a)
 
 ---
 
@@ -1211,7 +1211,9 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 
 # 30a. PWA-1 Identity and Access Architecture (PWA-1B — approved 2026-10-02)
 
-Approved design. **Nothing in this section is implemented.** Physical
+Approved design. **Only the PWA-1C foundation is implemented** (see
+"PWA-1C implementation record" below); every behaviour in this section is
+still to be built. Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
 
@@ -1450,14 +1452,58 @@ and must be resolved before general Family Portal rollout.
 ```text
 PWA-1A  Identity data discovery                          DONE
 PWA-1B  Identity and access design                       DONE
-PWA-1C  Schema / foundation                              NEXT
-PWA-1D  Identity resolver + links
+PWA-1C  Schema / foundation                              DONE
+PWA-1D  Identity resolver + links                        NEXT
 PWA-1E  Mobile trust + OTP / SMS abstraction
 PWA-1F  Activation
 PWA-1G  Login / reset / session / family context
 PWA-1H  Coordinator identity / scope
 PWA-1I  Security hardening / full regression
 ```
+
+## PWA-1C implementation record
+
+Implemented (foundation only):
+
+```text
+config/family_auth.php                 fingerprint key and version, approved OTP
+                                       and password values, activation gate (off)
+App\Support\FamilyAuth\FamilyNationalId  strict nine-digit normalizer
+App\Support\FamilyAuth\FamilyMobile      strict 05######## normalizer
+App\Support\FamilyAuth\KeyedFingerprint  HMAC-SHA256, contexts LOGIN_ID / MOBILE /
+                                       OTP_CODE, key versions, fails closed
+Seven migrations                       docs/04 §55b
+Six models, their enums and factories  docs/02 §45b
+COORDINATOR role + ten permissions     docs/06 §22b
+```
+
+Environment names (empty placeholders in the templates; no real secret is
+committed): `FAMILY_AUTH_FINGERPRINT_KEY`,
+`FAMILY_AUTH_FINGERPRINT_KEY_VERSION`,
+`FAMILY_AUTH_FINGERPRINT_PREVIOUS_KEY`,
+`FAMILY_AUTH_FINGERPRINT_PREVIOUS_KEY_VERSION`, `FAMILY_ACTIVATION_ENABLED`.
+Without a valid key the fingerprint service throws; there is no fallback to
+`APP_KEY` and the Staff application is unaffected.
+
+Refinements approved before implementation (docs/04 DB-ADR-043):
+
+1. Coordinator duplicates are prevented by three scope-specific partial
+   unique indexes, not by `NULLS NOT DISTINCT`.
+2. `auth_security_events.otp_challenge_uuid` is a plain reference with no
+   foreign key (challenges are purged after 90 days, events kept 24 months).
+3. "One open OTP challenge" cannot consider expiry; PWA-1E supersedes the
+   previous challenge before inserting another.
+4. CHECK constraints are PostgreSQL-only, by repository convention.
+
+Staged permission activation (docs/06 AUTH-ADR-064): `person-mobile-trust.assist`
+is held by SUPER_ADMIN and ADMINISTRATOR and is withheld from COORDINATOR
+until scope authorization is enforced in PWA-1H.
+
+Not implemented by PWA-1C: activation, login, reset, OTP generation or
+verification, SMS, mobile trust workflows, the eligibility resolver, the
+death and National ID correction hooks, coordinator scope authorization,
+Coordinator Space and every UI. No account, Link, identity or trust row
+exists, and none was derived from registry data.
 
 ---
 
@@ -1757,6 +1803,8 @@ PFP-022  (PWA-1, then per phase)
 Approval of the proposed permission names in docs/06 §22a.
 PARTLY DECIDED 2026-10-02: the PWA-1 permission names are final (docs/06
 §22b; documented, not seeded). Names for later phases stay PROPOSED.
+PWA-1C seeded the ten PWA-1 names; the coordinator's assist grant is
+deferred to PWA-1H (docs/06 AUTH-ADR-064).
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -1787,3 +1835,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 |---|---|---|---|
 | 1.0 | 2026-10-02 | Approved | PWA-0: Family Portal program specification — product definition, modules, identity and authentication architecture, mobile trust, multi-role and COORDINATOR, Profile Completion, Family Verification, requests, health and need submissions, card / QR / PDF, notifications and announcements, information architecture, visual direction, PWA direction, security baseline, auditability, logical schema concepts, phases, amendment register and open decisions. Review follow-up (same day): coordinator sign-in decided (FP-ADR-021), Family Portal palette decided (FP-ADR-022), PWA location decided (FP-ADR-023), National ID kept as the PWA-1 blocker (FP-ADR-024), proposals kept pending (PFP-022), §33a follow-ups. Documentation only |
 | 1.1 | 2026-10-02 | Approved | PWA-1A findings and PWA-1B design: §30a identity and access architecture (verified Production aggregates, National ID decision, strict normalizer, `family_auth_identities`, User-Person Link, eligibility with ALIVE only, mobile trust, activation, OTP and password policy, nullable `users.email`, disjoint Staff/family accounts, coordinator must be an eligible head, multiple scopes, security audit, retention, Production gates, slices PWA-1C … PWA-1I); FP-ADR-025 … 035; PFP-002/003/004/005/016/020/021 decided, PFP-001/022 partly; FU-01 made a rollout gate. Documentation only |
+| 1.2 | 2026-10-02 | Approved | PWA-1C implementation record in §30a: config, strict normalizers, keyed fingerprint service, seven migrations, six models with enums and factories, COORDINATOR role and ten permissions; the four pre-implementation refinements; staged activation of the coordinator assist permission; PWA-1C done, PWA-1D next. Foundation only |

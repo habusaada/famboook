@@ -398,13 +398,24 @@ Family Portal activation may be enabled in Production.
 - **Delivery-failure handling** for SMS must exist.
 - **Secrets**, stored like every other credential (§3, never in the
   repository):
-  - a dedicated Family Portal fingerprint secret, separate from `APP_KEY`.
-    Losing or changing it without the rotation procedure breaks Family
-    login; it must be covered by the same custody rules as §14;
+  - a dedicated Family Portal fingerprint secret, separate from `APP_KEY`:
+    `FAMILY_AUTH_FINGERPRINT_KEY` (at least 32 bytes, optionally
+    `base64:`), with `FAMILY_AUTH_FINGERPRINT_KEY_VERSION` (default 1) and,
+    only during a rotation, `FAMILY_AUTH_FINGERPRINT_PREVIOUS_KEY` /
+    `FAMILY_AUTH_FINGERPRINT_PREVIOUS_KEY_VERSION`. Losing or changing it
+    without the rotation procedure breaks Family login; it must be covered
+    by the same custody rules as §14;
   - the SMS provider credentials.
-- **Activation switch.** Activation stays disabled by configuration until
-  the owner approves it, following the same pattern as the Import Apply
-  gate (§7a).
+- **Activation switch.** `FAMILY_ACTIVATION_ENABLED=false` (the default)
+  until the owner approves it, following the same pattern as the Import
+  Apply gate (§7a). Nothing reads it before PWA-1F.
+- **PWA-1C deployment note.** The foundation (commits up to PWA-1C) adds
+  seven migrations and the COORDINATOR role with ten permissions. A deploy
+  runs `migrate`, the RolePermissionSeeder and `famboook:verify-permissions`
+  as usual (§7). The migrations create empty tables and drop one NOT NULL
+  (`users.email`); nothing is backfilled. The environment templates carry
+  the names above as empty placeholders, and the fingerprint key may stay
+  empty: no feature uses it yet and the Staff application is unaffected.
 - **Retention jobs** (when a scheduler exists): authentication and
   security events 24 months; finished OTP challenges 90 days.
 - **Rollout gate.** Head Succession (docs/11 FU-01) must be resolved
@@ -550,6 +561,7 @@ Never do this once real data has been entered.
 
 | Version | Date | Status | Description |
 |---|---|---|---|
+| 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
 | 1.1 | 2026-09-27 | Approved for Pilot preparation | §2a owner decisions; §12 retention wording; §17 approved smoke Family; §17a rebuild after smoke test; checklist order (backup/restore after rebuild) |

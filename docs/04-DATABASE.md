@@ -2171,8 +2171,10 @@ documents                §44–§46
 
 # 55b. Family Portal Identity Schema (PWA-1B — approved design)
 
-Approved 2026-10-02 (DB-ADR-042). **No migration exists.** This is the
-design PWA-1C implements. Entities: docs/02 §45b.
+Approved 2026-10-02 (DB-ADR-042). **Implemented by PWA-1C (DB-ADR-043):
+schema, models and factories only** — no row is created or derived, and no
+lifecycle, activation, OTP or authorization behaviour exists yet. Entities:
+docs/02 §45b. Implementation notes are at the end of this section.
 
 Conventions: `id BIGINT PK`, `uuid UUID UNIQUE` as the public reference,
 `created_at` / `updated_at`; user references are `BIGINT NULL FK users.id`
@@ -2276,7 +2278,8 @@ UNIQUE (person_id, purpose)
 ```text
 event_type, outcome, reason_code    VARCHAR
 person_id, user_id, actor_user_id   BIGINT NULL
-user_person_link_id, mobile_trust_id, otp_challenge_id   BIGINT NULL
+user_person_link_id, mobile_trust_id   BIGINT NULL
+otp_challenge_uuid   UUID NULL   plain reference value — NO foreign key
 login_key          CHAR(64) NULL    fingerprint only
 ip                 INET NULL
 user_agent_hash    CHAR(64) NULL
@@ -2285,7 +2288,12 @@ created_at         TIMESTAMP NOT NULL      (no updated_at: append-only)
 ```
 
 Indexes on `(person_id, created_at)`, `(user_id, created_at)`,
-`(event_type, created_at)`.
+`(event_type, created_at)` and `login_key`.
+
+`otp_challenge_uuid` carries no foreign key on purpose: challenges are
+purged after 90 days while events are retained 24 months, so a foreign key
+would either block the purge or force an update of an append-only row.
+The table has no free-text column.
 
 ## `coordinator_scope_assignments`
 
@@ -2303,9 +2311,55 @@ revoked_by, revoked_at, revoke_reason
 CHECK  CLAN         → branch_group_id IS NULL AND branch_id IS NULL
 CHECK  BRANCH_GROUP → branch_group_id IS NOT NULL AND branch_id IS NULL
 CHECK  BRANCH       → branch_id IS NOT NULL AND branch_group_id IS NULL
-UNIQUE active assignment per (user_id, scope_type, clan_id, branch_group_id,
-       branch_id) WHERE revoked_at IS NULL, NULLs treated as equal
+UNIQUE (user_id, clan_id)         WHERE scope_type = 'CLAN'         AND revoked_at IS NULL
+UNIQUE (user_id, branch_group_id) WHERE scope_type = 'BRANCH_GROUP' AND revoked_at IS NULL
+UNIQUE (user_id, branch_id)       WHERE scope_type = 'BRANCH'       AND revoked_at IS NULL
 ```
+
+Three scope-specific partial unique indexes prevent the same active scope
+twice. They replace the earlier "NULLs treated as equal" wording: the
+semantics are identical, they behave the same on PostgreSQL and SQLite, and
+they do not rely on `NULLS NOT DISTINCT`.
+
+## Implementation notes (PWA-1C)
+
+Migrations, in order:
+
+```text
+2026_10_13_090000_make_users_email_nullable
+2026_10_13_090001_create_user_person_links_table
+2026_10_13_090002_create_family_auth_identities_table
+2026_10_13_090003_create_person_mobile_trusts_table
+2026_10_13_090004_create_auth_otp_challenges_table
+2026_10_13_090005_create_auth_security_events_table
+2026_10_13_090006_create_coordinator_scope_assignments_table
+```
+
+- **No data migration.** No account, Link, authentication identity, mobile
+  trust or assignment is created from existing data. Imported mobiles stay
+  UNVERIFIED by the absence of a TRUSTED row. `persons.national_id`
+  receives no constraint.
+- `users.email`: only the NOT NULL is dropped; the unique index is kept.
+  The rollback refuses while an account without an email exists.
+- **Foreign keys are all RESTRICT**, including the actor columns
+  (`verified_by`, `assisted_by`, `suspended_by`, `ended_by`, `revoked_by`,
+  `assigned_by`): identity and security history is never cascaded or
+  nulled.
+- **CHECK constraints are PostgreSQL-only** (the repository convention);
+  on SQLite the enums and, later, the lifecycle actions carry the same
+  rules. Besides the constraints listed above they also require: fingerprints
+  and hashes to be 64 lowercase hex characters (so a raw National ID, mobile
+  or OTP cannot be stored), reasons to be codes, a `PASSWORD_RESET`
+  challenge to name its user, and `SUPERSEDED` / `REVOKED` / `STALE` rows to
+  carry their timestamps.
+- **Open OTP challenge.** The partial unique index covers rows that are not
+  consumed, superseded or locked. Expiry is time-dependent and cannot be
+  part of an index, so an expired challenge still occupies the slot: PWA-1E
+  must supersede the previous challenge before inserting another.
+- Partial unique indexes are created with raw SQL and are exercised by the
+  SQLite suite; the PostgreSQL-only checks are covered by
+  `IdentitySchemaConstraintsTest`, which runs only on a PostgreSQL `_test`
+  database.
 
 ## Retention
 
@@ -3899,6 +3953,9 @@ Family Portal future schema concepts are documented logically (§55a) with physi
 
 ### DB-ADR-042
 Family Portal identity schema (§55b, approved design, no migration): `users.email` nullable with its unique index kept; `user_person_links` with partial unique indexes on active/suspended links; dedicated `family_auth_identities`; person-specific `person_mobile_trusts` with a non-unique fingerprint; `auth_otp_challenges`; append-only `auth_security_events`; `coordinator_scope_assignments`. No UNIQUE constraint on `persons.national_id`.
+
+### DB-ADR-043
+PWA-1C implemented §55b as schema, models and factories only. Refinements approved before implementation: coordinator duplicates are prevented by three scope-specific partial unique indexes (no `NULLS NOT DISTINCT`); `auth_security_events.otp_challenge_uuid` is a plain value with no foreign key; "one open OTP challenge" ignores expiry, which PWA-1E handles by superseding; CHECK constraints are PostgreSQL-only. All new foreign keys are RESTRICT. No data was backfilled.
 ```
 
 ### 111. Pending Database Decisions
@@ -4159,6 +4216,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
 | 1.2.23 | 2026-10-02 | Approved | PWA-0: §55a Family Portal future schema concepts (logical design vs deferred physical schema; constraints) — no migration (DB-ADR-041). Documentation only |
 | 1.2.22 | 2026-09-30 | Approved | §83d Apply execution fields: import_batches.apply_plan_fingerprint (present exactly while Apply has started) and structured apply_error_code / apply_error_row_number, with CHECKs |

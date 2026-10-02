@@ -2052,7 +2052,7 @@ user cannot log in or keep using a session). `status`, `mobile` and
 `last_login_at` are not implemented. A Staff user holds exactly one Staff
 role (Spatie). A User is never a Person (§52).
 
-Approved 2026-10-02 (PWA-1B, not yet migrated): `email` becomes nullable
+Implemented by PWA-1C (approved 2026-10-02): `email` is nullable
 and keeps its unique index. Staff accounts still require an email;
 family-side accounts have none and never receive a synthetic one (§45b).
 
@@ -2246,7 +2246,9 @@ plaintext, passwords or secrets.
 
 # 45b. Family Portal Identity Entities (PWA-1B)
 
-Approved design 2026-10-02 (DD-ADR-032). **Not implemented.** Physical
+Approved design 2026-10-02 (DD-ADR-032). **PWA-1C implemented the tables,
+models, enums and factories only**: nothing creates these records yet and
+no lifecycle, activation, OTP or authorization behaviour exists. Physical
 schema: docs/04 §55b. Architecture: `11-FAMILY-PORTAL.md` §30a.
 
 ### `user_person_links`
@@ -2317,7 +2319,8 @@ Append-only authentication and security audit.
 ```text
 event_type, outcome, reason_code
 person_id, user_id, actor_user_id
-link, mobile trust and challenge references
+link and mobile trust references
+otp_challenge_uuid  plain reference value, no foreign key
 login_key           fingerprint only
 ip, user_agent_hash
 metadata            allow-listed keys only
@@ -4093,6 +4096,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |
 | 1.2.24 | 2026-10-02 | Approved | PWA-0: §45a Family Portal logical concepts (login identifier, trusted mobile, OTP challenge, Profile Completion, Family Verification, coordinator scope, card credential, announcements, security events); §47 proposed request types recorded as not approved (DD-ADR-031). Documentation only |
 | 1.2.23 | 2026-10-01 | Approved | §7c: canonical permanent code of Branches created by the INITIAL import (`BR_` + reserved id) |

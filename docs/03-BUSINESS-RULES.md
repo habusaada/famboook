@@ -2299,8 +2299,11 @@ are auditable. OTP plaintext, passwords and secrets are never logged.
 
 # 89b. Family Portal Identity and Access Rules (PWA-1B)
 
-Approved 2026-10-02. Architecture: `11-FAMILY-PORTAL.md` §30a.
-Documentation only; nothing here is implemented.
+Approved 2026-10-02. Architecture: `11-FAMILY-PORTAL.md` §30a. PWA-1C
+implemented the foundation only (schema, the strict normalizers, the keyed
+fingerprint service, the COORDINATOR role and the PWA-1 permission names).
+No rule below is enforced by application behaviour yet: activation, login,
+OTP, mobile trust workflows and the eligibility resolver are PWA-1D–1H.
 
 ## Eligibility
 
@@ -4582,6 +4585,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
 | 1.2.35 | 2026-10-02 | Approved | PWA-1B: §89b Family Portal Identity and Access Rules (eligibility with ALIVE only, National ID rule and correction effect, disjoint Staff/family accounts, coordinator must be an eligible head, mobile trust, OTP and password policy, audit retention, Production gates); PBD-028 decided. Documentation only |
 | 1.2.34 | 2026-10-02 | Approved | PWA-0: §89a Family Portal Program Rules (server-resolved Family access, National ID + OTP activation, mobile trust, multi-role, Profile Completion, Family Verification, VERIFIED ≠ assistance, submissions, card/QR, announcements, audit); §59 amended — activation is the approved system verification process; PBD-028 decided in direction. Documentation only |
 | 1.2.33 | 2026-10-02 | Approved | §55a: the Operational Dashboard shows the Declared Household Population (sum of current declared household sizes in scope) as a separate KPI beside Current People; no figure derived from another |
