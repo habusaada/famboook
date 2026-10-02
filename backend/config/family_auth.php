@@ -64,6 +64,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | OTP SMS abuse ceilings (docs/11 §30a) — App\Support\FamilyAuth\OtpThrottle
+    |--------------------------------------------------------------------------
+    |
+    | Sends allowed across ALL challenges, checked before every SMS (failed
+    | deliveries count). Security settings, environment-overridable; the
+    | per-challenge rules (cooldown, 3 sends, 5 attempts) are the `otp` values
+    | above. A ceiling below 1 blocks every send. The destination ceilings are
+    | higher than the person ones because several household heads may share
+    | one phone.
+    |
+    */
+
+    'throttle' => [
+        'person' => [
+            'hour' => (int) env('FAMILY_OTP_THROTTLE_PERSON_HOUR', 5),
+            'day' => (int) env('FAMILY_OTP_THROTTLE_PERSON_DAY', 10),
+        ],
+        'destination' => [
+            'hour' => (int) env('FAMILY_OTP_THROTTLE_DESTINATION_HOUR', 10),
+            'day' => (int) env('FAMILY_OTP_THROTTLE_DESTINATION_DAY', 20),
+        ],
+        'ip' => [
+            'hour' => (int) env('FAMILY_OTP_THROTTLE_IP_HOUR', 20),
+        ],
+        'global' => [
+            'hour' => (int) env('FAMILY_OTP_THROTTLE_GLOBAL_HOUR', 500),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Family Portal activation gate (docs/08 §16a)
     |--------------------------------------------------------------------------
     |
