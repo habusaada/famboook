@@ -4,7 +4,9 @@ namespace App\Actions;
 
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\UserPersonLinkEndReason;
 use App\Models\Person;
+use App\Models\UserPersonLink;
 use App\Support\DeathDate;
 use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +34,12 @@ use Illuminate\Support\Facades\DB;
  *
  * PERSON_DEATH_RECORDED is recorded on the Person's current Family with
  * no metadata (never the date).
+ *
+ * Family Portal (docs/11 §30a): a current User-Person Link of the deceased
+ * is ended in this same transaction (PERSON_DECEASED) — its Family Auth
+ * Identity is superseded (LINK_ENDED) and every session is revoked. The
+ * User account, the membership and the household-head flag are NOT changed:
+ * Head Succession stays a separate rollout gate (docs/11 FU-01).
  */
 class RecordPersonDeathAction
 {
@@ -49,6 +57,11 @@ class RecordPersonDeathAction
             $person->death_date = $deathDate;
             $person->updated_by = $actingUserId;
             $person->save();
+
+            $link = UserPersonLink::query()->where('person_id', $person->id)->current()->first();
+            if ($link !== null) {
+                app(EndUserPersonLinkAction::class)->bySystem($link, UserPersonLinkEndReason::PERSON_DECEASED, $actingUserId);
+            }
 
             $familyId = $person->activeMembership()->value('family_id');
             if ($familyId !== null) {

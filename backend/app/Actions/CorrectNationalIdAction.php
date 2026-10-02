@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Enums\FamilyActivityType;
 use App\Models\Person;
 use App\Support\FamilyActivityLog;
+use App\Support\FamilyAuth\FamilyAuthIdentities;
 use App\Support\NationalIdGuard;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +22,13 @@ use Illuminate\Support\Facades\DB;
  *
  * NATIONAL_ID_CORRECTED is recorded on the Person's current Family with no
  * metadata: never the old or new value.
+ *
+ * Family Portal (docs/11 §30a): when the Person has an ACTIVE or SUSPENDED
+ * User-Person Link, the Family Auth Identity is synchronized in this same
+ * transaction, so the registry value and the login identifier can never
+ * disagree — the old National ID stops authenticating at commit. A value
+ * that is not nine digits suspends the identity; a login key held by another
+ * account refuses the correction and nothing changes.
  */
 class CorrectNationalIdAction
 {
@@ -41,6 +49,9 @@ class CorrectNationalIdAction
             $person->national_id = $nationalId;
             $person->updated_by = $actingUserId;
             $person->save();
+
+            // Throws (and rolls the correction back) on a login-key collision.
+            app(FamilyAuthIdentities::class)->syncAfterNationalIdCorrection($person, $actingUserId);
 
             $familyId = $person->activeMembership()->value('family_id');
             if ($familyId !== null) {
