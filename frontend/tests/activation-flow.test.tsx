@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ActivationFlow } from "@/components/family/activation/activation-flow";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
-import { normalizeNationalId, normalizeOtp } from "@/lib/schemas/family-activation";
+import { normalizeNationalId, normalizeOtp, passwordByteLength } from "@/lib/schemas/family-auth";
 import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
@@ -78,6 +78,12 @@ describe("normalizers", () => {
     expect(normalizeOtp("٤٨٢ ٩١٥")).toBe("482915");
     expect(normalizeOtp("code: 482915 thanks")).toBe("482915");
     expect(normalizeOtp("4829157777")).toBe("482915");
+  });
+
+  it("measures a password in bytes of UTF-8, as bcrypt does", () => {
+    expect(passwordByteLength("a".repeat(72))).toBe(72);
+    expect(passwordByteLength("ك".repeat(36))).toBe(72);
+    expect(passwordByteLength("ك".repeat(37))).toBe(74);
   });
 });
 
@@ -351,6 +357,31 @@ describe("step 3 — the password", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("كلمة المرور يجب ألا تقل عن 8 أحرف.");
     expect(screen.getByLabelText("كلمة المرور")).toHaveAttribute("aria-invalid", "true");
     expect(post).not.toHaveBeenCalledWith(`${BASE}/complete`, expect.anything());
+  });
+
+  it("refuses a password beyond the bcrypt input limit with a clear message and no byte arithmetic", async () => {
+    const post = api({ "/start": START, "/verify": VERIFIED, "/complete": { user: familyUser() } });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toPasswordStep(user);
+
+    // 37 Arabic letters: only 37 characters, but 74 bytes of UTF-8.
+    const tooLong = "ك".repeat(37);
+    await fillPasswords(user, tooLong);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("كلمة المرور طويلة جدًا. يرجى استخدام كلمة مرور أقصر.");
+    expect(alert.textContent).not.toMatch(/72|بايت|byte/i);
+    expect(post).not.toHaveBeenCalledWith(`${BASE}/complete`, expect.anything());
+
+    // 36 Arabic letters are exactly 72 bytes: accepted and sent whole.
+    const longest = "ك".repeat(36);
+    await user.clear(screen.getByLabelText("كلمة المرور"));
+    await user.clear(screen.getByLabelText("تأكيد كلمة المرور"));
+    await fillPasswords(user, longest);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family"));
+    expect(post).toHaveBeenCalledWith(`${BASE}/complete`, { challenge: CHALLENGE, password: longest, password_confirmation: longest });
   });
 
   it("requires the confirmation to match", async () => {

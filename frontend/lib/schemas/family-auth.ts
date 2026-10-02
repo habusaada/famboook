@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-// Family activation forms (docs/11 §30a). UX only: the Laravel API is the
+// Family authentication forms — activation, login, password reset
+// (docs/11 §30a). UX only: the Laravel API is the
 // authoritative validator and normalizer.
 
 const ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩";
@@ -42,8 +43,20 @@ export function normalizeOtp(value: string): string {
   return toAsciiDigits(value).replace(/[^0-9]/g, "").slice(0, OTP_LENGTH);
 }
 
-/** The approved Family password policy: a minimum length and nothing else. */
+/**
+ * The approved Family password policy: a minimum length, a confirmation and
+ * no composition rule. One technical ceiling: bcrypt reads at most 72 BYTES,
+ * so a longer password is refused — never truncated. It is bytes of UTF-8
+ * (an Arabic letter is two), which is why the message does not quote a
+ * number of characters.
+ */
 export const FAMILY_PASSWORD_MIN_LENGTH = 8;
+export const FAMILY_PASSWORD_MAX_BYTES = 72;
+export const PASSWORD_TOO_LONG = "كلمة المرور طويلة جدًا. يرجى استخدام كلمة مرور أقصر.";
+
+export function passwordByteLength(value: string): number {
+  return new TextEncoder().encode(value).length;
+}
 
 export const passwordSchema = z
   .object({
@@ -51,7 +64,7 @@ export const passwordSchema = z
       .string()
       .min(1, "كلمة المرور مطلوبة.")
       .min(FAMILY_PASSWORD_MIN_LENGTH, `كلمة المرور يجب ألا تقل عن ${FAMILY_PASSWORD_MIN_LENGTH} أحرف.`)
-      .max(255, "كلمة المرور طويلة جدًا."),
+      .refine((value) => passwordByteLength(value) <= FAMILY_PASSWORD_MAX_BYTES, PASSWORD_TOO_LONG),
     password_confirmation: z.string().min(1, "تأكيد كلمة المرور مطلوب."),
   })
   .refine((values) => values.password === values.password_confirmation, {
@@ -59,3 +72,10 @@ export const passwordSchema = z
     message: "كلمتا المرور غير متطابقتين.",
   });
 export type PasswordValues = z.infer<typeof passwordSchema>;
+
+/** Login: the format of the identifier, and a password that is merely present. */
+export const loginSchema = nationalIdSchema.extend({
+  password: z.string().min(1, "كلمة المرور مطلوبة."),
+});
+export type LoginInput = z.input<typeof loginSchema>;
+export type LoginValues = z.output<typeof loginSchema>;

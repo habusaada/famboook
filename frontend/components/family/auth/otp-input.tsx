@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { OTP_LENGTH, normalizeOtp } from "@/lib/schemas/family-activation";
+import { OTP_LENGTH, normalizeOtp } from "@/lib/schemas/family-auth";
 
 type Props = {
   id: string;

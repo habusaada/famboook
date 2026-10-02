@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiClient } from "@/lib/api/client";
 
-// Family Portal session and activation (docs/11 §30a): the same Sanctum
+// Family Portal session, login, activation and password reset (docs/11 §30a): the same Sanctum
 // HttpOnly session cookie + XSRF token as the Staff application. No token is
 // read or stored by JavaScript, and nothing of the activation — National ID,
 // challenge reference, code, password — is written to browser storage: it
@@ -44,7 +44,11 @@ export async function familyLogout(): Promise<void> {
   await apiClient.post("/api/v1/family/auth/logout", {});
 }
 
-// ---------------------------------------------------------------- activation
+export async function familyLogin(nationalId: string, password: string): Promise<FamilyUser> {
+  return (await apiClient.post<{ user: FamilyUser }>("/api/v1/family/auth/login", { national_id: nationalId, password })).user;
+}
+
+// ------------------------------------------- activation and password reset
 
 /** The safe timers of a challenge; nothing about the person or the mobile. */
 export type ChallengeTimers = {
@@ -79,8 +83,32 @@ export async function completeActivation(challenge: string, password: string, pa
   ).user;
 }
 
-/** The stable public error codes of the activation API. */
-export type ActivationErrorCode =
+const RESET = "/api/v1/family/auth/password/reset";
+
+export function startPasswordReset(nationalId: string): Promise<ActivationStart> {
+  return apiClient.post<ActivationStart>(`${RESET}/start`, { national_id: nationalId });
+}
+
+export function verifyPasswordReset(challenge: string, code: string): Promise<{ verified: true; grant_expires_in_seconds: number }> {
+  return apiClient.post(`${RESET}/verify`, { challenge, code });
+}
+
+export function resendPasswordReset(challenge: string): Promise<ChallengeTimers> {
+  return apiClient.post<ChallengeTimers>(`${RESET}/resend`, { challenge });
+}
+
+export async function completePasswordReset(challenge: string, password: string, passwordConfirmation: string): Promise<FamilyUser> {
+  return (
+    await apiClient.post<{ user: FamilyUser }>(`${RESET}/complete`, {
+      challenge,
+      password,
+      password_confirmation: passwordConfirmation,
+    })
+  ).user;
+}
+
+/** The stable public error codes of the Family authentication API. */
+export type FamilyAuthErrorCode =
   | "OTP_INVALID"
   | "OTP_EXPIRED"
   | "OTP_LOCKED"
@@ -89,9 +117,13 @@ export type ActivationErrorCode =
   | "GRANT_EXPIRED"
   | "ACTIVATION_FAILED"
   | "TOO_MANY_REQUESTS"
-  | "ACTIVATION_UNAVAILABLE";
+  | "ACTIVATION_UNAVAILABLE"
+  | "INVALID_CREDENTIALS"
+  | "FAMILY_AUTH_UNAVAILABLE"
+  | "RESET_FAILED"
+  | "PASSWORD_RESET_UNAVAILABLE";
 
-const MESSAGES: Record<ActivationErrorCode, string> = {
+const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   OTP_INVALID: "رمز التحقق غير صحيح.",
   OTP_EXPIRED: "انتهت صلاحية رمز التحقق. اطلب رمزًا جديدًا أو ابدأ من جديد.",
   OTP_LOCKED: "تم إيقاف هذا الرمز. ابدأ من جديد.",
@@ -101,25 +133,30 @@ const MESSAGES: Record<ActivationErrorCode, string> = {
   ACTIVATION_FAILED: "تعذّر إكمال التفعيل. ابدأ من جديد أو راجع الإدارة.",
   TOO_MANY_REQUESTS: "محاولات كثيرة. حاول مجددًا بعد قليل.",
   ACTIVATION_UNAVAILABLE: "الخدمة غير متاحة حاليًا.",
+  // One message for every credential, account and context failure.
+  INVALID_CREDENTIALS: "رقم الهوية أو كلمة المرور غير صحيحة.",
+  FAMILY_AUTH_UNAVAILABLE: "تسجيل الدخول غير متاح حاليًا.",
+  RESET_FAILED: "تعذّر تغيير كلمة المرور. ابدأ من جديد أو راجع الإدارة.",
+  PASSWORD_RESET_UNAVAILABLE: "الخدمة غير متاحة حاليًا.",
 };
 
 export const CONNECTION_ERROR = "تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.";
 
-export type ActivationFailure = {
-  code: ActivationErrorCode | null;
+export type FamilyAuthFailure = {
+  code: FamilyAuthErrorCode | null;
   message: string;
   /** Laravel field errors of a 422 without a code. */
   fields: Record<string, string[]>;
   retryAfterSeconds: number | null;
 };
 
-/** One reading of any activation failure: the stable code, never free text. */
-export function readActivationError(error: unknown): ActivationFailure {
+/** One reading of any Family authentication failure: the stable code, never free text. */
+export function readFamilyAuthError(error: unknown): FamilyAuthFailure {
   if (!(error instanceof ApiError)) {
     return { code: null, message: CONNECTION_ERROR, fields: {}, retryAfterSeconds: null };
   }
   const payload = (error.payload ?? {}) as { code?: string; retry_after_seconds?: number };
-  const code = payload.code && payload.code in MESSAGES ? (payload.code as ActivationErrorCode) : null;
+  const code = payload.code && payload.code in MESSAGES ? (payload.code as FamilyAuthErrorCode) : null;
   const fields = error.validationErrors ?? {};
   if (code === null && error.status === 429) {
     return { code: "TOO_MANY_REQUESTS", message: MESSAGES.TOO_MANY_REQUESTS, fields, retryAfterSeconds: null };
