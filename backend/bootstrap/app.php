@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Foundation\Application;
@@ -19,7 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // The Staff API boundary (AUTH-ADR-065): family-side accounts never
         // enter Staff routes, whatever permission they hold.
-        $middleware->alias(['staff.side' => EnsureStaffSideAccount::class]);
+        // Its mirror for /api/v1/family (docs/06 §22b): only family-side accounts.
+        $middleware->alias([
+            'staff.side' => EnsureStaffSideAccount::class,
+            'family.side' => EnsureFamilySideAccount::class,
+        ]);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
         $middleware->appendToGroup('web', EnsureUserIsActive::class);

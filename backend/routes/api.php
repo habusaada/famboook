@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
 use App\Http\Controllers\Api\V1\FamilyController;
@@ -32,9 +33,21 @@ Route::get('/health', function () {
 // Staff authentication on the Sanctum session (docs/06 §59c, AUTH-ADR-057).
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
+// The Family Portal API (docs/06 §22b, PWA-1F), OUTSIDE the Staff group.
+// `family.side` only says the account is family-side; it authorizes no family
+// data — family-data routes will resolve the Family context explicitly.
+Route::prefix('family')->group(function () {
+    // Any authenticated account may end its own session.
+    Route::post('/auth/logout', [FamilySessionController::class, 'logout'])->middleware('auth:sanctum');
+
+    Route::middleware(['auth:sanctum', 'family.side'])->group(function () {
+        Route::get('/me', [FamilySessionController::class, 'me']);
+    });
+});
+
 // The authenticated Staff API. `staff.side` refuses every family-side account
 // (FAMILY_USER / COORDINATOR, or either mixed with a Staff role) before any
-// permission check (docs/06 §22b, AUTH-ADR-065). Future /api/v1/family routes
+// permission check (docs/06 §22b, AUTH-ADR-065). The /api/v1/family routes
 // are registered OUTSIDE this group.
 Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);

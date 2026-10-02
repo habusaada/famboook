@@ -235,6 +235,13 @@ class AccountSideBoundaryTest extends TestCase
                 continue;
             }
             $middleware = $route->gatherMiddleware();
+            // The Family Portal API (PWA-1F) is outside the Staff boundary:
+            // FamilySideBoundaryTest covers it.
+            if (str_starts_with($route->uri(), 'api/v1/family/')) {
+                $this->assertNotContains('staff.side', $middleware, $route->uri());
+
+                continue;
+            }
             if (in_array('auth:sanctum', $middleware, true)) {
                 $this->assertContains('staff.side', $middleware, $route->uri());
                 $checked++;
@@ -242,8 +249,6 @@ class AccountSideBoundaryTest extends TestCase
                 // Public routes only: the health check and the Staff login.
                 $this->assertContains($route->uri(), ['api/v1/health', 'api/v1/auth/login'], $route->uri());
             }
-            // No Family Portal route exists yet (PWA-1G).
-            $this->assertStringStartsNotWith('api/v1/family/', $route->uri());
         }
         $this->assertGreaterThan(80, $checked);
     }
