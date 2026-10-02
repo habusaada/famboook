@@ -748,8 +748,9 @@ sides, the role checks and the Staff API boundary below (AUTH-ADR-065);
 `user-person-link.manage` is checked by the link lifecycle actions. PWA-1E
 implemented the mobile trust Staff API, which reads
 `person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067).
-`person-mobile-trust.assist`, the coordinator permissions and
-`family-portal.access` are not read by any endpoint yet.
+PWA-1F implemented the Family API boundary and the activation endpoints
+below (AUTH-ADR-068). `person-mobile-trust.assist`, the coordinator
+permissions and `family-portal.access` are not read by any endpoint yet.
 
 ## Account sides
 
@@ -895,6 +896,64 @@ POST /api/v1/people/{person}/mobile-trust/revoke   person-mobile-trust.revoke
 - There is no family-side endpoint, no coordinator endpoint and no UI.
   `person-mobile-trust.assist` stays unused, and withheld from COORDINATOR,
   until PWA-1H.
+
+## Family API boundary and activation (PWA-1F)
+
+```text
+PUBLIC, behind the activation gate and the route limiters
+POST /api/v1/family/auth/activation/start
+POST /api/v1/family/auth/activation/verify
+POST /api/v1/family/auth/activation/resend
+POST /api/v1/family/auth/activation/complete
+
+auth:sanctum
+POST /api/v1/family/auth/logout
+
+auth:sanctum + family.side
+GET  /api/v1/family/me
+```
+
+- Every `/api/v1/family` route is registered **outside** the Staff group
+  and never carries `staff.side`.
+- **`family.side` fails closed**, the mirror of `staff.side`: only
+  `AccountSide::FAMILY` passes (FAMILY_USER, with or without COORDINATOR).
+  A Staff account, a mixed account, COORDINATOR alone, a role-less or
+  custom-role account get 403 — even when they hold `family-portal.access`.
+  An inactive account gets 401 from the existing active-user check.
+- `family.side` answers only "is this a family-side account". It resolves
+  no Family and authorizes no family data. Family-data routes will resolve
+  the Family context explicitly (`FamilyAccessResolver::familyContext`).
+- A family-side account still cannot enter the Staff API, whatever direct
+  permission it holds.
+- **`GET /family/me`** returns `display_name` (the linked Person's name),
+  `roles` (family-side roles only), `coordinator`, and `context`
+  (`available`, and `family` with `code` and `name` — the Branch name, else
+  the Clan name). Without a Family context `available` is false and
+  `family` is null; the reason is not sent. Never a National ID, a mobile,
+  an internal id, a permission list or a fingerprint. `Cache-Control:
+  no-store`.
+- **Activation gate.** `family.activation` runs first on the four
+  activation routes: while `family_auth.activation_enabled` is false they
+  answer 503 `ACTIVATION_UNAVAILABLE` with no lookup, event or SMS.
+- **Public error contract** of the activation routes: `{ message, code }`.
+
+  | Code | HTTP |
+  |---|---|
+  | `OTP_INVALID` | 422 |
+  | `OTP_EXPIRED` | 410 |
+  | `OTP_LOCKED` | 423 |
+  | `OTP_COOLDOWN` (+ `retry_after_seconds`) | 429 |
+  | `OTP_SEND_LIMIT` | 429 |
+  | `GRANT_EXPIRED` | 410 |
+  | `ACTIVATION_FAILED` | 409 |
+  | `TOO_MANY_REQUESTS` | 429 |
+  | `ACTIVATION_UNAVAILABLE` | 503 |
+
+  Field validation keeps the standard 422 `errors` object. No code says
+  whether an identifier exists, is eligible or has an account.
+- Activation is a system process: it needs no permission and assigns
+  FAMILY_USER only, to a new account only.
+- There is no Family login endpoint yet (PWA-1G).
 
 ## Seeded mapping (PWA-1C)
 
@@ -3924,6 +3983,9 @@ The Staff API requires `AccountSide::STAFF`. The `staff.side` middleware fails c
 
 ### AUTH-ADR-067
 PWA-1E mobile trust Staff API (§22b): three routes behind `auth:sanctum` and `staff.side`, gated by `person-mobile-trust.view`, `.grant` and `.revoke`, held by SUPER_ADMIN and ADMINISTRATOR only. The mobile number is never an input. Coordinator-assisted verification and `person-mobile-trust.assist` remain deferred to PWA-1H; no permission mapping changed in PWA-1E.
+
+### AUTH-ADR-068
+PWA-1F Family API boundary (§22b): `/api/v1/family` routes live outside the Staff group. `family.side` fails closed and admits only `AccountSide::FAMILY`; it classifies the account and authorizes no family data — Family context is resolved separately. `GET /family/me` exposes only safe bootstrap data and never the denial reason. The four activation routes are public, gated by `family.activation`, rate limited, and answer with a fixed public error contract. Activation always creates a new family-side account and never attaches FAMILY_USER to an existing one. No permission mapping changed in PWA-1F.
 ```
 
 ---
@@ -4293,6 +4355,7 @@ Date: 2026-09-24
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
 | 1.2.31 | 2026-10-02 | Approved | PWA-1E (AUTH-ADR-067): §22b mobile trust Staff API (view / grant / revoke) behind the Staff boundary; no permission mapping changed; coordinator assistance still deferred to PWA-1H |
+| 1.2.32 | 2026-10-02 | Approved | PWA-1F (AUTH-ADR-068): §22b Family API boundary (`family.side`, fail closed), `/family/me`, logout, the public activation routes with their gate and error contract; no permission mapping changed |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

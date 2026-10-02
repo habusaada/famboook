@@ -2306,9 +2306,57 @@ PWA-1D implemented the eligibility resolver, the User-Person Link
 lifecycle, the National ID correction and death effects below, and the
 account-side rules (including the Staff API boundary). PWA-1E implemented
 the mobile trust lifecycle with its Staff API, the OTP challenge service,
-the SMS abstraction, the OTP throttle and the OTP cleanup. Still not built:
-activation, login and password reset (PWA-1F–1G), coordinator scope and
+the SMS abstraction, the OTP throttle and the OTP cleanup. PWA-1F
+implemented activation (below) and the first Family Portal screens. Still
+not built: Family login and password reset (PWA-1G), coordinator scope and
 coordinator-assisted verification (PWA-1H), and any real SMS provider.
+
+## Activation as implemented (PWA-1F)
+
+- **Who may activate.** A Person found by an exact match of the nine
+  normalized digits on `persons.national_id` — exactly one live match; zero
+  or several deny — who is an eligible household head (the resolver's rule:
+  not deleted, active, ALIVE, active membership, household head, Family
+  ACTIVE and not deleted), has a TRUSTED current mobile and has no ACTIVE or
+  SUSPENDED User-Person Link. UNKNOWN life status is not eligible.
+- **Nothing is revealed.** Every well-formed identifier gets the same
+  answer from the first step. A denied start (unknown, ineligible, no or
+  untrusted mobile, already activated, ambiguous, SMS ceiling reached)
+  returns a decoy reference that behaves like a real one in the code and
+  resend steps. The reason is recorded as a security event only. No part of
+  the mobile number is ever shown. A failed SMS delivery is answered like a
+  sent one.
+- **The code goes only to the Person's current trusted mobile.** The caller
+  cannot name a destination.
+- **Server state decides the step.** A password can be set only against a
+  challenge whose code was verified, inside the 10-minute grant.
+- **Completion is one transaction**: the grant is consumed, eligibility and
+  "no current link" are re-checked, a NEW User is created (email null,
+  active, password hashed, `users.name` a snapshot of the Person's name),
+  FAMILY_USER alone is assigned, and the ACTIVE link and ACTIVE identity are
+  established. Any failure leaves nothing behind and the grant unconsumed.
+- **Never an existing account.** Activation never reuses a User, so a Staff
+  account can never receive FAMILY_USER; a staff member who is a household
+  head gets a separate family-side account. A Person whose earlier link was
+  ENDED activates again with a new account.
+- **Password policy**: at least 8 characters, confirmation, no composition
+  rule; passphrases allowed.
+- **Session.** Activation signs the new account in on the existing
+  first-party session. A request that cannot carry a session is refused
+  before anything is created. A Staff session in the same browser is
+  replaced: one browser session is either Staff or Family. No "remember me".
+- **Display name.** The Family Portal always shows the linked Person's name,
+  never `users.name`.
+- **Account is not access.** A family-side account without a Family context
+  (death recorded, headship moved, link suspended) sees a neutral
+  "access unavailable" state and no family data; the reason is not sent.
+- **Request ceilings** (configurable, in addition to the OTP SMS ceilings):
+  start 10 per minute and 30 per hour per IP and 5 per hour per identifier
+  (its keyed fingerprint); verify 30 per minute per IP; resend and complete
+  10 per minute per IP. A start or resend never answers faster than a
+  configured floor (400 ms by default — a development value).
+- **Gate.** All four activation endpoints answer "unavailable" and do
+  nothing while `FAMILY_ACTIVATION_ENABLED` is false (the default).
 
 ## Eligibility
 
@@ -4639,6 +4687,7 @@ Date: 2026-09-24
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
 | 1.2.39 | 2026-10-02 | Approved | PWA-1E: §89b mobile trust rules as implemented (current-number invariant, grant/revoke, STALE on change, change-back never restores, no head requirement), OTP resend and grant semantics, delivery and throttle ceilings |
+| 1.2.40 | 2026-10-02 | Approved | PWA-1F: §89b activation as implemented (lookup, anti-enumeration with decoy references, completion transaction, always a new family-side User, session rules, display name from the Person, account is not access, request ceilings and response floor, activation gate) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

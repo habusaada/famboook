@@ -1314,8 +1314,9 @@ Approved 2026-10-02 (WF-ADR-040). Architecture: `11-FAMILY-PORTAL.md`
 correction effect, the death effect and access loss (WF-ADR-041) as Domain
 Actions — no endpoint and no UI. PWA-1E implemented the mobile trust
 lifecycle (with a Staff API) and the OTP challenge state machine
-(WF-ADR-042). Activation and password reset below are still to be built
-(PWA-1F–1G); coordinator-assisted verification is PWA-1H.
+(WF-ADR-042). PWA-1F implemented activation (WF-ADR-043). Password reset
+below is still to be built (PWA-1G); coordinator-assisted verification is
+PWA-1H.
 
 ## User-Person Link
 
@@ -1380,6 +1381,45 @@ STALE / REVOKED ──a new grant of the current number──▶ a NEW TRUSTED r
 - Revoking changes neither the account, nor the link, nor the sessions.
 - `PENDING_VERIFICATION` and assistance are not used yet: the coordinator
   path above arrives with PWA-1H.
+
+## Activation as implemented (PWA-1F)
+
+```text
+START      POST /family/auth/activation/start     national_id
+             → the same answer for every well-formed identifier:
+               { challenge, resend_after_seconds, expires_in_seconds, can_resend }
+             eligible, trusted mobile, not activated → real ACTIVATION challenge + SMS
+             anything else                           → decoy reference (cache only)
+
+OTP        POST /family/auth/activation/verify    challenge, code
+PENDING      wrong code → counted; the fifth locks
+           POST /family/auth/activation/resend    challenge
+             same challenge, new code; 60 s cooldown; at most 3 sends
+
+OTP        a correct code opens the 10-minute grant; nothing is activated
+VERIFIED
+
+PASSWORD   POST /family/auth/activation/complete  challenge, password, confirmation
+REQUIRED     ONE transaction: lock Person → consume the grant → re-check
+             eligibility and "no current link" → new User → FAMILY_USER →
+             ACTIVE link + ACTIVE identity → ACTIVATION_COMPLETED
+
+ACTIVATED  after the commit: session established, session id regenerated
+             → the /family/me representation → the browser opens /family
+```
+
+- The client carries only the opaque challenge reference, in request
+  bodies. The National ID is sent once. Nothing sensitive is in a URL, and
+  the browser keeps the flow in memory only: a refresh restarts it.
+- A decoy models sends, cooldown, expiry, attempts, lock and supersession
+  with the same policy values, so verify and resend answer alike for a real
+  challenge and a decoy. A new start for the same identifier makes the
+  previous reference unusable in both cases. A reference is recognised for
+  one hour.
+- Public errors are a fixed set of codes (docs/06 §22b). Internal reasons
+  are never returned.
+- A grant cannot be re-verified: an expired grant means starting again.
+- Start and resend wait out a configured minimum response time.
 
 ## OTP challenge (PWA-1E)
 
@@ -3006,6 +3046,9 @@ PWA-1D implemented the Link lifecycle as Domain Actions (establish, suspend, res
 
 ### WF-ADR-042
 PWA-1E implemented the mobile trust lifecycle and the OTP challenge state machine. Trust is decided by one resolver against the Person's current normalized number; STALE and REVOKED never revert and changing back needs a new verification. A resend keeps the challenge row, replaces the code, restarts the expiry and keeps the attempts; a correct code opens a 10-minute grant that is consumed inside the consuming workflow's transaction. Delivery is synchronous after commit with no retry.
+
+### WF-ADR-043
+PWA-1F implemented Family account activation as four public steps (start, verify, resend, complete) driven by server state: the client holds only an opaque challenge reference. A denied start returns a cache-backed decoy that follows the same public state machine. Completion is one transaction that consumes the verified grant, re-checks eligibility, always creates a new family-side User and establishes the link and identity through `EstablishFamilyIdentityAction`; the session is established only after the commit, and a request without a session is refused before anything is created.
 ```
 
 ---
@@ -3270,3 +3313,4 @@ Date: 2026-09-24
 | 1.2.8 | 2026-10-02 | Approved | PWA-1B: §53b Family Portal Identity Workflows (Link, mobile trust, activation, National ID correction, reset, access loss); PWF-010 decided for V1 (WF-ADR-040). Documentation only |
 | 1.2.9 | 2026-10-02 | Approved | PWA-1D: §53b Link lifecycle, National ID correction and death effects recorded as implemented (Domain Actions only); ended identity is SUPERSEDED / LINK_ENDED; account not deactivated (WF-ADR-041) |
 | 1.2.10 | 2026-10-02 | Approved | PWA-1E: §53b mobile trust lifecycle as implemented and the OTP challenge state machine (resend, grant, supersede, delivery) (WF-ADR-042) |
+| 1.2.11 | 2026-10-02 | Approved | PWA-1F: §53b activation as implemented — public steps, decoy references, completion transaction and session (WF-ADR-043) |

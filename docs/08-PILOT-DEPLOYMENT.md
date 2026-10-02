@@ -405,7 +405,19 @@ Family Portal activation may be enabled in Production.
      as the provider requires (PWA-1E delivers synchronously, without a
      retry, precisely so that no plaintext code is written to a queue);
   5. worker process supervision exists if queued delivery is used;
-  6. the scheduler cron is configured for scheduled maintenance.
+  6. the scheduler cron is configured for scheduled maintenance;
+  7. PWA-1G Family login is delivered and validated — PWA-1F has no login,
+     so an activated user could not return after the session ends.
+- **Activation abuse controls (PWA-1F).** Defaults in
+  `config/family_auth.php`, overridable by
+  `FAMILY_ACTIVATION_LIMIT_START_IP_MINUTE` (10) / `_START_IP_HOUR` (30) /
+  `_START_IDENTIFIER_HOUR` (5) / `_VERIFY_IP_MINUTE` (30) /
+  `_RESEND_IP_MINUTE` (10) / `_COMPLETE_IP_MINUTE` (10). They use the
+  application cache store, as do the decoy activation references.
+  `FAMILY_ACTIVATION_MIN_RESPONSE_MS` (400) is a **development default**:
+  the Production value must exceed the real SMS provider's slow-case
+  latency and is reviewed with that integration (gate item 1). It holds a
+  PHP worker for its duration.
 - **OTP abuse ceilings** are security settings with defaults in
   `config/family_auth.php`, overridable by `FAMILY_OTP_THROTTLE_PERSON_HOUR`
   / `_PERSON_DAY` / `_DESTINATION_HOUR` / `_DESTINATION_DAY` / `_IP_HOUR` /
@@ -427,7 +439,12 @@ Family Portal activation may be enabled in Production.
   - the SMS provider credentials.
 - **Activation switch.** `FAMILY_ACTIVATION_ENABLED=false` (the default)
   until the owner approves it, following the same pattern as the Import
-  Apply gate (§7a). Nothing reads it before PWA-1F.
+  Apply gate (§7a). Since PWA-1F it gates the four public activation
+  endpoints: while false they answer 503 and do nothing. Deploying PWA-1F
+  does not enable activation, and `/family/activate` then only shows
+  "service unavailable". The Family Portal is served by the existing
+  frontend on the same origin, so CORS, the stateful domain and the session
+  cookie need no change.
 - **PWA-1C deployment note.** The foundation (commits up to PWA-1C) adds
   seven migrations and the COORDINATOR role with ten permissions. A deploy
   runs `migrate`, the RolePermissionSeeder and `famboook:verify-permissions`
@@ -586,6 +603,7 @@ Never do this once real data has been entered.
 | Version | Date | Status | Description |
 |---|---|---|---|
 | 1.1.4 | 2026-10-02 | Approved | §16a: PWA-1E — `FAMILY_SMS_DRIVER` (empty = no delivery; `log` local only), the six-point Production gate for self-activation, OTP throttle overrides, OTP purge command and the scheduler-cron prerequisite. Nothing activated |
+| 1.1.5 | 2026-10-02 | Approved | §16a: PWA-1F — activation gate now read by the public endpoints; activation limiter and response-floor overrides (400 ms is a development default); PWA-1G Family login added to the Production gate (seven points). Nothing activated |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
