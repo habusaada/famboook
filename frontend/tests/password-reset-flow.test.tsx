@@ -207,7 +207,7 @@ describe("step 2 — the code", () => {
 
       expect(screen.getByText(/إعادة الإرسال بعد/)).toHaveTextContent("إعادة الإرسال بعد 60 ثانية");
       await tick(60);
-      await user.click(screen.getByRole("button", { name: "إعادة إرسال الرمز" }));
+      await user.click(await screen.findByRole("button", { name: "إعادة إرسال الرمز" }));
 
       expect(await screen.findByRole("status")).toHaveTextContent("تم طلب رمز جديد");
       expect(post).toHaveBeenCalledWith(`${BASE}/resend`, { challenge: CHALLENGE });
@@ -222,13 +222,13 @@ describe("step 2 — the code", () => {
       await toOtpStep(user);
       await tick(60);
 
-      await user.click(screen.getByRole("button", { name: "إعادة إرسال الرمز" }));
+      await user.click(await screen.findByRole("button", { name: "إعادة إرسال الرمز" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("يمكن طلب رمز جديد بعد قليل.");
       expect(screen.getByText(/إعادة الإرسال بعد/)).toHaveTextContent("إعادة الإرسال بعد 25 ثانية");
 
       reply = refusal(429, "OTP_SEND_LIMIT");
       await tick(26);
-      await user.click(screen.getByRole("button", { name: "إعادة إرسال الرمز" }));
+      await user.click(await screen.findByRole("button", { name: "إعادة إرسال الرمز" }));
       expect(await screen.findByRole("alert")).toHaveTextContent("لا يمكن إرسال رمز آخر الآن.");
       expect(screen.queryByRole("button", { name: "إعادة إرسال الرمز" })).not.toBeInTheDocument();
     });
