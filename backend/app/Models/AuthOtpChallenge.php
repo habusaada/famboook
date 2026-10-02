@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OtpPurpose;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -64,6 +65,26 @@ class AuthOtpChallenge extends Model
     public function uniqueIds(): array
     {
         return ['uuid'];
+    }
+
+    /**
+     * Open = not consumed, not superseded and not locked (the partial unique
+     * index). Expiry is time-dependent and is checked by the OTP service.
+     */
+    public function scopeOpen(Builder $query): void
+    {
+        $query->whereNull('consumed_at')->whereNull('superseded_at')->whereNull('locked_at');
+    }
+
+    /**
+     * Supersedes every open challenge bound to a mobile trust: they become
+     * unusable immediately. The one place this rule lives — used when a
+     * trust is revoked or becomes stale. Returns the rows superseded.
+     */
+    public static function supersedeOpenForTrust(int $mobileTrustId): int
+    {
+        return static::query()->open()->where('mobile_trust_id', $mobileTrustId)
+            ->update(['superseded_at' => now(), 'updated_at' => now()]);
     }
 
     public function person(): BelongsTo

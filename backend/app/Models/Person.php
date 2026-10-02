@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\Gender;
 use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
+use App\Support\FamilyAuth\FamilyMobile;
+use App\Support\FamilyAuth\MobileTrusts;
 use App\Support\HealthRecordRules;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +53,31 @@ class Person extends Model
                 HealthRecordRules::assertGenderChangeAllowed($person, $person->gender);
             }
         });
+
+        // Only `updated`: a new Person has no trust to make stale.
+        static::updated(fn (Person $person) => self::staleMobileTrustWhenTheNumberChanges($person));
+    }
+
+    /**
+     * Family Portal (docs/11 §30a): when an existing Person's CANONICAL
+     * mobile changes, the trust of the previous number becomes STALE and its
+     * open OTP challenges are superseded — on every Eloquent write path, not
+     * only UpdatePersonAction. Nothing runs unless `mobile` itself changed,
+     * and a formatting-only edit (the same normalized number) changes
+     * nothing. It never saves the Person again, never runs on creation, and
+     * joins the caller's transaction. A stale trust is never restored, even
+     * if the number is later changed back.
+     */
+    private static function staleMobileTrustWhenTheNumberChanges(Person $person): void
+    {
+        if (! $person->wasChanged('mobile')) {
+            return;
+        }
+        if (FamilyMobile::normalize($person->getOriginal('mobile')) === FamilyMobile::normalize($person->mobile)) {
+            return;
+        }
+
+        MobileTrusts::markStale($person, $person->updated_by);
     }
 
     protected function casts(): array
