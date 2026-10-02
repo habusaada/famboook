@@ -2307,9 +2307,55 @@ lifecycle, the National ID correction and death effects below, and the
 account-side rules (including the Staff API boundary). PWA-1E implemented
 the mobile trust lifecycle with its Staff API, the OTP challenge service,
 the SMS abstraction, the OTP throttle and the OTP cleanup. PWA-1F
-implemented activation (below) and the first Family Portal screens. Still
-not built: Family login and password reset (PWA-1G), coordinator scope and
-coordinator-assisted verification (PWA-1H), and any real SMS provider.
+implemented activation (below) and the first Family Portal screens. PWA-1G
+implemented Family login and password reset (below). Still not built:
+coordinator scope and coordinator-assisted verification (PWA-1H), and any
+real SMS provider.
+
+## Login and password reset as implemented (PWA-1G)
+
+- **Lookup.** The typed National ID is normalized, fingerprinted and
+  matched against an ACTIVE authentication identity. `persons.national_id`
+  is never the login or reset lookup.
+- **A correct password is not enough.** Login requires the account's full
+  Family context at that moment: active family-side User, ACTIVE link,
+  Person not deleted, active and ALIVE, identity consistent with the
+  Person's current National ID, active household-head membership, Family
+  ACTIVE and not deleted. Without it no session is created.
+- **One answer for every login failure**: unknown identifier, wrong
+  password, inactive, Staff or mixed account, suspended or ended link,
+  death, moved headship, inactive Family. The reason is recorded as a
+  security event only. A password is verified even for an unknown
+  identifier, so the two cases cost the same.
+- **Login lockout**, over 15 minutes, counting FAILED attempts only: 5 for
+  one identifier from one address, and 20 for one identifier from any
+  address; plus 20 attempts of any kind per address. A successful login
+  clears the identifier counters. All apply to unknown identifiers alike.
+- **Password reset** requires the same Family context as login and a
+  TRUSTED current mobile. An account that could not enter the portal gets
+  no SMS. Every well-formed identifier gets the same answer; a denied
+  request gets a decoy, exactly as in activation.
+- **Activation and reset codes are not interchangeable.** A challenge
+  reference, real or decoy, exists only for the purpose it was issued for.
+- **Reset completion is one transaction**: the verified grant is consumed,
+  the Family context is re-checked, the password is replaced and EVERY
+  earlier session of the account is ended. A failure leaves the old
+  password, the grant and the sessions as they were. Mobile trust is not
+  changed.
+- **After a reset the account is signed in** on a new session; there is no
+  extra login step.
+- **Family password policy** (activation and reset): at least 8
+  characters, confirmation, no composition rule, passphrases allowed, and
+  at most 72 bytes of UTF-8 — the bcrypt input limit. A longer password is
+  refused, never truncated.
+- **One browser session is either Staff or Family.** A Family login or
+  reset replaces whatever was signed in.
+- **Not in PWA-1G:** "remember me", a Family-specific session lifetime (the
+  shared 120-minute idle lifetime applies; to be reviewed with the
+  installable PWA and the account module), and an authenticated "change my
+  password" (it belongs to the future account module).
+- **Three independent gates**, all off by default: activation, login,
+  password reset.
 
 ## Activation as implemented (PWA-1F)
 
@@ -4688,6 +4734,7 @@ Date: 2026-09-24
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
 | 1.2.39 | 2026-10-02 | Approved | PWA-1E: §89b mobile trust rules as implemented (current-number invariant, grant/revoke, STALE on change, change-back never restores, no head requirement), OTP resend and grant semantics, delivery and throttle ceilings |
 | 1.2.40 | 2026-10-02 | Approved | PWA-1F: §89b activation as implemented (lookup, anti-enumeration with decoy references, completion transaction, always a new family-side User, session rules, display name from the Person, account is not access, request ceilings and response floor, activation gate) |
+| 1.2.41 | 2026-10-03 | Approved | PWA-1G: §89b login and password reset as implemented (identity lookup, full Family context required, one generic login failure, two-tier lockout, reset eligibility and decoys, purpose-bound references, reset transaction ending all sessions, 72-byte password ceiling, three independent gates) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

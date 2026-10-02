@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.5
+**Version:** 1.6
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation and PWA-1F activation with the first Family Portal screens (§30a); activation is disabled by default; no Family login, password reset or real SMS provider
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens and PWA-1G Family login and password reset (§30a); activation, login and password reset are each disabled by default; no real SMS provider
 
 ---
 
@@ -1045,7 +1045,9 @@ with the Staff gate and shell in that group's layout; the Family Portal is
 `/family/activate`, and the authenticated `(portal)` group behind
 `FamilyGate`. The home is `/family` (not `/family/home`). No Staff URL
 changed. No manifest and no service worker exist yet: installability
-belongs to the later Family Portal shell phase.
+belongs to the later Family Portal shell phase. PWA-1G added the public
+`/family/login` and `/family/forgot-password`; the shared pieces of the
+three public screens live in `frontend/components/family/auth/`.
 
 URL scope stays `/family`, and the future manifest is scoped to `/family`.
 
@@ -1220,10 +1222,10 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 # 30a. PWA-1 Identity and Access Architecture (PWA-1B — approved 2026-10-02)
 
 Approved design. **Implemented: the PWA-1C foundation, the PWA-1D
-identity domain behaviour, the PWA-1E mobile trust and OTP foundation and
-PWA-1F activation** (see the four implementation records below). Family
-login, password reset, a real SMS provider and coordinator scope are still
-to be built.
+identity domain behaviour, the PWA-1E mobile trust and OTP foundation,
+PWA-1F activation and PWA-1G login and password reset** (see the five
+implementation records below). A real SMS provider and coordinator scope
+are still to be built.
 Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
@@ -1443,7 +1445,8 @@ authorization.
 ## Production activation gates
 
 Family self-activation MUST NOT be considered Production-ready until all
-hold (neither PWA-1E nor PWA-1F satisfies this gate):
+hold (PWA-1E, PWA-1F and PWA-1G do not satisfy this gate; PWA-1G delivers
+the code of item 7):
 
 ```text
 1. A real SMS provider is selected and integrated
@@ -1454,6 +1457,8 @@ hold (neither PWA-1E nor PWA-1F satisfies this gate):
 5. Worker process supervision exists if queued delivery is used
 6. The scheduler cron is configured for scheduled maintenance
 7. PWA-1G Family login is delivered and validated
+8. The response-time floor is set against the real provider
+9. The Family Auth flags are enabled deliberately, never by a deployment
 ```
 
 SMS is an abstraction (`SmsSender`) with a log-only development driver; no
@@ -1472,8 +1477,8 @@ PWA-1C  Schema / foundation                              DONE
 PWA-1D  Identity resolver + links                        DONE
 PWA-1E  Mobile trust + OTP / SMS abstraction             DONE
 PWA-1F  Activation + first Family Portal UI              DONE
-PWA-1G  Login / reset / session / family context         NEXT
-PWA-1H  Coordinator identity / scope
+PWA-1G  Login / password reset                           DONE
+PWA-1H  Coordinator identity / scope                     NEXT
 PWA-1I  Security hardening / full regression
 ```
 
@@ -1756,6 +1761,94 @@ Not implemented by PWA-1F: Family login, password reset, family-data
 endpoints, the family context middleware, the installable PWA (manifest,
 service worker), coordinator scope, a real SMS provider.
 
+## PWA-1G implementation record
+
+Implemented 2026-10-03. No migration. Login and password reset are each
+**disabled by default** (`FAMILY_LOGIN_ENABLED=false`,
+`FAMILY_PASSWORD_RESET_ENABLED=false`), independently of activation.
+
+**Backend.**
+
+- `FamilyLogin`: National ID → strict normalizer → keyed LOGIN_ID
+  fingerprint → ACTIVE identity (`findByNationalIdInput`) → User →
+  password → `FamilyAccessResolver::familyContext()`, and the identity that
+  was looked up must be the one the resolver holds. Never
+  `persons.national_id`.
+- Every failure after format validation is one 401 `INVALID_CREDENTIALS`.
+  The reason is a security event (`LOGIN_FAILED`) with the keyed
+  fingerprint.
+- Timing: the password is verified in every case — against a cached dummy
+  bcrypt hash of the configured cost when no identity exists — and the
+  context is evaluated only after a correct password. No response floor on
+  login.
+- Lockout, failures only, over 900 seconds: 5 per identifier and address,
+  20 per identifier across addresses; a success clears both. A route
+  limiter allows 20 attempts per address. Keys hold the fingerprint and a
+  digest of the address.
+- A request without a session is refused before any password is checked.
+  A successful login replaces any session in that browser and regenerates
+  the session id and CSRF token. No token, no "remember me".
+- `ChallengeDecoys` (was `ActivationDecoys`) is purpose-aware: the purpose
+  is part of the state and of the "open" key, so activation and reset
+  references never interchange. `FamilyOtpFlow` holds everything a caller
+  can observe in start, verify and resend, for one purpose at a time;
+  `FamilyActivation` and `FamilyPasswordReset` hold only who gets a real
+  challenge.
+- `FamilyPasswordReset`: the login lookup, the full Family context, then
+  `OtpChallenges::issue(PASSWORD_RESET, person, user)`. Denied requests get
+  a decoy.
+- `ResetFamilyPasswordAction` — the completion transaction: lock the
+  Person, lock the User, consume the verified grant for both, re-check the
+  Family context for the same Person, replace the password,
+  `FamilySessions::revoke`, record `PASSWORD_RESET_COMPLETED`. A failure
+  rolls everything back and is recorded after the rollback. The session of
+  the completing browser is established after the commit.
+- Sanctum's password-hash session check remains the second layer: a
+  session that outlived the deletion is refused on its next request.
+- Family password policy, for activation and reset: at least 8 characters,
+  confirmation, no composition rule, at most 72 bytes of UTF-8. A longer
+  password is refused with a plain message; nothing is truncated.
+- Gates: `family.login` and `family.password-reset`, beside the existing
+  `family.activation`.
+- Security events reuse `LOGIN_SUCCEEDED`, `LOGIN_FAILED`,
+  `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED` and
+  `SESSIONS_REVOKED`.
+
+**Frontend.**
+
+- `/family/login`: National ID and password, one generic sentence for a
+  credential failure, links to the password reset and to activation. The
+  page does not query `/family/me`.
+- `/family/forgot-password`: one route, three in-memory steps (identifier,
+  code, new password), built from the same steps as activation. A
+  successful reset signs in and opens `/family`.
+- `/family/activate` now shows "لديك حساب بالفعل؟ تسجيل الدخول".
+- `FamilyGate` sends a guest to `/family/login`; logout goes there too. A
+  Staff or other non-family session still sees the neutral notice, now
+  with a link to the Family login.
+- Shared pieces under `components/family/auth/`: the auth card, the
+  identifier step, the OTP step and input, the password step and field,
+  the error reader.
+
+**Known limits.**
+
+- The shared 120-minute idle session lifetime applies; no Family-specific
+  lifetime and no "remember me". To be reviewed with the installable PWA
+  and the account module.
+- No authenticated "change my password"; it belongs to the account module.
+- A head who lost eligibility sees the generic credential failure with a
+  correct password, and a reset sends nothing. That is deliberate; the
+  login page cannot explain it.
+- The family context MIDDLEWARE listed for this slice was not built: no
+  family-data route exists yet. It arrives with the first one, with the
+  cross-family IDOR tests.
+- The identifier lockout tiers and the decoy send ceiling are cache
+  counters; under heavy concurrency they are approximate.
+
+Not implemented by PWA-1G: family-data endpoints, the family context
+middleware, the installable PWA, coordinator scope, a real SMS provider,
+"change my password".
+
 ---
 
 # 31. Amendment Register
@@ -1993,6 +2086,28 @@ A family-side account is not access. `family.side` only classifies the
 account; Family context is resolved separately on every request, and
 without it the portal shows a neutral unavailable state. PWA-1G Family
 login is part of the Production activation gate.
+
+FP-ADR-044
+Family login resolves the account through the authentication identity,
+never the registry field, and creates a session only when the full Family
+context exists. Every failure is one generic answer; an unknown identifier
+costs a password verification like a known one. Lockout counts failures in
+two tiers — per identifier and address, and per identifier overall — so
+that knowing a National ID is not enough to lock its owner out from one
+address.
+
+FP-ADR-045
+Password reset follows activation's public contract on purpose-bound
+references: the same generic start, decoys, timers and errors, with no
+reference valid for the other purpose. It requires the same Family context
+as login, ends every earlier session of the account, and signs the
+completing browser in on a new session.
+
+FP-ADR-046
+A Family password is 8 characters to 72 bytes of UTF-8. The upper bound is
+the bcrypt input limit: a longer password is refused, never truncated.
+Activation, login and password reset are three independent gates, all off
+by default.
 ```
 
 ---
@@ -2139,3 +2254,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.3.1 | 2026-10-02 | Approved | PWA-1D hardening: the Staff API boundary fails closed — `AccountSide::STAFF` is required (FP-ADR-037 wording, docs/06 AUTH-ADR-066) |
 | 1.4 | 2026-10-02 | Approved | PWA-1E implementation record in §30a: trusted-mobile resolver, grant / revoke and the Staff API, STALE semantics, SMS abstraction and drivers, OTP challenge service (resend, 10-minute grant), throttle ceilings, cleanup; the six-point Production gate; FP-ADR-038 … 040; PWA-1E done, PWA-1F next. No migration; no activation, login, reset or provider |
 | 1.5 | 2026-10-02 | Approved | PWA-1F implementation record in §30a: Family API boundary and `/family/me`, public activation steps with decoys, limiters and the response floor, the completion transaction and session, the `(staff)` route group, the Family theme, the activation flow and the first shell; §25 layout as implemented; Production gate extended with PWA-1G (seven points); FP-ADR-041 … 043; PWA-1F done, PWA-1G next. No migration; activation disabled by default |
+| 1.6 | 2026-10-03 | Approved | PWA-1G implementation record in §30a: Family login (identity lookup, Family context, generic failure, dummy hash, two-tier lockout), password reset on purpose-aware decoys, the reset transaction and session revocation, the 72-byte password ceiling, three independent gates, the login and forgot-password screens; Production gate items 8–9; FP-ADR-044 … 046; PWA-1G done, PWA-1H next. No migration; nothing enabled |

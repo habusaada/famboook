@@ -406,8 +406,31 @@ Family Portal activation may be enabled in Production.
      retry, precisely so that no plaintext code is written to a queue);
   5. worker process supervision exists if queued delivery is used;
   6. the scheduler cron is configured for scheduled maintenance;
-  7. PWA-1G Family login is delivered and validated — PWA-1F has no login,
-     so an activated user could not return after the session ends.
+  7. PWA-1G Family login is delivered and validated — the code is
+     delivered (PWA-1G); validating it in the target environment remains;
+  8. the response-time floor is set against the real provider;
+  9. the three Family Auth flags are enabled deliberately, one decision
+     each — never by a deployment.
+- **Family Auth flags (PWA-1G).** Three independent switches, all `false`
+  by default and in the Production template: `FAMILY_ACTIVATION_ENABLED`,
+  `FAMILY_LOGIN_ENABLED`, `FAMILY_PASSWORD_RESET_ENABLED`. A closed surface
+  answers 503 and does nothing. Login sends no SMS; activation and password
+  reset do, and must stay closed until items 1–6 hold. Enabling activation
+  without login would strand activated users after their session ends.
+- **Login lockout (PWA-1G).** `FAMILY_LOGIN_LIMIT_DECAY_SECONDS` (900),
+  `_IP_ATTEMPTS` (20), `_IDENTIFIER_IP_FAILURES` (5),
+  `_IDENTIFIER_FAILURES` (20). Password reset request ceilings:
+  `FAMILY_PASSWORD_RESET_LIMIT_*`, same names and defaults as activation.
+  Reset start and resend use the same response floor as activation.
+- **Sessions.** Family and Staff share one session configuration
+  (`SESSION_LIFETIME=120`). A Family-specific lifetime is not implemented;
+  it is to be reviewed with the installable PWA and the account module. A
+  password reset deletes the account's session rows — this relies on
+  `SESSION_DRIVER=database`; with any other driver the remaining sessions
+  are still refused on their next request by the password-hash check.
+- **Operational prerequisite.** There is still no Staff screen for
+  granting mobile trust — only the API (docs/06 §22b). Nobody can activate
+  or reset without a TRUSTED mobile.
 - **Activation abuse controls (PWA-1F).** Defaults in
   `config/family_auth.php`, overridable by
   `FAMILY_ACTIVATION_LIMIT_START_IP_MINUTE` (10) / `_START_IP_HOUR` (30) /
@@ -604,6 +627,7 @@ Never do this once real data has been entered.
 |---|---|---|---|
 | 1.1.4 | 2026-10-02 | Approved | §16a: PWA-1E — `FAMILY_SMS_DRIVER` (empty = no delivery; `log` local only), the six-point Production gate for self-activation, OTP throttle overrides, OTP purge command and the scheduler-cron prerequisite. Nothing activated |
 | 1.1.5 | 2026-10-02 | Approved | §16a: PWA-1F — activation gate now read by the public endpoints; activation limiter and response-floor overrides (400 ms is a development default); PWA-1G Family login added to the Production gate (seven points). Nothing activated |
+| 1.1.6 | 2026-10-03 | Approved | §16a: PWA-1G — three independent Family Auth flags (all false), login lockout and password reset limiter overrides, session notes, gate item 7 code-delivered and items 8–9 added. Nothing activated |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

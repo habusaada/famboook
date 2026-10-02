@@ -2252,8 +2252,12 @@ the mobile trust lifecycle and the OTP challenge service; PWA-1F
 activation, which creates the family-side User, its ACTIVE link and its
 ACTIVE identity in one transaction (no new table or column; `users.name` of
 a family-side account is a snapshot of the Person's name taken at
-activation and is never displayed). Login and password reset do not exist
-yet. Physical schema: docs/04 §55b.
+activation and is never displayed); PWA-1G Family login and password
+reset, which read `family_auth_identities` by the keyed login fingerprint
+and write only `users.password` (no new table or column). A Family password
+is at least 8 characters and at most 72 bytes of UTF-8 — the bcrypt input
+limit; a longer one is refused, never truncated. Physical schema: docs/04
+§55b.
 Architecture: `11-FAMILY-PORTAL.md` §30a.
 
 ### `user_person_links`
@@ -4122,6 +4126,7 @@ Date: 2026-09-24
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1E: §45b mobile trust lifecycle (STALE / REVOKED never revert, revoke reasons) and OTP challenge semantics (keyed hash, send attempts, grant window, resend) as implemented |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1F: §45b activation creates the family-side User (email null, `users.name` a non-displayed snapshot), ACTIVE link and ACTIVE identity; no data-model change |
+| 1.2.30 | 2026-10-03 | Approved | PWA-1G: §45b login and password reset use the authentication identity (keyed fingerprint), never `persons.national_id`; Family password length 8 characters to 72 bytes; no data-model change |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

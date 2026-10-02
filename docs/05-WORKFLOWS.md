@@ -1314,9 +1314,9 @@ Approved 2026-10-02 (WF-ADR-040). Architecture: `11-FAMILY-PORTAL.md`
 correction effect, the death effect and access loss (WF-ADR-041) as Domain
 Actions — no endpoint and no UI. PWA-1E implemented the mobile trust
 lifecycle (with a Staff API) and the OTP challenge state machine
-(WF-ADR-042). PWA-1F implemented activation (WF-ADR-043). Password reset
-below is still to be built (PWA-1G); coordinator-assisted verification is
-PWA-1H.
+(WF-ADR-042). PWA-1F implemented activation (WF-ADR-043). PWA-1G
+implemented login and password reset (WF-ADR-044). Coordinator-assisted
+verification is PWA-1H.
 
 ## User-Person Link
 
@@ -1489,6 +1489,55 @@ Unchanged value             the existing early return: nothing happens
 ```text
 National ID → OTP to the TRUSTED current mobile → new password
 → all sessions of the user ended
+```
+
+As implemented (PWA-1G):
+
+```text
+START      POST /family/auth/password/reset/start     national_id
+             → the same answer for every well-formed identifier
+             ACTIVE identity → User → Family context → TRUSTED mobile
+                                  → real PASSWORD_RESET challenge + SMS
+             anything else        → decoy reference (cache only)
+
+OTP        POST /family/auth/password/reset/verify    challenge, code
+PENDING    POST /family/auth/password/reset/resend    challenge
+             the OTP rules of PWA-1E, unchanged
+
+OTP        a correct code opens the 10-minute grant; nothing changes yet
+VERIFIED
+
+NEW        POST /family/auth/password/reset/complete  challenge, password, confirmation
+PASSWORD     ONE transaction: lock Person → lock User → consume the grant
+             (bound to this Person and this User) → Family context still
+             valid, same Person → new password → all sessions of the User
+             ended → PASSWORD_RESET_COMPLETED
+
+DONE       after the commit: a NEW session for this browser
+             → the /family/me representation → the browser opens /family
+```
+
+- The steps mirror activation and share its implementation of everything a
+  caller can observe (generic start, decoys, timers, ceilings, errors).
+- An ACTIVATION reference is unknown to the reset endpoints and the
+  reverse, for real challenges and decoys alike.
+- The session of the completing browser is created after the commit, so it
+  is never among the sessions ended by the reset.
+
+## Login (PWA-1G)
+
+```text
+POST /family/auth/login     national_id, password
+
+format valid? ──no──▶ 422
+gate open?    ──no──▶ 503
+session-capable request? ──no──▶ 401 (no password is checked)
+identifier or address over its ceiling? ──yes──▶ 429
+fingerprint → ACTIVE identity → User
+password verified (against a dummy hash when no identity exists)
+correct? → Family context resolved → identity is the Person's current one?
+   any "no" ──▶ 401 INVALID_CREDENTIALS, failure counted and recorded
+   all "yes" ─▶ counters cleared → session replaced → 200 /family/me
 ```
 
 ## Access loss
@@ -3049,6 +3098,9 @@ PWA-1E implemented the mobile trust lifecycle and the OTP challenge state machin
 
 ### WF-ADR-043
 PWA-1F implemented Family account activation as four public steps (start, verify, resend, complete) driven by server state: the client holds only an opaque challenge reference. A denied start returns a cache-backed decoy that follows the same public state machine. Completion is one transaction that consumes the verified grant, re-checks eligibility, always creates a new family-side User and establishes the link and identity through `EstablishFamilyIdentityAction`; the session is established only after the commit, and a request without a session is refused before anything is created.
+
+### WF-ADR-044
+PWA-1G implemented Family login and password reset. Login resolves the account through the authentication identity, verifies the password in every case and requires the full Family context before any session; every failure is one generic 401. Password reset reuses the activation OTP flow for the `PASSWORD_RESET` purpose — decoys included, purpose-bound — and completes in one transaction that consumes the grant, re-checks the context, replaces the password and ends every earlier session; the completing browser then receives a new session.
 ```
 
 ---
@@ -3314,3 +3366,4 @@ Date: 2026-09-24
 | 1.2.9 | 2026-10-02 | Approved | PWA-1D: §53b Link lifecycle, National ID correction and death effects recorded as implemented (Domain Actions only); ended identity is SUPERSEDED / LINK_ENDED; account not deactivated (WF-ADR-041) |
 | 1.2.10 | 2026-10-02 | Approved | PWA-1E: §53b mobile trust lifecycle as implemented and the OTP challenge state machine (resend, grant, supersede, delivery) (WF-ADR-042) |
 | 1.2.11 | 2026-10-02 | Approved | PWA-1F: §53b activation as implemented — public steps, decoy references, completion transaction and session (WF-ADR-043) |
+| 1.2.12 | 2026-10-03 | Approved | PWA-1G: §53b login decision path and password reset as implemented — purpose-bound references, completion transaction, session revocation (WF-ADR-044) |

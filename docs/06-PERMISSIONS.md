@@ -749,7 +749,8 @@ sides, the role checks and the Staff API boundary below (AUTH-ADR-065);
 implemented the mobile trust Staff API, which reads
 `person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067).
 PWA-1F implemented the Family API boundary and the activation endpoints
-below (AUTH-ADR-068). `person-mobile-trust.assist`, the coordinator
+below (AUTH-ADR-068). PWA-1G added the Family login and password reset
+routes (AUTH-ADR-069). `person-mobile-trust.assist`, the coordinator
 permissions and `family-portal.access` are not read by any endpoint yet.
 
 ## Account sides
@@ -953,7 +954,37 @@ GET  /api/v1/family/me
   whether an identifier exists, is eligible or has an account.
 - Activation is a system process: it needs no permission and assigns
   FAMILY_USER only, to a new account only.
-- There is no Family login endpoint yet (PWA-1G).
+
+## Family login and password reset (PWA-1G)
+
+```text
+PUBLIC, each behind its own gate and route limiters
+POST /api/v1/family/auth/login                      family.login
+POST /api/v1/family/auth/password/reset/start       family.password-reset
+POST /api/v1/family/auth/password/reset/verify      family.password-reset
+POST /api/v1/family/auth/password/reset/resend      family.password-reset
+POST /api/v1/family/auth/password/reset/complete    family.password-reset
+```
+
+- **Three independent gates**, all off by default: `family.activation`,
+  `family.login`, `family.password-reset`. A closed gate answers 503 and
+  does nothing — no lookup, no event, no decoy, no OTP, no SMS. `/family/me`
+  and logout are not gated.
+- **Login authorizes nothing by itself.** It establishes a session only for
+  an account that `FamilyAccessResolver::familyContext()` accepts. A Staff
+  account, a mixed account or COORDINATOR alone can never sign in here,
+  whatever it holds.
+- **One browser session is one account side.** A Family login, activation
+  or reset replaces a Staff session in that browser, and the reverse is
+  already true of the Staff login.
+- Neither flow needs or grants a permission.
+- **Public errors.** Login: 422 field validation, 401
+  `INVALID_CREDENTIALS` (every credential, account and context failure),
+  429 `TOO_MANY_REQUESTS`, 503 `FAMILY_AUTH_UNAVAILABLE`. Reset: the
+  activation codes, with `RESET_FAILED` (409) and
+  `PASSWORD_RESET_UNAVAILABLE` (503).
+- An authenticated "change my password" endpoint does not exist; it belongs
+  to the future account module.
 
 ## Seeded mapping (PWA-1C)
 
@@ -3986,6 +4017,9 @@ PWA-1E mobile trust Staff API (§22b): three routes behind `auth:sanctum` and `s
 
 ### AUTH-ADR-068
 PWA-1F Family API boundary (§22b): `/api/v1/family` routes live outside the Staff group. `family.side` fails closed and admits only `AccountSide::FAMILY`; it classifies the account and authorizes no family data — Family context is resolved separately. `GET /family/me` exposes only safe bootstrap data and never the denial reason. The four activation routes are public, gated by `family.activation`, rate limited, and answer with a fixed public error contract. Activation always creates a new family-side account and never attaches FAMILY_USER to an existing one. No permission mapping changed in PWA-1F.
+
+### AUTH-ADR-069
+PWA-1G Family login and password reset (§22b): five public routes outside the Staff group, each behind its own gate (`family.login`, `family.password-reset`), independent of `family.activation` and off by default. A session is established only after the full Family context is resolved; every login failure is one generic 401, and the two identifier lockout tiers count failures only. A reset ends every earlier session of the account. No permission mapping changed in PWA-1G, and no account side can cross into the other through these routes.
 ```
 
 ---
@@ -4356,6 +4390,7 @@ Date: 2026-09-24
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
 | 1.2.31 | 2026-10-02 | Approved | PWA-1E (AUTH-ADR-067): §22b mobile trust Staff API (view / grant / revoke) behind the Staff boundary; no permission mapping changed; coordinator assistance still deferred to PWA-1H |
 | 1.2.32 | 2026-10-02 | Approved | PWA-1F (AUTH-ADR-068): §22b Family API boundary (`family.side`, fail closed), `/family/me`, logout, the public activation routes with their gate and error contract; no permission mapping changed |
+| 1.2.33 | 2026-10-03 | Approved | PWA-1G (AUTH-ADR-069): §22b Family login and password reset routes, three independent gates, login requires the Family context, public error contract; no permission mapping changed |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |
