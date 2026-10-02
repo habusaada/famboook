@@ -7,11 +7,11 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Family activation, verify and resend (docs/11 §30a): the opaque challenge
- * reference and, for verify, the code. Format only — a malformed code is a
+ * Family activation and password reset, verify and resend (docs/11 §30a):
+ * the opaque challenge reference and, for verify, the code. Format only — a malformed code is a
  * field error and not an attempt, for a real challenge and a decoy alike.
  */
-class ActivationChallengeRequest extends FormRequest
+class FamilyChallengeRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -22,7 +22,7 @@ class ActivationChallengeRequest extends FormRequest
     public function rules(): array
     {
         $rules = ['challenge' => ['required', 'string', 'uuid']];
-        if ($this->routeIs('family.activation.verify')) {
+        if ($this->routeIs('family.*.verify')) {
             $rules['code'] = ['required', function (string $attribute, mixed $value, Closure $fail) {
                 if ($this->code() === null) {
                     $fail('رمز التحقق يتكون من '.config('family_auth.otp.digits').' أرقام.');

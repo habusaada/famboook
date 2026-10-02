@@ -7,12 +7,13 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Family activation, step 1 (docs/11 §30a). Only the FORMAT is validated
+ * The National ID of a Family activation, login or password reset
+ * (docs/11 §30a). Only the FORMAT is validated
  * here — nine digits after the strict Family Portal normalizer — and a
  * format error reveals nothing about any Person. The value travels in the
  * body, is never flashed and is never logged.
  */
-class StartActivationRequest extends FormRequest
+class FamilyIdentifierRequest extends FormRequest
 {
     public const INVALID = 'رقم الهوية يجب أن يتكون من 9 أرقام.';
 

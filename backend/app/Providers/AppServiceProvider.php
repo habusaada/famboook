@@ -3,8 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\SmsSender;
-use App\Enums\ActivationError;
-use App\Exceptions\ActivationException;
+use App\Enums\FamilyAuthError;
+use App\Exceptions\FamilyAuthException;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
@@ -88,7 +88,7 @@ class AppServiceProvider extends ServiceProvider
 
                     return ($window === 'hour' ? Limit::perHour($max) : Limit::perMinute($max))
                         ->by("family-activation|{$step}|ip|".hash('sha256', (string) $request->ip())."|{$window}")
-                        ->response(fn () => ActivationException::response(ActivationError::TOO_MANY_REQUESTS));
+                        ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS));
                 },
                 $windows,
             ));

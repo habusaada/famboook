@@ -14,7 +14,7 @@ use App\Models\AuthSecurityEvent;
 use App\Models\Person;
 use App\Models\PersonMobileTrust;
 use App\Models\User;
-use App\Support\FamilyAuth\ActivationDecoys;
+use App\Support\FamilyAuth\ChallengeDecoys;
 use App\Support\FamilyAuth\OtpChallenges;
 use App\Support\FamilyAuth\ResponseFloor;
 use Database\Seeders\RolePermissionSeeder;
@@ -264,7 +264,9 @@ class FamilyActivationStartTest extends TestCase
         $this->assertSame(0, $this->sms->attempts);
         $this->assertSame(0, AuthOtpChallenge::count());
         $this->assertSame($users, User::count());
-        $this->assertNotNull(app(ActivationDecoys::class)->state($response->json('challenge')));
+        $this->assertNotNull(app(ChallengeDecoys::class)->state(OtpPurpose::ACTIVATION, $response->json('challenge')));
+        // Purpose-bound: the same reference does not exist for a password reset.
+        $this->assertNull(app(ChallengeDecoys::class)->state(OtpPurpose::PASSWORD_RESET, $response->json('challenge')));
 
         // The reason is recorded, never returned.
         $event = AuthSecurityEvent::where('event_type', $eventType)->sole();
@@ -341,7 +343,7 @@ class FamilyActivationStartTest extends TestCase
         $this->assertSame(0, AuthSecurityEvent::count());
         $this->assertSame(0, AuthOtpChallenge::count());
         $this->assertSame(0, $this->sms->attempts);
-        $this->assertNull(app(ActivationDecoys::class)->state($reference));
+        $this->assertNull(app(ChallengeDecoys::class)->state(OtpPurpose::ACTIVATION, $reference));
     }
 
     public function test_the_gate_is_off_by_default(): void
@@ -524,7 +526,7 @@ class FamilyActivationStartTest extends TestCase
     {
         $reference = $this->reference($kind);
 
-        $this->travel(ActivationDecoys::REFERENCE_TTL)->seconds();
+        $this->travel(ChallengeDecoys::REFERENCE_TTL)->seconds();
 
         $this->assertRefused($this->verify($reference), 422, 'OTP_INVALID');
         $this->assertRefused($this->resend($reference), 422, 'OTP_INVALID');

@@ -3,23 +3,22 @@
 namespace App\Actions;
 
 use App\Enums\ActivationDenial;
-use App\Enums\ActivationError;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
+use App\Enums\FamilyAuthError;
 use App\Enums\OtpFailure;
 use App\Enums\OtpPurpose;
-use App\Exceptions\ActivationException;
-use App\Exceptions\ActivationFailure;
+use App\Exceptions\FamilyAuthException;
+use App\Exceptions\FamilyAuthFailure;
 use App\Exceptions\FamilyIdentityException;
 use App\Models\AuthOtpChallenge;
 use App\Models\Person;
 use App\Models\User;
 use App\Models\UserPersonLink;
 use App\Support\AccountSide;
-use App\Support\FamilyAuth\ActivationDecoys;
 use App\Support\FamilyAuth\AuthSecurityLog;
 use App\Support\FamilyAuth\FamilyAccessResolver;
-use App\Support\FamilyAuth\FamilyActivation;
+use App\Support\FamilyAuth\FamilyOtpFlow;
 use App\Support\FamilyAuth\OtpChallenges;
 use Illuminate\Support\Facades\DB;
 
@@ -50,8 +49,7 @@ use Illuminate\Support\Facades\DB;
 class ActivateFamilyAccountAction
 {
     public function __construct(
-        private readonly FamilyActivation $activation,
-        private readonly ActivationDecoys $decoys,
+        private readonly FamilyOtpFlow $flow,
         private readonly OtpChallenges $otp,
         private readonly FamilyAccessResolver $resolver,
         private readonly EstablishFamilyIdentityAction $establish,
@@ -59,20 +57,14 @@ class ActivateFamilyAccountAction
 
     public function handle(string $reference, #[\SensitiveParameter] string $password): User
     {
-        $challenge = $this->activation->realChallenge($reference);
+        $challenge = $this->flow->realChallenge(OtpPurpose::ACTIVATION, $reference);
         if ($challenge === null) {
-            // A decoy can never have been verified: it answers as an
-            // unverified real challenge in the same state would.
-            $state = $this->decoys->state($reference);
-
-            throw new ActivationException(
-                $state !== null && ($state['superseded'] || $state['locked']) ? ActivationError::OTP_LOCKED : ActivationError::OTP_INVALID
-            );
+            throw $this->flow->withoutRealChallenge(OtpPurpose::ACTIVATION, $reference);
         }
 
         try {
             return DB::transaction(fn () => $this->activate($challenge, $password));
-        } catch (ActivationFailure $failure) {
+        } catch (FamilyAuthFailure $failure) {
             // After the rollback, so the refusal itself is kept.
             AuthSecurityLog::record(
                 AuthSecurityEventType::ACTIVATION_COMPLETED,
@@ -82,7 +74,7 @@ class ActivateFamilyAccountAction
                 otpChallengeUuid: $challenge->uuid,
             );
 
-            throw new ActivationException($failure->error);
+            throw new FamilyAuthException($failure->error);
         }
     }
 
@@ -92,7 +84,7 @@ class ActivateFamilyAccountAction
         /** @var Person|null $person */
         $person = Person::withTrashed()->whereKey($challenge->person_id)->lockForUpdate()->first();
         if ($person === null) {
-            throw new ActivationFailure(ActivationError::ACTIVATION_FAILED, ActivationDenial::CHALLENGE_UNUSABLE);
+            throw new FamilyAuthFailure(FamilyAuthError::ACTIVATION_FAILED, ActivationDenial::CHALLENGE_UNUSABLE);
         }
 
         // The grant first: without a verified challenge nothing below is
@@ -100,14 +92,14 @@ class ActivateFamilyAccountAction
         // (A later refusal rolls this consumption back.)
         $consumed = $this->otp->consume($challenge->uuid, OtpPurpose::ACTIVATION, $person);
         if (! $consumed->succeeded()) {
-            throw new ActivationFailure(self::publicError($consumed->failure), $consumed->failure);
+            throw new FamilyAuthFailure(self::publicError($consumed->failure), $consumed->failure);
         }
 
         if ($denial = $this->resolver->headEligibility($person)) {
-            throw new ActivationFailure(ActivationError::ACTIVATION_FAILED, $denial);
+            throw new FamilyAuthFailure(FamilyAuthError::ACTIVATION_FAILED, $denial);
         }
         if (UserPersonLink::query()->current()->where('person_id', $person->getKey())->exists()) {
-            throw new ActivationFailure(ActivationError::ACTIVATION_FAILED, ActivationDenial::ALREADY_LINKED);
+            throw new FamilyAuthFailure(FamilyAuthError::ACTIVATION_FAILED, ActivationDenial::ALREADY_LINKED);
         }
 
         // Always a NEW family-side account: never an existing User.
@@ -124,7 +116,7 @@ class ActivateFamilyAccountAction
         try {
             $link = $this->establish->handle($user, $person);
         } catch (FamilyIdentityException) {
-            throw new ActivationFailure(ActivationError::ACTIVATION_FAILED, ActivationDenial::IDENTITY_REFUSED);
+            throw new FamilyAuthFailure(FamilyAuthError::ACTIVATION_FAILED, ActivationDenial::IDENTITY_REFUSED);
         }
 
         AuthSecurityLog::record(
@@ -137,14 +129,14 @@ class ActivateFamilyAccountAction
         return $user;
     }
 
-    private static function publicError(OtpFailure $failure): ActivationError
+    private static function publicError(OtpFailure $failure): FamilyAuthError
     {
         return match ($failure) {
-            OtpFailure::GRANT_EXPIRED => ActivationError::GRANT_EXPIRED,
-            OtpFailure::LOCKED, OtpFailure::SUPERSEDED => ActivationError::OTP_LOCKED,
+            OtpFailure::GRANT_EXPIRED => FamilyAuthError::GRANT_EXPIRED,
+            OtpFailure::LOCKED, OtpFailure::SUPERSEDED => FamilyAuthError::OTP_LOCKED,
             // Proved the phone, but the grant can no longer be used.
-            OtpFailure::CONSUMED, OtpFailure::TRUST_NOT_CURRENT => ActivationError::ACTIVATION_FAILED,
-            default => ActivationError::OTP_INVALID,
+            OtpFailure::CONSUMED, OtpFailure::TRUST_NOT_CURRENT => FamilyAuthError::ACTIVATION_FAILED,
+            default => FamilyAuthError::OTP_INVALID,
         };
     }
 }

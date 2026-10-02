@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\ActivationError;
-use App\Exceptions\ActivationException;
+use App\Enums\FamilyAuthError;
+use App\Exceptions\FamilyAuthException;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,7 +20,7 @@ class EnsureActivationEnabled
     public function handle(Request $request, Closure $next): Response
     {
         if (config('family_auth.activation_enabled') !== true) {
-            return ActivationException::response(ActivationError::ACTIVATION_UNAVAILABLE);
+            return FamilyAuthException::response(FamilyAuthError::ACTIVATION_UNAVAILABLE);
         }
 
         return $next($request);

@@ -2,12 +2,13 @@
 
 namespace App\Enums;
 
-// docs/11 §30a — the PUBLIC error contract of the Family activation
-// endpoints: a stable code, an HTTP status and fixed Arabic text. Nothing
-// here says whether a National ID exists, is eligible or has an account;
-// internal reasons (FamilyAccessDenial, OtpFailure, ActivationDenial) are
-// mapped onto these and never leave the server.
-enum ActivationError: string
+// docs/11 §30a — the PUBLIC error contract of the Family authentication
+// endpoints (activation, login, password reset): a stable code, an HTTP
+// status and fixed Arabic text. Nothing here says whether a National ID
+// exists, is eligible or has an account; internal reasons
+// (FamilyAccessDenial, OtpFailure, ActivationDenial, …) are mapped onto
+// these and never leave the server.
+enum FamilyAuthError: string
 {
     case OTP_INVALID = 'OTP_INVALID';
     case OTP_EXPIRED = 'OTP_EXPIRED';

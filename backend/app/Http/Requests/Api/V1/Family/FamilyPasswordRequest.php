@@ -10,7 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
  * §89b): a minimum length, confirmation, NO composition rule — passphrases
  * are welcome. Stored only through Laravel hashing; never flashed or logged.
  */
-class CompleteActivationRequest extends FormRequest
+class FamilyPasswordRequest extends FormRequest
 {
     public function authorize(): bool
     {

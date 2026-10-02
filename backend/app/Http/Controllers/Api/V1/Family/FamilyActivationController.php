@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Api\V1\Family;
 
 use App\Actions\ActivateFamilyAccountAction;
 use App\Enums\ActivationDenial;
-use App\Enums\ActivationError;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
-use App\Exceptions\ActivationException;
+use App\Enums\FamilyAuthError;
+use App\Exceptions\FamilyAuthException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Family\ActivationChallengeRequest;
-use App\Http\Requests\Api\V1\Family\CompleteActivationRequest;
-use App\Http\Requests\Api\V1\Family\StartActivationRequest;
+use App\Http\Requests\Api\V1\Family\FamilyChallengeRequest;
+use App\Http\Requests\Api\V1\Family\FamilyIdentifierRequest;
+use App\Http\Requests\Api\V1\Family\FamilyPasswordRequest;
 use App\Support\FamilyAuth\AuthSecurityLog;
 use App\Support\FamilyAuth\FamilyActivation;
 use App\Support\FamilyAuth\ResponseFloor;
@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class FamilyActivationController extends Controller
 {
-    public function start(StartActivationRequest $request, FamilyActivation $activation): JsonResponse
+    public function start(FamilyIdentifierRequest $request, FamilyActivation $activation): JsonResponse
     {
         $startedAt = microtime(true);
         try {
@@ -36,12 +36,12 @@ class FamilyActivationController extends Controller
         }
     }
 
-    public function verify(ActivationChallengeRequest $request, FamilyActivation $activation): JsonResponse
+    public function verify(FamilyChallengeRequest $request, FamilyActivation $activation): JsonResponse
     {
         return self::json($activation->verify($request->challenge(), (string) $request->code()));
     }
 
-    public function resend(ActivationChallengeRequest $request, FamilyActivation $activation): JsonResponse
+    public function resend(FamilyChallengeRequest $request, FamilyActivation $activation): JsonResponse
     {
         $startedAt = microtime(true);
         try {
@@ -57,12 +57,12 @@ class FamilyActivationController extends Controller
      * session is refused BEFORE anything is created: an account is never
      * made for a caller that could not be signed in.
      */
-    public function complete(CompleteActivationRequest $request, ActivateFamilyAccountAction $activate): JsonResponse
+    public function complete(FamilyPasswordRequest $request, ActivateFamilyAccountAction $activate): JsonResponse
     {
         if (! $request->hasSession()) {
             AuthSecurityLog::record(AuthSecurityEventType::ACTIVATION_COMPLETED, AuthSecurityEventOutcome::DENIED, ActivationDenial::SESSION_REQUIRED);
 
-            throw new ActivationException(ActivationError::ACTIVATION_FAILED);
+            throw new FamilyAuthException(FamilyAuthError::ACTIVATION_FAILED);
         }
 
         $user = $activate->handle($request->challenge(), (string) $request->input('password'));
