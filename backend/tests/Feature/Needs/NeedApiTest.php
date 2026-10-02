@@ -681,8 +681,10 @@ class NeedApiTest extends TestCase
 
     public function test_family_update_is_not_a_substitute_for_need_permissions(): void
     {
-        $user = User::factory()->create();
-        $user->givePermissionTo(['family.view', 'family.update']);
+        // A Staff-side account with family.view + family.update and no need
+        // permission at all (REPORTS_VIEWER has none).
+        $user = $this->user('REPORTS_VIEWER');
+        $user->givePermissionTo('family.update');
 
         $this->create([], $user)->assertForbidden();
         $this->familyList([], $user)->assertForbidden();
@@ -765,7 +767,8 @@ class NeedApiTest extends TestCase
     public function test_need_events_are_hidden_without_need_view(): void
     {
         $this->createNeed();
-        $user = User::factory()->create();
+        // Staff-side, with the activity log but no need.view.
+        $user = $this->user('REPORTS_VIEWER');
         $user->givePermissionTo('activity-log.view');
 
         $this->actingAs($user)

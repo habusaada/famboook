@@ -226,8 +226,9 @@ class FamilyKeyResolutionTest extends TestCase
 
     public function test_16_17_reviewers_without_clan_manage_cannot_create_branches(): void
     {
-        // A role holding import.review but not clan.manage (constructed for the test).
-        $reviewer = User::factory()->create();
+        // A Staff-side account holding import.review but not clan.manage:
+        // DATA_ENTRY has neither, plus a direct import.review.
+        $reviewer = $this->user('DATA_ENTRY');
         $reviewer->givePermissionTo('import.review');
         $existing = $this->branch('BREEM', 'البريم');
 
@@ -357,7 +358,8 @@ class FamilyKeyResolutionTest extends TestCase
         ]])->assertUnprocessable()->assertJsonValidationErrors('items.1.code');
         $this->assertSame([0, 0], [Branch::count(), ImportFamilyKeyResolution::count()]);
 
-        $reviewer = User::factory()->create();
+        // Staff-side, import.review without clan.manage.
+        $reviewer = $this->user('DATA_ENTRY');
         $reviewer->givePermissionTo('import.review');
         $bulk(['decision' => 'CREATE_NEW_BRANCH', 'items' => [['source_family_key' => 'قديح', 'name' => 'قديح', 'code' => 'QDEH']]], $reviewer)->assertForbidden();
 

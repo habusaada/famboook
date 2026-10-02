@@ -155,10 +155,10 @@ class UpdateHouseholdHeadTest extends TestCase
         // PUT /people/{person}/national-id (AUTH-ADR-059): the generic PATCH
         // refuses the field even for holders of person.national-id.update.
         $original = $this->head->fresh()->national_id;
-        $role = Role::create(['name' => 'TEST_NATIONAL_ID_EDITOR', 'guard_name' => 'web']);
-        $role->givePermissionTo(['person.update', 'person.national-id.update']);
-        $user = User::factory()->create();
-        $user->assignRole($role);
+        // ADMINISTRATOR is the least-privileged Staff role holding both
+        // person.update and person.national-id.update.
+        $user = $this->user('ADMINISTRATOR');
+        $this->assertTrue($user->can('person.update') && $user->can('person.national-id.update'));
 
         $this->patchHead(['national_id' => '999999999'], $user)
             ->assertStatus(422)->assertJsonValidationErrors(['national_id']);

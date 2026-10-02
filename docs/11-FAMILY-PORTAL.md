@@ -1552,7 +1552,9 @@ the resolver as a mismatch.
 **Death.** `RecordPersonDeathAction` ends a current link (PERSON_DECEASED).
 The membership and the household-head flag are not changed (FU-01).
 
-**Account sides and Staff boundary.** See docs/06 §22b (AUTH-ADR-065).
+**Account sides and Staff boundary.** The Staff API requires
+`AccountSide::STAFF`; the boundary fails closed for FAMILY, INVALID and NONE
+accounts. See docs/06 §22b (AUTH-ADR-065, AUTH-ADR-066).
 
 **Events recorded.** `LINK_ACTIVATED`, `LINK_SUSPENDED`, `LINK_RESUMED`,
 `LINK_ENDED`, `LOGIN_IDENTIFIER_ROTATED`, `SESSIONS_REVOKED` — typed inputs
@@ -1766,9 +1768,10 @@ LINK_ENDED and revokes sessions; it never deactivates the account.
 Suspension is resumable and changes neither the identity nor the account.
 
 FP-ADR-037
-The Staff API refuses every account holding a family-side role through one
+The Staff API requires AccountSide::STAFF, enforced by one fail-closed
 boundary middleware on its route group, independently of permissions and of
-role order. Link administration exists as Domain Actions only until there
+role order: family-side, mixed, role-less and custom-role accounts are all
+refused. Link administration exists as Domain Actions only until there
 is an operational need for an endpoint or UI.
 ```
 
@@ -1913,3 +1916,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.1 | 2026-10-02 | Approved | PWA-1A findings and PWA-1B design: §30a identity and access architecture (verified Production aggregates, National ID decision, strict normalizer, `family_auth_identities`, User-Person Link, eligibility with ALIVE only, mobile trust, activation, OTP and password policy, nullable `users.email`, disjoint Staff/family accounts, coordinator must be an eligible head, multiple scopes, security audit, retention, Production gates, slices PWA-1C … PWA-1I); FP-ADR-025 … 035; PFP-002/003/004/005/016/020/021 decided, PFP-001/022 partly; FU-01 made a rollout gate. Documentation only |
 | 1.2 | 2026-10-02 | Approved | PWA-1C implementation record in §30a: config, strict normalizers, keyed fingerprint service, seven migrations, six models with enums and factories, COORDINATOR role and ten permissions; the four pre-implementation refinements; staged activation of the coordinator assist permission; PWA-1C done, PWA-1D next. Foundation only |
 | 1.3 | 2026-10-02 | Approved | PWA-1D implementation record in §30a: access resolver, authentication identity service, link lifecycle actions, National ID correction and death integration, security event recorder, session revocation, account sides and the Staff API boundary; `LINK_ENDED`; FP-ADR-036 and FP-ADR-037; PWA-1D done, PWA-1E next. No activation, login, OTP or UI |
+| 1.3.1 | 2026-10-02 | Approved | PWA-1D hardening: the Staff API boundary fails closed — `AccountSide::STAFF` is required (FP-ADR-037 wording, docs/06 AUTH-ADR-066) |

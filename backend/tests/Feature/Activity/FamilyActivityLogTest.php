@@ -21,7 +21,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
-use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -543,10 +542,12 @@ class FamilyActivityLogTest extends TestCase
         $this->actingAs($this->user)
             ->patchJson("/api/v1/families/{$this->family->family_code}", ['notes' => 'x'])->assertOk();
 
-        $role = Role::create(['name' => 'ACTIVITY_ONLY_TEST', 'guard_name' => 'web']);
-        $role->givePermissionTo('activity-log.view');
+        // A Staff-side account (REPORTS_VIEWER holds neither activity-log.view
+        // nor health-record.view) given the activity log only.
+        $viewer = $this->user('REPORTS_VIEWER');
+        $viewer->givePermissionTo('activity-log.view');
 
-        $this->activities(as: $this->user('ACTIVITY_ONLY_TEST'))->assertOk()
+        $this->activities(as: $viewer)->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.event_type', 'FAMILY_UPDATED');
     }

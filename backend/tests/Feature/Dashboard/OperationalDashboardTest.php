@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Assistances\BuildsExecutionFixtures;
 use Tests\TestCase;
 
@@ -280,10 +281,13 @@ class OperationalDashboardTest extends TestCase
             ->assertJsonPath('data.kpis.declared_household_population', 6);
 
         // Without family.view it is null (never computed), like active_families.
-        $role = Role::create(['name' => 'DASHBOARD_ONLY_TEST', 'guard_name' => 'web']);
-        $role->givePermissionTo('dashboard.view-operational');
-        $user = User::factory()->create();
-        $user->assignRole($role);
+        // Every canonical Staff role holds family.view, so for this test the
+        // REPORTS_VIEWER role itself is narrowed to the dashboard alone: the
+        // account stays Staff-side and genuinely lacks family.view.
+        Role::findByName('REPORTS_VIEWER', 'web')->syncPermissions(['dashboard.view-operational']);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $user = $this->user('REPORTS_VIEWER');
+        $this->assertFalse($user->can('family.view'));
         $this->dash([], $user)->assertOk()
             ->assertJsonPath('data.kpis.active_families', null)
             ->assertJsonPath('data.kpis.declared_household_population', null);
@@ -600,10 +604,11 @@ class OperationalDashboardTest extends TestCase
         $this->activity($family, FamilyActivityType::NEED_CREATED, '2026-09-12 09:00:00');
         Carbon::setTestNow('2026-09-24 10:00:00');
 
-        // A role with the activity log but no health / need permissions.
-        Role::create(['name' => 'TEST_ACTIVITY_ONLY', 'guard_name' => 'web'])
-            ->givePermissionTo(['dashboard.view-operational', 'family.view', 'person.view', 'activity-log.view']);
-        $limited = $this->user('TEST_ACTIVITY_ONLY');
+        // A Staff-side account with the activity log but no health / need
+        // permissions: REPORTS_VIEWER (dashboard, family.view, person.view)
+        // plus a direct activity-log.view.
+        $limited = $this->user('REPORTS_VIEWER');
+        $limited->givePermissionTo('activity-log.view');
 
         $response = $this->dash([], $limited)->assertOk();
         $this->assertSame(['FAMILY_UPDATED'], array_column($response->json('data.recent_activity'), 'event_type'));

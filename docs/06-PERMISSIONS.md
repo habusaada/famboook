@@ -790,15 +790,33 @@ NONE      neither
   the Filament user list refuse and hide every account holding a
   family-side role, so a role sync can never strip one. Filament itself
   admits Staff-side accounts only.
-- **Staff API boundary.** The middleware `staff.side`
-  (`EnsureStaffSideAccount`) is applied once, on the authenticated Staff API
-  route group. It refuses (403) any account holding FAMILY_USER or
-  COORDINATOR — alone, together, or mixed with a Staff role — before the
-  route's permission check, even if the account holds that permission.
-  Future `/api/v1/family` routes are registered outside this group.
-- The boundary refuses family-side accounts; it does not replace permission
-  checks. An account with no family-side role is still decided by the
-  route's permission, exactly as before.
+- **Staff API boundary — the Staff API requires `AccountSide::STAFF`.**
+  The middleware `staff.side` (`EnsureStaffSideAccount`) is applied once, on
+  the authenticated Staff API route group, and **fails closed**
+  (AUTH-ADR-066). Access needs, in this order:
+
+  ```text
+  1. an authenticated user
+  2. AccountSide::STAFF
+  3. the route's own permission / authorization
+  ```
+
+  It refuses (403), before the route's permission check and even if the
+  account holds that permission:
+
+  ```text
+  FAMILY    FAMILY_USER, with or without COORDINATOR
+  INVALID   a Staff role mixed with a family-side role, or COORDINATOR alone
+  NONE      no role at all, or only an unrecognised / custom role
+  ```
+
+  Being "not family-side" is not sufficient: a role-less account, or one
+  holding only a custom role, never enters the Staff API through a direct
+  permission. Staff login already requires a Staff-side account; the
+  middleware enforces the same invariant independently. Future
+  `/api/v1/family` routes are registered outside this group.
+- The boundary does not replace permission checks: a Staff-side account
+  without the route's permission is still denied by normal authorization.
 - The Family access resolver requires a FAMILY account; link administration
   requires a STAFF actor.
 - `famboook:verify-permissions` fails when any account is INVALID (a count
@@ -3870,6 +3888,9 @@ PWA-1C seeded the COORDINATOR role and the ten PWA-1 permissions (§22b). Staged
 
 ### AUTH-ADR-065
 PWA-1D account sides and Staff API boundary (§22b). `AccountSide` classifies an account from all of its roles (STAFF, FAMILY, INVALID, NONE); Staff Login, `/me`, Staff user administration and Filament no longer read the first role. The `staff.side` middleware on the authenticated Staff API group refuses every account holding a family-side role regardless of permissions, so Staff API authorization no longer rests on permissions alone. Accounts without a family-side role remain governed by the route permissions. The verifier refuses mixed and COORDINATOR-only accounts.
+
+### AUTH-ADR-066
+The Staff API requires `AccountSide::STAFF`. The `staff.side` middleware fails closed: it allows only STAFF and refuses FAMILY, INVALID and NONE, so a role-less account or one holding only an unrecognised role cannot enter the Staff API merely because it holds a direct permission. This supersedes the wording of AUTH-ADR-065 that left accounts without a family-side role to the route permissions. Order of checks: authenticated user, Staff-side account, then the route's permission.
 ```
 
 ---
@@ -4238,6 +4259,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1B (AUTH-ADR-063): §22b account sides, role checks, authorization layers, eligibility and the final PWA-1 permission names (not seeded); §59c refined — Staff-side and family-side accounts disjoint; §22a V1 coordinator must be an eligible head, multiple scopes; PAUTH-003 decided for V1. Documentation only |

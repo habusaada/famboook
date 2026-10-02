@@ -442,7 +442,8 @@ class AssistanceNominationTest extends TestCase
     {
         $family = $this->family();
         $this->manual(['family_code' => $family->family_code])->assertCreated();
-        $user = User::factory()->create();
+        // Staff-side, with the activity log but no assistance.view.
+        $user = $this->user('REPORTS_VIEWER');
         $user->givePermissionTo('activity-log.view');
 
         $this->actingAs($user)->getJson("/api/v1/families/{$family->family_code}/activities")->assertOk()->assertJsonCount(0, 'data');

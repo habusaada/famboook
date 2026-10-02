@@ -7,6 +7,7 @@ use App\Filament\Resources\Users\UserResource;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Requests\Api\V1\LoginRequest;
 use App\Models\User;
+use App\Support\AccountSide;
 use App\Support\StaffRoles;
 use Database\Seeders\RolePermissionSeeder;
 use Filament\Facades\Filament;
@@ -14,6 +15,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -150,15 +152,79 @@ class AccountSideBoundaryTest extends TestCase
         $this->actingAs($viewer)->getJson('/api/v1/families')->assertOk();
     }
 
-    public function test_an_account_without_any_family_side_role_is_left_to_the_permission_checks(): void
+    public function test_a_role_less_account_is_refused_even_with_a_direct_permission(): void
     {
-        // The middleware refuses family-side accounts; it does not replace
-        // the permission checks for everything else.
+        // AccountSide::NONE fails closed: "not family-side" is not enough.
         $none = $this->account([]);
-        $this->actingAs($none)->getJson('/api/v1/families')->assertStatus(403);
+        $this->assertSame(AccountSide::NONE, AccountSide::of($none));
+        $this->actingAs($none)->getJson('/api/v1/families')->assertStatus(403)
+            ->assertExactJson(['message' => EnsureStaffSideAccount::MESSAGE]);
 
-        $none->givePermissionTo('family.view');
-        $this->actingAs($none->fresh())->getJson('/api/v1/families')->assertOk();
+        $none->givePermissionTo(['family.view', 'family.create', 'dashboard.view-operational']);
+        $this->assertTrue($none->fresh()->can('family.view'));
+        foreach (['/api/v1/families', '/api/v1/me', '/api/v1/dashboard/scope-options'] as $uri) {
+            $this->actingAs($none->fresh())->getJson($uri)->assertStatus(403)
+                ->assertExactJson(['message' => EnsureStaffSideAccount::MESSAGE]);
+        }
+        $this->actingAs($none->fresh())->postJson('/api/v1/families', [])->assertStatus(403)
+            ->assertExactJson(['message' => EnsureStaffSideAccount::MESSAGE]);
+    }
+
+    public function test_an_unknown_or_custom_role_is_refused_even_with_the_permission(): void
+    {
+        // A role outside the canonical Staff roles is not a Staff-side
+        // account, whatever permission the role or the user carries.
+        $role = Role::create(['name' => 'SYNTHETIC_CUSTOM_ROLE', 'guard_name' => 'web']);
+        $role->givePermissionTo(['family.view', 'person.view']);
+        $custom = $this->account(['SYNTHETIC_CUSTOM_ROLE']);
+        $custom->givePermissionTo('dashboard.view-operational');
+
+        $this->assertSame(AccountSide::NONE, AccountSide::of($custom));
+        $this->assertTrue($custom->can('family.view'));
+        foreach (['/api/v1/families', '/api/v1/people', '/api/v1/dashboard/scope-options', '/api/v1/me'] as $uri) {
+            $this->actingAs($custom)->getJson($uri)->assertStatus(403)
+                ->assertExactJson(['message' => EnsureStaffSideAccount::MESSAGE]);
+        }
+
+        // The same custom role beside a real Staff role does not block it:
+        // the account is Staff-side, and permissions decide the rest.
+        $staff = $this->account(['REPORTS_VIEWER', 'SYNTHETIC_CUSTOM_ROLE']);
+        $this->assertSame(AccountSide::STAFF, AccountSide::of($staff));
+        $this->actingAs($staff)->getJson('/api/v1/families')->assertOk();
+    }
+
+    public function test_only_account_side_staff_passes_the_boundary(): void
+    {
+        $outcomes = [];
+        foreach ([
+            AccountSide::STAFF => ['DATA_ENTRY'],
+            AccountSide::FAMILY => ['FAMILY_USER'],
+            AccountSide::INVALID => ['DATA_ENTRY', 'FAMILY_USER'],
+            AccountSide::NONE => [],
+        ] as $side => $roles) {
+            $user = $this->account($roles);
+            $user->givePermissionTo('family.view');
+            $this->assertSame($side, AccountSide::of($user->fresh()));
+            $outcomes[$side] = $this->actingAs($user->fresh())->getJson('/api/v1/families')->status();
+        }
+
+        $this->assertSame(
+            [AccountSide::STAFF => 200, AccountSide::FAMILY => 403, AccountSide::INVALID => 403, AccountSide::NONE => 403],
+            $outcomes,
+        );
+    }
+
+    public function test_a_staff_account_without_the_route_permission_is_denied_by_normal_authorization(): void
+    {
+        // Past the boundary, the route's own permission still decides — and
+        // the refusal is the framework's, not the boundary's.
+        $viewer = $this->account(['REPORTS_VIEWER']);
+
+        $response = $this->actingAs($viewer)->postJson('/api/v1/families', []);
+        $response->assertStatus(403);
+        $this->assertNotSame(EnsureStaffSideAccount::MESSAGE, $response->json('message'));
+
+        $this->actingAs($viewer)->getJson('/api/v1/families')->assertOk();
     }
 
     public function test_every_authenticated_staff_route_is_behind_the_boundary(): void

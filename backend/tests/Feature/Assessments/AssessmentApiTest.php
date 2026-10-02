@@ -607,9 +607,10 @@ class AssessmentApiTest extends TestCase
     public function test_complete_with_draft_changes_also_requires_update_permission(): void
     {
         $assessment = $this->createDraft();
-        // A user holding only complete + view, not update.
-        $completer = User::factory()->create();
-        $completer->givePermissionTo(['assessment.view', 'assessment.complete']);
+        // A Staff-side account holding complete + view, not update: REVIEWER
+        // has assessment.view only, plus a direct assessment.complete.
+        $completer = $this->user('REVIEWER');
+        $completer->givePermissionTo('assessment.complete');
 
         $this->complete($assessment, ['general_notes' => 'تعديل'], $completer)->assertForbidden();
         $this->complete($assessment, [], $completer)->assertOk();
@@ -617,8 +618,10 @@ class AssessmentApiTest extends TestCase
 
     public function test_family_update_is_not_a_substitute_for_assessment_permissions(): void
     {
-        $user = User::factory()->create();
-        $user->givePermissionTo(['family.view', 'family.update']);
+        // A Staff-side account with family.view + family.update and no
+        // assessment permission at all (REPORTS_VIEWER has none).
+        $user = $this->user('REPORTS_VIEWER');
+        $user->givePermissionTo('family.update');
 
         $this->create([], $user)->assertForbidden();
         $this->actingAs($user)->getJson("/api/v1/families/{$this->family->family_code}/assessments")->assertForbidden();
@@ -705,7 +708,8 @@ class AssessmentApiTest extends TestCase
     public function test_assessment_events_are_hidden_without_assessment_view(): void
     {
         $this->createDraft();
-        $user = User::factory()->create();
+        // Staff-side, with the activity log but no assessment.view.
+        $user = $this->user('REPORTS_VIEWER');
         $user->givePermissionTo('activity-log.view');
 
         $timeline = $this->actingAs($user)

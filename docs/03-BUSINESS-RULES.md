@@ -2352,8 +2352,9 @@ assigned (Head Succession, docs/11 FU-01 — a rollout gate).
 - A recorded death ends the deceased Person's link in the same transaction.
   The membership and the household-head flag are not changed (Head
   Succession, docs/11 FU-01).
-- The Staff API refuses every account holding a family-side role, whatever
-  permission it holds (docs/06 §22b).
+- The Staff API requires a Staff-side account (`AccountSide::STAFF`). A
+  family-side, mixed, role-less or custom-role account is refused whatever
+  permission it holds (docs/06 §22b, AUTH-ADR-066).
 
 ## Coordinator
 
@@ -4598,6 +4599,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
 | 1.2.35 | 2026-10-02 | Approved | PWA-1B: §89b Family Portal Identity and Access Rules (eligibility with ALIVE only, National ID rule and correction effect, disjoint Staff/family accounts, coordinator must be an eligible head, mobile trust, OTP and password policy, audit retention, Production gates); PBD-028 decided. Documentation only |

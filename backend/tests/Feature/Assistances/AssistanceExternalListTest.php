@@ -156,7 +156,9 @@ class AssistanceExternalListTest extends TestCase
         // DATA_ENTRY has no export permissions at all.
         $this->configure(self::FIELDS, $this->user('DATA_ENTRY'))->assertForbidden();
 
-        $exporter = User::factory()->create();
+        // Staff-side: REPORTS_VIEWER holds no assistance permission, so this
+        // account has exactly view + export (never export-sensitive).
+        $exporter = $this->user('REPORTS_VIEWER');
         $exporter->givePermissionTo(['assistance.view', 'assistance.export']);
         $this->configure([['field_key' => 'national_id', 'column_label' => 'هوية']], $exporter)->assertForbidden();
         $this->configure([['field_key' => 'beneficiary_name', 'column_label' => 'اسم']], $exporter)->assertOk();
@@ -235,7 +237,9 @@ class AssistanceExternalListTest extends TestCase
         $this->configure()->assertOk();
         $activity = FamilyActivity::count();
 
-        $exporter = User::factory()->create();
+        // Staff-side: REPORTS_VIEWER holds no assistance permission, so this
+        // account has exactly view + export (never export-sensitive).
+        $exporter = $this->user('REPORTS_VIEWER');
         $exporter->givePermissionTo(['assistance.view', 'assistance.export']);
         $this->preview($exporter)->assertForbidden();
         $this->preview($this->user('SOCIAL_WORKER'))->assertForbidden();
@@ -308,7 +312,9 @@ class AssistanceExternalListTest extends TestCase
         $this->issue([$family])->assertUnprocessable()->assertJsonValidationErrors('fields');
 
         $this->configure()->assertOk();
-        $exporter = User::factory()->create();
+        // Staff-side: REPORTS_VIEWER holds no assistance permission, so this
+        // account has exactly view + export (never export-sensitive).
+        $exporter = $this->user('REPORTS_VIEWER');
         $exporter->givePermissionTo(['assistance.view', 'assistance.export']);
         $this->issue([$family], [], $exporter)->assertForbidden();
         $this->issue([$family], [], $this->user('SOCIAL_WORKER'))->assertForbidden();
@@ -369,7 +375,9 @@ class AssistanceExternalListTest extends TestCase
         $this->configure()->assertOk();
         $list = $this->issue([$family])->assertCreated()->json('data.id');
 
-        $exporter = User::factory()->create();
+        // Staff-side: REPORTS_VIEWER holds no assistance permission, so this
+        // account has exactly view + export (never export-sensitive).
+        $exporter = $this->user('REPORTS_VIEWER');
         $exporter->givePermissionTo(['assistance.view', 'assistance.export']);
         foreach ([$exporter, $this->user('REVIEWER'), $this->user('SOCIAL_WORKER'), $this->user('REPORTS_VIEWER')] as $user) {
             $this->actingAs($user)->getJson("/api/v1/assistance-beneficiary-lists/{$list}")->assertForbidden();
@@ -385,7 +393,9 @@ class AssistanceExternalListTest extends TestCase
         $this->configure([['field_key' => 'beneficiary_name', 'column_label' => 'اسم'], ['field_key' => 'family_code', 'column_label' => 'رقم الأسرة']])->assertOk();
         $list = $this->issue([$family])->assertCreated()->assertJsonPath('data.contains_sensitive', false)->json('data.id');
 
-        $exporter = User::factory()->create();
+        // Staff-side: REPORTS_VIEWER holds no assistance permission, so this
+        // account has exactly view + export (never export-sensitive).
+        $exporter = $this->user('REPORTS_VIEWER');
         $exporter->givePermissionTo(['assistance.view', 'assistance.export']);
         $this->actingAs($exporter)->getJson("/api/v1/assistance-beneficiary-lists/{$list}")->assertOk();
         $this->actingAs($exporter)->get("/api/v1/assistance-beneficiary-lists/{$list}/download")->assertOk();
