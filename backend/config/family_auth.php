@@ -97,6 +97,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Retention (docs/11 §30a)
+    |--------------------------------------------------------------------------
+    |
+    | Finished OTP challenges are purged by `famboook:purge-otp-challenges`
+    | (scheduled daily; the scheduler cron is a deployment prerequisite).
+    | auth_security_events are retained 24 months; their purge is not
+    | implemented yet, and nothing here deletes them.
+    |
+    */
+
+    'retention' => [
+        'otp_challenge_days' => (int) env('FAMILY_OTP_RETENTION_DAYS', 90),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Family Portal activation gate (docs/08 §16a)
     |--------------------------------------------------------------------------
     |
