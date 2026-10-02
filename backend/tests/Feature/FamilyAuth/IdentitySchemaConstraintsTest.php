@@ -103,6 +103,7 @@ class IdentitySchemaConstraintsTest extends TestCase
 
         $this->accepts('family_auth_identities', $base());
         $this->accepts('family_auth_identities', $base(['status' => 'SUPERSEDED', 'superseded_at' => now(), 'supersede_reason' => 'KEY_ROTATION']));
+        $this->accepts('family_auth_identities', $base(['status' => 'SUPERSEDED', 'superseded_at' => now(), 'supersede_reason' => 'LINK_ENDED']));
 
         $this->refuses('family_auth_identities', $base(['status' => 'DISABLED']), 'chk_family_auth_identity_status');
         // A raw National ID (or anything that is not a 64-hex fingerprint) can never be stored.

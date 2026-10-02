@@ -7,4 +7,6 @@ enum AuthIdentitySupersedeReason: string
 {
     case NATIONAL_ID_CORRECTED = 'NATIONAL_ID_CORRECTED';
     case KEY_ROTATION = 'KEY_ROTATION';
+    // The User-Person Link ended: the identity is retired with it (PWA-1D).
+    case LINK_ENDED = 'LINK_ENDED';
 }
