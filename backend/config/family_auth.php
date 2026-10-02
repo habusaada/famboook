@@ -116,12 +116,42 @@ return [
     | Family Portal activation gate (docs/08 §16a)
     |--------------------------------------------------------------------------
     |
-    | Off by default. Nothing reads it yet (activation is PWA-1F). It must stay
-    | false in Production until the SMS provider, the queue worker, delivery
-    | failure handling and secure credentials exist.
+    | Off by default; read by App\Http\Middleware\EnsureActivationEnabled on
+    | the four public activation endpoints, which answer 503 while it is off.
+    | It must stay false in Production until the SMS provider, the queue
+    | decision, delivery failure handling, secure credentials, the scheduler
+    | and the Family login (PWA-1G) exist.
     |
     */
 
     'activation_enabled' => (bool) env('FAMILY_ACTIVATION_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activation abuse controls (docs/11 §30a)
+    |--------------------------------------------------------------------------
+    |
+    | min_response_ms: the least time a start or resend takes, so an eligible
+    | request (lookup, transaction, SMS) and a denied one answer alike. 400 is
+    | a DEVELOPMENT default — the Production value must exceed the real SMS
+    | provider's slow-case latency and is set with that integration. 0 = off.
+    |
+    | limits: request ceilings of the public endpoints, per IP and — for
+    | start — per identifier (its keyed fingerprint, never the National ID).
+    | They complement the OTP SMS ceilings above; they do not replace them.
+    |
+    */
+
+    'activation' => [
+        'min_response_ms' => (int) env('FAMILY_ACTIVATION_MIN_RESPONSE_MS', 400),
+        'limits' => [
+            'start_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IP_MINUTE', 10),
+            'start_ip_hour' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IP_HOUR', 30),
+            'start_identifier_hour' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IDENTIFIER_HOUR', 5),
+            'verify_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_VERIFY_IP_MINUTE', 30),
+            'resend_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_RESEND_IP_MINUTE', 10),
+            'complete_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_COMPLETE_IP_MINUTE', 10),
+        ],
+    ],
 
 ];

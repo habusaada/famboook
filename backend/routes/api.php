@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
@@ -37,6 +38,18 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 // `family.side` only says the account is family-side; it authorizes no family
 // data — family-data routes will resolve the Family context explicitly.
 Route::prefix('family')->group(function () {
+    // Activation (docs/11 §30a): public and generic. The gate runs first —
+    // while it is off nothing is looked up, recorded or sent. National IDs,
+    // codes and passwords travel in the body, never in a URL.
+    Route::prefix('auth/activation')->middleware('family.activation')->group(function () {
+        Route::post('/start', [FamilyActivationController::class, 'start'])
+            ->middleware('throttle:family-activation-start')->name('family.activation.start');
+        Route::post('/verify', [FamilyActivationController::class, 'verify'])
+            ->middleware('throttle:family-activation-verify')->name('family.activation.verify');
+        Route::post('/resend', [FamilyActivationController::class, 'resend'])
+            ->middleware('throttle:family-activation-resend')->name('family.activation.resend');
+    });
+
     // Any authenticated account may end its own session.
     Route::post('/auth/logout', [FamilySessionController::class, 'logout'])->middleware('auth:sanctum');
 

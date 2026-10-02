@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureActivationEnabled;
 use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -24,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'staff.side' => EnsureStaffSideAccount::class,
             'family.side' => EnsureFamilySideAccount::class,
+            // The Family activation gate (docs/08 §16a): off by default.
+            'family.activation' => EnsureActivationEnabled::class,
         ]);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
@@ -38,5 +41,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'national_id_confirmation',
             'beneficiary_national_id',
             'delegate_national_id',
+            'code',
         ]);
     })->create();

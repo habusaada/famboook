@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\SmsSender;
+use App\Enums\ActivationError;
+use App\Exceptions\ActivationException;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
@@ -73,5 +75,23 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('national-id-check', fn (Request $request) => Limit::perMinute(30)
             ->by('nid-check|'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn () => response()->json(['message' => 'عدد كبير من عمليات التحقق. حاول مجددًا بعد قليل.'], 429)));
+
+        // Family activation (docs/11 §30a): request ceilings per IP on the
+        // public endpoints, real and decoy flows alike. The key is a digest
+        // of the address; the per-identifier ceiling of start lives in
+        // FamilyActivation (keyed fingerprint). OtpThrottle remains the only
+        // SMS ceiling.
+        foreach (['start' => ['minute', 'hour'], 'verify' => ['minute'], 'resend' => ['minute'], 'complete' => ['minute']] as $step => $windows) {
+            RateLimiter::for("family-activation-{$step}", fn (Request $request) => array_map(
+                function (string $window) use ($step, $request) {
+                    $max = (int) config("family_auth.activation.limits.{$step}_ip_{$window}");
+
+                    return ($window === 'hour' ? Limit::perHour($max) : Limit::perMinute($max))
+                        ->by("family-activation|{$step}|ip|".hash('sha256', (string) $request->ip())."|{$window}")
+                        ->response(fn () => ActivationException::response(ActivationError::TOO_MANY_REQUESTS));
+                },
+                $windows,
+            ));
+        }
     }
 }
