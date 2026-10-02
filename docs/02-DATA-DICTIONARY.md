@@ -2164,6 +2164,83 @@ as the canonical authorization relationship.
 
 ---
 
+# 45a. Family Portal Logical Concepts (PWA-0)
+
+Approved 2026-10-02 (DD-ADR-031). Logical concepts only: none is
+implemented and no physical field names are fixed here unless another
+section already defines them. Specification: `11-FAMILY-PORTAL.md` §28.
+
+### Family login identifier
+
+Family Users type their National ID to authenticate, not an email, and
+`users.email` cannot stay mandatory for Family Users. Nothing else is
+decided: `persons.national_id` is **not** simply made unique, and the
+relation between the stored value and a login identifier is designed only
+after the PWA-1 identity-data discovery (docs/11 §4, PFP-003; extends
+PDD-001).
+
+### Trusted mobile
+
+A per-Person fact, separate from the `mobile` value:
+
+```text
+TRUSTED / VERIFIED         may receive an activation OTP
+EXISTS, NOT TRUSTED        cannot activate until verified
+NO VALID MOBILE            needs an authorized contact update first
+```
+
+It records who trusted the mobile, when and by which process. An imported
+`mobile` is never trusted by default. A mobile number is not an identity
+and may be shared by several Persons.
+
+### OTP challenge
+
+A short-lived, hashed, attempt-counted secret bound to one purpose
+(activation or password reset), one Person and one trusted destination.
+The plaintext is never stored, logged or shown to Staff.
+
+### Profile Completion
+
+A value calculated by the backend from business-rule steps (docs/11 §9).
+It is not a stored count of filled columns and is distinct from
+verification.
+
+### Family Verification
+
+The review state and result of a family profile (docs/11 §11): at least
+the result, its version or equivalent, who verified, when, and the history
+of verification events. Conceptual states: INCOMPLETE, COMPLETE /
+READY_TO_SUBMIT, UNDER_REVIEW, NEEDS_CLARIFICATION, VERIFIED,
+REVERIFICATION_REQUIRED.
+
+### Coordinator scope assignment
+
+An explicit, audited assignment of a User to an organizational scope:
+CLAN, BRANCH_GROUP or BRANCH. Branch is the primary V1 level.
+
+### Digital Household Head Card
+
+A credential issued to the eligible household head of a Family: an opaque
+public holder ID, a public verification credential, a status (active,
+revoked), an issue date and an issue / revoke / reissue history. The
+public holder ID never reuses `family_code`, `person_code`, a database id
+or the National ID.
+
+### Announcement and recipient
+
+A manual message with a sender, a sender context (Administration or
+Coordinator), a title, a body, an optional action, an audience definition,
+resolved recipients, a sent time and per-recipient read state. Distinct
+from system notifications (§59).
+
+### Authentication and security event
+
+An append-only record of activation, OTP, login, reset, Link and card
+events that are not tied to a resolved Family. Never contains OTP
+plaintext, passwords or secrets.
+
+---
+
 # 46. Change Request Type
 
 ## Entity
@@ -2216,6 +2293,13 @@ OTHER
 ```
 
 Not every type must be enabled for Family Users immediately.
+
+Family Portal V1 plans CONTACT_UPDATE, RESIDENCE_UPDATE, PERSON_CORRECTION,
+ADD_FAMILY_MEMBER, BIRTH_REPORT and DEATH_REPORT (docs/11 §14). The
+following are **proposals, not approved types** (docs/11 PFP-008):
+`FAMILY_DATA_UPDATE`, `HOUSEHOLD_DECLARATION_UPDATE`,
+`HEALTH_RECORD_SUBMISSION`, `NEED_SUBMISSION`. Divorce and widowhood have
+no approved type.
 
 ---
 
@@ -3670,6 +3754,10 @@ Sensitive document files use private storage.
 
 Canonical reference values use stable codes independent from localization.
 
+### DD-ADR-031
+
+Family Portal logical concepts (§45a): National ID login identifier, per-Person trusted mobile, OTP challenge, calculated Profile Completion, Family Verification, coordinator scope assignment, Digital Household Head Card credential, announcements with recipients, and authentication/security events. Logical only; not implemented.
+
 ---
 
 # 92. Pending Data Decisions
@@ -3898,6 +3986,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.24 | 2026-10-02 | Approved | PWA-0: §45a Family Portal logical concepts (login identifier, trusted mobile, OTP challenge, Profile Completion, Family Verification, coordinator scope, card credential, announcements, security events); §47 proposed request types recorded as not approved (DD-ADR-031). Documentation only |
 | 1.2.23 | 2026-10-01 | Approved | §7c: canonical permanent code of Branches created by the INITIAL import (`BR_` + reserved id) |
 | 1.2.22 | 2026-09-30 | Approved | §88d `apply_plan_fingerprint`, `apply_error_code`, `apply_error_row_number` on import_batches |
 | 1.2.21 | 2026-09-29 | Approved | §88d `import_apply_records` (Apply provenance: effect, entity reference, role, spouse slot, outcome, reason code, applier) and batch status PARTIALLY_APPLIED / apply_started_at; not yet written by any flow |

@@ -137,8 +137,42 @@ when a screen uses it now.
   keyboard order follows reading order.
 - Semantic landmarks and headings: one `h1` per page (page header).
 
+## 11a. Family Portal (PWA-0 direction)
+
+Approved 2026-10-02 as direction; not implemented. Full text:
+`11-FAMILY-PORTAL.md` §23–§24.
+
+- Same brand, not a sub-brand: formal, trusted, clean, digital, modern,
+  mobile-first. Not a playful consumer app and not a shrunken admin
+  dashboard.
+- **Palette amendment (scoped).** §3 documents — and the Staff application
+  implements — a teal brand scale (`#176B63`). The Family Portal is
+  approved with the kingfisher / spring palette: UI primary `#751BD5`,
+  hover `#651CAD`, brand purple `#892CF1`; spring (`#07F49E`, strong
+  `#00BB76`) is semantic only. Kingfisher Purple is the Family Portal
+  identity (docs/11 FP-ADR-022). §3 is not changed: the Staff UI keeps its
+  teal scale during the Family PWA program, and no Staff palette migration
+  is started unless separately authorized.
+- Neutrals: background `#F7F7FA`, surface `#FFFFFF`, text `#18181B` /
+  `#52525B` / `#71717A`, border `#E4E4E7` / `#F0F0F2`. About 80% neutral,
+  15% purple, 5% semantic.
+- Type direction: page title ~24/700, section ~18/600, card title
+  ~16/600, body ~15–16/400, label ~14/500, caption ~12–13/400. Larger than
+  the Staff ramp of §6 because the Portal is read on phones.
+- Geometry: page padding 16px, section gap 24px, card padding 16px, card
+  radius 14–16px, control radius 10–12px, badge radius ~8px. Borders and
+  spacing carry hierarchy; little or no shadow.
+- One primary action per screen; long forms are stepped.
+- Status language: icon + text + color (§11). Green verified / approved /
+  completed; amber pending / under review; orange needs attention /
+  returned; red rejected; gray draft; kingfisher informational.
+- Codes and identifiers render LTR (§10).
+
+These become tokens in PWA-3; no raw hex in components (§4).
+
 ## 12. Change Log
 
 | Version | Date | Description |
 |---|---|---|
 | 1.0 | 2026-09-27 | Foundations (surfaces, elevation, radius, type, motion) and Dashboard components; applied to the Operational Dashboard only |
+| 1.1 | 2026-10-02 | §11a Family Portal visual direction (PWA-0); kingfisher / spring palette scoped to the Family Portal — the Staff teal scale of §3 is unchanged. Direction only, not implemented |

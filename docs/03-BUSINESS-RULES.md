@@ -1749,6 +1749,12 @@ A User must not verify their own identity link.
 
 Verification requires an authorized Staff/System process.
 
+**Amended 2026-10-02 (PWA-0, docs/11 §31 A-01).** Self-verification stays
+prohibited. The approved **system** verification process is account
+activation: eligibility is decided by the registry, the OTP destination is
+a mobile trusted through an authorized process, and the proof is the OTP
+(§89a). The person activating chooses none of these.
+
 ---
 
 # 60. Family User Role
@@ -2167,6 +2173,126 @@ Evidence
 Re-authentication
 Application permission
 ```
+
+---
+
+# 89a. Family Portal Program Rules (PWA-0)
+
+Approved 2026-10-02. Specification: `11-FAMILY-PORTAL.md`. Documentation
+only; nothing here is implemented.
+
+## Access
+
+- Family access is resolved on every request: authenticated User →
+  verified active User-Person Link → Person → active household-head
+  membership → Family (§62, unchanged).
+- Family endpoints never accept a Family identifier from the client to
+  decide the current Family. The server resolves it.
+- Family API authorization defaults to deny.
+- Access is re-evaluated on the events of §64, including the death of the
+  household head and user deactivation.
+
+## Authentication
+
+```text
+Activation   National ID → eligibility → trusted mobile → OTP → password
+Login        National ID + password
+Reset        National ID → OTP to the trusted mobile → new password
+```
+
+- No generated password is ever sent by SMS.
+- Responses are generic wherever a specific answer would reveal that a
+  National ID exists, is eligible or has an account.
+- No name and no Family information is shown before authentication
+  succeeds.
+- Staff authentication (§116) is unchanged.
+- How a typed National ID is matched to a Person is not decided here.
+  `persons.national_id` is not simply made unique: PWA-1 begins with an
+  identity-data discovery (docs/11 §4, PFP-003).
+
+## Mobile trust
+
+- An imported mobile is not trusted for activation.
+- Only a trusted mobile receives an activation OTP.
+- During activation a person cannot replace the mobile with a new number
+  and receive an OTP on it.
+- A change of the authentication mobile is separately authorized and
+  verified; a Family User's request to change it is never self-approved.
+- A mobile number is never an identity; shared numbers are expected.
+
+## Multi-role
+
+- One person holding FAMILY_USER and COORDINATOR uses one account.
+- An action is authorized by the context it is performed in.
+- COORDINATOR is permission + organizational scope, never role alone, and
+  is not a REVIEWER (docs/06 §22a).
+- In V1 a coordinator signs in through the Family Portal identity flow,
+  not the Staff Login, and works in a visibly distinct Coordinator Space.
+
+## Profile Completion and Family Verification
+
+- Completion is calculated from business-rule steps, not from a count of
+  filled columns; steps may be conditional.
+- Declared household size and the registered member count are separate
+  facts. Missing people are never inferred from their difference, and
+  equality is never a condition of completion or verification (§55).
+- Verification is separate from completion and is granted only by an
+  authorized Famboook user or process. A Family User cannot self-verify; a
+  coordinator cannot grant it by role.
+- Verification is auditable: who, when, status/version, history.
+- Later changes affect verification by risk class — MINOR, MATERIAL,
+  CRITICAL — from one backend decision table (docs/11 §12, pending
+  approval).
+
+## Verified is not beneficiary
+
+```text
+VERIFIED ≠ APPROVED FOR ASSISTANCE
+```
+
+Verification makes a family eligible to be considered by targeting and
+nomination. Assistance still requires service criteria, nomination, review
+and approval (§47).
+
+## Submissions
+
+- V1 registry requests: CONTACT_UPDATE, RESIDENCE_UPDATE,
+  PERSON_CORRECTION, ADD_FAMILY_MEMBER, BIRTH_REPORT, DEATH_REPORT (§68).
+- Family-data, household-declaration, health and need submissions need
+  request types that are **PROPOSED and not approved** (docs/11 §14,
+  PFP-008).
+- A family health submission never creates an official health record, and
+  a family need submission never creates an official Need, without review.
+  On approval the existing health and Needs Domain Actions apply them.
+- Need ≠ health condition. Family Users never create Assistance records.
+- Marriage, divorce, widowhood, member transfer and household-head change
+  stay out of V1 until their Domain Actions and request types exist.
+
+## Card and QR
+
+- The Digital Household Head Card carries minimal data and an opaque
+  public holder ID that never reuses a Family code, Person code, database
+  id or National ID.
+- The QR holds only an opaque credential and resolves to live status.
+- A QR proves access to the QR, not the identity of the presenter.
+- A downloaded PDF is outside system control; only its QR can be revoked.
+
+## Notifications and announcements
+
+- In-app records are the source of truth; Web Push and SMS are channels.
+- §90 is extended: system notifications still originate from backend
+  events; **manual announcements** are a distinct, audited kind sent by
+  Famboook Administration or by a coordinator within scope.
+- Audiences are resolved on the server; a client-supplied audience is
+  never trusted beyond the sender's scope.
+- A coordinator's message never appears as an administrative decision.
+
+## Audit
+
+Activation, OTP security events, password reset, Link verification and
+revocation, verification decisions, request transitions and apply, card
+issue / revoke / reissue, coordinator scope changes and announcement sends
+are auditable. OTP plaintext, passwords and secrets are never logged.
 
 ---
 
@@ -4239,6 +4365,7 @@ Exact session timeout rules.
 
 PBD-028
 Exact login identifier policy.
+Decided in direction 2026-10-02: Family Users log in with National ID, Staff with email (§89a); the identifier design itself stays open and blocks PWA-1 (docs/11 PFP-003).
 
 PBD-029
 Exact low-bandwidth/offline behavior permitted for sensitive data.
@@ -4364,6 +4491,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.34 | 2026-10-02 | Approved | PWA-0: §89a Family Portal Program Rules (server-resolved Family access, National ID + OTP activation, mobile trust, multi-role, Profile Completion, Family Verification, VERIFIED ≠ assistance, submissions, card/QR, announcements, audit); §59 amended — activation is the approved system verification process; PBD-028 decided in direction. Documentation only |
 | 1.2.33 | 2026-10-02 | Approved | §55a: the Operational Dashboard shows the Declared Household Population (sum of current declared household sizes in scope) as a separate KPI beside Current People; no figure derived from another |
 | 1.2.32 | 2026-10-01 | Approved | §55: the Family list and profile show the declared household statistics beside the registered `member_count` (labelled "المعلن"); nothing derived or reconciled |
 | 1.2.31 | 2026-10-01 | Approved | §96a INITIAL import: one explicit action resolves every unresolved family key from the workbook — exact existing Branch name → MATCH_EXISTING_BRANCH, otherwise a new ungrouped Branch; canonical permanent Branch code `BR_` + reserved id; formula keys included; missing keys stay blocking; re-run is a no-op; Step 4 Branches persist independently of the batch |

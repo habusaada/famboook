@@ -405,6 +405,16 @@ FAMILY_USER
 
 ---
 
+# 14a. COORDINATOR (planned role)
+
+Approved 2026-10-02 (AUTH-ADR-061). **Documented, not seeded**: the role
+does not exist in `RolePermissionSeeder` and must not be added before
+PWA-1. It is neither one of the six Staff roles nor an external role like
+FAMILY_USER; it is a scope-bound operational role defined in §22a. In
+Family Portal V1 a COORDINATOR does not use the Staff Login (AUTH-ADR-062).
+
+---
+
 # 15. SUPER_ADMIN
 
 `SUPER_ADMIN` is the highest technical/system role.
@@ -604,6 +614,127 @@ is_household_head = TRUE
 ```
 
 These remain separate.
+
+---
+
+# 22a. Family Portal Program Authorization (PWA-0)
+
+Approved 2026-10-02 (AUTH-ADR-061). Specification:
+`11-FAMILY-PORTAL.md`. **Nothing in this section is seeded or enforced
+yet.**
+
+## Roles
+
+```text
+FAMILY_USER    preserved as a distinct role and context
+COORDINATOR    new
+FAMILY_USER + COORDINATOR    valid combination, one account
+COORDINATOR ≠ REVIEWER
+```
+
+## COORDINATOR
+
+```text
+Permission + Organizational Scope = Allowed Action
+```
+
+Scope levels: CLAN, BRANCH_GROUP, BRANCH (branch is the primary V1 case).
+A scope assignment is an explicit, audited record made by an authorized
+administrator.
+
+A coordinator may, within scope:
+
+```text
+View a limited dashboard
+View families with deliberately limited data
+View profile completion and verification status
+View whether a family account is activated, where authorized
+Send notifications and announcements
+Assist activation operationally
+```
+
+A coordinator must not, by virtue of the role:
+
+```text
+Approve, reject or apply Change Requests
+Review as a REVIEWER
+Grant VERIFIED
+See OTP values or set family passwords
+See health, disability, pregnancy or breastfeeding details
+Create assistance decisions
+Act outside the assigned scope
+```
+
+No existing broad Staff permission (`family.view`, `person.view`,
+`health-record.view`, `need.view`, `assistance.*`, `report.view`, …) is
+granted to COORDINATOR for convenience.
+
+## Coordinator authentication (V1)
+
+Approved 2026-10-02 (AUTH-ADR-062).
+
+- A COORDINATOR does **not** use the Staff Login (§59c) in Family Portal
+  V1; Staff Login rules are unchanged.
+- A coordinator authenticates through the Family Portal identity flow.
+- The same account may hold FAMILY_USER + COORDINATOR.
+- The family context stays under `/family`; authorized coordinators
+  additionally reach `/family/coordinator`.
+- Coordinator Space is visibly distinguished from the Family context.
+- Access stays permission + organizational scope; COORDINATOR ≠ REVIEWER.
+- A separately authorized Staff role or account model remains possible
+  later if the product requires it.
+
+## Contexts
+
+A dual-role user acts in the Family context or in Coordinator Space
+("مساحة التنسيق"). Each request is authorized in its own context: the
+Family context grants nothing in Coordinator Space, and the reverse.
+
+## Family Portal access
+
+- The current Family is resolved by the server (§24, §30–§31); a Family
+  endpoint never takes it from the client.
+- Family API authorization defaults to deny.
+
+## Proposed permission families — PENDING product-owner review
+
+**PROPOSED, not approved** (docs/11 PFP-022). These names are not
+canonical, not part of the permission catalog and not seeded; they must
+not be implemented before review. They follow the existing
+`resource.action` convention.
+
+| Proposed permission | Intended holder | Phase |
+|---|---|---|
+| `family-portal.access` | FAMILY_USER | PWA-1 |
+| `person-contact.verify` (mark a mobile trusted) | Authorized Staff | PWA-1 |
+| `coordinator-scope.view` | Authorized Staff | PWA-1 |
+| `coordinator-scope.manage` | SUPER_ADMIN / ADMINISTRATOR | PWA-1 |
+| `coordinator-space.access` | COORDINATOR | PWA-1 / PWA-9 |
+| `coordinator-family.view-summary` | COORDINATOR (scope-bound, limited fields) | PWA-9 |
+| `coordinator-family.view-account-status` | COORDINATOR (scope-bound) | PWA-9 |
+| `family-verification.submit` | FAMILY_USER (own Family) | PWA-4 |
+| `family-verification.view` | Authorized Staff | PWA-4 |
+| `family-verification.review` | Authorized Staff | PWA-4 |
+| `family-verification.approve` | Authorized Staff | PWA-4 |
+| `announcement.view` | Senders and authorized Staff | PWA-9 |
+| `announcement.create` | Administration; COORDINATOR (scope-bound) | PWA-9 |
+| `announcement.send` | Administration; COORDINATOR (scope-bound) | PWA-9 |
+| `announcement.send-all` (all eligible family users) | Administration only | PWA-9 |
+| `family-card.view` | Authorized Staff | PWA-8 |
+| `family-card.issue` | Authorized Staff / system process | PWA-8 |
+| `family-card.revoke` | Authorized Staff | PWA-8 |
+| `family-card.reissue` | Authorized Staff | PWA-8 |
+| `family-card.open-record` (open the internal record from a QR) | Authorized Staff | PWA-8 |
+
+Existing permissions reused: `user.link-person`,
+`user.verify-person-link`, `user.activate`, `user.suspend` (§54, §100) and
+the `change-request.*` family (§52–§53).
+
+The coordinator sees verification **status** through
+`coordinator-family.view-summary`; `family-verification.review` and
+`family-verification.approve` are never implied by COORDINATOR.
+
+The Initial Role Matrix (§140) is unchanged until these are seeded.
 
 ---
 
@@ -1824,6 +1955,14 @@ DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER in V1. FAMILY_USER is
 not a Staff Portal user: it cannot log in to the Staff Portal, is never
 assignable from Staff administration, and FAMILY_USER accounts are not
 listed there.
+
+**Amended 2026-10-02 (AUTH-ADR-061, docs/11 §31 A-04).** Old rule: a user
+holds exactly one role and FAMILY_USER never coexists with another. New
+decision: one user may hold FAMILY_USER + COORDINATOR. The six Staff roles
+above still hold "exactly one", and Staff Portal login rules for them are
+unchanged. Code that reads only the first role (Staff login, the `/me`
+representation, Staff user administration) must be changed in PWA-1 before
+a second role is ever assigned.
 
 ## Filament (System / High Administration)
 
@@ -3048,6 +3187,14 @@ HIDDEN BY DEFAULT
 
 in Family Portal until explicit visibility rules are approved.
 
+**Amended 2026-10-02 (PWA-0, docs/11 §31 A-05).** Reading stays as above:
+until detailed visibility is approved (docs/11 PFP-006), a household head
+sees only the minimum necessary — what they submitted and its request
+status — and never other adults' canonical health records. What changes:
+a Family User may **submit** health and disability information for review
+(docs/11 §15). A COORDINATOR sees no health, disability, pregnancy or
+breastfeeding details.
+
 ---
 
 # 124. Needs Portal Visibility
@@ -3561,6 +3708,12 @@ Registry search and exact National ID duplicate checks (docs/03 §93a). The Fami
 
 ### AUTH-ADR-059
 Data-entry corrections (Pilot Readiness Slice C, docs/03 §93b). `family-membership.update` (relationship correction of a current member) goes to SUPER_ADMIN, ADMINISTRATOR and DATA_ENTRY, mirroring "Correct Basic Person Data". `family-membership.end` (ending a current, non-head membership with a required reason; no delete) goes to SUPER_ADMIN and ADMINISTRATOR only: ending is not easily reversible in V1 (no reactivation, attach-existing-person or transfer, and the National ID duplicate rule prevents re-creating the Person). Neither can change the household head: the HEAD relationship stays tied to `is_household_head`, and the head's membership cannot be ended; `family.change-household-head` stays unused. `person.national-id.view-masked` and `person.national-id.update` go to SUPER_ADMIN and ADMINISTRATOR only; `person.national-id.view` (FULL) stays unassigned, so no API returns a full National ID. Masking is centralized (NationalIdMask). National ID changes move to one dedicated, rate-limited endpoint with a required, confirmed replacement (no clear action, duplicate guard active); the generic Person update no longer accepts the field. The three new activity events carry no metadata. This supersedes the "still unassigned" statements of AUTH-ADR-047 and AUTH-ADR-058 for `.view-masked` / `.update` only.
+
+### AUTH-ADR-061
+Family Portal program authorization (§14a, §22a, `11-FAMILY-PORTAL.md`). COORDINATOR is a new scope-bound role (permission + organizational scope; never REVIEWER by implication); FAMILY_USER + COORDINATOR is a valid combination on one account, amending the single-role rule of §59c for that combination only; Family access is server-resolved and default-deny; activation by National ID + OTP to a trusted mobile is the approved system verification process (amends §100–§101); the permission names of §22a are PROPOSED, pending review and NOT seeded.
+
+### AUTH-ADR-062
+In Family Portal V1 a COORDINATOR does not use the Staff Login: a coordinator authenticates through the Family Portal identity flow and reaches Coordinator Space at `/family/coordinator`, visibly distinct from the Family context. Staff Login rules (§59c) are unchanged. A separately authorized Staff role or account model remains possible later.
 ```
 
 ---
@@ -3570,9 +3723,11 @@ Data-entry corrections (Pilot Readiness Slice C, docs/03 §93b). `family-members
 ```text
 PAUTH-001
 Exact Family User identity-verification mechanism.
+Decided in direction 2026-10-02: registry eligibility + OTP to a trusted mobile (§22a, docs/11 §5–§6); details are docs/11 PFP-002/004.
 
 PAUTH-002
 Exact Family User account activation mechanism.
+Decided in direction 2026-10-02: National ID → OTP → password (docs/11 §5).
 
 PAUTH-003
 Whether Family Portal V1 supports more than one Family User per Family.
@@ -3926,6 +4081,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.26 | 2026-10-02 | Approved | PWA-0 (AUTH-ADR-061): §14a COORDINATOR planned role; §22a Family Portal program authorization (scope-bound coordinator, contexts, PROPOSED permission names — pending review, not seeded; coordinator signs in through the Family Portal, not the Staff Login — AUTH-ADR-062); §59c single-role rule amended for FAMILY_USER + COORDINATOR; §123 amended (health submission allowed, reading minimum-necessary); PAUTH-001/002 decided in direction. Documentation only |
 | 1.2.25 | 2026-10-01 | Approved | §61 `family-keys/auto-branches` (INITIAL): `import.review` + `clan.manage` (checked in the Domain Action); no new permission |
 | 1.2.24 | 2026-10-01 | Approved | §61 Apply endpoints (Phase 4B.4d): start / run / resume require `import.apply`, progress requires `import.review`; `import.apply` granted to SUPER_ADMIN only through the Apply activation gate (closed by default), checked at runtime too; verifier enforces both modes and forbids direct grants |
 | 1.2.23 | 2026-09-30 | Approved | §61 Dry Run endpoints (`dry-run`, `dry-run/rows`) require `import.review`; `import.apply` still unassigned |

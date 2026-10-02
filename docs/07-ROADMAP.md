@@ -1991,6 +1991,54 @@ Family-visible/internal notes separated
 
 ---
 
+# 31a. Family PWA Program (PWA-0 … PWA-10)
+
+Approved 2026-10-02 (RM-ADR-041). Specification: `11-FAMILY-PORTAL.md`.
+
+Phases 16–19 are delivered through this program. Their objectives and
+exit criteria stand; the PWA phases refine their order and add the scope
+approved on 2026-10-02.
+
+```text
+Phase 16  Family User Identity & Access   → PWA-1, PWA-2
+Phase 17  Family Portal Foundation        → PWA-3
+Phase 18  Change Request Engine           → PWA-5
+Phase 19  Family Portal Self-Service      → PWA-6, PWA-7
+New scope                                 → PWA-4, PWA-8, PWA-9, PWA-10
+```
+
+Every phase is local, reviewable and independently testable. No phase
+deploys or touches Production by itself.
+
+| Phase | Objective | Main scope | Schema impact | Depends on | Exit criteria |
+|---|---|---|---|---|---|
+| PWA-0 | Baseline | Architecture, business rules, workflows, permissions, product and design direction | None | — | Documentation approved (**this update**) |
+| PWA-1 | Family identity and access | **Starts with a read-only identity-data discovery** (National ID normalization, null/blank, malformed, duplicates and their cause, login-identifier relation, backfill strategy — docs/11 §4); then User-Person Link, Family access resolver, eligibility, trusted-mobile concept, multi-role fixes, coordinator scope foundation | Link, trust state, scope assignment, login identifier | PWA-0; PFP-003, PFP-004, PFP-016 | Cross-family denial; head change, death, suspended Link and deactivation end access; a dual-role user is handled deterministically; Staff login unchanged |
+| PWA-2 | Family authentication | National ID activation, OTP, password setup, login, reset, rate limiting, SMS provider abstraction, security audit | OTP challenge, activation state, security events | PWA-1; PFP-001, PFP-002, PFP-005, PFP-020 | No enumeration; brute force and resend abuse blocked; untrusted mobile cannot activate; destination cannot be chosen; no secret logged |
+| PWA-3 | Family shell and read-only portal | Route groups, mobile shell, home, family summary, members, account | None expected | PWA-2 | Only the resolved Family is visible; no client Family id; sensitive fields filtered server-side; responses not cached; Staff URLs unchanged |
+| PWA-4 | Profile Completion and Family Verification | Completion calculation, verification submission, Staff review, later-change decision table | Verification state and history | PWA-3; PFP-007, PFP-017 | Completion is rule-derived and conditional; declared ≠ registered respected; only authorized approval grants VERIFIED; fully audited |
+| PWA-5 | Change Request engine and Staff review workspace | Engine, workflow events, lifecycle actions, Staff queue and detail | Change requests, types, workflow events | PWA-1; PFP-008 | All transitions tested; APPROVED ≠ APPLIED; apply transactional and idempotent; rollback and concurrency tested; internal notes never family-visible |
+| PWA-6 | Registry requests / life events | CONTACT_UPDATE, RESIDENCE_UPDATE, PERSON_CORRECTION, ADD_FAMILY_MEMBER, BIRTH_REPORT, DEATH_REPORT; evidence; My Requests | Documents | PWA-3, PWA-5 | Per-type validation; duplicate check on apply; evidence private; authentication-mobile change never self-approved |
+| PWA-7 | Health, disability and need submissions | Reviewed submissions applied through the existing health and Needs actions | Possibly new types or reference rows only | PWA-6; PFP-006, PFP-008, PFP-009 | No direct canonical write; minimum-necessary visibility; temporary conditions end correctly; no Assistance created by a Family User |
+| PWA-8 | Digital card, QR, public verification, PDF | Credential, issue / revoke / reissue, public page, server PDF | Card credential and history | PWA-3 (card may be pulled ahead of PWA-5–7); PFP-010, PFP-011, PFP-018 | Opaque identifiers; live revocation; enumeration and rate-limit tests; minimal public fields |
+| PWA-9 | Notifications, announcements, Coordinator Space | In-app center, system notifications, announcements, audiences, coordinator dashboard and family summaries | Announcements, recipients | PWA-1, PWA-3, PWA-5; PFP-019 | Server-side audience; scope limits; recipient-only reads; queued fan-out; coordinator sees no health details |
+| PWA-10 | Installability and hardening | Manifest scoped to `/family`, service worker, security, performance and accessibility review | None | All | No authenticated response cached; no offline sensitive data; session policy decided (PFP-014) |
+
+Infrastructure prerequisites recorded for later phases: an SMS provider
+(PWA-2) and a queue worker in production, which currently runs
+`QUEUE_CONNECTION=sync` with no worker (PWA-2 for SMS, PWA-9 for fan-out).
+
+The Family PWA lives inside the existing Next.js frontend application; no
+separate repository-level application is created (docs/11 §25). The
+blocking prerequisite of PWA-1 is the National ID identity-data discovery
+(docs/11 PFP-003); PFP-004, PFP-016, PFP-021 and PFP-022 are decided
+during the phase. Other recorded follow-ups: docs/11 §33a.
+
+Not in V1: marriage, divorce, widowhood, member transfer and
+household-head change flows (docs/11 §14, PFP-012).
+
+---
+
 # 32. Phase 20 — Search & Duplicate Management
 
 ## Objective
@@ -4567,6 +4615,9 @@ MVP delivery is divided into Registry, Case Management, and Family Self-Service.
 
 ### RM-ADR-040
 Native mobile and advanced integrations remain post-V1 unless separately approved.
+
+### RM-ADR-041
+The Family Portal is delivered as the Family PWA Program, PWA-0 … PWA-10 (§31a), which carries Phases 16–19 and adds Profile Completion, Family Verification, the Digital Household Head Card, announcements, Coordinator Space and installability. Each phase is local, reviewable and independently testable.
 ```
 
 ---
@@ -4792,6 +4843,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.25 | 2026-10-02 | Approved | PWA-0: §31a Family PWA Program (PWA-0 … PWA-10) mapped onto Phases 16–19, with scope, schema impact, dependencies and exit criteria (RM-ADR-041). Documentation only; no phase started |
 | 1.2.24 | 2026-10-01 | Approved | Phase 23 progress note: Step 6 Apply UI (Phase 4B.4e) |
 | 1.2.23 | 2026-10-01 | Approved | Phase 23 progress note: Apply API and activation gate (Phase 4B.4d) |
 | 1.2.22 | 2026-09-30 | Approved | Phase 23 progress note: Apply runner (Phase 4B.4c) |

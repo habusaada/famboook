@@ -471,6 +471,57 @@ Perform unrestricted exports
 
 ---
 
+# 16a. Family Portal Program (PWA-0)
+
+Approved 2026-10-02 (PROD-ADR-047). Full specification:
+`11-FAMILY-PORTAL.md`. Documentation only; nothing here is implemented.
+
+The Family Portal is the official mobile-first self-service PWA for
+household heads, hosted under `/family` in the same Next.js application as
+the Staff application and public card verification. It is part of
+Famboook: not a separate brand and not a parallel registry.
+
+V1 modules:
+
+```text
+Home
+My Family
+Family Members
+Profile Completion & Verification
+Registry Updates / Life Events
+Health & Disability submissions
+Needs submissions
+My Requests
+Digital Household Head Card
+QR Verification
+Notifications
+Account & Security
+Coordinator Space (where applicable)
+PWA installability
+```
+
+This extends §15: Family Users may **submit** health, disability and need
+information for review (docs/11 §15–§16), hold a Digital Household Head
+Card (docs/11 §18–§20), and receive announcements from Famboook
+Administration and from their authorized coordinator (docs/11 §21–§22).
+The restrictions in §16 are unchanged.
+
+Product rule:
+
+```text
+VERIFIED ≠ APPROVED FOR ASSISTANCE
+```
+
+A verified family profile may be considered by targeting and nomination;
+it is never a promise of assistance (docs/11 §13).
+
+§12 is unchanged in substance: knowing a National ID or a phone number
+grants nothing. Activation additionally requires registry eligibility and
+possession of a mobile that was trusted through an authorized process
+(docs/11 §5–§6).
+
+---
+
 # 17. Canonical Registry
 
 Famboook maintains a canonical registry.
@@ -2395,6 +2446,12 @@ Offline storage of sensitive Family data requires separate security design.
 
 PWA capability must not be enabled merely for technical novelty.
 
+**Superseded 2026-10-02 (PROD-ADR-047, docs/11 §31 A-03).** Old rule: PWA
+capabilities may be considered later. Approved decision: the Family Portal
+is delivered as a PWA, scoped to `/family`. The offline rule is kept and
+tightened: V1 stores no sensitive family data offline and the service
+worker never caches authenticated API responses (docs/11 §25).
+
 ---
 
 # 96. External Integrations
@@ -2917,6 +2974,10 @@ Arabic and RTL are architectural product requirements.
 
 Modern custom UX is a core product requirement rather than post-development visual polish.
 
+### PROD-ADR-047
+
+The Family Portal is an official mobile-first PWA for household heads under `/family`, part of the Famboook product and brand, reading the canonical registry and changing it only through reviewed requests; VERIFIED does not mean approved for assistance (§16a, `11-FAMILY-PORTAL.md`).
+
 ---
 
 # 105. Preferred Technology Stack
@@ -3076,6 +3137,7 @@ Final production hostnames and infrastructure topology.
 
 PPD-015
 Whether Staff and Family routes remain in one Next.js application or are separated later.
+Decided 2026-10-02: one Next.js application with separate route groups (docs/11 §25).
 
 PPD-016
 Final Famboook visual identity, typography, and design tokens.
@@ -3088,6 +3150,7 @@ Whether Redis is required for initial production or introduced only when operati
 
 PPD-019
 PWA requirements after V1.
+Decided 2026-10-02 for the Family Portal: see §95 and docs/11 §25; remaining details are PFP-014/015.
 
 PPD-020
 Future external API/integration authentication strategy.
@@ -3155,6 +3218,7 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
+| 1.2.2 | 2026-10-02 | Approved | PWA-0: added §16a Family Portal Program (modules, submissions, card, announcements, VERIFIED ≠ assistance); §95 PWA rule superseded (PROD-ADR-047); PPD-015 and PPD-019 decided. Documentation only |
 | 1.2.1 | 2026-09-25 | Approved | Added §25a "Clan and Branch (V1)": Clan → Branch Groups → Branches → Families → Persons; Clan ≠ Family; required Clan, optional Branch; no multi-tenancy |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL, Laravel API-first backend, custom Next.js Staff/Executive/Family experiences, Famboook Design System, Sanctum authentication, Domain Actions, controlled API Resources, and restricted Filament System Administration |
 

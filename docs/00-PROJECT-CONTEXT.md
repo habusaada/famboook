@@ -2523,7 +2523,24 @@ The architecture baseline consists of:
 
 07-ROADMAP.md
 → Implementation sequence
+
+08-PILOT-DEPLOYMENT.md
+→ Pilot deployment architecture and procedures
+
+09-PILOT-SOP.md
+→ Pilot standard operating procedure
+
+10-DESIGN-SYSTEM.md
+→ Design System v1 and Family Portal visual direction
+
+11-FAMILY-PORTAL.md
+→ Family Portal / Family PWA program specification
 ```
+
+Documents 08–11 were added after the v1.2 baseline (index completed
+2026-10-02). All of 00–11 are current and are mandatory reading before
+work on the area they cover; `CLAUDE.md` carries the same list for
+development sessions.
 
 ---
 
@@ -3385,6 +3402,7 @@ Exact notification channels.
 
 CTX-PENDING-022
 Whether PWA functionality is V1 or post-V1.
+Decided 2026-10-02: the Family Portal is delivered as a PWA (docs/11 §25, §31 A-10).
 
 CTX-PENDING-023
 Exact production backup/retention targets.
@@ -3615,3 +3633,4 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial project context |
 | 1.1 | 2026-09-22 | Superseded | Expanded registry, Family Portal, workflow, security and domain architecture |
 | 1.2 | 2026-09-22 | Approved | Final synchronized architecture baseline establishing API-first Laravel/PostgreSQL core, custom Next.js Staff/Executive/Family experiences, Filament System Administration boundary, Sanctum authorization architecture, Famboook Design System, Change Request self-service model, deployment topology and implementation starting point |
+| 1.2.1 | 2026-10-02 | Approved | PWA-0: §103 documentation set completed with `08`–`11` (all current documents are mandatory reading); CTX-PENDING-022 decided (Family Portal is a PWA). Documentation only |

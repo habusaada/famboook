@@ -23,9 +23,13 @@ permissions, workflows, or major features, read the relevant documents:
 - `docs/07-ROADMAP.md`
 - `docs/08-PILOT-DEPLOYMENT.md`
 - `docs/09-PILOT-SOP.md`
+- `docs/10-DESIGN-SYSTEM.md`
+- `docs/11-FAMILY-PORTAL.md`
 
 Treat these documents as the approved Famboook Architecture Baseline v1.2
-(08 and 09 are the approved Pilot deployment and operating procedures).
+(08 and 09 are the approved Pilot deployment and operating procedures; 10
+is the Design System; 11 is the Family Portal / Family PWA program
+specification and must be read before any Family Portal work).
 
 If an implementation request conflicts with the documentation:
 

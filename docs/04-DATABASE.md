@@ -2120,6 +2120,56 @@ as the canonical authorization shortcut.
 
 ---
 
+# 55a. Family Portal Program — Future Schema Concepts (PWA-0)
+
+Approved 2026-10-02 (DB-ADR-041). **No migration exists for anything in
+this section.** It separates the logical design from the future physical
+schema; physical names are given only where this document already defines
+them. Specification: `11-FAMILY-PORTAL.md` §28.
+
+## Already defined here, not yet built
+
+```text
+user_person_links        §53–§54
+change_request_types     §36
+change_requests          §37–§42
+workflow_events          §33–§35
+documents                §44–§46
+```
+
+## New concepts — physical design deferred to their phase
+
+| Concept | Needs | Phase |
+|---|---|---|
+| Family login identifier | Undecided until the PWA-1 identity-data discovery (docs/11 §4); `users.email` not mandatory for Family Users | PWA-1 / PWA-2 |
+| Activation state | Whether the account is activated and a password set | PWA-2 |
+| Trusted mobile | Per-Person trust state with verifier, time and method | PWA-1 / PWA-2 |
+| OTP challenge | Hashed, short-lived, attempt-counted, purpose-bound | PWA-2 |
+| Coordinator scope assignment | User ↔ Clan / Branch Group / Branch; audited | PWA-1 |
+| Family Verification | State, version, verifier, timestamps, history | PWA-4 |
+| Profile Completion | Calculated; a table only if a snapshot proves necessary | PWA-4 |
+| Card credential and issuance | Opaque public holder ID, verification credential, status, history | PWA-8 |
+| Announcement | Sender, sender context, audience definition, content | PWA-9 |
+| Notification recipient / read state | Per-recipient row with read state | PWA-9 |
+| Authentication / security audit | Append-only events | PWA-2 |
+
+## Constraints the physical design must honour
+
+- No `users.family_id` (§55).
+- `persons.national_id` is indexed but not unique and stored as entered
+  (PDD-001). This section does **not** decide to make it unique. Whether a
+  separate normalized login key is introduced, and how it is backfilled,
+  is decided after the PWA-1 identity-data discovery (docs/11 §4,
+  PFP-003).
+- Opaque identifiers (public holder ID, verification credential) must be
+  unique and must not be derivable from sequential ids or business codes.
+- OTP secrets are stored only as hashes.
+- Verification and card history are append-only.
+- Coordinator scope references the existing `clans`, `branch_groups` and
+  `branches` tables.
+
+---
+
 # 56. Notifications
 
 V1 should use Laravel's standard database notification infrastructure unless implementation requirements justify a custom model.
@@ -3698,6 +3748,9 @@ Specialized Arabic/fuzzy search indexes are introduced only after search testing
 
 ### DB-ADR-040
 Database backups and restore testing are production requirements.
+
+### DB-ADR-041
+Family Portal future schema concepts are documented logically (§55a) with physical design deferred to each PWA phase; no `users.family_id`; opaque card identifiers never reuse sequential ids or business codes; OTP secrets stored only hashed.
 ```
 
 ### 111. Pending Database Decisions
@@ -3766,6 +3819,7 @@ Exact uniqueness rules for active User-Person Links.
 
 PDB-021
 Whether notification data requires additional domain-specific tables.
+Direction 2026-10-02: manual announcements need their own audience/recipient records; Laravel database notifications stay valid for system events (§55a).
 
 PDB-022
 Exact database-level handling of Family archive effects.
@@ -3956,6 +4010,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.23 | 2026-10-02 | Approved | PWA-0: §55a Family Portal future schema concepts (logical design vs deferred physical schema; constraints) — no migration (DB-ADR-041). Documentation only |
 | 1.2.22 | 2026-09-30 | Approved | §83d Apply execution fields: import_batches.apply_plan_fingerprint (present exactly while Apply has started) and structured apply_error_code / apply_error_row_number, with CHECKs |
 | 1.2.21 | 2026-09-29 | Approved | §83d Import Apply foundation: import_batches PARTIALLY_APPLIED + apply_started_at with CHECK (started Apply never FAILED), import_apply_records (append-only provenance, unique (import_row_id, effect_key), composite row/batch FK, created-entity uniqueness, shape/outcome/entity/reason CHECKs, no polymorphic FK) |
 | 1.2.20 | 2026-09-29 | Approved | §83c `import_row_reconciliations` (migration `2026_10_10_090000`), batch reconciliation columns, CHECKs; partial checksum index preserved on SQLite rebuild |

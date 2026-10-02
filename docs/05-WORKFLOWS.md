@@ -1138,6 +1138,11 @@ A Family User must not verify their own User-Person Link.
 
 Verification requires an authorized internal actor/process.
 
+**Amended 2026-10-02 (PWA-0, docs/11 §31 A-01).** The approved internal
+process is the activation workflow of §53a: registry-decided eligibility,
+an OTP to a mobile trusted through an authorized process, then password
+setup. The Family User still verifies nothing by assertion.
+
 ---
 
 # 52. Dynamic Family Eligibility
@@ -1182,6 +1187,122 @@ User Suspension
 User-Person Link Suspension
 
 User-Person Link End
+```
+
+---
+
+# 53a. Family Portal Program Workflows (PWA-0)
+
+Approved 2026-10-02 (WF-ADR-039). Specification: `11-FAMILY-PORTAL.md`.
+Documentation only; nothing here is implemented.
+
+## Mobile trust
+
+```text
+IMPORTED / UNVERIFIED MOBILE
+          ↓  authorized verification process
+       TRUSTED
+          ↓  authorized change of the authentication mobile
+   (new number verified before it becomes the OTP destination)
+```
+
+A number with no valid mobile first needs an authorized contact update.
+
+## Account activation
+
+```text
+National ID entered
+       ↓
+Eligibility resolved silently
+(current household head · alive · active membership · trusted mobile)
+       ↓
+OTP sent to the trusted mobile
+       ↓
+OTP verified
+       ↓
+Password set
+       ↓
+User-Person Link verified by the system process and activated
+       ↓
+ACTIVE
+```
+
+Any failure returns a generic response. The same lifecycle of §48 applies;
+this workflow is how IDENTITY VERIFICATION and USER-PERSON LINK are
+performed.
+
+## Password reset
+
+```text
+National ID → OTP to the trusted mobile → new password → sessions ended
+```
+
+## Profile Completion and Family Verification
+
+```text
+INCOMPLETE
+    ↓  required steps completed
+COMPLETE / READY_TO_SUBMIT
+    ↓  Family User submits
+UNDER_REVIEW  ⇄  NEEDS_CLARIFICATION
+    ↓  authorized approval
+VERIFIED
+    ↓  critical later change
+REVERIFICATION_REQUIRED
+```
+
+Completion is calculated; review and result are separate state. Only an
+authorized Famboook user or process grants VERIFIED.
+
+## Later changes
+
+```text
+MINOR      VERIFIED kept, update pending
+MATERIAL   review, verification kept until decided
+CRITICAL   REVERIFICATION_REQUIRED
+```
+
+The event matrix is docs/11 §12 (pending approval).
+
+## Health and need submissions
+
+```text
+Family submission
+       ↓
+Review  ⇄  clarification
+       ↓
+Approval
+       ↓
+CreateHealthRecordAction / CloseHealthRecordAction / CreateNeedAction
+       ↓
+APPLIED
+```
+
+They follow the Change Request lifecycle and application rules (§54–§69).
+Their request types are not yet approved (docs/11 PFP-008).
+
+## Digital Household Head Card
+
+```text
+ISSUED → ACTIVE → REVOKED
+              ↘ REISSUED (new credential; the old one is revoked)
+```
+
+Loss of household-head eligibility invalidates the card. Public
+verification always reads live status.
+
+## Announcements
+
+```text
+Compose
+   ↓
+Audience resolved on the server (within the sender's scope)
+   ↓
+Recipient count shown to the sender
+   ↓
+Send (queued fan-out, after commit)
+   ↓
+Per-recipient in-app record → read / unread
 ```
 
 ---
@@ -2717,6 +2838,9 @@ After-commit processing is preferred for non-critical notification delivery.
 
 ### WF-ADR-038
 Queued mutating operations must revalidate state and be retry-safe.
+
+### WF-ADR-039
+Family Portal program workflows (§53a): activation is the approved system verification process for the User-Person Link; Profile Completion, verification review and verification result are separate state; health and need submissions follow the Change Request lifecycle; card and announcement lifecycles are defined.
 ```
 
 ---
@@ -2747,6 +2871,7 @@ Exact Household Head eligibility workflow.
 
 PWF-008
 Exact Family User activation workflow.
+Decided in direction 2026-10-02: §53a; OTP parameters and the trust process remain open (docs/11 PFP-002, PFP-004).
 
 PWF-009
 Exact identity-verification evidence.
@@ -2975,3 +3100,4 @@ Date: 2026-09-24
 | 1.2.4 | 2026-09-24 | Approved | §40: Assistance V1-B approval, INTERNAL delivery/reversal, EXTERNAL list issuance, completion |
 | 1.2.5 | 2026-09-25 | Approved | §22: V1 Clan (required) and Branch (optional) selection at registration and correction |
 | 1.2.6 | 2026-09-29 | Approved | §22: Branch Group optional — ungrouped Branches ("بدون مجموعة") selectable; Branches created without a Group and later assigned/moved/ungrouped within the same Clan |
+| 1.2.7 | 2026-10-02 | Approved | PWA-0: §53a Family Portal Program Workflows (mobile trust, activation, reset, Profile Completion and Family Verification, later-change classes, health/need submissions, card, announcements); §51 amended (WF-ADR-039); PWF-008 decided in direction. Documentation only |
