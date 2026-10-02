@@ -284,6 +284,7 @@ class FamilyPasswordResetStartTest extends TestCase
             $this->start(),
             $this->verify($reference),
             $this->resend($reference),
+            $this->postJson(self::RESET.'/complete', []),
         ] as $response) {
             $response->assertStatus(503)->assertExactJson(['message' => 'الخدمة غير متاحة حاليًا.', 'code' => 'PASSWORD_RESET_UNAVAILABLE']);
         }

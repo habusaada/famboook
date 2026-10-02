@@ -67,6 +67,8 @@ Route::prefix('family')->group(function () {
             ->middleware('throttle:family-password-reset-verify')->name('family.password-reset.verify');
         Route::post('/resend', [FamilyPasswordResetController::class, 'resend'])
             ->middleware('throttle:family-password-reset-resend')->name('family.password-reset.resend');
+        Route::post('/complete', [FamilyPasswordResetController::class, 'complete'])
+            ->middleware('throttle:family-password-reset-complete')->name('family.password-reset.complete');
     });
 
     // Any authenticated account may end its own session.

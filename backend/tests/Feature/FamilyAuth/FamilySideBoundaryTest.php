@@ -177,10 +177,15 @@ class FamilySideBoundaryTest extends TestCase
 
     public function test_family_routes_are_outside_the_staff_group_and_behind_their_own_boundary(): void
     {
-        $public = [
-            'api/v1/family/auth/activation/start', 'api/v1/family/auth/activation/verify',
-            'api/v1/family/auth/activation/resend', 'api/v1/family/auth/activation/complete',
+        // Public by design, each behind its own feature gate (PWA-1F, PWA-1G).
+        $gates = [
+            'api/v1/family/auth/activation/start' => 'family.activation', 'api/v1/family/auth/activation/verify' => 'family.activation',
+            'api/v1/family/auth/activation/resend' => 'family.activation', 'api/v1/family/auth/activation/complete' => 'family.activation',
+            'api/v1/family/auth/login' => 'family.login',
+            'api/v1/family/auth/password/reset/start' => 'family.password-reset', 'api/v1/family/auth/password/reset/verify' => 'family.password-reset',
+            'api/v1/family/auth/password/reset/resend' => 'family.password-reset', 'api/v1/family/auth/password/reset/complete' => 'family.password-reset',
         ];
+        $public = array_keys($gates);
         $checked = 0;
         foreach (Route::getRoutes() as $route) {
             if (! str_starts_with($route->uri(), 'api/v1/family/')) {
@@ -190,6 +195,9 @@ class FamilySideBoundaryTest extends TestCase
             $this->assertNotContains('staff.side', $middleware, $route->uri());
             if (in_array($route->uri(), $public, true)) {
                 $this->assertNotContains('auth:sanctum', $middleware, $route->uri());
+                // The gate, then a throttle: never an open public route.
+                $this->assertContains($gates[$route->uri()], $middleware, $route->uri());
+                $this->assertNotEmpty(array_filter($middleware, fn ($m) => str_starts_with((string) $m, 'throttle:family-')), $route->uri());
             } elseif ($route->uri() === 'api/v1/family/auth/logout') {
                 $this->assertContains('auth:sanctum', $middleware);
             } else {
@@ -198,6 +206,6 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        $this->assertGreaterThanOrEqual(2, $checked);
+        $this->assertSame(11, $checked);
     }
 }
