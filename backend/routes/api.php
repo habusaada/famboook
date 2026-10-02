@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\ImportApplyController;
 use App\Http\Controllers\Api\V1\InitialFamilyImportController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
+use App\Http\Controllers\Api\V1\PersonMobileTrustController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
@@ -85,6 +86,17 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     // tells whether a value is already registered.
     Route::put('/people/{person}/national-id', [PersonController::class, 'correctNationalId'])
         ->middleware(['can:person.national-id.update', 'throttle:national-id-check']);
+
+    // Mobile trust (docs/06 §22b, PWA-1E): Staff-side only. The mobile number
+    // is never an input — the Person's stored mobile is what gets trusted.
+    Route::get('/people/{person}/mobile-trust', [PersonMobileTrustController::class, 'show'])
+        ->middleware('can:person-mobile-trust.view');
+
+    Route::post('/people/{person}/mobile-trust', [PersonMobileTrustController::class, 'grant'])
+        ->middleware('can:person-mobile-trust.grant');
+
+    Route::post('/people/{person}/mobile-trust/revoke', [PersonMobileTrustController::class, 'revoke'])
+        ->middleware('can:person-mobile-trust.revoke');
 
     // Person-based health records (docs/06 §40): health-record.* only.
     Route::get('/families/{family}/health-records', [HealthRecordController::class, 'index'])
