@@ -282,3 +282,9 @@
 
     color: var(--foreground);
 }
+
+/* The portal has its own show/hide control: no second, browser-native one. */
+[data-portal="family"] input::-ms-reveal,
+[data-portal="family"] input::-ms-clear {
+    display: none;
+}

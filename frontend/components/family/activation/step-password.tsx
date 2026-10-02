@@ -89,7 +89,7 @@ export function StepPassword({ challenge, onActivated, onRestart }: Props) {
               onClick={() => setVisible((v) => !v)}
               aria-label={visible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
               aria-pressed={visible}
-              className="absolute start-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              className="absolute start-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
               {visible ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
             </button>
