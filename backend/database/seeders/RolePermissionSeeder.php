@@ -69,6 +69,9 @@ class RolePermissionSeeder extends Seeder
         'SOCIAL_WORKER',
         'REPORTS_VIEWER',
         'FAMILY_USER',
+        // Family-side, scope-bound (§14a, §22b). Seeding the role enables
+        // nothing: Coordinator Space and scope authorization are PWA-1H.
+        'COORDINATOR',
     ];
 
     /**
@@ -259,6 +262,19 @@ class RolePermissionSeeder extends Seeder
 
         // §63 Filament Access
         'system-admin.access',
+
+        // §22b PWA-1 Identity and Access (AUTH-ADR-063). Names only in
+        // PWA-1C: no endpoint reads them yet.
+        'family-portal.access',
+        'coordinator-space.access',
+        'person-mobile-trust.view',
+        'person-mobile-trust.assist',
+        'person-mobile-trust.grant',
+        'person-mobile-trust.revoke',
+        'user-person-link.view',
+        'user-person-link.manage',
+        'coordinator-scope.view',
+        'coordinator-scope.manage',
     ];
 
     /**
@@ -277,6 +293,16 @@ class RolePermissionSeeder extends Seeder
      */
     public const ROLE_PERMISSIONS = [
         'SUPER_ADMIN' => [
+            // Family Portal identity administration (§22b, AUTH-ADR-063/064).
+            // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
+            'person-mobile-trust.view',
+            'person-mobile-trust.assist',
+            'person-mobile-trust.grant',
+            'person-mobile-trust.revoke',
+            'user-person-link.view',
+            'user-person-link.manage',
+            'coordinator-scope.view',
+            'coordinator-scope.manage',
             // Filament ✓
             'system-admin.access',
             // View/Create/Update Canonical Family ✓
@@ -391,6 +417,16 @@ class RolePermissionSeeder extends Seeder
             'system.reference-data.manage',
         ],
         'ADMINISTRATOR' => [
+            // Family Portal identity administration (§22b, AUTH-ADR-063/064).
+            // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
+            'person-mobile-trust.view',
+            'person-mobile-trust.assist',
+            'person-mobile-trust.grant',
+            'person-mobile-trust.revoke',
+            'user-person-link.view',
+            'user-person-link.manage',
+            'coordinator-scope.view',
+            'coordinator-scope.manage',
             // View/Create/Update Canonical Family ✓
             'family.view',
             'family.create',
@@ -613,6 +649,17 @@ class RolePermissionSeeder extends Seeder
             'change-request.update-own-draft',
             'change-request.submit',
             'change-request.resubmit',
+            // §22b Family Portal, family context (PWA-1).
+            'family-portal.access',
+        ],
+        'COORDINATOR' => [
+            // §22b. Effective only with an active scope assignment (PWA-1H).
+            // STAGED ACTIVATION (AUTH-ADR-064): person-mobile-trust.assist is
+            // deliberately NOT granted here until coordinator scope
+            // authorization is enforced — a family-side session shares the
+            // guard with the Staff API, and a permission-only endpoint would
+            // otherwise accept it. Never grant, never revoke.
+            'coordinator-space.access',
         ],
     ];
 

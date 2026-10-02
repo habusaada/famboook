@@ -41,13 +41,29 @@ class VerifyPermissions extends Command
             'lacks' => ['family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic'],
         ],
         'ADMINISTRATOR' => [
-            'has' => ['family-membership.end', 'person.national-id.update'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant'],
             'lacks' => ['person.national-id.view'],
         ],
         'SUPER_ADMIN' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant'],
             // import.apply is gated: see the explicit check in handle().
             'lacks' => ['person.national-id.view'],
+        ],
+        // Family Portal identity (docs/06 §22b). Mobile trust is granted by
+        // SUPER_ADMIN and ADMINISTRATOR only; the COORDINATOR role must not
+        // hold assist before coordinator scope authorization exists (PWA-1H).
+        'REVIEWER' => [
+            'has' => [],
+            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist'],
+        ],
+        'FAMILY_USER' => [
+            'has' => ['family-portal.access'],
+            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access'],
+        ],
+        'COORDINATOR' => [
+            'has' => ['coordinator-space.access'],
+            'lacks' => ['person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
+                'user-person-link.manage', 'coordinator-scope.manage', 'family.view', 'person.view'],
         ],
     ];
 

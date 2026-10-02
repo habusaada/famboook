@@ -21,6 +21,7 @@ class RolePermissionSeederTest extends TestCase
         'SOCIAL_WORKER',
         'REPORTS_VIEWER',
         'FAMILY_USER',
+        'COORDINATOR',
     ];
 
     public function test_canonical_roles_can_be_seeded(): void
@@ -298,7 +299,7 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($superAdmin->hasPermissionTo('workflow-history.view'));
         $this->assertFalse($superAdmin->hasPermissionTo('audit.view-sensitive'));
 
-        // SUPER_ADMIN holds far fewer than the full 129-permission catalog,
+        // SUPER_ADMIN holds far fewer than the full 139-permission catalog,
         // confirming it is not implemented as a blanket-grant role.
         $this->assertLessThan(Permission::count(), $superAdmin->getAllPermissions()->count());
         // 71 = 42 + residence.update (AUTH-ADR-046)
@@ -313,8 +314,11 @@ class RolePermissionSeederTest extends TestCase
         //      + report.view (AUTH-ADR-056)
         //      + family-membership.update/end, person.national-id.view-masked/update (AUTH-ADR-059)
         //      + import.upload/validate/review (AUTH-ADR-060; import.apply only
-        //        through the Apply activation gate, closed by default).
-        $this->assertSame(78, $superAdmin->getAllPermissions()->count());
+        //        through the Apply activation gate, closed by default)
+        //      + person-mobile-trust.view/assist/grant/revoke,
+        //        user-person-link.view/manage, coordinator-scope.view/manage
+        //        (AUTH-ADR-063).
+        $this->assertSame(86, $superAdmin->getAllPermissions()->count());
         foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
             $this->assertTrue($superAdmin->hasPermissionTo($permission));
         }
@@ -338,13 +342,13 @@ class RolePermissionSeederTest extends TestCase
         }
         $superAdmin = User::factory()->create();
         $superAdmin->assignRole('SUPER_ADMIN');
-        $this->assertSame(79, $superAdmin->getAllPermissions()->count());
+        $this->assertSame(87, $superAdmin->getAllPermissions()->count());
 
         // Closing the gate again and re-seeding (every deployment) revokes it.
         config(['import.apply_enabled' => false]);
         $this->seed(RolePermissionSeeder::class);
         $this->assertFalse($superAdmin->fresh()->hasPermissionTo('import.apply'));
-        $this->assertSame(78, $superAdmin->fresh()->getAllPermissions()->count());
+        $this->assertSame(86, $superAdmin->fresh()->getAllPermissions()->count());
     }
 
     public function test_only_a_strict_boolean_opens_the_apply_gate(): void
@@ -401,20 +405,22 @@ class RolePermissionSeederTest extends TestCase
         $this->assertFalse($unassignedUser->hasPermissionTo('change-request.create'));
     }
 
-    public function test_family_user_retains_only_change_request_permissions_and_no_staff_permissions(): void
+    public function test_family_user_holds_only_its_family_portal_permissions_and_no_staff_permissions(): void
     {
         $this->seed(RolePermissionSeeder::class);
 
         $familyUser = User::factory()->create();
         $familyUser->assignRole('FAMILY_USER');
 
-        // Retains exactly its approved Family Portal change-request permissions.
+        // Exactly its approved Family Portal permissions: the change-request
+        // set (§53) and family-portal.access (§22b).
         $this->assertEqualsCanonicalizing(
             [
                 'change-request.create',
                 'change-request.update-own-draft',
                 'change-request.submit',
                 'change-request.resubmit',
+                'family-portal.access',
             ],
             $familyUser->getAllPermissions()->pluck('name')->all()
         );
