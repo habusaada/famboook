@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Users\Pages;
 use App\Actions\ManageStaffUsersAction;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\User;
+use App\Support\AccountSide;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ class EditUser extends EditRecord
         /** @var User $user */
         $user = $this->getRecord();
 
-        return [...$data, 'role' => $user->getRoleNames()->first(), 'password' => null];
+        return [...$data, 'role' => AccountSide::staffRole($user), 'password' => null];
     }
 
     /** @param array<string, mixed> $data */

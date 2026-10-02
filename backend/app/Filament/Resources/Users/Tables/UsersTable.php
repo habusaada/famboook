@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users\Tables;
 
 use App\Actions\ManageStaffUsersAction;
 use App\Models\User;
+use App\Support\AccountSide;
 use App\Support\StaffRoles;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -34,7 +35,7 @@ class UsersTable
                 TextColumn::make('role')
                     ->label('الدور')
                     ->badge()
-                    ->state(fn (User $record) => $record->getRoleNames()->first())
+                    ->state(fn (User $record) => AccountSide::staffRole($record))
                     ->formatStateUsing(fn (?string $state) => StaffRoles::LABELS[$state] ?? 'بلا دور'),
                 IconColumn::make('is_active')->label('نشط')->boolean(),
             ])

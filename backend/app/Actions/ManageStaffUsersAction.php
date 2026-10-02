@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\User;
+use App\Support\AccountSide;
 use App\Support\StaffRoles;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +49,10 @@ class ManageStaffUsersAction
     /** Whether $actor may administer $target at all (role hierarchy). */
     public static function canManage(User $actor, User $target): bool
     {
-        if ($target->hasRole('FAMILY_USER')) {
+        // Family-side accounts (FAMILY_USER, COORDINATOR, or either mixed
+        // with a Staff role) are never administered here: syncRoles() below
+        // could otherwise strip a family-side role (AUTH-ADR-065).
+        if (AccountSide::holdsFamilySideRole($target)) {
             return false;
         }
         if ($target->hasAnyRole(StaffRoles::PRIVILEGED)) {
@@ -97,7 +101,7 @@ class ManageStaffUsersAction
         return DB::transaction(function () use ($actor, $user, $data) {
             $user->fill(array_intersect_key($data, array_flip(['name', 'email'])))->save();
 
-            $current = $user->getRoleNames()->first();
+            $current = AccountSide::staffRole($user);
             if (isset($data['role']) && $data['role'] !== $current) {
                 $this->authorize(in_array($data['role'], self::assignableRoles($actor), true), 'role');
                 $this->guard($actor->isNot($user), 'role', 'لا يمكنك تغيير دورك بنفسك.');

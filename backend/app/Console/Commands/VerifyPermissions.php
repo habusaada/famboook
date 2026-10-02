@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\User;
+use App\Support\AccountSide;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -130,6 +132,19 @@ class VerifyPermissions extends Command
             ->count();
         if ($directApplyGrants > 0) {
             $problems[] = 'CRITICAL: '.self::APPLY_PERMISSION.' is granted directly to a model; it may only come from the '.self::APPLY_ROLE.' role';
+        }
+
+        // Account sides are disjoint (docs/06 §22b): no account mixes a Staff
+        // role with a family-side role, and COORDINATOR never stands without
+        // FAMILY_USER. Counts only — never a user.
+        $invalidAccounts = User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', AccountSide::FAMILY_SIDE_ROLES))
+            ->with('roles')
+            ->get()
+            ->filter(fn (User $user) => AccountSide::of($user) === AccountSide::INVALID)
+            ->count();
+        if ($invalidAccounts > 0) {
+            $problems[] = "CRITICAL: {$invalidAccounts} account(s) mix Staff-side and family-side roles, or hold COORDINATOR without FAMILY_USER";
         }
 
         $this->line('Import Apply gate: '.($applyEnabled ? 'ENABLED ('.self::APPLY_ROLE.' only)' : 'DISABLED (no role holds '.self::APPLY_PERMISSION.')'));

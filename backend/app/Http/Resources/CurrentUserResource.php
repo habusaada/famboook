@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Models\User;
+use App\Support\AccountSide;
 use App\Support\StaffRoles;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -12,7 +14,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * permission names — never ids, hashes, tokens or timestamps. UX only:
  * the API still authorizes every request.
  *
- * @mixin \App\Models\User
+ * @mixin User
  */
 class CurrentUserResource extends JsonResource
 {
@@ -21,7 +23,8 @@ class CurrentUserResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        $role = $this->getRoleNames()->first();
+        // The Staff role, never "the first role" (AUTH-ADR-065).
+        $role = AccountSide::staffRole($this->resource);
 
         return [
             'name' => $this->name,

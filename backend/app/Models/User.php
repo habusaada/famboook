@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\AccountSide;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -61,7 +62,7 @@ class User extends Authenticatable implements FilamentUser
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_active && $this->can('system-admin.access');
+        return $this->is_active && AccountSide::isStaff($this) && $this->can('system-admin.access');
     }
 
     // Family Portal identity (docs/04 §55b). Relationships only: a Staff

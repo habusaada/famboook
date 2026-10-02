@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
-use App\Support\StaffRoles;
+use App\Support\AccountSide;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +14,10 @@ use Illuminate\Validation\ValidationException;
  * Staff login (docs/06 §59c, AUTH-ADR-057) on the Sanctum session guard.
  * Wrong password, unknown email, inactive account and non-Staff account
  * (e.g. FAMILY_USER) all fail with the same generic message, so the
- * response never reveals whether an account exists. Failed attempts are
+ * response never reveals whether an account exists. "Staff account" is
+ * decided by AccountSide from ALL of the user's roles — never the first one —
+ * so a family-side account, or one mixing both sides, is refused whatever the
+ * role order (AUTH-ADR-065). Failed attempts are
  * limited per normalized email + IP; the route adds a per-IP limit.
  */
 class LoginRequest extends FormRequest
@@ -63,7 +66,7 @@ class LoginRequest extends FormRequest
         $valid = $guard->validate(['email' => $this->email(), 'password' => (string) $this->input('password')]);
         $user = $valid ? $guard->getLastAttempted() : null;
 
-        if ($user === null || ! $user->is_active || ! StaffRoles::isStaff($user->getRoleNames()->first())) {
+        if ($user === null || ! $user->is_active || ! AccountSide::isStaff($user)) {
             RateLimiter::hit($this->throttleKey(), self::DECAY_SECONDS);
 
             throw ValidationException::withMessages(['email' => self::FAILED]);

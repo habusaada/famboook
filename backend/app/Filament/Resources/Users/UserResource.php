@@ -8,6 +8,7 @@ use App\Filament\Resources\Users\Pages\ListUsers;
 use App\Filament\Resources\Users\Schemas\UserForm;
 use App\Filament\Resources\Users\Tables\UsersTable;
 use App\Models\User;
+use App\Support\AccountSide;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -39,7 +40,7 @@ class UserResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with('roles')
-            ->whereDoesntHave('roles', fn (Builder $q) => $q->where('name', 'FAMILY_USER'));
+            ->whereDoesntHave('roles', fn (Builder $q) => $q->whereIn('name', AccountSide::FAMILY_SIDE_ROLES));
     }
 
     public static function form(Schema $schema): Schema

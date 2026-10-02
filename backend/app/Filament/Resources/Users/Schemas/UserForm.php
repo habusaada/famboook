@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use App\Actions\ManageStaffUsersAction;
 use App\Models\User;
+use App\Support\AccountSide;
 use App\Support\StaffRoles;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -41,7 +42,7 @@ class UserForm
                     // Own role, or a role the admin may not assign: read-only.
                     ->disabled(fn (?User $record) => $record !== null && (
                         Auth::user()->is($record)
-                        || ! in_array($record->getRoleNames()->first(), ManageStaffUsersAction::assignableRoles(Auth::user()), true)
+                        || ! in_array(AccountSide::staffRole($record), ManageStaffUsersAction::assignableRoles(Auth::user()), true)
                     )),
                 TextInput::make('password')
                     ->label(fn (string $operation) => $operation === 'create' ? 'كلمة المرور المؤقتة' : 'كلمة مرور مؤقتة جديدة')
@@ -66,7 +67,7 @@ class UserForm
     {
         $roles = ManageStaffUsersAction::assignableRoles(Auth::user());
         // Keep the current (non-assignable) role displayable when read-only.
-        if ($record !== null && ($current = $record->getRoleNames()->first()) !== null) {
+        if ($record !== null && ($current = AccountSide::staffRole($record)) !== null) {
             $roles = array_unique([...$roles, $current]);
         }
 

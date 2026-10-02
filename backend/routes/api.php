@@ -31,7 +31,11 @@ Route::get('/health', function () {
 // Staff authentication on the Sanctum session (docs/06 §59c, AUTH-ADR-057).
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::middleware('auth:sanctum')->group(function () {
+// The authenticated Staff API. `staff.side` refuses every family-side account
+// (FAMILY_USER / COORDINATOR, or either mixed with a Staff role) before any
+// permission check (docs/06 §22b, AUTH-ADR-065). Future /api/v1/family routes
+// are registered OUTSIDE this group.
+Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
