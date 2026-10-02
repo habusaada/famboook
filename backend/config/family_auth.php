@@ -132,6 +132,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Family login gate and lockout (docs/11 §30a, docs/08 §16a)
+    |--------------------------------------------------------------------------
+    |
+    | login_enabled: off by default, independent of the other two gates; read
+    | by App\Http\Middleware\EnsureFamilyLoginEnabled (503 while off).
+    | Deploying the code enables nothing.
+    |
+    | limits (App\Support\FamilyAuth\FamilyLogin), all over decay_seconds:
+    |   ip_attempts              every attempt from one IP (route limiter)
+    |   identifier_ip_failures   FAILED attempts for one identifier from one IP
+    |   identifier_failures      FAILED attempts for one identifier, any IP
+    | The identifier is its keyed fingerprint and the IP a digest. A
+    | successful login clears the two identifier counters.
+    |
+    */
+
+    'login_enabled' => (bool) env('FAMILY_LOGIN_ENABLED', false),
+
+    'login' => [
+        'limits' => [
+            'decay_seconds' => (int) env('FAMILY_LOGIN_LIMIT_DECAY_SECONDS', 900),
+            'ip_attempts' => (int) env('FAMILY_LOGIN_LIMIT_IP_ATTEMPTS', 20),
+            'identifier_ip_failures' => (int) env('FAMILY_LOGIN_LIMIT_IDENTIFIER_IP_FAILURES', 5),
+            'identifier_failures' => (int) env('FAMILY_LOGIN_LIMIT_IDENTIFIER_FAILURES', 20),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Activation abuse controls (docs/11 §30a)
     |--------------------------------------------------------------------------
     |

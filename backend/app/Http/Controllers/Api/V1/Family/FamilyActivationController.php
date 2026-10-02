@@ -16,7 +16,6 @@ use App\Support\FamilyAuth\AuthSecurityLog;
 use App\Support\FamilyAuth\FamilyActivation;
 use App\Support\FamilyAuth\ResponseFloor;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Family account activation (docs/11 §30a): public, behind the activation
@@ -67,18 +66,8 @@ class FamilyActivationController extends Controller
 
         $user = $activate->handle($request->challenge(), (string) $request->input('password'));
 
-        // Committed. One browser session is either Staff or Family: whatever
-        // was signed in here is replaced, and the session id is new.
-        $guard = Auth::guard('web');
-        if ($guard->check()) {
-            $guard->logout();
-            $request->session()->invalidate();
-        }
-        $guard->login($user);
-        $request->session()->regenerate();
-        $request->session()->regenerateToken();
-
-        return FamilySessionController::current($request, 201);
+        // Committed: only now the session.
+        return FamilySessionController::signIn($request, $user, 201);
     }
 
     /** @param  array<string, mixed>  $body */

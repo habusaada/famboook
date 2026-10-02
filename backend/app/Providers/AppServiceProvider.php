@@ -93,5 +93,14 @@ class AppServiceProvider extends ServiceProvider
                 $windows,
             ));
         }
+
+        // Family login (docs/11 §30a): every attempt from one IP. The two
+        // identifier ceilings (failures only) live in FamilyLogin.
+        RateLimiter::for('family-login', fn (Request $request) => Limit::perSecond(
+            (int) config('family_auth.login.limits.ip_attempts'),
+            (int) config('family_auth.login.limits.decay_seconds'),
+        )
+            ->by('family-login|ip|'.hash('sha256', (string) $request->ip()))
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
     }
 }

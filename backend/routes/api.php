@@ -52,6 +52,11 @@ Route::prefix('family')->group(function () {
             ->middleware('throttle:family-activation-complete')->name('family.activation.complete');
     });
 
+    // Login (docs/11 §30a): public, behind its own gate. Every credential,
+    // account and context failure is the same 401.
+    Route::post('/auth/login', [FamilySessionController::class, 'login'])
+        ->middleware(['family.login', 'throttle:family-login'])->name('family.login');
+
     // Any authenticated account may end its own session.
     Route::post('/auth/logout', [FamilySessionController::class, 'logout'])->middleware('auth:sanctum');
 
