@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\SmsSender;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
 use App\Models\Family;
@@ -12,6 +13,8 @@ use App\Models\PersonHealthRecord;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
+use App\Support\Sms\LogSmsSender;
+use App\Support\Sms\UnconfiguredSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -31,6 +34,14 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ApplyRunnerLock::class, fn () => DB::getDriverName() === 'pgsql'
             ? new PostgresApplyRunnerLock
             : new ProcessApplyRunnerLock);
+
+        // SMS delivery (docs/11 §30a): fails closed. Only an explicitly
+        // configured driver delivers; anything else — unset or unknown — is
+        // the sender that always refuses. No real provider exists yet.
+        $this->app->bind(SmsSender::class, fn () => match (config('family_auth.sms.driver')) {
+            'log' => new LogSmsSender((string) config('family_auth.sms.log_path')),
+            default => new UnconfiguredSmsSender,
+        });
     }
 
     /**

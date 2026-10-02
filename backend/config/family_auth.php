@@ -47,6 +47,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | SMS delivery (docs/11 §30a, docs/08 §16a)
+    |--------------------------------------------------------------------------
+    |
+    | No provider is chosen. With no driver nothing can be delivered
+    | (UnconfiguredSmsSender), so deploying this code does not make Production
+    | SMS-ready. `log` is a LOCAL / TESTING development driver only: it writes
+    | to its own file and refuses to run in any other environment.
+    |
+    */
+
+    'sms' => [
+        'driver' => env('FAMILY_SMS_DRIVER'),
+        'log_path' => storage_path('logs/family-sms-dev.log'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Family Portal activation gate (docs/08 §16a)
     |--------------------------------------------------------------------------
     |
