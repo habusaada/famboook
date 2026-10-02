@@ -30,8 +30,8 @@ return [
     | Approved policy values (docs/03 §89b)
     |--------------------------------------------------------------------------
     |
-    | Product decisions, not deployment settings. Nothing reads them yet:
-    | OTP challenges arrive in PWA-1E and passwords in PWA-1F.
+    | Product decisions, not deployment settings. The OTP values are read by
+    | App\Support\FamilyAuth\OtpChallenges; passwords arrive in PWA-1F.
     |
     */
 
@@ -41,6 +41,8 @@ return [
         'max_attempts' => 5,
         'resend_cooldown_seconds' => 60,
         'max_sends' => 3,
+        // After a correct code: how long the verified grant may be consumed.
+        'grant_ttl_seconds' => 600,
     ],
 
     'password_min_length' => 8,

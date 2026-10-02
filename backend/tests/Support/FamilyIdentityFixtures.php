@@ -8,6 +8,7 @@ use App\Models\Family;
 use App\Models\FamilyAuthIdentity;
 use App\Models\FamilyMembership;
 use App\Models\Person;
+use App\Models\PersonMobileTrust;
 use App\Models\User;
 use App\Models\UserPersonLink;
 use App\Support\FamilyAuth\KeyedFingerprint;
@@ -77,6 +78,21 @@ trait FamilyIdentityFixtures
         ]);
 
         return compact('user', 'person', 'family', 'membership', 'link', 'identity');
+    }
+
+    /**
+     * A TRUSTED mobile for the Person, built row by row (no action): the
+     * Person's stored mobile is set and its real fingerprint is trusted.
+     */
+    protected function trustedMobile(Person $person, string $mobile = '0591234567'): PersonMobileTrust
+    {
+        $person->forceFill(['mobile' => $mobile])->save();
+
+        return PersonMobileTrust::factory()->trusted()->create([
+            'person_id' => $person->id,
+            'mobile_fingerprint' => KeyedFingerprint::of(FingerprintContext::MOBILE, $mobile),
+            'mobile_last2' => substr($mobile, -2),
+        ]);
     }
 
     protected function sessionRowFor(User $user): void

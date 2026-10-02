@@ -165,7 +165,7 @@ class KeyedFingerprintTest extends TestCase
         $this->assertSame(1, config('family_auth.fingerprint.key_version'));
         $this->assertFalse(config('family_auth.activation_enabled'));
         $this->assertSame(
-            ['digits' => 6, 'ttl_seconds' => 300, 'max_attempts' => 5, 'resend_cooldown_seconds' => 60, 'max_sends' => 3],
+            ['digits' => 6, 'ttl_seconds' => 300, 'max_attempts' => 5, 'resend_cooldown_seconds' => 60, 'max_sends' => 3, 'grant_ttl_seconds' => 600],
             config('family_auth.otp'),
         );
         $this->assertSame(8, config('family_auth.password_min_length'));

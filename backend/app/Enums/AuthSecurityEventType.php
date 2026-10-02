@@ -11,6 +11,8 @@ enum AuthSecurityEventType: string
     case OTP_ISSUED = 'OTP_ISSUED';
     case OTP_FAILED = 'OTP_FAILED';
     case OTP_LOCKED = 'OTP_LOCKED';
+    // The correct code was entered: the grant window is open (PWA-1E).
+    case OTP_VERIFIED = 'OTP_VERIFIED';
     case OTP_CONSUMED = 'OTP_CONSUMED';
     case LOGIN_SUCCEEDED = 'LOGIN_SUCCEEDED';
     case LOGIN_FAILED = 'LOGIN_FAILED';
