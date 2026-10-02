@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.3
+**Version:** 1.4
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation and the PWA-1D identity domain behaviour (§30a); no activation, login, OTP or UI
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour and the PWA-1E mobile trust and OTP foundation (§30a); no activation, login, password reset, real SMS provider or UI
 
 ---
 
@@ -1211,10 +1211,11 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 
 # 30a. PWA-1 Identity and Access Architecture (PWA-1B — approved 2026-10-02)
 
-Approved design. **Implemented: the PWA-1C foundation and the PWA-1D
-identity domain behaviour** (see the two implementation records below).
-Activation, login, password reset, OTP, the mobile trust workflow and
-coordinator scope are still to be built. Physical
+Approved design. **Implemented: the PWA-1C foundation, the PWA-1D
+identity domain behaviour and the PWA-1E mobile trust and OTP foundation**
+(see the three implementation records below). Activation, login, password
+reset, a real SMS provider and coordinator scope are still to be built.
+Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
 
@@ -1432,13 +1433,17 @@ authorization.
 
 ## Production activation gates
 
-Family Portal activation MUST NOT be enabled in Production until all hold:
+Family self-activation MUST NOT be considered Production-ready until all
+hold (PWA-1E does **not** satisfy this gate):
 
 ```text
-A Production SMS provider is configured
-A queue worker is operational
-Delivery-failure handling exists
-Provider credentials are stored securely
+1. A real SMS provider is selected and integrated
+2. Its credentials are securely configured
+3. Delivery-failure behaviour is validated
+4. The Production queue / retry architecture is decided and implemented as
+   the provider requires
+5. Worker process supervision exists if queued delivery is used
+6. The scheduler cron is configured for scheduled maintenance
 ```
 
 SMS is an abstraction (`SmsSender`) with a log-only development driver; no
@@ -1455,8 +1460,8 @@ PWA-1A  Identity data discovery                          DONE
 PWA-1B  Identity and access design                       DONE
 PWA-1C  Schema / foundation                              DONE
 PWA-1D  Identity resolver + links                        DONE
-PWA-1E  Mobile trust + OTP / SMS abstraction             NEXT
-PWA-1F  Activation
+PWA-1E  Mobile trust + OTP / SMS abstraction             DONE
+PWA-1F  Activation                                       NEXT
 PWA-1G  Login / reset / session / family context
 PWA-1H  Coordinator identity / scope
 PWA-1I  Security hardening / full regression
@@ -1570,6 +1575,89 @@ Not implemented by PWA-1D: activation, OTP, SMS, Family login, password
 reset, the mobile trust workflow, any Family Portal route or middleware,
 coordinator scope authorization, Coordinator Space, the key-rotation
 command, and any Staff endpoint or UI for link administration.
+
+## PWA-1E implementation record
+
+Implemented (infrastructure and a Staff API; no migration):
+
+```text
+App\Support\FamilyAuth\CurrentTrustedMobile   for(Person): TrustedMobileResult
+App\Support\FamilyAuth\MobileTrusts           the STALE transition; authorization
+Actions   GrantPersonMobileTrustAction, RevokePersonMobileTrustAction
+Staff API GET / POST /people/{person}/mobile-trust, POST …/mobile-trust/revoke
+App\Contracts\SmsSender                        send(SmsMessage)
+App\Support\Sms\UnconfiguredSmsSender          the default: always refuses
+App\Support\Sms\LogSmsSender                   local / testing only
+App\Support\FamilyAuth\OtpChallenges          issue, resend, verify, consume, supersede
+App\Support\FamilyAuth\OtpThrottle            cross-challenge ceilings
+famboook:purge-otp-challenges                  scheduled daily
+```
+
+**CurrentTrustedMobile invariant.** A Person has a trusted mobile only when
+their current stored mobile normalizes (`FamilyMobile`: ten ASCII digits
+beginning `05`, nothing else) and the latest trust record is TRUSTED with a
+fingerprint — under its own key version — equal to that number's. Everything
+else fails closed. OTP issuing, and later activation and reset, ask this
+service and never query the trust table themselves.
+
+**Trust lifecycle.** A grant (SUPER_ADMIN or ADMINISTRATOR, through
+`person-mobile-trust.grant`) trusts the stored number and takes no number as
+input; the Person must be not deleted, active and ALIVE, and need not be a
+household head. A grant of an already trusted number is a conflict. A
+revoke records the actor, the time and a reason code. Neither changes the
+account, the link or the sessions.
+
+**STALE.** When the canonical number changes — on any Eloquent write path —
+the previous trust becomes STALE and its open OTP challenges are superseded.
+A formatting-only edit changes nothing. **Changing back does not restore
+trust:** STALE and REVOKED records never become TRUSTED again, and a new
+verification creates a new record.
+
+**Shared numbers.** Valid data, never unique. Each Person on a shared number
+is verified, revoked and challenged independently; the destination
+throttle is the only thing they share.
+
+**OTP.** Six digits from a cryptographically secure source; a keyed hash
+bound to the challenge uuid (`OTP_CODE` context of the Family Auth key) is
+stored, never the code. Five-minute expiry, five attempts, a 60-second
+resend cooldown, three sends per challenge, single use. A resend keeps the
+row, replaces the code, restarts the expiry and keeps the attempts. A
+correct code opens a **10-minute verified grant**; consumption happens
+inside the transaction of the workflow that uses it. One open challenge per
+Person and purpose; a new issue, a revoked trust or a changed number
+supersede it. Purposes: `ACTIVATION`, `PASSWORD_RESET` (no workflow uses
+them yet).
+
+**Delivery.** Synchronous, after the challenge is committed, through
+`SmsSender`. No provider exists: the default sender always refuses, and the
+log driver runs only in `local` and `testing`, writing to its own file with
+the destination masked. A failed delivery leaves a counted challenge, an
+`OTP_ISSUED` event with a FAILURE outcome, and no retry. Nothing is queued,
+so no plaintext code is written to a queue table.
+
+**Throttle** (configurable security settings; no raw identifier in a key;
+fails closed):
+
+```text
+Person        5 per hour · 10 per day
+Destination   10 per hour · 20 per day
+IP            20 per hour
+Global        500 per hour
+```
+
+**Events recorded.** `MOBILE_TRUST_GRANTED`, `MOBILE_TRUST_REVOKED`,
+`MOBILE_TRUST_STALE`, `OTP_ISSUED` (a resend is the same event with a
+higher send count), `OTP_FAILED`, `OTP_LOCKED`, `OTP_VERIFIED` (new),
+`OTP_CONSUMED`. Never a code, a number or a National ID.
+
+**Retention.** Finished OTP challenges are purged after 90 days by a daily
+scheduled command; the schedule only runs where the scheduler cron exists.
+Security events keep their 24-month policy; that purge is not implemented.
+
+Not implemented by PWA-1E: Family self-activation, any public National ID
+endpoint, Family login, password setup or reset, the Family Portal
+frontend, coordinator-assisted verification (PWA-1H), a real SMS provider,
+Production SMS credentials, queued delivery and provider retries.
 
 ---
 
@@ -1773,6 +1861,23 @@ boundary middleware on its route group, independently of permissions and of
 role order: family-side, mixed, role-less and custom-role accounts are all
 refused. Link administration exists as Domain Actions only until there
 is an operational need for an endpoint or UI.
+
+FP-ADR-038
+One resolver decides mobile trust against the Person's CURRENT normalized
+number. A trust record only ever leaves TRUSTED (to STALE or REVOKED) and
+never returns; changing a number back needs a new verification. Revoking
+mobile trust never touches the account, the link or the sessions.
+
+FP-ADR-039
+An OTP resend keeps the challenge, replaces the code, restarts the
+five-minute expiry and keeps the attempts. A correct code opens a 10-minute
+grant, consumed inside the consuming workflow's transaction.
+
+FP-ADR-040
+OTP SMS is sent synchronously after commit through a provider-neutral
+contract whose default refuses. A failed send counts and is not retried.
+Sends are throttled per Person, destination, IP and globally, failing
+closed. PWA-1E does not satisfy the Production gate for self-activation.
 ```
 
 ---
@@ -1917,3 +2022,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.2 | 2026-10-02 | Approved | PWA-1C implementation record in §30a: config, strict normalizers, keyed fingerprint service, seven migrations, six models with enums and factories, COORDINATOR role and ten permissions; the four pre-implementation refinements; staged activation of the coordinator assist permission; PWA-1C done, PWA-1D next. Foundation only |
 | 1.3 | 2026-10-02 | Approved | PWA-1D implementation record in §30a: access resolver, authentication identity service, link lifecycle actions, National ID correction and death integration, security event recorder, session revocation, account sides and the Staff API boundary; `LINK_ENDED`; FP-ADR-036 and FP-ADR-037; PWA-1D done, PWA-1E next. No activation, login, OTP or UI |
 | 1.3.1 | 2026-10-02 | Approved | PWA-1D hardening: the Staff API boundary fails closed — `AccountSide::STAFF` is required (FP-ADR-037 wording, docs/06 AUTH-ADR-066) |
+| 1.4 | 2026-10-02 | Approved | PWA-1E implementation record in §30a: trusted-mobile resolver, grant / revoke and the Staff API, STALE semantics, SMS abstraction and drivers, OTP challenge service (resend, 10-minute grant), throttle ceilings, cleanup; the six-point Production gate; FP-ADR-038 … 040; PWA-1E done, PWA-1F next. No migration; no activation, login, reset or provider |

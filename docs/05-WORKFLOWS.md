@@ -1312,8 +1312,10 @@ Per-recipient in-app record → read / unread
 Approved 2026-10-02 (WF-ADR-040). Architecture: `11-FAMILY-PORTAL.md`
 §30a. PWA-1D implemented the User-Person Link lifecycle, the National ID
 correction effect, the death effect and access loss (WF-ADR-041) as Domain
-Actions — no endpoint and no UI. Mobile trust, activation and password reset
-below are still to be built (PWA-1E–1G).
+Actions — no endpoint and no UI. PWA-1E implemented the mobile trust
+lifecycle (with a Staff API) and the OTP challenge state machine
+(WF-ADR-042). Activation and password reset below are still to be built
+(PWA-1F–1G); coordinator-assisted verification is PWA-1H.
 
 ## User-Person Link
 
@@ -1359,6 +1361,48 @@ STALE / REVOKED ──new verification of the current number──▶ TRUSTED
 
 A coordinator assists within scope and never grants. A shared number is
 verified separately for each Person.
+
+As implemented (PWA-1E):
+
+```text
+UNVERIFIED ──Staff grant (person-mobile-trust.grant)──▶ TRUSTED   (a NEW row)
+TRUSTED ──the Person's canonical number changes──▶ STALE
+TRUSTED ──Staff revoke (person-mobile-trust.revoke)──▶ REVOKED
+STALE / REVOKED ──never──▶ TRUSTED
+STALE / REVOKED ──a new grant of the current number──▶ a NEW TRUSTED row
+```
+
+- The grant reads the Person's stored mobile; no number is supplied. A grant
+  of an already trusted current number is a conflict.
+- STALE and REVOKED supersede the open OTP challenges of that trust.
+- Changing the number back to an older one does not restore its trust.
+- A formatting-only edit (the same normalized number) keeps the trust.
+- Revoking changes neither the account, nor the link, nor the sessions.
+- `PENDING_VERIFICATION` and assistance are not used yet: the coordinator
+  path above arrives with PWA-1H.
+
+## OTP challenge (PWA-1E)
+
+```text
+issue ──▶ OPEN ──correct code──▶ VERIFIED ──consume (within 10 min)──▶ CONSUMED
+            │ wrong code ×5 ──▶ LOCKED
+            │ 5 minutes ──▶ EXPIRED
+            │ new issue · trust revoked · number changed ──▶ SUPERSEDED
+            └ resend (same row): new code · expiry restarts · attempts kept
+```
+
+```text
+6 digits · 5-minute expiry · 5 attempts · 60-second resend cooldown
+· 3 sends per challenge · 10-minute grant after a correct code · single use
+```
+
+- One open challenge per Person and purpose; a new issue supersedes the
+  previous one, expired or not.
+- Issue, resend and verify commit on their own (a failed attempt stays
+  counted); consume runs inside the transaction of the workflow it serves.
+- The SMS leaves after the commit, synchronously. A failed delivery leaves
+  a counted challenge and no retry.
+- Finished challenges are purged after 90 days.
 
 ## Activation
 
@@ -2959,6 +3003,9 @@ Family Portal identity workflows (§53b): Link lifecycle with direct ACTIVE crea
 
 ### WF-ADR-041
 PWA-1D implemented the Link lifecycle as Domain Actions (establish, suspend, resume, end). End is terminal, supersedes the authentication identity with `LINK_ENDED`, revokes sessions and never deactivates the account; suspension is resumable and leaves identity and account untouched. A National ID correction synchronizes the identity in its own transaction and rolls back entirely on a login-key collision; a recorded death ends the Link without changing the membership or the head flag.
+
+### WF-ADR-042
+PWA-1E implemented the mobile trust lifecycle and the OTP challenge state machine. Trust is decided by one resolver against the Person's current normalized number; STALE and REVOKED never revert and changing back needs a new verification. A resend keeps the challenge row, replaces the code, restarts the expiry and keeps the attempts; a correct code opens a 10-minute grant that is consumed inside the consuming workflow's transaction. Delivery is synchronous after commit with no retry.
 ```
 
 ---
@@ -3222,3 +3269,4 @@ Date: 2026-09-24
 | 1.2.7 | 2026-10-02 | Approved | PWA-0: §53a Family Portal Program Workflows (mobile trust, activation, reset, Profile Completion and Family Verification, later-change classes, health/need submissions, card, announcements); §51 amended (WF-ADR-039); PWF-008 decided in direction. Documentation only |
 | 1.2.8 | 2026-10-02 | Approved | PWA-1B: §53b Family Portal Identity Workflows (Link, mobile trust, activation, National ID correction, reset, access loss); PWF-010 decided for V1 (WF-ADR-040). Documentation only |
 | 1.2.9 | 2026-10-02 | Approved | PWA-1D: §53b Link lifecycle, National ID correction and death effects recorded as implemented (Domain Actions only); ended identity is SUPERSEDED / LINK_ENDED; account not deactivated (WF-ADR-041) |
+| 1.2.10 | 2026-10-02 | Approved | PWA-1E: §53b mobile trust lifecycle as implemented and the OTP challenge state machine (resend, grant, supersede, delivery) (WF-ADR-042) |

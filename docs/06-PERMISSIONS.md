@@ -745,8 +745,11 @@ The Initial Role Matrix (§140) is unchanged until these are seeded.
 Approved 2026-10-02 (AUTH-ADR-063). Architecture: `11-FAMILY-PORTAL.md`
 §30a. Seeded by PWA-1C (AUTH-ADR-064). PWA-1D implemented the account
 sides, the role checks and the Staff API boundary below (AUTH-ADR-065);
-`user-person-link.manage` is checked by the link lifecycle actions. The
-other permissions are not read by any endpoint yet.
+`user-person-link.manage` is checked by the link lifecycle actions. PWA-1E
+implemented the mobile trust Staff API, which reads
+`person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067).
+`person-mobile-trust.assist`, the coordinator permissions and
+`family-portal.access` are not read by any endpoint yet.
 
 ## Account sides
 
@@ -865,6 +868,33 @@ and not deleted. `UNKNOWN` is not eligible (docs/03 §89b).
   `audit.view` / `audit.view-sensitive` (§57).
 - The Initial Role Matrix (§140) is a capability summary and is not
   changed by these administrative permissions.
+
+## Mobile trust Staff API (PWA-1E)
+
+```text
+GET  /api/v1/people/{person}/mobile-trust          person-mobile-trust.view
+POST /api/v1/people/{person}/mobile-trust          person-mobile-trust.grant
+POST /api/v1/people/{person}/mobile-trust/revoke   person-mobile-trust.revoke
+```
+
+- All three sit inside the authenticated Staff API group: `auth:sanctum`,
+  the `staff.side` boundary, then the route permission. The Domain Actions
+  re-check that the actor is an active Staff-side holder of the permission.
+- Holders: SUPER_ADMIN and ADMINISTRATOR only. REVIEWER and COORDINATOR hold
+  none of them; a family-side, mixed, role-less or custom-role account is
+  refused at the boundary even if it holds the permission directly.
+- Grant accepts only `verification_method` (`IN_PERSON`, `STAFF_CALLBACK`,
+  `AUTHORIZED_RECORD_REVIEW`). A `mobile` field is refused: the Person's
+  stored number is what gets trusted.
+- Revoke accepts only `reason` (`REPORTED_LOST`, `NOT_OWNER`,
+  `VERIFICATION_ERROR`, `ADMINISTRATIVE`).
+- The response is the derived state (`NO_MOBILE`, `UNVERIFIED`, `TRUSTED`,
+  `STALE`, `REVOKED`), a mask of the current number and the history with
+  status, method, times and display names. Never the fingerprint, its key
+  version, internal ids or anything about OTP challenges.
+- There is no family-side endpoint, no coordinator endpoint and no UI.
+  `person-mobile-trust.assist` stays unused, and withheld from COORDINATOR,
+  until PWA-1H.
 
 ## Seeded mapping (PWA-1C)
 
@@ -3891,6 +3921,9 @@ PWA-1D account sides and Staff API boundary (§22b). `AccountSide` classifies an
 
 ### AUTH-ADR-066
 The Staff API requires `AccountSide::STAFF`. The `staff.side` middleware fails closed: it allows only STAFF and refuses FAMILY, INVALID and NONE, so a role-less account or one holding only an unrecognised role cannot enter the Staff API merely because it holds a direct permission. This supersedes the wording of AUTH-ADR-065 that left accounts without a family-side role to the route permissions. Order of checks: authenticated user, Staff-side account, then the route's permission.
+
+### AUTH-ADR-067
+PWA-1E mobile trust Staff API (§22b): three routes behind `auth:sanctum` and `staff.side`, gated by `person-mobile-trust.view`, `.grant` and `.revoke`, held by SUPER_ADMIN and ADMINISTRATOR only. The mobile number is never an input. Coordinator-assisted verification and `person-mobile-trust.assist` remain deferred to PWA-1H; no permission mapping changed in PWA-1E.
 ```
 
 ---
@@ -4259,6 +4292,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial permissions model |
 | 1.1 | 2026-09-22 | Superseded | Added FAMILY_USER, User-Person Links, Family scope, field-level visibility, Change Request permissions, object authorization and Family Portal privacy |
 | 1.2 | 2026-09-22 | Approved | Centralized authorization in Laravel, aligned Staff/Executive/Family Next.js applications and Filament with shared Policies and Spatie Permission, formalized object/data/field/workflow authorization, Filament boundaries, API security, Sanctum boundary, private file authorization, export controls and expanded authorization testing |
+| 1.2.31 | 2026-10-02 | Approved | PWA-1E (AUTH-ADR-067): §22b mobile trust Staff API (view / grant / revoke) behind the Staff boundary; no permission mapping changed; coordinator assistance still deferred to PWA-1H |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

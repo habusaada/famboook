@@ -2304,9 +2304,11 @@ implemented the foundation only (schema, the strict normalizers, the keyed
 fingerprint service, the COORDINATOR role and the PWA-1 permission names).
 PWA-1D implemented the eligibility resolver, the User-Person Link
 lifecycle, the National ID correction and death effects below, and the
-account-side rules (including the Staff API boundary). Still not built:
-activation, login, password reset, OTP and the mobile trust workflow
-(PWA-1E–1G) and coordinator scope (PWA-1H).
+account-side rules (including the Staff API boundary). PWA-1E implemented
+the mobile trust lifecycle with its Staff API, the OTP challenge service,
+the SMS abstraction, the OTP throttle and the OTP cleanup. Still not built:
+activation, login and password reset (PWA-1F–1G), coordinator scope and
+coordinator-assisted verification (PWA-1H), and any real SMS provider.
 
 ## Eligibility
 
@@ -2376,6 +2378,24 @@ assigned (Head Succession, docs/11 FU-01 — a rollout gate).
 - A changed number no longer authorizes an OTP.
 - A head without a mobile cannot self-activate; an authorized contact
   update establishes the number, which starts UNVERIFIED.
+- **One question decides trust** (PWA-1E): does this Person have a TRUSTED
+  record for exactly their CURRENT normalized mobile? Everything else
+  fails closed, including a missing fingerprint key.
+- A grant trusts the Person's stored mobile only; a number is never an
+  input. The Person must be not deleted, active and ALIVE. Being a
+  household head is **not** required: mobile trust belongs to the Person.
+- A grant for a number that is already TRUSTED is a conflict; the verifier,
+  method and time of an existing trust are never rewritten.
+- When the canonical number changes, the previous trust becomes STALE and
+  its open OTP challenges are superseded. A formatting-only edit changes
+  nothing.
+- **Changing back does not restore trust.** A STALE or REVOKED record never
+  becomes TRUSTED again; the number needs a new verification.
+- Revoking mobile trust does not deactivate the account, end the link or
+  revoke sessions: it is the trust of an OTP destination, not of an
+  identity or a session.
+- Only the canonical format is accepted: ten ASCII digits beginning `05`.
+  `+970…`, `00970…` and numbers without the leading zero are not valid.
 
 ## OTP and password
 
@@ -2389,6 +2409,25 @@ Password   minimum 8 characters · confirmation required · no mandatory
 OTPs are stored only as keyed hashes. Passwords are stored only through
 Laravel hashing. A generated password is never sent by SMS. A password
 reset ends every session of the user.
+
+As implemented (PWA-1E):
+
+- A challenge is bound to one purpose, one Person and one trusted mobile.
+  Every step re-checks that this is still the Person's current trusted
+  mobile, so a code can never prove another number, Person or purpose.
+- **Resend** uses the same challenge: a NEW code, the previous one invalid
+  at once, the five-minute expiry restarts, the attempts are NOT reset —
+  three sends never give more than five attempts. An expired challenge is
+  not resurrected; a new one is issued.
+- A correct code opens a **10-minute grant**; it does not consume. The
+  grant is consumed inside the transaction of the workflow that uses it.
+- The SMS is sent synchronously after the challenge is committed. A failed
+  delivery still counts as a send and toward the throttles; there is no
+  automatic retry.
+- Sends are also limited across challenges — configurable security
+  settings: per Person 5 per hour and 10 per day; per destination 10 per
+  hour and 20 per day; per IP 20 per hour; globally 500 per hour. If the
+  limiter cannot be checked, nothing is sent.
 
 ## Audit and retention
 
@@ -4599,6 +4638,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.39 | 2026-10-02 | Approved | PWA-1E: §89b mobile trust rules as implemented (current-number invariant, grant/revoke, STALE on change, change-back never restores, no head requirement), OTP resend and grant semantics, delivery and throttle ceilings |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

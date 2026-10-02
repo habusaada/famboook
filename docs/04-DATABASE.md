@@ -3960,6 +3960,9 @@ PWA-1C implemented §55b as schema, models and factories only. Refinements appro
 
 ### DB-ADR-044
 PWA-1D added one migration (`2026_10_14_090000`): the PostgreSQL CHECK on `family_auth_identities.supersede_reason` now also allows `LINK_ENDED`, so an ended User-Person Link retires its identity as SUPERSEDED instead of leaving it SUSPENDED. No row changes; the rollback refuses while such an identity exists. No other schema change was needed for the resolver, the link lifecycle or the account-side rules.
+
+### DB-ADR-045
+PWA-1E added **no migration**: the mobile trust lifecycle, the OTP challenge service, the throttle and the cleanup run on the PWA-1C schema unchanged. `auth_otp_challenges.uuid` is set by the service before the insert, because `code_hash` is bound to it. `famboook:purge-otp-challenges` deletes only finished challenges older than the retention period and no other table.
 ```
 
 ### 111. Pending Database Decisions
@@ -4220,6 +4223,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.27 | 2026-10-02 | Approved | PWA-1E: no schema change (DB-ADR-045); OTP purge deletes finished `auth_otp_challenges` rows only |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

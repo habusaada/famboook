@@ -389,9 +389,28 @@ Recorded 2026-10-02 (docs/11 §30a). Nothing here is deployed; the Family
 Portal is not implemented. This section lists what must exist **before**
 Family Portal activation may be enabled in Production.
 
-- **SMS provider.** None is chosen. The application will send through an
-  `SmsSender` abstraction whose only initial driver writes to the log;
-  that driver must never be the Production driver once activation is on.
+- **SMS provider.** None is chosen. PWA-1E sends through the `SmsSender`
+  abstraction. `FAMILY_SMS_DRIVER` empty (the default, and the Production
+  value) binds a sender that always refuses, so nothing can be delivered.
+  `log` is a LOCAL development driver: it appends to its own file
+  (`storage/logs/family-sms-dev.log`, destination masked) and refuses to
+  run outside the `local` and `testing` environments. Deploying PWA-1E does
+  not make Production SMS-ready.
+- **Production gate for Family self-activation** — not satisfied by
+  PWA-1E. Activation is not Production-ready until:
+  1. a real SMS provider is selected and integrated;
+  2. its credentials are securely configured;
+  3. delivery-failure behaviour is validated;
+  4. the Production queue / retry architecture is decided and implemented
+     as the provider requires (PWA-1E delivers synchronously, without a
+     retry, precisely so that no plaintext code is written to a queue);
+  5. worker process supervision exists if queued delivery is used;
+  6. the scheduler cron is configured for scheduled maintenance.
+- **OTP abuse ceilings** are security settings with defaults in
+  `config/family_auth.php`, overridable by `FAMILY_OTP_THROTTLE_PERSON_HOUR`
+  / `_PERSON_DAY` / `_DESTINATION_HOUR` / `_DESTINATION_DAY` / `_IP_HOUR` /
+  `_GLOBAL_HOUR`. They use the application cache store; if it cannot be
+  read, no SMS is sent.
 - **Queue worker.** §16 stays true for the Pilot. Activation needs an
   operational worker (supervised, restarted on deploy) so SMS sending and
   retries do not run inside web requests.
@@ -416,8 +435,13 @@ Family Portal activation may be enabled in Production.
   (`users.email`); nothing is backfilled. The environment templates carry
   the names above as empty placeholders, and the fingerprint key may stay
   empty: no feature uses it yet and the Staff application is unaffected.
-- **Retention jobs** (when a scheduler exists): authentication and
-  security events 24 months; finished OTP challenges 90 days.
+- **Retention.** `famboook:purge-otp-challenges` deletes finished OTP
+  challenges older than `FAMILY_OTP_RETENTION_DAYS` (default 90) and is
+  defined in the Laravel schedule as a daily task. §16 still holds: no
+  scheduler cron is deployed, so the schedule does not run in Production
+  until `schedule:run` is added to cron — a deployment prerequisite. The
+  command can also be run by hand. Authentication and security events are
+  retained 24 months; their purge is not implemented yet.
 - **Rollout gate.** Head Succession (docs/11 FU-01) must be resolved
   before general Family Portal rollout.
 
@@ -561,6 +585,7 @@ Never do this once real data has been entered.
 
 | Version | Date | Status | Description |
 |---|---|---|---|
+| 1.1.4 | 2026-10-02 | Approved | §16a: PWA-1E — `FAMILY_SMS_DRIVER` (empty = no delivery; `log` local only), the six-point Production gate for self-activation, OTP throttle overrides, OTP purge command and the scheduler-cron prerequisite. Nothing activated |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

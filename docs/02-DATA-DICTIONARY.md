@@ -2246,10 +2246,11 @@ plaintext, passwords or secrets.
 
 # 45b. Family Portal Identity Entities (PWA-1B)
 
-Approved design 2026-10-02 (DD-ADR-032). **PWA-1C implemented the tables,
-models, enums and factories only**: nothing creates these records yet and
-no lifecycle, activation, OTP or authorization behaviour exists. Physical
-schema: docs/04 §55b. Architecture: `11-FAMILY-PORTAL.md` §30a.
+Approved design 2026-10-02 (DD-ADR-032). PWA-1C implemented the tables,
+models, enums and factories; PWA-1D the link and identity behaviour; PWA-1E
+the mobile trust lifecycle and the OTP challenge service. Activation, login
+and password reset do not exist yet. Physical schema: docs/04 §55b.
+Architecture: `11-FAMILY-PORTAL.md` §30a.
 
 ### `user_person_links`
 
@@ -2301,6 +2302,13 @@ revoked_by / revoked_at / revoke_reason
 `NO_MOBILE` and `UNVERIFIED` are derived states with no row. Rows are
 history and are never deleted. The number is not unique.
 
+As implemented (PWA-1E): a row only ever moves away from TRUSTED — to STALE
+when the Person's canonical number changes, or to REVOKED (`revoke_reason`:
+`REPORTED_LOST`, `NOT_OWNER`, `VERIFICATION_ERROR`, `ADMINISTRATIVE`) — and
+never back. A renewed trust is always a new row, also when the number is
+changed back to an older one. `PENDING_VERIFICATION` and `assisted_by` /
+`assisted_at` are not written yet (coordinator assistance, PWA-1H).
+
 ### `auth_otp_challenges`
 
 ```text
@@ -2316,6 +2324,13 @@ ip
 ```
 
 Operational records; purgeable 90 days after they finish.
+
+As implemented (PWA-1E): `code_hash` is a keyed hash of the challenge uuid
+and the code (context `OTP_CODE`); the plaintext is never stored.
+`send_count` counts send ATTEMPTS, failed deliveries included. `verified_at`
+opens a grant that ends at `grant_expires_at` (10 minutes); `consumed_at`
+closes it. A resend rewrites `code_hash`, `last_sent_at` and `expires_at` on
+the same row and never resets `attempts`.
 
 ### `auth_security_events`
 
@@ -4101,6 +4116,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.28 | 2026-10-02 | Approved | PWA-1E: §45b mobile trust lifecycle (STALE / REVOKED never revert, revoke reasons) and OTP challenge semantics (keyed hash, send attempts, grant window, resend) as implemented |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |
