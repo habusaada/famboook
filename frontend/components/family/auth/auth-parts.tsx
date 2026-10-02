@@ -12,8 +12,9 @@ export const fieldClass =
 export const primaryButtonClass =
   "h-12 w-full rounded-xl text-[15px] font-semibold hover:bg-[var(--family-primary-hover)]";
 
+/** An inline link with a 40px touch target. */
 export const textLinkClass =
-  "rounded-md font-semibold text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring";
+  "inline-flex min-h-10 items-center rounded-md px-1 font-semibold text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring";
 
 /**
  * The public page frame: the brand, one narrow card, a short safety note.
