@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\BranchGroup;
 use App\Models\Clan;
 use App\Models\Family;
+use App\Models\FamilyHouseholdDeclaration;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\User;
@@ -182,6 +183,110 @@ class OperationalDashboardTest extends TestCase
             ->assertJsonPath('data.kpis.active_families', 1)
             ->assertJsonPath('data.kpis.current_people', 2)
             ->assertJsonPath('data.demographics.total', 2);
+    }
+
+    // ------------------------------------------------- declared population
+
+    /** A household declaration for the family (docs/02 §20a). */
+    private function declare(Family $family, ?int $size, bool $current = true): FamilyHouseholdDeclaration
+    {
+        return FamilyHouseholdDeclaration::factory()->create([
+            'family_id' => $family->id,
+            'declared_household_size' => $size,
+            'is_current' => $current,
+        ]);
+    }
+
+    public function test_declared_household_population_sums_current_declarations(): void
+    {
+        $families = $this->scopedFamilies();
+        $this->declare($families['teima'], 7);
+        $this->declare($families['halas'], 5);
+
+        // 7 + 5 — a separate figure beside the registered members.
+        $this->dash()->assertOk()
+            ->assertJsonPath('data.kpis.declared_household_population', 12)
+            ->assertJsonPath('data.kpis.active_families', 4)
+            ->assertJsonPath('data.kpis.current_people', 10);
+    }
+
+    public function test_declared_household_population_ignores_historical_missing_and_null_declarations(): void
+    {
+        $families = $this->scopedFamilies();
+        $this->declare($families['teima'], 7);
+        // Superseded declarations of the same family are never counted.
+        $this->declare($families['teima'], 20, current: false);
+        $this->declare($families['teima'], 30, current: false);
+        // A current declaration without a size (only sons/daughters declared).
+        $this->declare($families['halas'], null);
+        // 'hannun' and 'none' have no declaration at all.
+
+        $this->dash()->assertOk()->assertJsonPath('data.kpis.declared_household_population', 7);
+    }
+
+    public function test_declared_household_population_is_zero_without_declarations(): void
+    {
+        $this->scopedFamilies();
+
+        $this->dash()->assertOk()
+            ->assertJsonPath('data.kpis.declared_household_population', 0)
+            ->assertJsonPath('data.kpis.current_people', 10);
+    }
+
+    public function test_declared_household_population_respects_the_organizational_scope(): void
+    {
+        $families = $this->scopedFamilies();
+        $this->declare($families['teima'], 7);   // BG07 / ABU_TEIMA
+        $this->declare($families['halas'], 5);   // BG07 / ABU_HALAS
+        $this->declare($families['hannun'], 4);  // BG01
+        $this->declare($families['none'], 3);    // Clan scope only (no Branch)
+        $this->declare($families['other'], 9);   // another Clan
+        // Non-ACTIVE families are outside the dashboard population.
+        $this->declare($this->family(6, ['status' => 'INACTIVE']), 50);
+
+        $this->dash()->assertOk()->assertJsonPath('data.kpis.declared_household_population', 19);
+        $this->dash(['branch_group' => 'BG07'])->assertOk()->assertJsonPath('data.kpis.declared_household_population', 12);
+        $this->dash(['branch_group' => 'BG01'])->assertOk()->assertJsonPath('data.kpis.declared_household_population', 4);
+        $this->dash(['branch_group' => 'BG07', 'branch' => 'ABU_TEIMA'])->assertOk()->assertJsonPath('data.kpis.declared_household_population', 7);
+        $this->dash(['branch_group' => 'BG17'])->assertOk()->assertJsonPath('data.kpis.declared_household_population', 0);
+        $this->dash(['clan' => 'TEST_CLAN'])->assertOk()->assertJsonPath('data.kpis.declared_household_population', 9);
+    }
+
+    public function test_declared_household_population_is_independent_of_registered_members(): void
+    {
+        $family = $this->family(2);
+        $this->declare($family, 8);
+        $before = $this->dash()->assertOk();
+        $before->assertJsonPath('data.kpis.declared_household_population', 8)
+            ->assertJsonPath('data.kpis.current_people', 2);
+
+        // Registering a member changes the registered figure only.
+        $this->member($family, []);
+        $this->dash()->assertOk()
+            ->assertJsonPath('data.kpis.declared_household_population', 8)
+            ->assertJsonPath('data.kpis.current_people', 3);
+
+        // Declared sons/daughters are never added to the declared size.
+        FamilyHouseholdDeclaration::where('family_id', $family->id)->update(['declared_living_sons' => 4, 'declared_living_daughters' => 3]);
+        $this->dash()->assertOk()->assertJsonPath('data.kpis.declared_household_population', 8);
+    }
+
+    public function test_declared_household_population_follows_family_view(): void
+    {
+        $this->declare($this->family(2), 6);
+
+        // REPORTS_VIEWER holds family.view: the declared figure is available.
+        $this->dash([], $this->user('REPORTS_VIEWER'))->assertOk()
+            ->assertJsonPath('data.kpis.declared_household_population', 6);
+
+        // Without family.view it is null (never computed), like active_families.
+        $role = Role::create(['name' => 'DASHBOARD_ONLY_TEST', 'guard_name' => 'web']);
+        $role->givePermissionTo('dashboard.view-operational');
+        $user = User::factory()->create();
+        $user->assignRole($role);
+        $this->dash([], $user)->assertOk()
+            ->assertJsonPath('data.kpis.active_families', null)
+            ->assertJsonPath('data.kpis.declared_household_population', null);
     }
 
     // ----------------------------------------------------------- demographics

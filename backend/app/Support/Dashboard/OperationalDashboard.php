@@ -31,7 +31,8 @@ use Illuminate\Support\Facades\DB;
  *
  * A section the user may not read is returned as null (never computed),
  * so the dashboard cannot bypass domain permissions:
- *   population figures   family.view (people and demographics: person.view)
+ *   population figures   family.view (people and demographics: person.view;
+ *                        the declared household population: family.view)
  *   health               health-record.view
  *   needs / Open Needs   need.view
  *   assessments          assessment.view
@@ -69,6 +70,7 @@ final class OperationalDashboard
             'as_of_date' => today()->toDateString(),
             'kpis' => [
                 'active_families' => $families ? $this->scope->familyIds()->count() : null,
+                'declared_household_population' => $families ? $this->declaredHouseholdPopulation() : null,
                 'current_people' => $people ? $this->scope->currentMembers()->count() : null,
                 'displaced_families' => $families ? $this->aggregates->displacedFamilies() : null,
                 'open_needs' => $can('need.view') ? $this->openNeeds()->count() : null,
@@ -81,6 +83,24 @@ final class OperationalDashboard
             'assistance' => $can('assistance.view') ? $this->assistance() : null,
             'recent_activity' => $can('activity-log.view') ? $this->recentActivity($request) : null,
         ];
+    }
+
+    // ------------------------------------------------------------- population
+
+    /**
+     * Declared household population (docs/02 §20a): the sum of the scoped
+     * families' CURRENT declared household sizes. A declaration, not a
+     * count of Persons — never derived from memberships or from the
+     * declared sons / daughters, and separate from `current_people`.
+     * Families without a current declaration and NULL sizes contribute
+     * nothing; historical (non-current) declarations are never counted.
+     */
+    private function declaredHouseholdPopulation(): int
+    {
+        return (int) DB::table('family_household_declarations as hd')
+            ->where('hd.is_current', true)
+            ->whereIn('hd.family_id', $this->scope->familyIds())
+            ->sum('hd.declared_household_size');
     }
 
     // ----------------------------------------------------------------- needs

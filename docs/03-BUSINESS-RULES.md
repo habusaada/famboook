@@ -1433,6 +1433,13 @@ People     not soft-deleted, not DECEASED, with an ACTIVE membership in
 
 ```text
 Active Families      scoped families
+Declared Household   sum of the scoped families' CURRENT declared household
+Population           sizes (docs/02 §20a). A declaration, never derived from
+                     memberships or declared sons/daughters; families without
+                     a current declaration and NULL sizes contribute nothing.
+                     Shown beside Current People ("أفراد الأسر (المعلن)" /
+                     "المسجلون تفصيليًا"), never summed with or reconciled
+                     against it. Requires family.view
 Current People       scoped current people
 Displaced Families   scoped families whose current residence is DISPLACED
 Open Needs           OPEN Needs of scoped families
@@ -4357,6 +4364,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.33 | 2026-10-02 | Approved | §55a: the Operational Dashboard shows the Declared Household Population (sum of current declared household sizes in scope) as a separate KPI beside Current People; no figure derived from another |
 | 1.2.32 | 2026-10-01 | Approved | §55: the Family list and profile show the declared household statistics beside the registered `member_count` (labelled "المعلن"); nothing derived or reconciled |
 | 1.2.31 | 2026-10-01 | Approved | §96a INITIAL import: one explicit action resolves every unresolved family key from the workbook — exact existing Branch name → MATCH_EXISTING_BRANCH, otherwise a new ungrouped Branch; canonical permanent Branch code `BR_` + reserved id; formula keys included; missing keys stay blocking; re-run is a no-op; Step 4 Branches persist independently of the batch |
 | 1.2.30 | 2026-10-01 | Approved | §96b Step 6 Apply UI (Phase 4B.4e): server-derived Dry Run `execution_enabled` (gate + permission + READY plan), approved confirmation wording with derived counts, browser-driven chunk loop with pause / continue / resume, APPLY_IN_PROGRESS read-only behaviour, fresh Dry Run required after a refused start, Steps 4–5 read only after Apply starts; §96a Step 6 reachable after Apply starts; gate still closed |

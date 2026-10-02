@@ -25,6 +25,10 @@ export interface DashboardData {
   as_of_date: string;
   kpis: {
     active_families: number | null;
+    // Sum of the scoped families' CURRENT declared household sizes — a
+    // declaration, never derived from (or mixed with) current_people.
+    declared_household_population: number | null;
+    // Living persons with an ACTIVE membership (registered individually).
     current_people: number | null;
     displaced_families: number | null;
     open_needs: number | null;

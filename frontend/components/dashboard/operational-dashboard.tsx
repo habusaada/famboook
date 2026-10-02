@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Filter, HeartHandshake, Lock, SlidersHorizontal, Tent, UserRound, Users } from "lucide-react";
+import { AlertCircle, Filter, HeartHandshake, Lock, SlidersHorizontal, Tent, UserRound, Users, UsersRound } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -60,14 +60,14 @@ function Section<T>({ title, data, render }: { title: string; data: T | null; re
 const locked = <Lock className="size-6 text-subtle-foreground" aria-label="غير متاح" />;
 const unavailable = "غير متاح لصلاحياتك";
 
-/** Four KPI cards. Secondary lines are derived only from data already on this response. */
+/** KPI cards. Secondary lines are derived only from data already on this response. */
 function Kpis({ data }: { data: DashboardData }) {
   const { kpis, demographics, displacement, needs } = data;
   const value = (n: number | null) => (n === null ? locked : fmt(n));
   const urgent = needs?.by_priority.find((p) => p.priority === "URGENT")?.count ?? 0;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
       <KpiCard
         icon={Users}
         label="الأسر النشطة"
@@ -85,10 +85,18 @@ function Kpis({ data }: { data: DashboardData }) {
           ) : undefined
         }
       />
+      {/* Declared ≠ registered: two separate figures, never summed or reconciled. */}
+      <KpiCard
+        icon={UsersRound}
+        label="أفراد الأسر (المعلن)"
+        value={value(kpis.declared_household_population)}
+        href="/families"
+        context={kpis.declared_household_population === null ? unavailable : "مجموع أحجام الأسر المعلنة حاليًا"}
+      />
       <KpiCard
         icon={UserRound}
         tone="info"
-        label="الأفراد الحاليون"
+        label="المسجلون تفصيليًا"
         value={value(kpis.current_people)}
         href="/people"
         context={kpis.current_people === null ? unavailable : "أحياء بعضوية نشطة في هذه الأسر"}
