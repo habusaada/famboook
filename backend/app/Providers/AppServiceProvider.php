@@ -76,22 +76,25 @@ class AppServiceProvider extends ServiceProvider
             ->by('nid-check|'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
             ->response(fn () => response()->json(['message' => 'عدد كبير من عمليات التحقق. حاول مجددًا بعد قليل.'], 429)));
 
-        // Family activation (docs/11 §30a): request ceilings per IP on the
-        // public endpoints, real and decoy flows alike. The key is a digest
-        // of the address; the per-identifier ceiling of start lives in
-        // FamilyActivation (keyed fingerprint). OtpThrottle remains the only
-        // SMS ceiling.
-        foreach (['start' => ['minute', 'hour'], 'verify' => ['minute'], 'resend' => ['minute'], 'complete' => ['minute']] as $step => $windows) {
-            RateLimiter::for("family-activation-{$step}", fn (Request $request) => array_map(
-                function (string $window) use ($step, $request) {
-                    $max = (int) config("family_auth.activation.limits.{$step}_ip_{$window}");
+        // Family activation and password reset (docs/11 §30a): request
+        // ceilings per IP on the public endpoints, real and decoy flows
+        // alike, each workflow with its own counters. The key is a digest of
+        // the address; the per-identifier ceiling of start lives in
+        // FamilyOtpFlow (keyed fingerprint). OtpThrottle remains the only SMS
+        // ceiling.
+        foreach (['activation' => 'family-activation', 'password_reset' => 'family-password-reset'] as $config => $prefix) {
+            foreach (['start' => ['minute', 'hour'], 'verify' => ['minute'], 'resend' => ['minute'], 'complete' => ['minute']] as $step => $windows) {
+                RateLimiter::for("{$prefix}-{$step}", fn (Request $request) => array_map(
+                    function (string $window) use ($config, $prefix, $step, $request) {
+                        $max = (int) config("family_auth.{$config}.limits.{$step}_ip_{$window}");
 
-                    return ($window === 'hour' ? Limit::perHour($max) : Limit::perMinute($max))
-                        ->by("family-activation|{$step}|ip|".hash('sha256', (string) $request->ip())."|{$window}")
-                        ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS));
-                },
-                $windows,
-            ));
+                        return ($window === 'hour' ? Limit::perHour($max) : Limit::perMinute($max))
+                            ->by("{$prefix}|{$step}|ip|".hash('sha256', (string) $request->ip())."|{$window}")
+                            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS));
+                    },
+                    $windows,
+                ));
+            }
         }
 
         // Family login (docs/11 §30a): every attempt from one IP. The two

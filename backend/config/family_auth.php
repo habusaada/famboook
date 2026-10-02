@@ -161,10 +161,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Family password reset gate and request ceilings (docs/11 §30a)
+    |--------------------------------------------------------------------------
+    |
+    | password_reset_enabled: off by default, independent of the other two
+    | gates; read by App\Http\Middleware\EnsurePasswordResetEnabled (503 while
+    | off). A reset sends an SMS: it must stay false in Production until SMS
+    | delivery is Production-ready.
+    |
+    | limits: the same pattern as activation, with their own counters. They
+    | complement the OTP SMS ceilings; they do not replace them. The response
+    | floor of start and resend is activation.min_response_ms.
+    |
+    */
+
+    'password_reset_enabled' => (bool) env('FAMILY_PASSWORD_RESET_ENABLED', false),
+
+    'password_reset' => [
+        'limits' => [
+            'start_ip_minute' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_START_IP_MINUTE', 10),
+            'start_ip_hour' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_START_IP_HOUR', 30),
+            'start_identifier_hour' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_START_IDENTIFIER_HOUR', 5),
+            'verify_ip_minute' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_VERIFY_IP_MINUTE', 30),
+            'resend_ip_minute' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_RESEND_IP_MINUTE', 10),
+            'complete_ip_minute' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_COMPLETE_IP_MINUTE', 10),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Activation abuse controls (docs/11 §30a)
     |--------------------------------------------------------------------------
     |
-    | min_response_ms: the least time a start or resend takes, so an eligible
+    | min_response_ms: the least time an activation or password reset start or
+    | resend takes (one shared value), so an eligible
     | request (lookup, transaction, SMS) and a denied one answer alike. 400 is
     | a DEVELOPMENT default — the Production value must exceed the real SMS
     | provider's slow-case latency and is set with that integration. 0 = off.

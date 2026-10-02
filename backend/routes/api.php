@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
+use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
@@ -56,6 +57,17 @@ Route::prefix('family')->group(function () {
     // account and context failure is the same 401.
     Route::post('/auth/login', [FamilySessionController::class, 'login'])
         ->middleware(['family.login', 'throttle:family-login'])->name('family.login');
+
+    // Password reset (docs/11 §30a): public and generic, behind its own gate,
+    // mirroring activation. The OTP goes only to the trusted mobile.
+    Route::prefix('auth/password/reset')->middleware('family.password-reset')->group(function () {
+        Route::post('/start', [FamilyPasswordResetController::class, 'start'])
+            ->middleware('throttle:family-password-reset-start')->name('family.password-reset.start');
+        Route::post('/verify', [FamilyPasswordResetController::class, 'verify'])
+            ->middleware('throttle:family-password-reset-verify')->name('family.password-reset.verify');
+        Route::post('/resend', [FamilyPasswordResetController::class, 'resend'])
+            ->middleware('throttle:family-password-reset-resend')->name('family.password-reset.resend');
+    });
 
     // Any authenticated account may end its own session.
     Route::post('/auth/logout', [FamilySessionController::class, 'logout'])->middleware('auth:sanctum');
