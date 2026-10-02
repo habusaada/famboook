@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 (documentation only; nothing in this document is implemented)
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design (documentation only; nothing in this document is implemented)
 
 ---
 
@@ -23,7 +23,7 @@ in their own documents and cross-referenced here:
 03-BUSINESS-RULES.md   §59, §89a
 04-DATABASE.md         §55a
 05-WORKFLOWS.md        §51, §53a
-06-PERMISSIONS.md      §14a, §22a, §59c, §123
+06-PERMISSIONS.md      §14a, §22a, §22b, §59c, §123
 07-ROADMAP.md          §31a
 10-DESIGN-SYSTEM.md    §11a
 ```
@@ -162,7 +162,11 @@ User deactivation
 Because the chain is resolved per request, a change in any link takes
 effect on the next request without a separate revocation step.
 
-## PWA-1 blocker: identity-data discovery
+## PWA-1 identity-data discovery — COMPLETED 2026-10-02
+
+**Resolved.** The discovery ran (PWA-1A) and the identity design is
+approved (PWA-1B): see §30a. The paragraphs below are kept as the PWA-0
+record of why the discovery was required.
 
 PWA-0 does **not** decide that `persons.national_id` becomes unique, and
 does not decide how the login identifier is derived. Today the value is
@@ -245,8 +249,10 @@ User sets a NEW password
 - The OTP destination is never chosen by the person activating (§6).
 - OTP values and passwords are never logged, stored in plaintext, or
   visible to Staff or coordinators.
-- How a typed National ID is matched to a Person is **not decided**. It
-  depends on the identity-data discovery that opens PWA-1 (§4, PFP-003).
+- A typed National ID is normalized by the strict Family Portal normalizer
+  and must be exactly nine ASCII digits; it is matched through a dedicated
+  authentication identity, never by making the registry field a
+  credential (§30a).
 - All activation, login and reset endpoints are rate limited per National
   ID, per destination mobile and per IP (exact values: PFP-002).
 
@@ -309,12 +315,14 @@ The architecture must therefore:
 - rate limit per destination so one number cannot be used to probe many
   National IDs.
 
-Whether a shared number may be trusted for more than one household head is
-an open decision (PFP-005).
+Decided 2026-10-02: a shared number may be trusted for more than one
+household head, but only through an individual verification per Person and
+never automatically (§30a).
 
-The exact authorized process that makes a mobile trusted is an open
-decision (PFP-004). A coordinator may assist operationally but never sees
-an OTP or a password.
+The authorized process that makes a mobile trusted is decided (§30a):
+three verification methods, a final grant by SUPER_ADMIN or ADMINISTRATOR
+only, and optional assistance by a coordinator within scope. A coordinator
+never grants trust and never sees an OTP or a password.
 
 ---
 
@@ -385,6 +393,14 @@ made by an authorized administrator.
 - Access stays permission + organizational scope.
 - This does not prevent a separately authorized Staff role or account
   model later, if the product requires one.
+- **V1: a COORDINATOR must also be an eligible Family Portal household
+  head.** There is no coordinator activation bypass: a coordinator first
+  activates as an ordinary FAMILY_USER, and the COORDINATOR role plus
+  active scope assignments then enable `/family/coordinator`. A scope
+  assignment is an authorization enhancement, never an activation
+  identity source.
+- A coordinator may hold several active scope assignments; authorization
+  is their union. A client-supplied scope never grants access.
 
 ## V1 responsibilities
 
@@ -1131,7 +1147,7 @@ already defines them.
 | Logical concept | Future physical schema | Status |
 |---|---|---|
 | User-Person Link | `user_person_links` — defined in docs/04 §53 | Documented, not built |
-| Family login identifier | Undecided — depends on the PWA-1 identity-data discovery (§4, PFP-003); `users.email` cannot stay mandatory for Family Users | New; not designed |
+| Family login identifier | `family_auth_identities` (keyed fingerprint); `users.email` nullable, unique kept — §30a, docs/04 §55b | Approved design, not built |
 | Account activation state | Activation and password-set state on the account or Link | New; names not fixed |
 | Trusted / verified contact | Per-Person mobile trust state, who verified, when, how | New; names not fixed |
 | OTP challenge | Short-lived, hashed, attempt-counted challenge records | New; names not fixed |
@@ -1152,9 +1168,10 @@ Details: docs/04 §55a, docs/02 §45a.
 
 # 29. Permissions Plan
 
-The role is specified in docs/06 §22a. The permission **names** listed
-there are PROPOSED and pending product-owner review (PFP-022); none is
-canonical or seeded. Summary:
+The role is specified in docs/06 §22a. The ten permission names needed by
+PWA-1 are final (docs/06 §22b; documented, not seeded). The names listed
+in docs/06 §22a for later phases stay PROPOSED and pending review
+(PFP-022). Summary:
 
 ```text
 FAMILY_USER    preserved as a distinct role and context
@@ -1173,8 +1190,10 @@ convenience.
 ```text
 PWA-0   Architecture, business rules, workflows, permissions, product and
         design baseline (this document)
-PWA-1   Family identity and access
-PWA-2   Family authentication
+PWA-1   Family identity and access — delivered as slices PWA-1A … PWA-1I
+        (§30a); PWA-1A and PWA-1B are DONE
+PWA-2   Family authentication — its scope (activation, OTP, login, reset)
+        is delivered inside PWA-1E … PWA-1G; no separate phase remains
 PWA-3   Family shell and read-only portal
 PWA-4   Profile Completion and Family Verification
 PWA-5   Change Request engine and Staff review workspace
@@ -1187,6 +1206,258 @@ PWA-10  PWA installability; security, performance and accessibility
 ```
 
 Scope, dependencies and exit criteria: docs/07 §31a.
+
+---
+
+# 30a. PWA-1 Identity and Access Architecture (PWA-1B — approved 2026-10-02)
+
+Approved design. **Nothing in this section is implemented.** Physical
+schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
+Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
+
+## Verified Production findings (PWA-1A, aggregate only)
+
+A controlled read-only aggregate analysis of Production returned:
+
+| Area | Finding |
+|---|---|
+| Population | 3,306 persons; 1,787 families, all active; 3,305 active memberships; 1,787 current household heads |
+| Eligible heads | 1,749 living current heads; 38 current heads are deceased; 0 FAMILY_USER accounts |
+| National ID | All 1,749 eligible heads have one; all are exactly nine ASCII digits; no duplicates among eligible heads or among all non-deleted persons; no normalization candidate creates a collision |
+| Mobile | 1,567 eligible heads have a mobile (all ten ASCII digits beginning `05`); 182 have none; 1,501 distinct numbers; 65 numbers are shared by 131 heads (at most three per number); 1,436 heads have a unique number |
+| Integrity | No active family without a head; no family with two heads; no person with two active memberships |
+
+No individual identifier was copied into the documentation.
+
+## National ID decision (PFP-003 — resolved)
+
+- National ID is the Family Portal **login input**. It is not the
+  credential and it is not the authentication index.
+- Registry Identity and Authentication Identity stay separate.
+  `persons.national_id` remains a registry field and receives **no**
+  UNIQUE constraint.
+- The clean state of the data is a property of the import, not of the
+  schema. The design therefore fails closed on anything non-canonical.
+
+## Strict Family Portal normalizer
+
+A dedicated normalizer; `NationalId::normalize()` is left unchanged for its
+comparison uses.
+
+```text
+1. Reject input that is not a string or is longer than 32 characters.
+2. Convert Arabic-Indic (U+0660–0669) and Persian (U+06F0–06F9) digits to
+   ASCII digits.
+3. Remove only: whitespace (including the non-breaking space), the
+   bidirectional marks U+200E, U+200F and U+061C, and the separators
+   - . / _
+4. The result must be exactly nine ASCII digits.
+5. Anything else is INVALID.
+```
+
+Letters and other symbols are never stripped, so arbitrary input cannot
+become a valid identifier. There is no check-digit rule. INVALID input
+receives the same generic external response as an unknown identifier.
+
+## Authentication identity — `family_auth_identities`
+
+- A dedicated table; no login key column on `users`.
+- `login_key` = HMAC-SHA256 over the nine normalized digits with a
+  dedicated Family Portal secret, separate from `APP_KEY`, and a context
+  string separate from the import `NationalIdFingerprint`.
+- Statuses: `ACTIVE`, `SUSPENDED`, `SUPERSEDED`. At most one ACTIVE row
+  per key and one ACTIVE/SUSPENDED row per user. A key version supports
+  secret rotation; the source value stays recoverable through the Link.
+- **National ID correction.** `CorrectNationalIdAction`, in its own
+  transaction, supersedes the old identity and creates the new one. The
+  old National ID stops authenticating at commit. A corrected value that
+  is not nine digits suspends the identity instead.
+- **Consistency check at login.** The stored key must equal the
+  fingerprint of the linked Person's current National ID; a mismatch is
+  denied and audited, so an obsolete identifier can never keep working.
+
+## Lookup paths
+
+```text
+PRE-ACTIVATION
+National ID input → strict normalizer → Person (exact match on the stored
+value; zero or several matches deny) → eligibility → TRUSTED mobile → OTP
+
+POST-ACTIVATION
+National ID input → strict normalizer → login key → family_auth_identities
+→ User → User-Person Link → consistency check → identity validity
+→ password → session
+```
+
+## User-Person Link
+
+- `user_person_links`, `link_type = SELF` only in V1.
+- At most one ACTIVE/SUSPENDED Link per User and per Person (partial
+  unique indexes), which preserves future representative models.
+- VERIFIED means the identity relation is proven; ACTIVE means proven and
+  enabled. V1 activation creates the Link directly as ACTIVE with
+  `verification_method = SYSTEM_OTP_ACTIVATION`.
+- A head change does not end the Link (the Link says who the user is; the
+  resolver denies the family context). A recorded death ends it.
+
+## Eligibility
+
+```text
+User active
+User-Person Link ACTIVE
+Person not deleted
+Person active
+life_status = ALIVE            (UNKNOWN is NOT eligible)
+Active membership
+is_household_head = true
+Family ACTIVE
+Family not deleted
+```
+
+One backend resolver evaluates this at activation, login, reset and on
+every Family API request. It returns the resolved User, Person, membership
+and Family, or one internal denial reason. Externally: the generic failure
+at login and activation, 401 with the session destroyed when identity is
+lost, 403 with a neutral message when only the family context is lost. The
+client never supplies or selects a Family.
+
+## Mobile trust
+
+- Trust binds **Person + exact normalized mobile value**. Presence is not
+  trust. Mobile values are not unique and shared numbers are valid
+  registry data.
+- Mobile normalizer: the same character handling as the National ID
+  normalizer; the result must be ten ASCII digits beginning `05`.
+
+```text
+NO_MOBILE     derived: no valid mobile on the Person
+UNVERIFIED    derived: a valid mobile with no matching TRUSTED record
+TRUSTED       stored: verified for this Person and this exact number
+STALE         stored: the Person's number no longer matches
+REVOKED       stored: withdrawn by authorized Staff
+```
+
+- All imported mobiles begin UNVERIFIED. There is no bulk trust;
+  verification is staged.
+- A shared number receives no automatic trust: each Person needs an
+  individual verification before that number is TRUSTED for them.
+- Verification methods: `IN_PERSON`, `STAFF_CALLBACK`,
+  `AUTHORIZED_RECORD_REVIEW`.
+- Only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED initially, through a
+  dedicated permission. A COORDINATOR may assist within scope and can
+  never grant. `assisted_by` / `assisted_at` are kept separately from
+  `verified_by` / `verified_at`.
+- If the Person's mobile changes, the previous trust no longer authorizes
+  an OTP.
+- A head without a mobile has no self-activation path: an authorized
+  contact update establishes the number, which starts UNVERIFIED.
+
+## Activation
+
+```text
+National ID → generic response → (internally) Person, eligibility, no
+existing Link, TRUSTED mobile → OTP challenge → OTP verified → password
+set → in ONE transaction: User created (email null), FAMILY_USER assigned,
+family_auth_identities row, ACTIVE Link, challenge consumed, audit event
+→ session
+```
+
+Already activated, no mobile, unverified mobile, ineligible, deceased,
+duplicate or non-canonical stored identifier: the external response is
+identical and no SMS is sent. Concurrent completions are serialized by a
+row lock and the partial unique indexes.
+
+## OTP policy
+
+```text
+6 numeric digits
+TTL 5 minutes
+Maximum 5 verification attempts
+Resend cooldown 60 seconds
+Maximum 3 sends per challenge
+Single use; a superseded code is immediately invalid
+Stored only as a keyed hash
+```
+
+Per-person, per-destination, per-IP and global SMS ceilings are
+configurable security settings, not product constants.
+
+## Password login and reset
+
+- Login: National ID + password. Reset: National ID → OTP to the TRUSTED
+  current mobile → new password. A generated password is never sent.
+- Family password policy: minimum 8 characters, confirmation required, no
+  mandatory character composition, passphrases allowed, stored only
+  through Laravel hashing.
+- A reset ends every session of the user, does not change mobile trust,
+  requires a TRUSTED current mobile and an ACTIVE Link.
+
+## Accounts and roles
+
+- `users.email` becomes nullable and keeps its unique index. Staff account
+  creation still requires an email. No synthetic email is ever created.
+- **Staff-side and family-side accounts are disjoint.** A Staff account
+  holds one Staff role and uses the Staff Login (email + password). A
+  family-side account holds FAMILY_USER, optionally COORDINATOR, and uses
+  the Family Portal login. One account never combines the two sides; a
+  staff member who is also a household head uses two accounts.
+- FAMILY_USER and COORDINATOR coexist on the **same** family-side account.
+- Role checks never depend on role order.
+
+## Authorization layers
+
+```text
+Authentication          who the user is
+Family context          which Family the user acts for (server-resolved)
+Coordinator scope       permission + union of active scope assignments
+Staff authorization     existing permissions, unchanged
+```
+
+`OrganizationalScope` remains a reporting filter and is never coordinator
+authorization.
+
+## Security audit and retention
+
+- `auth_security_events` is append-only and covers activation, OTP, login,
+  reset, mobile trust, Link, identifier rotation and eligibility denials
+  at activation, login and reset. It never stores a raw National ID, an
+  OTP or a password, and avoids raw mobiles.
+- Retention: `auth_security_events` 24 months; consumed, expired,
+  superseded or locked `auth_otp_challenges` may be purged after 90 days.
+  User-Person Link history and mobile trust history are never purged by
+  OTP cleanup.
+
+## Production activation gates
+
+Family Portal activation MUST NOT be enabled in Production until all hold:
+
+```text
+A Production SMS provider is configured
+A queue worker is operational
+Delivery-failure handling exists
+Provider credentials are stored securely
+```
+
+SMS is an abstraction (`SmsSender`) with a log-only development driver; no
+provider is chosen (docs/08 §16a).
+
+**FU-01 — Head Succession** is a rollout gate: the 38 families whose
+current head is deceased have no eligible user. It is not part of PWA-1
+and must be resolved before general Family Portal rollout.
+
+## Implementation slices
+
+```text
+PWA-1A  Identity data discovery                          DONE
+PWA-1B  Identity and access design                       DONE
+PWA-1C  Schema / foundation                              NEXT
+PWA-1D  Identity resolver + links
+PWA-1E  Mobile trust + OTP / SMS abstraction
+PWA-1F  Activation
+PWA-1G  Login / reset / session / family context
+PWA-1H  Coordinator identity / scope
+PWA-1I  Security hardening / full regression
+```
 
 ---
 
@@ -1207,7 +1478,10 @@ also annotated at its original location.
 | A-08 | docs/10 §3: teal brand scale, primary `#176B63` | Family Portal uses the kingfisher / spring palette | **Scoped amendment.** Applies to the Family Portal only. The Staff UI is unchanged during the program unless separately authorized (FP-ADR-022) |
 | A-09 | docs/07 Phases 16–19 order; docs/05 §125 | Program sequence PWA-1 … PWA-10 | **Refined.** Phases 16–19 are delivered through the PWA phases (docs/07 §31a) |
 | A-10 | docs/01 PPD-015, docs/00 CTX-PENDING-022, docs/01 PPD-019 | One Next.js application hosts Staff, Family and public verification; PWA is in the program | **Decided** |
-| A-11 | docs/03 PBD-028: exact login identifier policy | Family Users type their National ID to log in; Staff stays email | **Decided in direction only.** How the typed value maps to a login identifier, and any uniqueness rule, stay open and block PWA-1 (PFP-003) |
+| A-11 | docs/03 PBD-028: exact login identifier policy | Family Users type their National ID to log in; Staff stays email | **Decided (PWA-1B).** Strict nine-digit normalization and a dedicated `family_auth_identities` key; no UNIQUE on `persons.national_id` (§30a) |
+| A-12 | docs/06 §59c as amended by A-04 | Staff-side and family-side accounts are disjoint; FAMILY_USER + COORDINATOR share one family-side account | **Refined.** A Staff role is never combined with FAMILY_USER or COORDINATOR on one account |
+| A-13 | docs/04 §51: `users.email` required | `users.email` nullable, unique index kept; Staff creation still requires it | **Amended** (approved design, not yet migrated) |
+| A-14 | Program phases PWA-1 and PWA-2 (§30) | Activation, OTP, login and reset are delivered inside PWA-1E … PWA-1G | **Refined.** PWA-2 is absorbed into the PWA-1 slices |
 
 ---
 
@@ -1314,6 +1588,66 @@ verification is /verify/{opaque-token}.
 FP-ADR-024
 persons.national_id is not made unique by this program's baseline. PWA-1
 begins with an identity-data discovery before any login-identifier design.
+
+FP-ADR-025
+National ID is the Family Portal login input, normalized by a strict
+normalizer to exactly nine ASCII digits. Registry Identity and
+Authentication Identity are separate; persons.national_id receives no
+UNIQUE constraint.
+
+FP-ADR-026
+Authentication lookup uses a dedicated family_auth_identities table with a
+keyed fingerprint under a dedicated secret, separate from APP_KEY and from
+the import fingerprint context. A National ID correction supersedes the
+identity transactionally; the old identifier stops authenticating at
+commit.
+
+FP-ADR-027
+Family Portal eligibility requires life_status = ALIVE. UNKNOWN is not
+eligible.
+
+FP-ADR-028
+Mobile trust is person-specific and bound to the exact normalized number.
+Imported mobiles begin UNVERIFIED with no bulk trust. Shared numbers get
+no automatic trust. Methods: IN_PERSON, STAFF_CALLBACK,
+AUTHORIZED_RECORD_REVIEW. Only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED
+initially; a COORDINATOR may assist and never grants.
+
+FP-ADR-029
+OTP: 6 digits, 5-minute TTL, 5 attempts, 60-second resend cooldown, 3
+sends per challenge, single use, superseded codes invalid. Rate ceilings
+are configurable security settings.
+
+FP-ADR-030
+Family password policy: minimum 8 characters, confirmation required, no
+mandatory composition, passphrases allowed. Generated passwords are never
+sent by SMS.
+
+FP-ADR-031
+users.email becomes nullable with its unique index kept. Staff-side and
+family-side accounts are disjoint. FAMILY_USER and COORDINATOR coexist on
+one family-side account.
+
+FP-ADR-032
+In V1 a COORDINATOR must also be an eligible Family Portal household head.
+A scope assignment never enables activation. A coordinator may hold
+several active assignments (CLAN, BRANCH_GROUP, BRANCH); authorization is
+their union.
+
+FP-ADR-033
+Authentication, family context, coordinator scope and Staff authorization
+are separate layers. OrganizationalScope is a reporting filter only.
+
+FP-ADR-034
+auth_security_events are append-only and retained 24 months; finished OTP
+challenges may be purged after 90 days. Link and mobile-trust history are
+never purged by OTP cleanup.
+
+FP-ADR-035
+Family Portal activation is not enabled in Production before an SMS
+provider, an operational queue worker, delivery-failure handling and
+secure credential storage exist. Head Succession (FU-01) is a gate for
+general rollout and is outside PWA-1.
 ```
 
 ---
@@ -1326,11 +1660,15 @@ named.
 ```text
 PFP-001  (PWA-2)
 SMS provider.
+Architecture decided 2026-10-02: an SmsSender abstraction with a log-only
+development driver. The Production provider itself stays OPEN and is a
+Production activation gate (§30a).
 
 PFP-002  (PWA-2)
 Exact OTP TTL, attempt limit, resend cooldown and daily caps.
+DECIDED 2026-10-02 (FP-ADR-029). Rate ceilings are configurable settings.
 
-PFP-003  (PWA-1 — BLOCKER)
+PFP-003  — RESOLVED 2026-10-02 (FP-ADR-025, FP-ADR-026; §30a)
 National ID as login identifier. Not decided, and `persons.national_id`
 is NOT simply made unique. PWA-1 begins with the identity-data discovery
 of §4 (normalization, null/blank, malformed, duplicates and their cause,
@@ -1340,10 +1678,13 @@ migration/backfill). Extends docs/02 PDD-001.
 PFP-004  (PWA-1 / PWA-2)
 Exact trusted-mobile verification process: who may mark a mobile trusted,
 on what evidence, and how a coordinator may assist.
+DECIDED 2026-10-02 (FP-ADR-028).
 
 PFP-005  (PWA-2)
 Shared mobile numbers: whether one number may be trusted for more than one
 household head.
+DECIDED 2026-10-02: allowed, but only through an individual verification per
+Person; no automatic trust (FP-ADR-028).
 
 PFP-006  (PWA-7)
 Exact health and disability visibility between adult family members, and
@@ -1384,6 +1725,9 @@ PFP-016  (PWA-1)
 Coordinator scope: exact V1 permission set and whether a coordinator may
 hold more than one assignment. (How a coordinator signs in is decided:
 FP-ADR-021.)
+DECIDED 2026-10-02 (FP-ADR-032): multiple active assignments, union of
+scopes; a coordinator must be an eligible household head. The permission
+names for PWA-1 are final (docs/06 §22b).
 
 PFP-017  (PWA-4)
 Who reviews and who approves Family Verification, and whether the two must
@@ -1399,13 +1743,20 @@ Queue and worker infrastructure for announcement fan-out and SMS.
 PFP-020  (PWA-2)
 Handling of households whose registered head is deceased, missing a
 National ID or missing any mobile.
+DECIDED 2026-10-02: deceased heads are ineligible and Head Succession is a
+rollout gate (FU-01); no eligible head lacks a National ID; heads without
+a mobile need an authorized contact update, then verification (§30a).
 
 PFP-021  (PWA-1)
 Whether more than one Family User per Family is ever supported (docs/05
 PWF-010 stays open; V1 eligibility is the current household head only).
+V1 DECIDED 2026-10-02: one family-side account per Person and one eligible
+head per Family, so one Family User per Family. Later models stay open.
 
 PFP-022  (PWA-1, then per phase)
 Approval of the proposed permission names in docs/06 §22a.
+PARTLY DECIDED 2026-10-02: the PWA-1 permission names are final (docs/06
+§22b; documented, not seeded). Names for later phases stay PROPOSED.
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -1421,9 +1772,9 @@ is handled in the phase named; none changes code or an unrelated rule now.
 
 | # | Finding | Handle in |
 |---|---|---|
-| FU-01 | `RecordPersonDeathAction` does not handle household-head succession, and no household-head change action exists | PWA-6 (DEATH_REPORT apply); PFP-012 |
+| FU-01 | **Head Succession.** `RecordPersonDeathAction` does not handle household-head succession and no household-head change action exists; 38 families currently have a deceased head and therefore no eligible user | **Rollout gate**: must be resolved before general Family Portal rollout; not part of PWA-1 (PFP-012) |
 | FU-02 | Whether `UpdateFamilyResidenceAction` preserves residence history as docs/03 §32 requires is unverified | PWA-6 (RESIDENCE_UPDATE apply) |
-| FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker, and there is no SMS provider | PWA-2 (SMS, PFP-001); PWA-9 (fan-out, PFP-019) |
+| FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker, and there is no SMS provider | **Production activation gate** (§30a, docs/08 §16a); provider choice PFP-001; fan-out PWA-9 (PFP-019) |
 | FU-04 | docs/06 §53 gives FAMILY_USER "scoped view access" to Change Requests; the seeder grants no view permission | PWA-5 |
 | FU-05 | AUTH-ADR-060 is referenced in docs/03, docs/06 and docs/07 but has no entry in the docs/06 decision list | Next docs/06 maintenance |
 | FU-06 | "Document Status" version blocks are stale relative to the change logs (e.g. docs/03) | Next documentation maintenance |
@@ -1435,3 +1786,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | Version | Date | Status | Description |
 |---|---|---|---|
 | 1.0 | 2026-10-02 | Approved | PWA-0: Family Portal program specification — product definition, modules, identity and authentication architecture, mobile trust, multi-role and COORDINATOR, Profile Completion, Family Verification, requests, health and need submissions, card / QR / PDF, notifications and announcements, information architecture, visual direction, PWA direction, security baseline, auditability, logical schema concepts, phases, amendment register and open decisions. Review follow-up (same day): coordinator sign-in decided (FP-ADR-021), Family Portal palette decided (FP-ADR-022), PWA location decided (FP-ADR-023), National ID kept as the PWA-1 blocker (FP-ADR-024), proposals kept pending (PFP-022), §33a follow-ups. Documentation only |
+| 1.1 | 2026-10-02 | Approved | PWA-1A findings and PWA-1B design: §30a identity and access architecture (verified Production aggregates, National ID decision, strict normalizer, `family_auth_identities`, User-Person Link, eligibility with ALIVE only, mobile trust, activation, OTP and password policy, nullable `users.email`, disjoint Staff/family accounts, coordinator must be an eligible head, multiple scopes, security audit, retention, Production gates, slices PWA-1C … PWA-1I); FP-ADR-025 … 035; PFP-002/003/004/005/016/020/021 decided, PFP-001/022 partly; FU-01 made a rollout gate. Documentation only |

@@ -383,6 +383,35 @@ worker and no scheduler cron are deployed for the Pilot**
 
 ---
 
+# 16a. Family Portal activation prerequisites (not yet applicable)
+
+Recorded 2026-10-02 (docs/11 §30a). Nothing here is deployed; the Family
+Portal is not implemented. This section lists what must exist **before**
+Family Portal activation may be enabled in Production.
+
+- **SMS provider.** None is chosen. The application will send through an
+  `SmsSender` abstraction whose only initial driver writes to the log;
+  that driver must never be the Production driver once activation is on.
+- **Queue worker.** §16 stays true for the Pilot. Activation needs an
+  operational worker (supervised, restarted on deploy) so SMS sending and
+  retries do not run inside web requests.
+- **Delivery-failure handling** for SMS must exist.
+- **Secrets**, stored like every other credential (§3, never in the
+  repository):
+  - a dedicated Family Portal fingerprint secret, separate from `APP_KEY`.
+    Losing or changing it without the rotation procedure breaks Family
+    login; it must be covered by the same custody rules as §14;
+  - the SMS provider credentials.
+- **Activation switch.** Activation stays disabled by configuration until
+  the owner approves it, following the same pattern as the Import Apply
+  gate (§7a).
+- **Retention jobs** (when a scheduler exists): authentication and
+  security events 24 months; finished OTP challenges 90 days.
+- **Rollout gate.** Head Succession (docs/11 FU-01) must be resolved
+  before general Family Portal rollout.
+
+---
+
 # 17. Post-deployment smoke test
 
 Use synthetic data only, before any real entry. The smoke Family cannot be
@@ -521,6 +550,7 @@ Never do this once real data has been entered.
 
 | Version | Date | Status | Description |
 |---|---|---|---|
+| 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
 | 1.1 | 2026-09-27 | Approved for Pilot preparation | §2a owner decisions; §12 retention wording; §17 approved smoke Family; §17a rebuild after smoke test; checklist order (backup/restore after rebuild) |
 | 1.0 | 2026-09-27 | Approved for Pilot preparation | Slice D: topology, audit, environment templates, cookie/Sanctum/CORS decision, database initialization, pg_trgm, permission verification, dev-surface gating, HTTPS, permissions, backup/restore, APP_KEY, logging, queues, smoke test, Staff setup, checklist |

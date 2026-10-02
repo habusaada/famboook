@@ -520,6 +520,15 @@ grants nothing. Activation additionally requires registry eligibility and
 possession of a mobile that was trusted through an authorized process
 (docs/11 §5–§6).
 
+Accounts (approved 2026-10-02, PROD-ADR-048, docs/11 §30a): a Staff-side
+account (one Staff role, email + password) and a family-side account
+(FAMILY_USER, optionally COORDINATOR, National ID + password) are
+disjoint. A staff member who is also a household head uses two accounts.
+In V1 a coordinator is always an eligible household head. Activation is
+not enabled in Production before the SMS and queue prerequisites exist,
+and Head Succession for families whose head is deceased is a gate for
+general rollout.
+
 ---
 
 # 17. Canonical Registry
@@ -2978,6 +2987,10 @@ Modern custom UX is a core product requirement rather than post-development visu
 
 The Family Portal is an official mobile-first PWA for household heads under `/family`, part of the Famboook product and brand, reading the canonical registry and changing it only through reviewed requests; VERIFIED does not mean approved for assistance (§16a, `11-FAMILY-PORTAL.md`).
 
+### PROD-ADR-048
+
+Staff-side and family-side accounts are disjoint; FAMILY_USER and COORDINATOR coexist on one family-side account; a V1 coordinator is an eligible household head; Family Portal activation in Production is gated on SMS and queue prerequisites, and general rollout on Head Succession (§16a, `11-FAMILY-PORTAL.md` §30a).
+
 ---
 
 # 105. Preferred Technology Stack
@@ -3218,6 +3231,7 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
+| 1.2.3 | 2026-10-02 | Approved | PWA-1B: §16a account separation (Staff-side vs family-side), V1 coordinator is an eligible household head, Production activation and rollout gates (PROD-ADR-048). Documentation only |
 | 1.2.2 | 2026-10-02 | Approved | PWA-0: added §16a Family Portal Program (modules, submissions, card, announcements, VERIFIED ≠ assistance); §95 PWA rule superseded (PROD-ADR-047); PPD-015 and PPD-019 decided. Documentation only |
 | 1.2.1 | 2026-09-25 | Approved | Added §25a "Clan and Branch (V1)": Clan → Branch Groups → Branches → Families → Persons; Clan ≠ Family; required Clan, optional Branch; no multi-tenancy |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL, Laravel API-first backend, custom Next.js Staff/Executive/Family experiences, Famboook Design System, Sanctum authentication, Domain Actions, controlled API Resources, and restricted Filament System Administration |

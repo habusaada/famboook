@@ -2052,6 +2052,10 @@ user cannot log in or keep using a session). `status`, `mobile` and
 `last_login_at` are not implemented. A Staff user holds exactly one Staff
 role (Spatie). A User is never a Person (§52).
 
+Approved 2026-10-02 (PWA-1B, not yet migrated): `email` becomes nullable
+and keeps its unique index. Staff accounts still require an email;
+family-side accounts have none and never receive a synthetic one (§45b).
+
 ---
 
 # 41. User-Person Link
@@ -2172,12 +2176,11 @@ section already defines them. Specification: `11-FAMILY-PORTAL.md` §28.
 
 ### Family login identifier
 
-Family Users type their National ID to authenticate, not an email, and
-`users.email` cannot stay mandatory for Family Users. Nothing else is
-decided: `persons.national_id` is **not** simply made unique, and the
-relation between the stored value and a login identifier is designed only
-after the PWA-1 identity-data discovery (docs/11 §4, PFP-003; extends
-PDD-001).
+Family Users type their National ID to authenticate, not an email.
+Resolved 2026-10-02 (PWA-1B): the typed value is normalized to exactly
+nine ASCII digits and matched through `family_auth_identities` (§45b).
+`persons.national_id` stays a registry field with **no** UNIQUE
+constraint; PDD-001 (registry-wide normalization) stays open.
 
 ### Trusted mobile
 
@@ -2238,6 +2241,106 @@ from system notifications (§59).
 An append-only record of activation, OTP, login, reset, Link and card
 events that are not tied to a resolved Family. Never contains OTP
 plaintext, passwords or secrets.
+
+---
+
+# 45b. Family Portal Identity Entities (PWA-1B)
+
+Approved design 2026-10-02 (DD-ADR-032). **Not implemented.** Physical
+schema: docs/04 §55b. Architecture: `11-FAMILY-PORTAL.md` §30a.
+
+### `user_person_links`
+
+Refines §41–§44. `link_type` is `SELF` only in V1. Additional fields:
+`uuid`, `verification_method` (`SYSTEM_OTP_ACTIVATION`; `STAFF`
+reserved), `suspended_at`, `suspended_by`, `suspension_reason`,
+`ended_by`. VERIFIED = the identity relation is proven; ACTIVE = proven
+and enabled. V1 creates Links directly as ACTIVE. At most one
+ACTIVE/SUSPENDED Link per User and per Person.
+
+### `family_auth_identities`
+
+The authentication identity of a family-side account.
+
+```text
+user_id
+login_key           keyed fingerprint of the nine normalized digits (sensitive)
+key_version
+status              ACTIVE | SUSPENDED | SUPERSEDED
+superseded_at
+supersede_reason    NATIONAL_ID_CORRECTED | KEY_ROTATION
+```
+
+It is never the raw National ID and never derived with `APP_KEY` or the
+import fingerprint context.
+
+### `person_mobile_trusts`
+
+Trust of one exact mobile number for one Person.
+
+```text
+person_id
+mobile_fingerprint      keyed fingerprint of the normalized number (sensitive)
+mobile_last2            masked display only
+key_version
+status                  PENDING_VERIFICATION | TRUSTED | STALE | REVOKED
+verification_method     IN_PERSON | STAFF_CALLBACK | AUTHORIZED_RECORD_REVIEW
+assisted_by / assisted_at
+verified_by / verified_at
+stale_at
+revoked_by / revoked_at / revoke_reason
+```
+
+`NO_MOBILE` and `UNVERIFIED` are derived states with no row. Rows are
+history and are never deleted. The number is not unique.
+
+### `auth_otp_challenges`
+
+```text
+purpose             ACTIVATION | PASSWORD_RESET
+person_id
+user_id             for resets
+mobile_trust_id     the destination
+code_hash           keyed hash (sensitive); never the plaintext
+expires_at, attempts, send_count, last_sent_at
+verified_at, grant_expires_at
+consumed_at, superseded_at, locked_at
+ip
+```
+
+Operational records; purgeable 90 days after they finish.
+
+### `auth_security_events`
+
+Append-only authentication and security audit.
+
+```text
+event_type, outcome, reason_code
+person_id, user_id, actor_user_id
+link, mobile trust and challenge references
+login_key           fingerprint only
+ip, user_agent_hash
+metadata            allow-listed keys only
+created_at
+```
+
+Retained 24 months. Never a raw National ID, OTP or password; raw mobiles
+are avoided.
+
+### `coordinator_scope_assignments`
+
+```text
+user_id
+scope_type          CLAN | BRANCH_GROUP | BRANCH
+clan_id             always set
+branch_group_id     for BRANCH_GROUP
+branch_id           for BRANCH
+assigned_by / assigned_at
+revoked_by / revoked_at / revoke_reason
+```
+
+A coordinator may hold several active assignments; authorization is their
+union.
 
 ---
 
@@ -3758,6 +3861,10 @@ Canonical reference values use stable codes independent from localization.
 
 Family Portal logical concepts (§45a): National ID login identifier, per-Person trusted mobile, OTP challenge, calculated Profile Completion, Family Verification, coordinator scope assignment, Digital Household Head Card credential, announcements with recipients, and authentication/security events. Logical only; not implemented.
 
+### DD-ADR-032
+
+Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIED vs ACTIVE), `family_auth_identities`, `person_mobile_trusts`, `auth_otp_challenges`, `auth_security_events`, `coordinator_scope_assignments`; `users.email` nullable with its unique index kept. Approved design; not implemented.
+
 ---
 
 # 92. Pending Data Decisions
@@ -3986,6 +4093,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |
 | 1.2.24 | 2026-10-02 | Approved | PWA-0: §45a Family Portal logical concepts (login identifier, trusted mobile, OTP challenge, Profile Completion, Family Verification, coordinator scope, card credential, announcements, security events); §47 proposed request types recorded as not approved (DD-ADR-031). Documentation only |
 | 1.2.23 | 2026-10-01 | Approved | §7c: canonical permanent code of Branches created by the INITIAL import (`BR_` + reserved id) |
 | 1.2.22 | 2026-09-30 | Approved | §88d `apply_plan_fingerprint`, `apply_error_code`, `apply_error_row_number` on import_batches |

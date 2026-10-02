@@ -2012,7 +2012,7 @@ deploys or touches Production by itself.
 
 | Phase | Objective | Main scope | Schema impact | Depends on | Exit criteria |
 |---|---|---|---|---|---|
-| PWA-0 | Baseline | Architecture, business rules, workflows, permissions, product and design direction | None | — | Documentation approved (**this update**) |
+| PWA-0 | Baseline | Architecture, business rules, workflows, permissions, product and design direction | None | — | **DONE** (`80235cf`) |
 | PWA-1 | Family identity and access | **Starts with a read-only identity-data discovery** (National ID normalization, null/blank, malformed, duplicates and their cause, login-identifier relation, backfill strategy — docs/11 §4); then User-Person Link, Family access resolver, eligibility, trusted-mobile concept, multi-role fixes, coordinator scope foundation | Link, trust state, scope assignment, login identifier | PWA-0; PFP-003, PFP-004, PFP-016 | Cross-family denial; head change, death, suspended Link and deactivation end access; a dual-role user is handled deterministically; Staff login unchanged |
 | PWA-2 | Family authentication | National ID activation, OTP, password setup, login, reset, rate limiting, SMS provider abstraction, security audit | OTP challenge, activation state, security events | PWA-1; PFP-001, PFP-002, PFP-005, PFP-020 | No enumeration; brute force and resend abuse blocked; untrusted mobile cannot activate; destination cannot be chosen; no secret logged |
 | PWA-3 | Family shell and read-only portal | Route groups, mobile shell, home, family summary, members, account | None expected | PWA-2 | Only the resolved Family is visible; no client Family id; sensitive fields filtered server-side; responses not cached; Staff URLs unchanged |
@@ -2024,15 +2024,52 @@ deploys or touches Production by itself.
 | PWA-9 | Notifications, announcements, Coordinator Space | In-app center, system notifications, announcements, audiences, coordinator dashboard and family summaries | Announcements, recipients | PWA-1, PWA-3, PWA-5; PFP-019 | Server-side audience; scope limits; recipient-only reads; queued fan-out; coordinator sees no health details |
 | PWA-10 | Installability and hardening | Manifest scoped to `/family`, service worker, security, performance and accessibility review | None | All | No authenticated response cached; no offline sensitive data; session policy decided (PFP-014) |
 
+## Program status and PWA-1 slices (2026-10-02, RM-ADR-042)
+
+```text
+PWA-0    Baseline documentation                          DONE
+PWA-1A   Identity data discovery (Production, read-only) DONE
+PWA-1B   Identity and access design + documentation      DONE
+PWA-1C   Schema / foundation                             NEXT
+PWA-1D   Identity resolver + links
+PWA-1E   Mobile trust + OTP / SMS abstraction
+PWA-1F   Activation
+PWA-1G   Login / reset / session / family context
+PWA-1H   Coordinator identity / scope
+PWA-1I   Security hardening / full regression
+```
+
+The PWA-1 and PWA-2 rows of the table above are delivered together through
+these slices: activation, OTP, login and reset (the former PWA-2 scope) are
+PWA-1E … PWA-1G. No separate PWA-2 phase remains; PWA-3 follows PWA-1I.
+
+| Slice | Content | Exit |
+|---|---|---|
+| PWA-1C | Migrations for docs/04 §55b; models and factories; strict normalizers; fingerprint service; COORDINATOR role and the `family-portal.access` permission seeded | Schema and unit tests; Staff suite unchanged |
+| PWA-1D | Link lifecycle; authentication identity service; eligibility resolver; death and National ID correction hooks; role checks without order dependence | Resolver matrix; Staff regression |
+| PWA-1E | Mobile trust actions and Staff endpoints; person-update hook; OTP challenge service; `SmsSender` with a log-only driver | Trust and OTP matrices; no real SMS possible |
+| PWA-1F | Activation endpoints and transactional completion | Activation matrix; anti-enumeration |
+| PWA-1G | Login, logout, reset, `/family/me`, family context middleware, session revocation | Login and reset matrices; cross-family IDOR tests |
+| PWA-1H | Scope assignments, scope service, coordinator context | Scope and dual-role matrices |
+| PWA-1I | Security-event coverage, throttling, full regression | Whole suite |
+
+Gates outside PWA-1:
+
+- **Production activation gate:** SMS provider, operational queue worker,
+  delivery-failure handling, secure credentials (docs/08 §16a).
+- **Rollout gate FU-01 — Head Succession:** must be resolved before
+  general Family Portal rollout; it is not part of PWA-1C or any PWA-1
+  slice (docs/11 §33a).
+
 Infrastructure prerequisites recorded for later phases: an SMS provider
 (PWA-2) and a queue worker in production, which currently runs
 `QUEUE_CONNECTION=sync` with no worker (PWA-2 for SMS, PWA-9 for fan-out).
 
 The Family PWA lives inside the existing Next.js frontend application; no
 separate repository-level application is created (docs/11 §25). The
-blocking prerequisite of PWA-1 is the National ID identity-data discovery
-(docs/11 PFP-003); PFP-004, PFP-016, PFP-021 and PFP-022 are decided
-during the phase. Other recorded follow-ups: docs/11 §33a.
+National ID identity-data discovery that blocked PWA-1 is complete and
+PFP-003 is resolved (docs/11 §30a). Other recorded follow-ups: docs/11
+§33a.
 
 Not in V1: marriage, divorce, widowhood, member transfer and
 household-head change flows (docs/11 §14, PFP-012).
@@ -4618,6 +4655,9 @@ Native mobile and advanced integrations remain post-V1 unless separately approve
 
 ### RM-ADR-041
 The Family Portal is delivered as the Family PWA Program, PWA-0 … PWA-10 (§31a), which carries Phases 16–19 and adds Profile Completion, Family Verification, the Digital Household Head Card, announcements, Coordinator Space and installability. Each phase is local, reviewable and independently testable.
+
+### RM-ADR-042
+PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA-1I, which also deliver the former PWA-2 authentication scope. Production activation is gated on SMS and queue prerequisites; general rollout is gated on Head Succession (FU-01), which is outside PWA-1.
 ```
 
 ---
@@ -4843,6 +4883,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |
 | 1.2.25 | 2026-10-02 | Approved | PWA-0: §31a Family PWA Program (PWA-0 … PWA-10) mapped onto Phases 16–19, with scope, schema impact, dependencies and exit criteria (RM-ADR-041). Documentation only; no phase started |
 | 1.2.24 | 2026-10-01 | Approved | Phase 23 progress note: Step 6 Apply UI (Phase 4B.4e) |
 | 1.2.23 | 2026-10-01 | Approved | Phase 23 progress note: Apply API and activation gate (Phase 4B.4d) |

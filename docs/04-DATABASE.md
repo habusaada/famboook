@@ -2141,7 +2141,7 @@ documents                §44–§46
 
 | Concept | Needs | Phase |
 |---|---|---|
-| Family login identifier | Undecided until the PWA-1 identity-data discovery (docs/11 §4); `users.email` not mandatory for Family Users | PWA-1 / PWA-2 |
+| Family login identifier | Decided: `family_auth_identities` (§55b); `users.email` nullable | PWA-1C |
 | Activation state | Whether the account is activated and a password set | PWA-2 |
 | Trusted mobile | Per-Person trust state with verifier, time and method | PWA-1 / PWA-2 |
 | OTP challenge | Hashed, short-lived, attempt-counted, purpose-bound | PWA-2 |
@@ -2157,16 +2157,161 @@ documents                §44–§46
 
 - No `users.family_id` (§55).
 - `persons.national_id` is indexed but not unique and stored as entered
-  (PDD-001). This section does **not** decide to make it unique. Whether a
-  separate normalized login key is introduced, and how it is backfilled,
-  is decided after the PWA-1 identity-data discovery (docs/11 §4,
-  PFP-003).
+  (PDD-001). It receives **no** UNIQUE constraint. Authentication uses the
+  separate `family_auth_identities` key (§55b); no backfill is needed
+  because identities are created only at activation.
 - Opaque identifiers (public holder ID, verification credential) must be
   unique and must not be derivable from sequential ids or business codes.
 - OTP secrets are stored only as hashes.
 - Verification and card history are append-only.
 - Coordinator scope references the existing `clans`, `branch_groups` and
   `branches` tables.
+
+---
+
+# 55b. Family Portal Identity Schema (PWA-1B — approved design)
+
+Approved 2026-10-02 (DB-ADR-042). **No migration exists.** This is the
+design PWA-1C implements. Entities: docs/02 §45b.
+
+Conventions: `id BIGINT PK`, `uuid UUID UNIQUE` as the public reference,
+`created_at` / `updated_at`; user references are `BIGINT NULL FK users.id`
+unless stated. `persons`, `families` and `family_memberships` are not
+changed.
+
+## `users` (change)
+
+```text
+email   VARCHAR NULL   (was NOT NULL); the unique index is kept
+```
+
+## `user_person_links`
+
+```text
+user_id               BIGINT NOT NULL FK users.id      (restrict)
+person_id             BIGINT NOT NULL FK persons.id    (restrict)
+link_type             VARCHAR NOT NULL                 SELF
+status                VARCHAR NOT NULL                 PENDING_VERIFICATION | VERIFIED
+                                                       | ACTIVE | SUSPENDED | ENDED
+verification_method   VARCHAR NULL                     SYSTEM_OTP_ACTIVATION | STAFF
+verified_by, verified_at, activated_at
+suspended_at, suspended_by, suspension_reason
+ended_at, ended_by, end_reason
+```
+
+```text
+UNIQUE (person_id) WHERE status IN ('ACTIVE','SUSPENDED')
+UNIQUE (user_id)   WHERE status IN ('ACTIVE','SUSPENDED')
+INDEX  (user_id, status), (person_id, status)
+CHECK  status IN ('ACTIVE','SUSPENDED') requires verified_at
+CHECK  status = 'ENDED' requires ended_at and end_reason
+```
+
+This resolves PDB-020.
+
+## `family_auth_identities`
+
+```text
+user_id            BIGINT NOT NULL FK users.id (restrict)
+login_key          CHAR(64) NOT NULL             sensitive
+key_version        SMALLINT NOT NULL
+status             VARCHAR NOT NULL              ACTIVE | SUSPENDED | SUPERSEDED
+superseded_at      TIMESTAMP NULL
+supersede_reason   VARCHAR NULL
+```
+
+```text
+UNIQUE (login_key) WHERE status = 'ACTIVE'
+UNIQUE (user_id)   WHERE status IN ('ACTIVE','SUSPENDED')
+```
+
+## `person_mobile_trusts`
+
+```text
+person_id             BIGINT NOT NULL FK persons.id (restrict)
+mobile_fingerprint    CHAR(64) NOT NULL            sensitive
+mobile_last2          CHAR(2) NOT NULL
+key_version           SMALLINT NOT NULL
+status                VARCHAR NOT NULL             PENDING_VERIFICATION | TRUSTED
+                                                   | STALE | REVOKED
+verification_method   VARCHAR NULL                 IN_PERSON | STAFF_CALLBACK
+                                                   | AUTHORIZED_RECORD_REVIEW
+assisted_by, assisted_at
+verified_by, verified_at
+stale_at
+revoked_by, revoked_at, revoke_reason
+```
+
+```text
+UNIQUE (person_id) WHERE status = 'TRUSTED'
+UNIQUE (person_id) WHERE status = 'PENDING_VERIFICATION'
+INDEX  (mobile_fingerprint)          -- NOT unique: shared numbers are valid
+CHECK  status = 'TRUSTED' requires verified_by and verified_at
+```
+
+## `auth_otp_challenges`
+
+```text
+purpose            VARCHAR NOT NULL               ACTIVATION | PASSWORD_RESET
+person_id          BIGINT NOT NULL FK persons.id
+user_id            BIGINT NULL FK users.id
+mobile_trust_id    BIGINT NOT NULL FK person_mobile_trusts.id
+code_hash          CHAR(64) NOT NULL              sensitive; never plaintext
+expires_at         TIMESTAMP NOT NULL
+attempts           SMALLINT NOT NULL DEFAULT 0
+send_count         SMALLINT NOT NULL
+last_sent_at       TIMESTAMP NOT NULL
+verified_at, grant_expires_at
+consumed_at, superseded_at, locked_at
+ip                 INET NULL
+```
+
+```text
+UNIQUE (person_id, purpose)
+       WHERE consumed_at IS NULL AND superseded_at IS NULL AND locked_at IS NULL
+```
+
+## `auth_security_events`
+
+```text
+event_type, outcome, reason_code    VARCHAR
+person_id, user_id, actor_user_id   BIGINT NULL
+user_person_link_id, mobile_trust_id, otp_challenge_id   BIGINT NULL
+login_key          CHAR(64) NULL    fingerprint only
+ip                 INET NULL
+user_agent_hash    CHAR(64) NULL
+metadata           JSONB NULL       allow-listed keys only
+created_at         TIMESTAMP NOT NULL      (no updated_at: append-only)
+```
+
+Indexes on `(person_id, created_at)`, `(user_id, created_at)`,
+`(event_type, created_at)`.
+
+## `coordinator_scope_assignments`
+
+```text
+user_id            BIGINT NOT NULL FK users.id (restrict)
+scope_type         VARCHAR NOT NULL            CLAN | BRANCH_GROUP | BRANCH
+clan_id            BIGINT NOT NULL FK clans.id
+branch_group_id    BIGINT NULL    FK (branch_group_id, clan_id) → branch_groups (id, clan_id)
+branch_id          BIGINT NULL    FK (branch_id, clan_id) → branches (id, clan_id)
+assigned_by, assigned_at
+revoked_by, revoked_at, revoke_reason
+```
+
+```text
+CHECK  CLAN         → branch_group_id IS NULL AND branch_id IS NULL
+CHECK  BRANCH_GROUP → branch_group_id IS NOT NULL AND branch_id IS NULL
+CHECK  BRANCH       → branch_id IS NOT NULL AND branch_group_id IS NULL
+UNIQUE active assignment per (user_id, scope_type, clan_id, branch_group_id,
+       branch_id) WHERE revoked_at IS NULL, NULLs treated as equal
+```
+
+## Retention
+
+`auth_security_events`: 24 months. `auth_otp_challenges`: finished rows
+purgeable after 90 days. `user_person_links` and `person_mobile_trusts`
+history is never purged by OTP cleanup.
 
 ---
 
@@ -3751,6 +3896,9 @@ Database backups and restore testing are production requirements.
 
 ### DB-ADR-041
 Family Portal future schema concepts are documented logically (§55a) with physical design deferred to each PWA phase; no `users.family_id`; opaque card identifiers never reuse sequential ids or business codes; OTP secrets stored only hashed.
+
+### DB-ADR-042
+Family Portal identity schema (§55b, approved design, no migration): `users.email` nullable with its unique index kept; `user_person_links` with partial unique indexes on active/suspended links; dedicated `family_auth_identities`; person-specific `person_mobile_trusts` with a non-unique fingerprint; `auth_otp_challenges`; append-only `auth_security_events`; `coordinator_scope_assignments`. No UNIQUE constraint on `persons.national_id`.
 ```
 
 ### 111. Pending Database Decisions
@@ -3816,6 +3964,7 @@ Exact handling of partial unknown birth dates if required.
 
 PDB-020
 Exact uniqueness rules for active User-Person Links.
+Resolved 2026-10-02 (§55b): at most one ACTIVE/SUSPENDED Link per User and per Person, as partial unique indexes.
 
 PDB-021
 Whether notification data requires additional domain-specific tables.
@@ -4010,6 +4159,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
 | 1.2.23 | 2026-10-02 | Approved | PWA-0: §55a Family Portal future schema concepts (logical design vs deferred physical schema; constraints) — no migration (DB-ADR-041). Documentation only |
 | 1.2.22 | 2026-09-30 | Approved | §83d Apply execution fields: import_batches.apply_plan_fingerprint (present exactly while Apply has started) and structured apply_error_code / apply_error_row_number, with CHECKs |
 | 1.2.21 | 2026-09-29 | Approved | §83d Import Apply foundation: import_batches PARTIALLY_APPLIED + apply_started_at with CHECK (started Apply never FAILED), import_apply_records (append-only provenance, unique (import_row_id, effect_key), composite row/batch FK, created-entity uniqueness, shape/outcome/entity/reason CHECKs, no polymorphic FK) |

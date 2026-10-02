@@ -1307,6 +1307,83 @@ Per-recipient in-app record → read / unread
 
 ---
 
+# 53b. Family Portal Identity Workflows (PWA-1B)
+
+Approved 2026-10-02 (WF-ADR-040). Architecture: `11-FAMILY-PORTAL.md`
+§30a. Documentation only; nothing here is implemented.
+
+## User-Person Link
+
+```text
+(none) ──activation completes──▶ ACTIVE
+ACTIVE ──authorized Staff──▶ SUSPENDED ──authorized Staff──▶ ACTIVE
+ACTIVE / SUSPENDED ──death recorded · Staff action · identity error──▶ ENDED
+```
+
+V1 creates the Link directly as ACTIVE; PENDING_VERIFICATION and VERIFIED
+are retained for later flows. A head change does not end the Link; the
+eligibility resolver denies the family context instead.
+
+## Mobile trust
+
+```text
+NO_MOBILE ──authorized contact update──▶ UNVERIFIED
+UNVERIFIED ──coordinator or Staff opens / assists──▶ PENDING_VERIFICATION
+PENDING_VERIFICATION ──SUPER_ADMIN or ADMINISTRATOR grants──▶ TRUSTED
+TRUSTED ──the Person's number changes──▶ STALE
+TRUSTED ──authorized Staff──▶ REVOKED
+STALE / REVOKED ──new verification of the current number──▶ TRUSTED
+```
+
+A coordinator assists within scope and never grants. A shared number is
+verified separately for each Person.
+
+## Activation
+
+```text
+National ID
+   ↓ generic response
+Person, eligibility, no existing Link, TRUSTED mobile  (internal)
+   ↓
+OTP challenge → OTP verified → password set
+   ↓ one transaction
+User · FAMILY_USER · authentication identity · ACTIVE Link · audit
+   ↓
+Session
+```
+
+Every non-success condition returns the same external response.
+
+## National ID correction
+
+```text
+CorrectNationalIdAction
+   ↓ same transaction
+old authentication identity → SUPERSEDED
+new authentication identity → ACTIVE   (or SUSPENDED if not nine digits)
+   ↓
+The old National ID stops authenticating at commit
+```
+
+## Password reset
+
+```text
+National ID → OTP to the TRUSTED current mobile → new password
+→ all sessions of the user ended
+```
+
+## Access loss
+
+```text
+Death recorded        Link ENDED, sessions ended
+Head change           family context denied
+Family not ACTIVE     family context denied
+Link SUSPENDED        session ended
+User deactivated      session ended
+```
+
+---
+
 # 54. Change Request Workflow
 
 Canonical lifecycle:
@@ -2841,6 +2918,9 @@ Queued mutating operations must revalidate state and be retry-safe.
 
 ### WF-ADR-039
 Family Portal program workflows (§53a): activation is the approved system verification process for the User-Person Link; Profile Completion, verification review and verification result are separate state; health and need submissions follow the Change Request lifecycle; card and announcement lifecycles are defined.
+
+### WF-ADR-040
+Family Portal identity workflows (§53b): Link lifecycle with direct ACTIVE creation at activation; mobile trust lifecycle with assistance separate from the Staff grant; transactional activation; authentication identity superseded on National ID correction; reset ends all sessions.
 ```
 
 ---
@@ -2878,6 +2958,7 @@ Exact identity-verification evidence.
 
 PWF-010
 Whether multiple Family Users are supported in V1.
+Decided 2026-10-02 for V1: one family-side account per Person and one eligible head per Family (§53b); later models stay open.
 
 PWF-011
 Guardian / Authorized Representative workflow.
@@ -3101,3 +3182,4 @@ Date: 2026-09-24
 | 1.2.5 | 2026-09-25 | Approved | §22: V1 Clan (required) and Branch (optional) selection at registration and correction |
 | 1.2.6 | 2026-09-29 | Approved | §22: Branch Group optional — ungrouped Branches ("بدون مجموعة") selectable; Branches created without a Group and later assigned/moved/ungrouped within the same Clan |
 | 1.2.7 | 2026-10-02 | Approved | PWA-0: §53a Family Portal Program Workflows (mobile trust, activation, reset, Profile Completion and Family Verification, later-change classes, health/need submissions, card, announcements); §51 amended (WF-ADR-039); PWF-008 decided in direction. Documentation only |
+| 1.2.8 | 2026-10-02 | Approved | PWA-1B: §53b Family Portal Identity Workflows (Link, mobile trust, activation, National ID correction, reset, access loss); PWF-010 decided for V1 (WF-ADR-040). Documentation only |

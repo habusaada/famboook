@@ -2206,9 +2206,10 @@ Reset        National ID → OTP to the trusted mobile → new password
 - No name and no Family information is shown before authentication
   succeeds.
 - Staff authentication (§116) is unchanged.
-- How a typed National ID is matched to a Person is not decided here.
-  `persons.national_id` is not simply made unique: PWA-1 begins with an
-  identity-data discovery (docs/11 §4, PFP-003).
+- A typed National ID must be exactly nine ASCII digits after the strict
+  Family Portal normalization and is matched through a dedicated
+  authentication identity (§89b). `persons.national_id` is not made
+  unique.
 
 ## Mobile trust
 
@@ -2293,6 +2294,96 @@ Activation, OTP security events, password reset, Link verification and
 revocation, verification decisions, request transitions and apply, card
 issue / revoke / reissue, coordinator scope changes and announcement sends
 are auditable. OTP plaintext, passwords and secrets are never logged.
+
+---
+
+# 89b. Family Portal Identity and Access Rules (PWA-1B)
+
+Approved 2026-10-02. Architecture: `11-FAMILY-PORTAL.md` §30a.
+Documentation only; nothing here is implemented.
+
+## Eligibility
+
+A Family Portal user is eligible only while all hold:
+
+```text
+User active
+User-Person Link ACTIVE
+Person not deleted and active
+life_status = ALIVE
+Active membership with is_household_head = true
+Family ACTIVE and not deleted
+```
+
+`UNKNOWN` life status is **not** eligible. A deceased current head is
+never eligible; the family then has no eligible user until a new head is
+assigned (Head Succession, docs/11 FU-01 — a rollout gate).
+
+## National ID
+
+- The login input is accepted only if, after the strict normalization, it
+  is exactly nine ASCII digits. No check-digit rule applies.
+- Registry Identity and Authentication Identity are separate.
+  `persons.national_id` is not a credential and is not made unique.
+- A National ID correction (§93b) of a Person who has a family-side
+  account supersedes the authentication identity in the same transaction.
+  The old National ID stops authenticating at commit; a corrected value
+  that is not nine digits suspends the identity.
+
+## Accounts
+
+- Staff-side and family-side accounts are disjoint: one account never
+  combines a Staff role with FAMILY_USER or COORDINATOR. A staff member
+  who is also a household head has two accounts.
+- FAMILY_USER and COORDINATOR coexist on the same family-side account.
+- A family-side account has no email; no synthetic email is created.
+- One active or suspended User-Person Link per User and per Person.
+
+## Coordinator
+
+- In V1 a COORDINATOR is always an eligible Family Portal household head.
+  A scope assignment never enables activation.
+- A coordinator may hold several active scope assignments (CLAN,
+  BRANCH_GROUP, BRANCH); authorization is their union. A client-supplied
+  scope never grants access.
+
+## Mobile trust
+
+- Trust binds one Person to one exact normalized number. Presence is not
+  trust. Mobile numbers are not unique; shared numbers are valid data.
+- Every imported mobile begins UNVERIFIED. There is no bulk trust.
+- A shared number is trusted only per Person, by individual verification.
+- Methods: `IN_PERSON`, `STAFF_CALLBACK`, `AUTHORIZED_RECORD_REVIEW`.
+- Only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED initially. A
+  COORDINATOR may assist within scope and never grants.
+- A changed number no longer authorizes an OTP.
+- A head without a mobile cannot self-activate; an authorized contact
+  update establishes the number, which starts UNVERIFIED.
+
+## OTP and password
+
+```text
+OTP        6 digits · 5-minute TTL · 5 attempts · 60-second resend cooldown
+           · 3 sends per challenge · single use · superseded codes invalid
+Password   minimum 8 characters · confirmation required · no mandatory
+           composition · passphrases allowed
+```
+
+OTPs are stored only as keyed hashes. Passwords are stored only through
+Laravel hashing. A generated password is never sent by SMS. A password
+reset ends every session of the user.
+
+## Audit and retention
+
+Authentication and security events are append-only and retained 24
+months. Finished OTP challenges may be purged after 90 days. Link and
+mobile-trust history are never purged by OTP cleanup.
+
+## Production gates
+
+Activation is not enabled in Production before a Production SMS provider,
+an operational queue worker, delivery-failure handling and secure
+credential storage exist (docs/08 §16a).
 
 ---
 
@@ -4365,7 +4456,7 @@ Exact session timeout rules.
 
 PBD-028
 Exact login identifier policy.
-Decided in direction 2026-10-02: Family Users log in with National ID, Staff with email (§89a); the identifier design itself stays open and blocks PWA-1 (docs/11 PFP-003).
+Decided 2026-10-02: Family Users log in with National ID (strict nine-digit normalization, dedicated authentication identity — §89b); Staff with email.
 
 PBD-029
 Exact low-bandwidth/offline behavior permitted for sensitive data.
@@ -4491,6 +4582,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.35 | 2026-10-02 | Approved | PWA-1B: §89b Family Portal Identity and Access Rules (eligibility with ALIVE only, National ID rule and correction effect, disjoint Staff/family accounts, coordinator must be an eligible head, mobile trust, OTP and password policy, audit retention, Production gates); PBD-028 decided. Documentation only |
 | 1.2.34 | 2026-10-02 | Approved | PWA-0: §89a Family Portal Program Rules (server-resolved Family access, National ID + OTP activation, mobile trust, multi-role, Profile Completion, Family Verification, VERIFIED ≠ assistance, submissions, card/QR, announcements, audit); §59 amended — activation is the approved system verification process; PBD-028 decided in direction. Documentation only |
 | 1.2.33 | 2026-10-02 | Approved | §55a: the Operational Dashboard shows the Declared Household Population (sum of current declared household sizes in scope) as a separate KPI beside Current People; no figure derived from another |
 | 1.2.32 | 2026-10-01 | Approved | §55: the Family list and profile show the declared household statistics beside the registered `member_count` (labelled "المعلن"); nothing derived or reconciled |
