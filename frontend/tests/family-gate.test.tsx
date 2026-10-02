@@ -70,12 +70,12 @@ describe("FamilyGate", () => {
     }
   });
 
-  it("sends a visitor without a session to the activation page", async () => {
+  it("sends a visitor without a session to the Family login", async () => {
     vi.spyOn(apiClient, "get").mockRejectedValue(new ApiError(401, { message: "Unauthenticated." }));
 
     renderPortal();
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/activate"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/login"));
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("حسابك مفعّل")).not.toBeInTheDocument();
   });
@@ -86,7 +86,9 @@ describe("FamilyGate", () => {
     renderPortal();
 
     expect(await screen.findByRole("alert")).toHaveTextContent("هذا الحساب ليس حساب أسرة");
+    // Never a silent redirect, never the portal: a notice and a clear way on.
     expect(router.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "تسجيل الدخول بحساب الأسرة" })).toHaveAttribute("href", "/family/login");
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("حسابك مفعّل")).not.toBeInTheDocument();
   });
@@ -127,14 +129,14 @@ describe("FamilyGate", () => {
     expect(screen.queryByText("سالم الاختبار")).not.toBeInTheDocument();
   });
 
-  it("logs out through the Family API and returns to the entry page", async () => {
+  it("logs out through the Family API and returns to the Family login", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ user: familyUser() });
     const post = vi.spyOn(apiClient, "post").mockResolvedValue(null);
 
     renderPortal();
     await userEvent.click(await screen.findByRole("button", { name: "تسجيل الخروج" }));
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/activate"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/login"));
     expect(post).toHaveBeenCalledWith("/api/v1/family/auth/logout", {});
   });
 
@@ -145,6 +147,6 @@ describe("FamilyGate", () => {
     renderPortal();
     await userEvent.click(await screen.findByRole("button", { name: "تسجيل الخروج" }));
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/activate"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family/login"));
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { FamilyAuthCard } from "@/components/family/auth/auth-parts";
+import { FamilyAuthCard, textLinkClass } from "@/components/family/auth/auth-parts";
 import { NationalIdStep } from "@/components/family/auth/national-id-step";
 import { OtpStep } from "@/components/family/auth/otp-step";
 import { PasswordStep } from "@/components/family/auth/password-step";
@@ -50,7 +51,20 @@ export function ActivationFlow() {
   }
 
   return (
-    <FamilyAuthCard step={state.step} progress={state.step === "ACTIVATED" ? null : `الخطوة ${STEP_NUMBER[state.step]} من 3`}>
+    <FamilyAuthCard
+      step={state.step}
+      progress={state.step === "ACTIVATED" ? null : `الخطوة ${STEP_NUMBER[state.step]} من 3`}
+      below={
+        state.step === "NATIONAL_ID" && (
+          <p>
+            لديك حساب بالفعل؟{" "}
+            <Link href="/family/login" className={textLinkClass}>
+              تسجيل الدخول
+            </Link>
+          </p>
+        )
+      }
+    >
       {state.step === "NATIONAL_ID" && (
         <NationalIdStep
           title="مرحبًا بك في فامبوك"

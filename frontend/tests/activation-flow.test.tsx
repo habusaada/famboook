@@ -9,6 +9,13 @@ import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/link", () => ({
+  default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 // Synthetic values only.
 const NATIONAL_ID = "123456789";
@@ -88,7 +95,7 @@ describe("normalizers", () => {
 });
 
 describe("step 1 — National ID", () => {
-  it("is an accessible, numeric-friendly text field with the approved copy and no login link", () => {
+  it("is an accessible, numeric-friendly text field with the approved copy and the login link", () => {
     renderWithClient(<ActivationFlow />);
 
     expect(screen.getByRole("heading", { level: 1, name: "مرحبًا بك في فامبوك" })).toBeInTheDocument();
@@ -96,9 +103,9 @@ describe("step 1 — National ID", () => {
     expect(idField()).toHaveAttribute("type", "text");
     expect(idField()).toHaveAttribute("inputmode", "numeric");
     expect(idField()).toHaveAttribute("dir", "ltr");
-    // /family/login does not exist until PWA-1G.
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByText(/تسجيل الدخول/)).not.toBeInTheDocument();
+    // The only link: to the Family login, for someone already activated.
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
   });
 
   it("sends Arabic digits as nine ASCII digits", async () => {

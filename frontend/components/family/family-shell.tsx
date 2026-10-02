@@ -21,7 +21,7 @@ function LogoutButton() {
     await familyLogout().catch(() => undefined);
     queryClient.clear();
     queryClient.setQueryData(FAMILY_ME_QUERY_KEY, null);
-    router.replace("/family/activate");
+    router.replace("/family/login");
   }
 
   return (
