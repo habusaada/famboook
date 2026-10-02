@@ -1310,7 +1310,10 @@ Per-recipient in-app record → read / unread
 # 53b. Family Portal Identity Workflows (PWA-1B)
 
 Approved 2026-10-02 (WF-ADR-040). Architecture: `11-FAMILY-PORTAL.md`
-§30a. Documentation only; nothing here is implemented.
+§30a. PWA-1D implemented the User-Person Link lifecycle, the National ID
+correction effect, the death effect and access loss (WF-ADR-041) as Domain
+Actions — no endpoint and no UI. Mobile trust, activation and password reset
+below are still to be built (PWA-1E–1G).
 
 ## User-Person Link
 
@@ -1323,6 +1326,25 @@ ACTIVE / SUSPENDED ──death recorded · Staff action · identity error──�
 V1 creates the Link directly as ACTIVE; PENDING_VERIFICATION and VERIFIED
 are retained for later flows. A head change does not end the Link; the
 eligibility resolver denies the family context instead.
+
+As implemented (PWA-1D):
+
+```text
+Establish   system process inside the activation transaction: ACTIVE Link +
+            ACTIVE authentication identity together, for an eligible head
+Suspend     ACTIVE → SUSPENDED · sessions revoked · identity and account
+            untouched · resumable
+Resume      SUSPENDED → ACTIVE · no session is created
+End         ACTIVE / SUSPENDED → ENDED · TERMINAL
+            authentication identity → SUPERSEDED / LINK_ENDED
+            sessions revoked
+            the User account is NOT deactivated
+```
+
+Suspend, resume and an administrative end require a Staff-side actor holding
+`user-person-link.manage`. An end that follows from a recorded death runs
+inside the death action's transaction and needs no link permission. After
+an end, the Person may be activated again as a NEW link.
 
 ## Mobile trust
 
@@ -1363,6 +1385,19 @@ old authentication identity → SUPERSEDED
 new authentication identity → ACTIVE   (or SUSPENDED if not nine digits)
    ↓
 The old National ID stops authenticating at commit
+```
+
+As implemented (PWA-1D), for a Person with an ACTIVE or SUSPENDED Link:
+
+```text
+Nine digits, another key    old identity SUPERSEDED / NATIONAL_ID_CORRECTED,
+                            new ACTIVE identity; sessions kept
+Nine digits, the same key   nothing (a formatting-only correction)
+Not nine digits             identity SUSPENDED; sessions revoked; a later
+                            valid correction restores an ACTIVE identity
+Key held by another ACTIVE  the whole correction rolls back with an explicit
+identity                    failure; registry and identity never disagree
+Unchanged value             the existing early return: nothing happens
 ```
 
 ## Password reset
@@ -2921,6 +2956,9 @@ Family Portal program workflows (§53a): activation is the approved system verif
 
 ### WF-ADR-040
 Family Portal identity workflows (§53b): Link lifecycle with direct ACTIVE creation at activation; mobile trust lifecycle with assistance separate from the Staff grant; transactional activation; authentication identity superseded on National ID correction; reset ends all sessions.
+
+### WF-ADR-041
+PWA-1D implemented the Link lifecycle as Domain Actions (establish, suspend, resume, end). End is terminal, supersedes the authentication identity with `LINK_ENDED`, revokes sessions and never deactivates the account; suspension is resumable and leaves identity and account untouched. A National ID correction synchronizes the identity in its own transaction and rolls back entirely on a login-key collision; a recorded death ends the Link without changing the membership or the head flag.
 ```
 
 ---
@@ -3183,3 +3221,4 @@ Date: 2026-09-24
 | 1.2.6 | 2026-09-29 | Approved | §22: Branch Group optional — ungrouped Branches ("بدون مجموعة") selectable; Branches created without a Group and later assigned/moved/ungrouped within the same Clan |
 | 1.2.7 | 2026-10-02 | Approved | PWA-0: §53a Family Portal Program Workflows (mobile trust, activation, reset, Profile Completion and Family Verification, later-change classes, health/need submissions, card, announcements); §51 amended (WF-ADR-039); PWF-008 decided in direction. Documentation only |
 | 1.2.8 | 2026-10-02 | Approved | PWA-1B: §53b Family Portal Identity Workflows (Link, mobile trust, activation, National ID correction, reset, access loss); PWF-010 decided for V1 (WF-ADR-040). Documentation only |
+| 1.2.9 | 2026-10-02 | Approved | PWA-1D: §53b Link lifecycle, National ID correction and death effects recorded as implemented (Domain Actions only); ended identity is SUPERSEDED / LINK_ENDED; account not deactivated (WF-ADR-041) |

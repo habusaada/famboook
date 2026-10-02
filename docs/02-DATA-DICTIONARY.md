@@ -2270,11 +2270,16 @@ login_key           keyed fingerprint of the nine normalized digits (sensitive)
 key_version
 status              ACTIVE | SUSPENDED | SUPERSEDED
 superseded_at
-supersede_reason    NATIONAL_ID_CORRECTED | KEY_ROTATION
+supersede_reason    NATIONAL_ID_CORRECTED | KEY_ROTATION | LINK_ENDED
 ```
 
 It is never the raw National ID and never derived with `APP_KEY` or the
 import fingerprint context.
+
+`LINK_ENDED` (PWA-1D): when a User-Person Link ends, its identity is
+SUPERSEDED with this reason. An ended link is never represented by an
+indefinitely SUSPENDED identity; SUSPENDED is reserved for a stored National
+ID that is not nine digits, and is recoverable by a later correction.
 
 ### `person_mobile_trusts`
 
@@ -4096,6 +4101,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Data Dictionary |
 | 1.1 | 2026-09-22 | Superseded | Added User-Person Links, Family Portal data concepts, Change Requests, documents, notifications, classification, and controlled self-service |
 | 1.2 | 2026-09-22 | Approved | Synchronized `persons.death_date`, clarified canonical vs proposed data, PostgreSQL canonical storage, API representation boundaries, frontend-state boundaries, private documents, and the new Next.js/Laravel API architecture |
+| 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |
 | 1.2.24 | 2026-10-02 | Approved | PWA-0: §45a Family Portal logical concepts (login identifier, trusted mobile, OTP challenge, Profile Completion, Family Verification, coordinator scope, card credential, announcements, security events); §47 proposed request types recorded as not approved (DD-ADR-031). Documentation only |

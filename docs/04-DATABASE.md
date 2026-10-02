@@ -2333,6 +2333,7 @@ Migrations, in order:
 2026_10_13_090004_create_auth_otp_challenges_table
 2026_10_13_090005_create_auth_security_events_table
 2026_10_13_090006_create_coordinator_scope_assignments_table
+2026_10_14_090000_allow_link_ended_auth_identity_supersede_reason   (PWA-1D)
 ```
 
 - **No data migration.** No account, Link, authentication identity, mobile
@@ -3956,6 +3957,9 @@ Family Portal identity schema (§55b, approved design, no migration): `users.ema
 
 ### DB-ADR-043
 PWA-1C implemented §55b as schema, models and factories only. Refinements approved before implementation: coordinator duplicates are prevented by three scope-specific partial unique indexes (no `NULLS NOT DISTINCT`); `auth_security_events.otp_challenge_uuid` is a plain value with no foreign key; "one open OTP challenge" ignores expiry, which PWA-1E handles by superseding; CHECK constraints are PostgreSQL-only. All new foreign keys are RESTRICT. No data was backfilled.
+
+### DB-ADR-044
+PWA-1D added one migration (`2026_10_14_090000`): the PostgreSQL CHECK on `family_auth_identities.supersede_reason` now also allows `LINK_ENDED`, so an ended User-Person Link retires its identity as SUPERSEDED instead of leaving it SUSPENDED. No row changes; the rollback refuses while such an identity exists. No other schema change was needed for the resolver, the link lifecycle or the account-side rules.
 ```
 
 ### 111. Pending Database Decisions
@@ -4216,6 +4220,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial database architecture |
 | 1.1 | 2026-09-22 | Superseded | Added death_date, User-Person Links, Change Requests, documents, workflows, notifications, transactions, locking, domain actions and Family Portal architecture |
 | 1.2 | 2026-09-22 | Approved | Established PostgreSQL as canonical database, formalized Next.js → Laravel API → Domain Actions → PostgreSQL boundary, restricted Filament to shared Laravel domain operations, expanded constraints/indexes, private storage, API Resources, transaction/concurrency strategy, migration discipline, testing and infrastructure boundaries |
+| 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
 | 1.2.23 | 2026-10-02 | Approved | PWA-0: §55a Family Portal future schema concepts (logical design vs deferred physical schema; constraints) — no migration (DB-ADR-041). Documentation only |

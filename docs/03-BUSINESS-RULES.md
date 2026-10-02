@@ -2302,8 +2302,11 @@ are auditable. OTP plaintext, passwords and secrets are never logged.
 Approved 2026-10-02. Architecture: `11-FAMILY-PORTAL.md` §30a. PWA-1C
 implemented the foundation only (schema, the strict normalizers, the keyed
 fingerprint service, the COORDINATOR role and the PWA-1 permission names).
-No rule below is enforced by application behaviour yet: activation, login,
-OTP, mobile trust workflows and the eligibility resolver are PWA-1D–1H.
+PWA-1D implemented the eligibility resolver, the User-Person Link
+lifecycle, the National ID correction and death effects below, and the
+account-side rules (including the Staff API boundary). Still not built:
+activation, login, password reset, OTP and the mobile trust workflow
+(PWA-1E–1G) and coordinator scope (PWA-1H).
 
 ## Eligibility
 
@@ -2341,6 +2344,16 @@ assigned (Head Succession, docs/11 FU-01 — a rollout gate).
 - FAMILY_USER and COORDINATOR coexist on the same family-side account.
 - A family-side account has no email; no synthetic email is created.
 - One active or suspended User-Person Link per User and per Person.
+- Account state, link state and authentication-identity state are separate
+  (PWA-1D). Ending a link supersedes its authentication identity and
+  revokes the sessions; it does **not** deactivate the account. Deactivation
+  is its own explicit operation. An ended link is terminal; a suspended one
+  is resumable.
+- A recorded death ends the deceased Person's link in the same transaction.
+  The membership and the household-head flag are not changed (Head
+  Succession, docs/11 FU-01).
+- The Staff API refuses every account holding a family-side role, whatever
+  permission it holds (docs/06 §22b).
 
 ## Coordinator
 
@@ -4585,6 +4598,7 @@ Date: 2026-09-24
 | 1.0 | 2026-09-22 | Superseded | Initial Business Rules |
 | 1.1 | 2026-09-22 | Superseded | Added Family Portal, User-Person Links, Change Requests, death-date rules, controlled self-service, workflow/application rules and security invariants |
 | 1.2 | 2026-09-22 | Approved | Established Laravel as authoritative domain layer, PostgreSQL as canonical persistence, shared Domain Actions across Next.js and Filament, API/data-exposure boundaries, frontend validation limits, private-file rules, Sanctum authentication boundary and additional defense-in-depth invariants |
+| 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
 | 1.2.35 | 2026-10-02 | Approved | PWA-1B: §89b Family Portal Identity and Access Rules (eligibility with ALIVE only, National ID rule and correction effect, disjoint Staff/family accounts, coordinator must be an eligible head, mobile trust, OTP and password policy, audit retention, Production gates); PBD-028 decided. Documentation only |
 | 1.2.34 | 2026-10-02 | Approved | PWA-0: §89a Family Portal Program Rules (server-resolved Family access, National ID + OTP activation, mobile trust, multi-role, Profile Completion, Family Verification, VERIFIED ≠ assistance, submissions, card/QR, announcements, audit); §59 amended — activation is the approved system verification process; PBD-028 decided in direction. Documentation only |

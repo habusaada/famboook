@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation only (§30a)
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation and the PWA-1D identity domain behaviour (§30a); no activation, login, OTP or UI
 
 ---
 
@@ -1211,9 +1211,10 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 
 # 30a. PWA-1 Identity and Access Architecture (PWA-1B — approved 2026-10-02)
 
-Approved design. **Only the PWA-1C foundation is implemented** (see
-"PWA-1C implementation record" below); every behaviour in this section is
-still to be built. Physical
+Approved design. **Implemented: the PWA-1C foundation and the PWA-1D
+identity domain behaviour** (see the two implementation records below).
+Activation, login, password reset, OTP, the mobile trust workflow and
+coordinator scope are still to be built. Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
 
@@ -1453,8 +1454,8 @@ and must be resolved before general Family Portal rollout.
 PWA-1A  Identity data discovery                          DONE
 PWA-1B  Identity and access design                       DONE
 PWA-1C  Schema / foundation                              DONE
-PWA-1D  Identity resolver + links                        NEXT
-PWA-1E  Mobile trust + OTP / SMS abstraction
+PWA-1D  Identity resolver + links                        DONE
+PWA-1E  Mobile trust + OTP / SMS abstraction             NEXT
 PWA-1F  Activation
 PWA-1G  Login / reset / session / family context
 PWA-1H  Coordinator identity / scope
@@ -1504,6 +1505,69 @@ verification, SMS, mobile trust workflows, the eligibility resolver, the
 death and National ID correction hooks, coordinator scope authorization,
 Coordinator Space and every UI. No account, Link, identity or trust row
 exists, and none was derived from registry data.
+
+## PWA-1D implementation record
+
+Implemented (domain behaviour; no endpoint and no UI):
+
+```text
+App\Support\FamilyAuth\FamilyAccessResolver   identity(User), familyContext(User),
+                                            headEligibility(Person)
+App\Support\FamilyAuth\FamilyAccessResult     read-only result; a denial or the
+                                            resolved records
+App\Enums\FamilyAccessDenial                  internal reason codes
+App\Support\FamilyAuth\FamilyAuthIdentities   create, isConsistent,
+                                            syncAfterNationalIdCorrection,
+                                            findByNationalIdInput
+App\Support\FamilyAuth\AuthSecurityLog        the only writer of auth_security_events
+App\Support\FamilyAuth\FamilySessions         session revocation
+App\Support\AccountSide                       account-side classification
+App\Http\Middleware\EnsureStaffSideAccount    the `staff.side` Staff API boundary
+Actions   EstablishFamilyIdentityAction, SuspendUserPersonLinkAction,
+          ResumeUserPersonLinkAction, EndUserPersonLinkAction
+Migration 2026_10_14_090000 (LINK_ENDED supersede reason)
+```
+
+**Resolver.** Identity validity and Family context are separate. The
+resolver takes a User (or, for `headEligibility`, a Person) and nothing
+else: the Family comes only from the linked Person's membership, so no
+client-supplied Family can establish a context. It reads afresh on every
+call — no lock, no cache, no audit event — and its denial reasons are
+internal. A missing fingerprint key denies (fail closed).
+
+**Link lifecycle.** Suspension is resumable and leaves the authentication
+identity and the account untouched. An end is terminal: the identity becomes
+SUPERSEDED with the reason `LINK_ENDED`, every session is revoked, and the
+User account is **not** deactivated — account state, link state and
+authentication-identity state are separate concepts. The Person can later
+be activated again as a new link.
+
+**National ID correction.** Synchronized inside `CorrectNationalIdAction`:
+a different valid ID rotates the identity (sessions kept); the same key
+changes nothing; a value that is not nine digits suspends the identity and
+revokes sessions; a key held by another ACTIVE identity rolls the whole
+correction back. A registry change that bypasses the action is caught by
+the resolver as a mismatch.
+
+**Death.** `RecordPersonDeathAction` ends a current link (PERSON_DECEASED).
+The membership and the household-head flag are not changed (FU-01).
+
+**Account sides and Staff boundary.** See docs/06 §22b (AUTH-ADR-065).
+
+**Events recorded.** `LINK_ACTIVATED`, `LINK_SUSPENDED`, `LINK_RESUMED`,
+`LINK_ENDED`, `LOGIN_IDENTIFIER_ROTATED`, `SESSIONS_REVOKED` — typed inputs
+only, never a raw identifier.
+
+**Sessions.** With the `database` session driver the session rows are on
+the application's connection, so a revocation inside a Domain Action's
+transaction commits or rolls back with the identity change. With another
+driver no row is deleted here; the resolver still denies on the next
+request.
+
+Not implemented by PWA-1D: activation, OTP, SMS, Family login, password
+reset, the mobile trust workflow, any Family Portal route or middleware,
+coordinator scope authorization, Coordinator Space, the key-rotation
+command, and any Staff endpoint or UI for link administration.
 
 ---
 
@@ -1694,6 +1758,18 @@ Family Portal activation is not enabled in Production before an SMS
 provider, an operational queue worker, delivery-failure handling and
 secure credential storage exist. Head Succession (FU-01) is a gate for
 general rollout and is outside PWA-1.
+
+FP-ADR-036
+Account state, link state and authentication-identity state are separate.
+An ended User-Person Link is terminal, supersedes its identity with
+LINK_ENDED and revokes sessions; it never deactivates the account.
+Suspension is resumable and changes neither the identity nor the account.
+
+FP-ADR-037
+The Staff API refuses every account holding a family-side role through one
+boundary middleware on its route group, independently of permissions and of
+role order. Link administration exists as Domain Actions only until there
+is an operational need for an endpoint or UI.
 ```
 
 ---
@@ -1836,3 +1912,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.0 | 2026-10-02 | Approved | PWA-0: Family Portal program specification — product definition, modules, identity and authentication architecture, mobile trust, multi-role and COORDINATOR, Profile Completion, Family Verification, requests, health and need submissions, card / QR / PDF, notifications and announcements, information architecture, visual direction, PWA direction, security baseline, auditability, logical schema concepts, phases, amendment register and open decisions. Review follow-up (same day): coordinator sign-in decided (FP-ADR-021), Family Portal palette decided (FP-ADR-022), PWA location decided (FP-ADR-023), National ID kept as the PWA-1 blocker (FP-ADR-024), proposals kept pending (PFP-022), §33a follow-ups. Documentation only |
 | 1.1 | 2026-10-02 | Approved | PWA-1A findings and PWA-1B design: §30a identity and access architecture (verified Production aggregates, National ID decision, strict normalizer, `family_auth_identities`, User-Person Link, eligibility with ALIVE only, mobile trust, activation, OTP and password policy, nullable `users.email`, disjoint Staff/family accounts, coordinator must be an eligible head, multiple scopes, security audit, retention, Production gates, slices PWA-1C … PWA-1I); FP-ADR-025 … 035; PFP-002/003/004/005/016/020/021 decided, PFP-001/022 partly; FU-01 made a rollout gate. Documentation only |
 | 1.2 | 2026-10-02 | Approved | PWA-1C implementation record in §30a: config, strict normalizers, keyed fingerprint service, seven migrations, six models with enums and factories, COORDINATOR role and ten permissions; the four pre-implementation refinements; staged activation of the coordinator assist permission; PWA-1C done, PWA-1D next. Foundation only |
+| 1.3 | 2026-10-02 | Approved | PWA-1D implementation record in §30a: access resolver, authentication identity service, link lifecycle actions, National ID correction and death integration, security event recorder, session revocation, account sides and the Staff API boundary; `LINK_ENDED`; FP-ADR-036 and FP-ADR-037; PWA-1D done, PWA-1E next. No activation, login, OTP or UI |

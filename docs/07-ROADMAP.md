@@ -2031,8 +2031,8 @@ PWA-0    Baseline documentation                          DONE
 PWA-1A   Identity data discovery (Production, read-only) DONE
 PWA-1B   Identity and access design + documentation      DONE
 PWA-1C   Schema / foundation                             DONE
-PWA-1D   Identity resolver + links                       NEXT
-PWA-1E   Mobile trust + OTP / SMS abstraction
+PWA-1D   Identity resolver + links                       DONE
+PWA-1E   Mobile trust + OTP / SMS abstraction            NEXT
 PWA-1F   Activation
 PWA-1G   Login / reset / session / family context
 PWA-1H   Coordinator identity / scope
@@ -2046,7 +2046,7 @@ PWA-1E … PWA-1G. No separate PWA-2 phase remains; PWA-3 follows PWA-1I.
 | Slice | Content | Exit |
 |---|---|---|
 | PWA-1C | **DONE.** Migrations for docs/04 §55b; models, enums and factories; strict normalizers; keyed fingerprint service and `config/family_auth.php`; COORDINATOR role and the ten PWA-1 permissions seeded (coordinator assist deferred) | Schema and unit tests; Staff suite unchanged |
-| PWA-1D | Link lifecycle; authentication identity service; eligibility resolver; death and National ID correction hooks; role checks without order dependence | Resolver matrix; Staff regression |
+| PWA-1D | **DONE.** Security event recorder and session revocation; authentication identity service; eligibility resolver; Link lifecycle actions (no endpoint, no UI); death and National ID correction hooks; `AccountSide`, role checks without order dependence and the `staff.side` Staff API boundary; one migration (`LINK_ENDED`) | Resolver matrix; Staff regression |
 | PWA-1E | Mobile trust actions and Staff endpoints; person-update hook; OTP challenge service; `SmsSender` with a log-only driver | Trust and OTP matrices; no real SMS possible |
 | PWA-1F | Activation endpoints and transactional completion | Activation matrix; anti-enumeration |
 | PWA-1G | Login, logout, reset, `/family/me`, family context middleware, session revocation | Login and reset matrices; cross-family IDOR tests |
@@ -4887,6 +4887,7 @@ Date: 2026-09-24
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial implementation roadmap |
 | 1.1 | 2026-09-22 | Superseded | Expanded Family Portal, Change Request, security, deployment, pilot and operational phases |
+| 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |
 | 1.2.25 | 2026-10-02 | Approved | PWA-0: §31a Family PWA Program (PWA-0 … PWA-10) mapped onto Phases 16–19, with scope, schema impact, dependencies and exit criteria (RM-ADR-041). Documentation only; no phase started |
