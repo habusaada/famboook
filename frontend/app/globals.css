@@ -230,3 +230,55 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Family Portal (docs/11 §24): Kingfisher purple, scoped to the /family
+   layout wrapper. It only re-points the tokens above, so the same shadcn
+   primitives render purple inside the portal and the Staff teal is
+   untouched. Spring green is semantic (verified / success) only. */
+[data-portal="family"] {
+    --brand-900: #42047E;
+    --brand-800: #53188B;
+    --brand-700: #751BD5;
+    --brand-600: #892CF1;
+    --brand-500: #9F4FFD;
+    --brand-100: #F2E7FF;
+    --brand-50: #F9F5FF;
+    --family-primary-hover: #651CAD;
+
+    --canvas: #F7F7FA;
+    --surface-1: #FFFFFF;
+    --surface-2: #FAFAFC;
+    --surface-3: #FFFFFF;
+    --surface-hover: #F4F4F7;
+    --surface-pressed: #ECECF0;
+    --surface-selected: var(--brand-50);
+    --stroke-subtle: #F0F0F2;
+    --elevation-1: 0 1px 2px rgb(24 24 27 / 0.04);
+    --elevation-2: 0 1px 3px rgb(24 24 27 / 0.06);
+
+    --background: #FFFFFF;
+    --foreground: #18181B;
+    --card: #FFFFFF;
+    --card-foreground: #18181B;
+    --primary: var(--brand-700);
+    --primary-foreground: #FFFFFF;
+    --secondary: #F4F4F5;
+    --secondary-foreground: #18181B;
+    --muted: #F4F4F5;
+    --muted-foreground: #52525B;
+    --subtle-foreground: #71717A;
+    --accent: var(--brand-50);
+    --accent-foreground: var(--brand-900);
+    --border: #E4E4E7;
+    --input: #D4D4D8;
+    --ring: var(--brand-600);
+    --radius: 0.75rem;
+
+    /* Spring: #07F49E / #00BB76 for marks; the darker step for text. */
+    --success: #09724D;
+    --success-soft: #EEFFF8;
+    --family-spring: #00BB76;
+    --family-spring-bright: #07F49E;
+
+    color: var(--foreground);
+}

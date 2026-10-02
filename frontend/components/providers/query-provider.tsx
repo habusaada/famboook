@@ -4,14 +4,17 @@ import { useState } from "react";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
 import { ME_QUERY_KEY } from "@/lib/api/auth";
+import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [client] = useState(() => {
     // Any 401 (session expired, logged out elsewhere, account deactivated)
-    // ends the session in the UI: AuthGate then redirects to /login.
+    // ends the session in the UI: the Staff AuthGate redirects to /login,
+    // the FamilyGate to the Family Portal entry.
     const onError = (error: unknown) => {
       if (error instanceof ApiError && error.status === 401) {
         queryClient.setQueryData(ME_QUERY_KEY, null);
+        queryClient.setQueryData(FAMILY_ME_QUERY_KEY, null);
       }
     };
     const queryClient: QueryClient = new QueryClient({
