@@ -261,6 +261,41 @@ class FamilyActivationCompleteTest extends TestCase
         $this->assertSame(8, (require base_path('config/family_auth.php'))['password_min_length']);
     }
 
+    public function test_a_password_beyond_the_bcrypt_input_limit_is_refused_not_truncated(): void
+    {
+        $reference = $this->verified();
+        // 72 bytes is the last safe length: 72 ASCII letters, or 36 Arabic ones.
+        $arabic36 = str_repeat('ك', 36);
+        $this->assertSame(72, strlen($arabic36));
+
+        foreach ([str_repeat('a', 73), $arabic36.'a', str_repeat('ك', 37), str_repeat('a', 255)] as $tooLong) {
+            $this->complete($reference, ['password' => $tooLong, 'password_confirmation' => $tooLong])
+                ->assertStatus(422)
+                ->assertJsonPath('errors.password.0', 'كلمة المرور طويلة جدًا. يرجى استخدام كلمة مرور أقصر.');
+        }
+        $this->assertNothingWasCreated($reference);
+
+        $this->complete($reference, ['password' => $arabic36, 'password_confirmation' => $arabic36])->assertCreated();
+        $stored = User::whereNull('email')->sole()->password;
+        // Every character counts: dropping or changing the last one fails.
+        $this->assertTrue(Hash::check($arabic36, $stored));
+        $this->assertFalse(Hash::check(str_repeat('ك', 35), $stored));
+        $this->assertFalse(Hash::check(str_repeat('ك', 35).'ل', $stored));
+    }
+
+    public function test_seventy_two_ascii_characters_and_a_short_arabic_password_are_accepted(): void
+    {
+        $ascii72 = str_repeat('a', 71).'b';
+        $this->complete($this->verified(), ['password' => $ascii72, 'password_confirmation' => $ascii72])->assertCreated();
+        $stored = User::whereNull('email')->sole()->password;
+        $this->assertTrue(Hash::check($ascii72, $stored));
+        $this->assertFalse(Hash::check(str_repeat('a', 72), $stored));
+
+        // The minimum is eight CHARACTERS, whatever their byte length.
+        $this->assertSame(8, mb_strlen('كلمةسرية'));
+        $this->assertSame(72, (require base_path('config/family_auth.php'))['password_max_bytes']);
+    }
+
     // -------------------------------------------------------------- refusals
 
     public function test_an_unverified_challenge_cannot_reach_the_password_step(): void

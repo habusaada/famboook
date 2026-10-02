@@ -47,6 +47,10 @@ return [
 
     'password_min_length' => 8,
 
+    // bcrypt ignores input past 72 bytes: a longer password is refused, never
+    // truncated. Bytes of UTF-8, not characters. Not a tunable.
+    'password_max_bytes' => 72,
+
     /*
     |--------------------------------------------------------------------------
     | SMS delivery (docs/11 §30a, docs/08 §16a)
