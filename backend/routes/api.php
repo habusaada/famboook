@@ -48,6 +48,8 @@ Route::prefix('family')->group(function () {
             ->middleware('throttle:family-activation-verify')->name('family.activation.verify');
         Route::post('/resend', [FamilyActivationController::class, 'resend'])
             ->middleware('throttle:family-activation-resend')->name('family.activation.resend');
+        Route::post('/complete', [FamilyActivationController::class, 'complete'])
+            ->middleware('throttle:family-activation-complete')->name('family.activation.complete');
     });
 
     // Any authenticated account may end its own session.

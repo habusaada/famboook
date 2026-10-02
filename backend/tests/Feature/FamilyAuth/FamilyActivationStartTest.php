@@ -333,6 +333,7 @@ class FamilyActivationStartTest extends TestCase
             $this->start(),
             $this->verify($reference),
             $this->resend($reference),
+            $this->postJson('/api/v1/family/auth/activation/complete', []),
         ] as $response) {
             $this->assertRefused($response, 503, 'ACTIVATION_UNAVAILABLE');
         }

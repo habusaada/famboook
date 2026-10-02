@@ -15,4 +15,6 @@ enum ActivationDenial: string
     case SESSION_REQUIRED = 'SESSION_REQUIRED';
     // The challenge reference does not lead to an activation challenge.
     case CHALLENGE_UNUSABLE = 'CHALLENGE_UNUSABLE';
+    // The link or the identity could not be established (already taken).
+    case IDENTITY_REFUSED = 'IDENTITY_REFUSED';
 }
