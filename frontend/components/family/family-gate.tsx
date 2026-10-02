@@ -41,7 +41,7 @@ export function FamilyGate({ children }: { children: React.ReactNode }) {
 
     return (
       <Centered>
-        <FamilyBrand />
+        <FamilyBrand size="lg" />
         {forbidden ? (
           <div className="flex max-w-xs flex-col items-center gap-3" data-family-forbidden>
             <Lock className="size-6 text-muted-foreground" aria-hidden />

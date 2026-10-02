@@ -39,6 +39,22 @@ describe("FamilyGate", () => {
     expect(get).toHaveBeenCalledWith("/api/v1/family/me");
   });
 
+  it("shows the official logo file, not a composed wordmark or icon", async () => {
+    vi.spyOn(apiClient, "get").mockResolvedValue({ user: familyUser() });
+
+    const { container } = renderPortal();
+
+    const logo = await screen.findByRole("img", { name: "Famboook" });
+    expect(logo).toHaveAttribute("src", "/brand/famboook-logo.svg");
+    // Intrinsic 648 × 83: only the height is styled, so the ratio is kept.
+    expect(logo).toHaveAttribute("width", "648");
+    expect(logo).toHaveAttribute("height", "83");
+    const brand = container.querySelector("[data-family-brand]");
+    expect(brand).toHaveTextContent("بوابة الأسرة");
+    expect(brand?.textContent).not.toContain("Famboook");
+    expect(brand?.querySelector("svg")).toBeNull();
+  });
+
   it("renders the shell and the home for a family user", async () => {
     vi.spyOn(apiClient, "get").mockResolvedValue({ user: familyUser() });
 

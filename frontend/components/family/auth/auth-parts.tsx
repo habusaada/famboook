@@ -37,7 +37,7 @@ export function FamilyAuthCard({
   return (
     <main className="flex min-h-svh flex-col items-center px-4 py-8 sm:justify-center sm:py-12" data-auth-step={step}>
       <div className="flex w-full max-w-[400px] flex-col">
-        <FamilyBrand size="lg" className="mb-7 justify-center" />
+        <FamilyBrand size="lg" className="mb-5" />
 
         <div className="rounded-2xl border border-border bg-surface-1 p-5 sm:p-7">
           {progress && (
