@@ -35,6 +35,18 @@ class UserFactory extends Factory
     }
 
     /**
+     * A family-side account (docs/11 §30a): no email — never a synthetic one.
+     * Roles are assigned by the test that needs them.
+     */
+    public function familySide(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email' => null,
+            'email_verified_at' => null,
+        ]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

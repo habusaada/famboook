@@ -75,6 +75,18 @@ class Person extends Model
         return $this->hasMany(PersonHealthRecord::class);
     }
 
+    // Family Portal identity (docs/04 §55b). Relationships only.
+
+    public function userLinks(): HasMany
+    {
+        return $this->hasMany(UserPersonLink::class);
+    }
+
+    public function mobileTrusts(): HasMany
+    {
+        return $this->hasMany(PersonMobileTrust::class);
+    }
+
     public function activeMembership(): HasOne
     {
         return $this->hasOne(FamilyMembership::class)->where('is_active', true);

@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -61,5 +62,23 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return $this->is_active && $this->can('system-admin.access');
+    }
+
+    // Family Portal identity (docs/04 §55b). Relationships only: a Staff
+    // user has none of these, and none of them grants access by itself.
+
+    public function personLinks(): HasMany
+    {
+        return $this->hasMany(UserPersonLink::class);
+    }
+
+    public function familyAuthIdentities(): HasMany
+    {
+        return $this->hasMany(FamilyAuthIdentity::class);
+    }
+
+    public function coordinatorScopeAssignments(): HasMany
+    {
+        return $this->hasMany(CoordinatorScopeAssignment::class);
     }
 }
