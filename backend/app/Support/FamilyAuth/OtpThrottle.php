@@ -57,6 +57,39 @@ final class OtpThrottle
     }
 
     /**
+     * READ-ONLY: whether a send asked for from $ip would now be refused by a
+     * ceiling that does not depend on whose phone it is — the IP's or the
+     * global one. Nothing is counted.
+     *
+     * Decoy resends use it (FamilyOtpFlow): a real resend is refused once one
+     * of these is reached, so a decoy must be too, or the refusal would tell
+     * a real challenge from a decoy. The Person ceilings are mirrored per
+     * identifier by FamilyOtpFlow itself; the destination ceilings CANNOT be
+     * mirrored — a decoy has no destination, and inventing one would be
+     * worse. Fails closed like attempt().
+     */
+    public function sharedCeilingReached(?string $ip): bool
+    {
+        try {
+            $limits = [[self::key('global', 'all', 'hour'), self::max('global.hour')]];
+            if ($ip !== null && $ip !== '') {
+                $limits[] = [self::key('ip', hash('sha256', $ip), 'hour'), self::max('ip.hour')];
+            }
+            foreach ($limits as [$key, $max]) {
+                if ($max < 1 || RateLimiter::tooManyAttempts($key, $max)) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (Throwable) {
+            Log::error('OTP throttle unavailable: no SMS was sent.');
+
+            return true;
+        }
+    }
+
+    /**
      * Every ceiling that applies, as [key, max, window seconds].
      *
      * @return list<array{0: string, 1: int, 2: int}>

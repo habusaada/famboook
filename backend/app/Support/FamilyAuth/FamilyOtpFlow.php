@@ -43,6 +43,7 @@ final class FamilyOtpFlow
         private readonly FamilyAuthIdentities $identities,
         private readonly OtpChallenges $otp,
         private readonly ChallengeDecoys $decoys,
+        private readonly OtpThrottle $throttle,
     ) {}
 
     /**
@@ -111,7 +112,12 @@ final class FamilyOtpFlow
     {
         $decoy = $this->decoys->state($purpose, $reference);
         if ($decoy !== null) {
-            $failure = $this->decoys->resend($purpose, $reference, $this->sendsExhausted($decoy['login_key']));
+            // The ceilings a real resend would meet: this identifier's sends
+            // (the Person ceilings) and the IP and global SMS ceilings —
+            // read, never counted. Destination ceilings cannot be mirrored.
+            $throttled = $this->sendsExhausted($decoy['login_key'])
+                || $this->throttle->sharedCeilingReached(app()->bound('request') ? request()->ip() : null);
+            $failure = $this->decoys->resend($purpose, $reference, $throttled);
             if ($failure !== null) {
                 throw $this->refused($failure, false, $this->decoys->cooldownRemaining($purpose, $reference));
             }
