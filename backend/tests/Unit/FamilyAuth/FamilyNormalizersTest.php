@@ -37,6 +37,48 @@ class FamilyNormalizersTest extends TestCase
         }
     }
 
+    public function test_each_approved_invisible_formatting_character_is_removed(): void
+    {
+        $approved = [
+            0x200B, 0x200C, 0x200D,                 // ZWSP, ZWNJ, ZWJ
+            0x202A, 0x202B, 0x202C, 0x202D, 0x202E, // LRE, RLE, PDF, LRO, RLO
+            0x2066, 0x2067, 0x2068, 0x2069,         // LRI, RLI, FSI, PDI
+            0xFEFF,                                 // BOM / ZWNBSP
+        ];
+        foreach ($approved as $codepoint) {
+            $char = mb_chr($codepoint, 'UTF-8');
+            foreach (["{$char}123456789", "1234{$char}56789", "123456789{$char}"] as $input) {
+                $this->assertSame('123456789', FamilyNationalId::normalize($input), sprintf('U+%04X', $codepoint));
+            }
+        }
+        // A pasted, RTL-isolated and joined number with Arabic-Indic digits.
+        $this->assertSame('123456789', FamilyNationalId::normalize("\u{FEFF}\u{2067}١٢٣\u{200D}٤٥٦\u{200B}٧٨٩\u{2069}"));
+    }
+
+    public function test_characters_outside_the_approved_ranges_are_still_rejected(): void
+    {
+        // Neighbours of the approved ranges and other invisible format
+        // characters: not approved as harmless, so never stripped.
+        $rejected = [
+            0x2060, // WORD JOINER
+            0x2065, // unassigned
+            0x206A, // INHIBIT SYMMETRIC SWAPPING
+            0x00AD, // SOFT HYPHEN
+            0x180E, // MONGOLIAN VOWEL SEPARATOR
+            0x201F, // a quotation mark
+            0xFEFE, // an Arabic presentation form
+        ];
+        foreach ($rejected as $codepoint) {
+            $this->assertNull(
+                FamilyNationalId::normalize('1234'.mb_chr($codepoint, 'UTF-8').'56789'),
+                sprintf('U+%04X must not be stripped', $codepoint),
+            );
+        }
+        // Stripping never yields anything but exactly nine ASCII digits.
+        $this->assertNull(FamilyNationalId::normalize("12345678\u{200B}"));
+        $this->assertNull(FamilyNationalId::normalize("1234567890\u{FEFF}"));
+    }
+
     public function test_a_national_id_must_be_exactly_nine_digits(): void
     {
         foreach (['', ' ', '12345678', '1234567890', '00000000', '12345678901234567890'] as $input) {
