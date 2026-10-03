@@ -50,6 +50,15 @@ class PostgresConcurrencyTest extends TestCase
 {
     use DatabaseTruncation, FamilyIdentityFixtures;
 
+    /**
+     * Rows a MIGRATION created are reference data, not test data: the
+     * canonical AL_BREEM Clan (FamilyFactory's default clan) must survive
+     * truncation, as it survives every RefreshDatabase test.
+     *
+     * @var list<string>
+     */
+    protected $exceptTables = ['clans'];
+
     private const ACTIVATION = '/api/v1/family/auth/activation';
 
     private const RESET = '/api/v1/family/auth/password/reset';
@@ -86,6 +95,10 @@ class PostgresConcurrencyTest extends TestCase
     {
         if (isset($this->app)) {
             DB::connection('other_runner')->disconnect();
+            // DatabaseTruncation empties the tables BEFORE each test only:
+            // this test's committed rows must not reach the next test class,
+            // whose RefreshDatabase transaction would see them.
+            $this->truncateTablesForAllConnections();
         }
         parent::tearDown();
     }

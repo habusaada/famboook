@@ -241,7 +241,10 @@ class IdentitySchemaTest extends TestCase
         $event = AuthSecurityEvent::factory()->create(['metadata' => ['attempts' => 3, 'purpose' => 'ACTIVATION']]);
 
         $this->assertSame(AuthSecurityEventType::LOGIN_FAILED, $event->fresh()->event_type);
-        $this->assertSame(['attempts' => 3, 'purpose' => 'ACTIVATION'], $event->fresh()->metadata);
+        // jsonb (PostgreSQL) does not keep key order: compare the pairs.
+        $metadata = $event->fresh()->metadata;
+        ksort($metadata);
+        $this->assertSame(['attempts' => 3, 'purpose' => 'ACTIVATION'], $metadata);
         $this->assertNotNull($event->fresh()->created_at);
 
         try {

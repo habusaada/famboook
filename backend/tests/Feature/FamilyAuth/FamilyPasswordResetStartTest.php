@@ -206,7 +206,7 @@ class FamilyPasswordResetStartTest extends TestCase
             'family-deleted' => $family->delete(),
             'no-mobile' => $person->forceFill(['mobile' => null])->saveQuietly(),
             'stale' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'STALE', 'stale_at' => now()]),
-            'revoked' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'REVOKED', 'revoked_at' => now(), 'revoke_reason' => 'ADMINISTRATIVE']),
+            'revoked' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'REVOKED', 'revoked_by' => User::factory()->create()->id, 'revoked_at' => now(), 'revoke_reason' => 'ADMINISTRATIVE']),
             'throttled' => config(['family_auth.throttle.person.hour' => 0]),
         };
 

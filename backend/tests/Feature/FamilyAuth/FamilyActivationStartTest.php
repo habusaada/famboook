@@ -236,7 +236,7 @@ class FamilyActivationStartTest extends TestCase
             'no-mobile' => $person->forceFill(['mobile' => null])->save(),
             'untrusted' => $person->forceFill(['mobile' => self::MOBILE])->save(),
             'stale' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'STALE', 'stale_at' => now()]),
-            'revoked' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'REVOKED', 'revoked_at' => now(), 'revoke_reason' => 'ADMINISTRATIVE']),
+            'revoked' => PersonMobileTrust::where('person_id', $person->id)->update(['status' => 'REVOKED', 'revoked_by' => User::factory()->create()->id, 'revoked_at' => now(), 'revoke_reason' => 'ADMINISTRATIVE']),
             'duplicate' => Person::factory()->create(['national_id' => self::ELIGIBLE_ID]),
             'throttled' => config(['family_auth.throttle.person.hour' => 0]),
         };
