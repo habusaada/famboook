@@ -23,7 +23,9 @@ class GrantMobileTrustRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'verification_method' => ['required', 'string', Rule::enum(MobileVerificationMethod::class)],
+            // SELF_OTP is established only by a successful activation OTP,
+            // never by a Staff grant.
+            'verification_method' => ['required', 'string', Rule::enum(MobileVerificationMethod::class)->only(MobileVerificationMethod::staffMethods())],
             // A number in the request is refused, not ignored.
             'mobile' => ['prohibited'],
         ];

@@ -5,10 +5,13 @@ namespace App\Support\FamilyAuth;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
 use App\Enums\FingerprintContext;
+use App\Enums\MobileTrustDenial;
+use App\Enums\MobileTrustStatus;
 use App\Enums\OtpFailure;
 use App\Enums\OtpPurpose;
 use App\Models\AuthOtpChallenge;
 use App\Models\Person;
+use App\Models\PersonMobileTrust;
 use App\Models\User;
 use App\Support\Sms\SmsDeliveryException;
 use App\Support\Sms\SmsDispatcher;
@@ -28,7 +31,11 @@ use LogicException;
  * the Person no longer has, another Person, or another purpose.
  *
  *   issue    trusted mobile → throttle → supersede the open challenge →
- *            new challenge (first send) → SMS after commit
+ *            new challenge (first send) → SMS after commit. First
+ *            self-activation only ($selfVerification, FP-ADR-053): without
+ *            a trusted mobile, the Person's CURRENT registered mobile, bound
+ *            through a PENDING_VERIFICATION row — which a correct code (and
+ *            nothing else) turns into a TRUSTED, SELF_OTP mobile at verify
  *   resend   same row: NEW code, the old one dead at once, the 5-minute
  *            expiry restarts, attempts are NOT reset; 60 s cooldown, at most
  *            3 sends; an expired challenge is never resurrected
@@ -54,27 +61,52 @@ final class OtpChallenges
         private readonly SmsDispatcher $sms,
     ) {}
 
-    public function issue(OtpPurpose $purpose, Person $person, ?User $user = null): OtpResult
+    public function issue(OtpPurpose $purpose, Person $person, ?User $user = null, bool $selfVerification = false): OtpResult
     {
         $this->assertOwnTransaction();
         if ($purpose === OtpPurpose::PASSWORD_RESET && $user === null) {
             throw new InvalidArgumentException('A password reset challenge belongs to an existing account.');
         }
+        if ($selfVerification && $purpose !== OtpPurpose::ACTIVATION) {
+            // A password reset always needs an already TRUSTED mobile.
+            throw new InvalidArgumentException('Only first activation may verify the registered mobile itself.');
+        }
 
         $trusted = $this->trustedMobile->for($person);
+        $selfMobile = null;
         if (! $trusted->isTrusted()) {
-            return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT);
+            // A number whose trust Staff REVOKED is never self-verified back.
+            $selfMobile = $selfVerification && $trusted->denial !== MobileTrustDenial::REVOKED
+                ? FamilyMobile::normalize($person->mobile)
+                : null;
+            if ($selfMobile === null) {
+                return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT);
+            }
         }
-        if (! $this->throttle->attempt($person, $trusted->trust->mobile_fingerprint, $this->ip())) {
+        $fingerprint = $selfMobile === null
+            ? $trusted->trust->mobile_fingerprint
+            : KeyedFingerprint::of(FingerprintContext::MOBILE, $selfMobile);
+        if (! $this->throttle->attempt($person, $fingerprint, $this->ip())) {
             return OtpResult::failed(OtpFailure::THROTTLED);
         }
 
         $code = $this->newCode();
-        [$challenge, $destination] = DB::transaction(function () use ($purpose, $person, $user, $trusted, $code) {
+        [$challenge, $destination] = DB::transaction(function () use ($purpose, $person, $user, $trusted, $selfMobile, $code) {
             // One issue per Person at a time; the trust is re-read under the lock.
             $locked = Person::withTrashed()->whereKey($person->getKey())->lockForUpdate()->first();
             $current = $locked ? $this->trustedMobile->for($locked) : null;
-            if ($current === null || ! $current->isTrusted() || ! $current->trust->is($trusted->trust)) {
+            if ($current !== null && $selfMobile !== null) {
+                // Self-verification: the same current number, bound through
+                // its PENDING_VERIFICATION row — unless it became trusted.
+                if (! $current->isTrusted()) {
+                    $current = FamilyMobile::normalize($locked->mobile) === $selfMobile
+                        ? TrustedMobileResult::pendingVerification(MobileTrusts::pendingFor($locked, $selfMobile), $selfMobile)
+                        : null;
+                }
+            } elseif ($current === null || ! $current->isTrusted() || ! $current->trust->is($trusted->trust)) {
+                return [null, null];
+            }
+            if ($current === null) {
                 return [null, null];
             }
 
@@ -159,6 +191,10 @@ final class OtpChallenges
         $this->assertOwnTransaction();
 
         return DB::transaction(function () use ($challengeUuid, $purpose, $code, $person) {
+            // Person, then challenge — the order issue and the completions
+            // use — because a correct code may write the Person's trust.
+            $personId = Str::isUuid($challengeUuid) ? AuthOtpChallenge::query()->where('uuid', $challengeUuid)->value('person_id') : null;
+            $lockedPerson = $personId === null ? null : Person::withTrashed()->whereKey($personId)->lockForUpdate()->first();
             $challenge = $this->locked($challengeUuid);
             if ($failure = $this->unusable($challenge, $purpose, $person)) {
                 return OtpResult::failed($failure, $challenge);
@@ -170,7 +206,8 @@ final class OtpChallenges
             if ($this->expired($challenge)) {
                 return OtpResult::failed(OtpFailure::EXPIRED, $challenge);
             }
-            if ($this->currentTrust($challenge) === null) {
+            $current = $this->currentTrust($challenge);
+            if ($current === null) {
                 return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT, $challenge);
             }
 
@@ -188,6 +225,16 @@ final class OtpChallenges
                 }
 
                 return OtpResult::failed(OtpFailure::CODE_MISMATCH, $challenge);
+            }
+
+            // First self-activation: the correct code — and only it — makes
+            // the pending number the Person's TRUSTED, SELF_OTP mobile.
+            if ($current->pendingVerification) {
+                $trust = $lockedPerson === null ? null : MobileTrusts::confirmSelfVerified($lockedPerson, $current->trust, $current->destination);
+                if ($trust === null) {
+                    return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT, $challenge);
+                }
+                $challenge->forceFill(['mobile_trust_id' => $trust->getKey()]);
             }
 
             // Verified, not consumed: the later workflow has the grant window.
@@ -305,15 +352,34 @@ final class OtpChallenges
         return now()->greaterThanOrEqualTo($challenge->expires_at);
     }
 
-    /** The Person's current trusted mobile, only if it is this challenge's trust. */
+    /**
+     * The Person's current trusted mobile, only if it is this challenge's
+     * trust — or, for a first-activation challenge, its PENDING_VERIFICATION
+     * row while that row is still pending and still the Person's CURRENT
+     * number (a changed number makes the code worthless).
+     */
     private function currentTrust(AuthOtpChallenge $challenge): ?TrustedMobileResult
     {
         $person = Person::withTrashed()->find($challenge->person_id);
         $trusted = $person ? $this->trustedMobile->for($person) : null;
+        if ($trusted !== null && $trusted->isTrusted() && $trusted->trust->getKey() === $challenge->mobile_trust_id) {
+            return $trusted;
+        }
+        if ($person === null || $challenge->purpose !== OtpPurpose::ACTIVATION) {
+            return null;
+        }
 
-        return $trusted !== null && $trusted->isTrusted() && $trusted->trust->getKey() === $challenge->mobile_trust_id
-            ? $trusted
-            : null;
+        $pending = PersonMobileTrust::query()->whereKey($challenge->mobile_trust_id)->first();
+        $mobile = FamilyMobile::normalize($person->mobile);
+        try {
+            $current = $pending !== null && $mobile !== null
+                && $pending->status === MobileTrustStatus::PENDING_VERIFICATION
+                && KeyedFingerprint::matches(FingerprintContext::MOBILE, $mobile, $pending->mobile_fingerprint, $pending->key_version);
+        } catch (LogicException) {
+            return null;
+        }
+
+        return $current ? TrustedMobileResult::pendingVerification($pending, $mobile) : null;
     }
 
     private function newCode(): string

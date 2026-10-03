@@ -19,6 +19,7 @@ final readonly class TrustedMobileResult
         public ?MobileTrustDenial $denial,
         public ?PersonMobileTrust $trust = null,
         #[\SensitiveParameter] public ?string $destination = null,
+        public bool $pendingVerification = false,
     ) {}
 
     /** @internal CurrentTrustedMobile only. */
@@ -28,6 +29,16 @@ final readonly class TrustedMobileResult
     }
 
     /** @internal CurrentTrustedMobile only. */
+    /**
+     * First self-activation (FP-ADR-053): the PENDING_VERIFICATION row an
+     * activation OTP is bound to — a usable OTP destination, NOT a trust
+     * (isTrusted() is false).
+     */
+    public static function pendingVerification(PersonMobileTrust $trust, #[\SensitiveParameter] string $destination): self
+    {
+        return new self(null, $trust, $destination, true);
+    }
+
     public static function denied(MobileTrustDenial $denial): self
     {
         return new self($denial);
@@ -35,7 +46,7 @@ final readonly class TrustedMobileResult
 
     public function isTrusted(): bool
     {
-        return $this->denial === null;
+        return $this->denial === null && ! $this->pendingVerification;
     }
 
     /**
@@ -45,7 +56,7 @@ final readonly class TrustedMobileResult
     public function state(): string
     {
         return match ($this->denial) {
-            null => 'TRUSTED',
+            null => $this->pendingVerification ? 'PENDING_VERIFICATION' : 'TRUSTED',
             MobileTrustDenial::NO_VALID_MOBILE => 'NO_MOBILE',
             MobileTrustDenial::FINGERPRINT_UNAVAILABLE => 'UNAVAILABLE',
             default => $this->denial->value,

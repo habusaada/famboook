@@ -40,6 +40,10 @@ class GrantPersonMobileTrustAction
     public function handle(User $actor, Person $person, MobileVerificationMethod $method): PersonMobileTrust
     {
         MobileTrusts::authorize($actor, 'person-mobile-trust.grant');
+        if (! in_array($method, MobileVerificationMethod::staffMethods(), true)) {
+            // SELF_OTP belongs to the activation OTP (MobileTrusts::confirmSelfVerified).
+            throw new \InvalidArgumentException('A Staff grant cannot use a self-verification method.');
+        }
 
         return DB::transaction(function () use ($actor, $person, $method) {
             /** @var Person|null $person */

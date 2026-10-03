@@ -14,4 +14,7 @@ enum FingerprintContext: string
     case MOBILE = 'famboook.family-auth.mobile.v1:';
     // An OTP code bound to its challenge (auth_otp_challenges.code_hash).
     case OTP_CODE = 'famboook.family-auth.otp.v1:';
+    // The stable fake masked mobile of a decoy activation confirmation
+    // (derived from the LOGIN_ID fingerprint; never stored).
+    case DECOY_MASK = 'famboook.family-auth.decoy-mask.v1:';
 }
