@@ -774,6 +774,30 @@ class OtpChallengesTest extends TestCase
         $this->assertEquals(now()->addSeconds(30), $next->fresh()->grant_expires_at);
     }
 
+    public function test_the_otp_message_is_the_approved_text_in_one_ucs2_part(): void
+    {
+        $this->assertTrue($this->issue()->succeeded());
+        $code = $this->sms->lastCode();
+        $body = $this->sms->last()->body;
+
+        $this->assertMatchesRegularExpression('/\A[0-9]{6}\z/', $code, 'ASCII digits only.');
+        $this->assertSame("رمز التحقق في Famboook: {$code}\nصالح 5 دقائق. لا تشاركه مع أحد.", $body);
+        // One UCS-2 SMS part holds 70 UTF-16 units; every character is in the BMP.
+        $this->assertLessThanOrEqual(70, mb_strlen($body, 'UTF-8'));
+        $this->assertSame(mb_strlen($body, 'UTF-8') * 2, strlen(mb_convert_encoding($body, 'UTF-16BE', 'UTF-8')));
+        // Nothing beyond the code: no name, National ID, family code or mobile.
+        $this->assertSame(0, preg_match('/[0-9]{7,}/', $body), 'No National ID or mobile number.');
+    }
+
+    public function test_the_otp_message_states_the_configured_validity(): void
+    {
+        config(['family_auth.otp.ttl_seconds' => 600]);
+
+        $this->assertTrue($this->issue()->succeeded());
+
+        $this->assertStringContainsString('صالح 10 دقائق.', $this->sms->last()->body);
+    }
+
     public function test_the_service_has_no_method_that_returns_a_code(): void
     {
         foreach ((new ReflectionClass(OtpChallenges::class))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {

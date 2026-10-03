@@ -334,7 +334,8 @@ final class OtpChallenges
     {
         $minutes = (int) ceil($this->setting('ttl_seconds') / 60);
 
-        return "رمز التحقق لبوابة الأسرة: {$code}. صالح لمدة {$minutes} دقائق. لا تشاركه مع أحد.";
+        // One UCS-2 SMS part (≤ 70 units): ASCII digits, nothing else.
+        return "رمز التحقق في Famboook: {$code}\nصالح {$minutes} دقائق. لا تشاركه مع أحد.";
     }
 
     /** @param  array<string, string>  $extra  safe codes only */
