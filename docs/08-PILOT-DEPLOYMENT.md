@@ -611,18 +611,31 @@ it has been verified on the server yet.
   decoy, at least 500 samples each, p50 / p95 / p99. Set the floor above
   the slowest p99 with a margin; confirm in Production with the single test
   household against unknown identifiers.
-- **PostgreSQL validation** before the deploy, never against the
-  development database:
-  1. create the dedicated database once, by hand:
+- **PostgreSQL validation** before the deploy, on a PHYSICALLY SEPARATE
+  test instance — never the development PostgreSQL server or database
+  (developer workstation, Windows):
+  1. create a separate, disposable PostgreSQL cluster once (`initdb` into a
+     data directory in the user profile, with password authentication) and
+     run it with `pg_ctl` on **port 5433, listening on localhost only**. It
+     is not installed as a service and does not touch the development
+     server's configuration; start it with `pg_ctl … start` when needed and
+     stop it with `pg_ctl … stop`. Deleting its data directory removes it;
+  2. create the database in THAT instance, by hand:
      `createdb -h 127.0.0.1 -p 5433 -U postgres famboook_test`
-     (host, port and user as `phpunit.pgsql.xml` forces them; the
+     (host, port, user and database as `phpunit.pgsql.xml` forces them; the
      application never creates it);
-  2. supply the password outside Git (libpq `pgpass.conf`, or a git-ignored
-     copy of `phpunit.pgsql.xml`);
-  3. run `vendor/bin/phpunit -c phpunit.pgsql.xml tests/Feature/FamilyAuth`
-     (the CHECK constraints and `PostgresConcurrencyTest`), then the whole
-     suite the same way. `TestDatabaseGuard` refuses any database whose name
-     does not end in `_test`, and the development database of `.env`.
+  3. keep the instance's password outside Git: one line for
+     `127.0.0.1:5433` in the user's libpq password file (`pgpass.conf`).
+     `phpunit.pgsql.xml` forces an empty `DB_PASSWORD`, so libpq reads that
+     file; `PGPASSWORD` is not used in that case. Never write the password
+     into the repository, `.env.example`, this document or a ticket;
+  4. run `vendor/bin/phpunit -c phpunit.pgsql.xml tests/Feature/FamilyAuth`
+     (the CHECK constraints, `PostgresConcurrencyTest` and every other
+     Family Auth test), then the whole suite the same way.
+  `TestDatabaseGuard` refuses any database whose name does not end in
+  `_test`, and the development database of `.env` — but it checks the NAME
+  only, not the server: it is a second line of defence, not a substitute
+  for the physical separation above.
 - **Retention.** `auth_otp_challenges.ip` keeps the raw client IP of the
   issuing request for at most the 90-day retention of finished challenges
   (`famboook:purge-otp-challenges`, which needs the scheduler cron).
@@ -777,6 +790,7 @@ Never do this once real data has been entered.
 | 1.1.7 | 2026-10-03 | Approved | §16a: PWA-1H — seed `coordinator-family.view-summary`, no migration or flag, coordinators managed through the Staff API by SUPER_ADMIN and ADMINISTRATOR, no assignment expiry |
 | 1.1.8 | 2026-10-03 | Approved | §16a: TweetsMS SMS delivery — `FAMILY_SMS_DRIVER=tweetsms`, `TWEETSMS_API_KEY` / `TWEETSMS_SENDER` in the server `.env` only, `05XXXXXXXX` unchanged, success only on code 999 (accepted, not handset delivery), failure classes, after-response with no queue and no retry, `famboook:sms-check` validation procedure and rollback; gate items 1, 4 and 5 resolved, scheduler cron still separate. Nothing enabled |
 | 1.1.9 | 2026-10-03 | Approved | §16a: PWA-1I — `famboook:family-auth-check` (read-only readiness; detects a wrong fingerprint key), PHP-FPM requirements (`fpm-fcgi`, `request_terminate_timeout` >= 30 s or unset, `pm.max_children` headroom), proxy / `trustProxies` rule, CGNAT risk and limited-cohort review, response floor on all four OTP steps and its measurement, `famboook_test` PostgreSQL procedure, raw challenge IP retention. No migration, nothing enabled |
+| 1.1.10 | 2026-10-03 | Approved | §16a PWA-1I: the PostgreSQL validation runs on a physically separate, disposable test cluster (`initdb`, `pg_ctl`, port 5433, localhost only, never a service, never the development server); credentials in `pgpass.conf` only; `TestDatabaseGuard` is a secondary guard (name only) |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
