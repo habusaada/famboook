@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\ImportApplyController;
 use App\Http\Controllers\Api\V1\InitialFamilyImportController;
 use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
+use App\Http\Controllers\Api\V1\PersonCoordinatorController;
 use App\Http\Controllers\Api\V1\PersonMobileTrustController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ReportController;
@@ -144,6 +145,24 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
 
     Route::post('/people/{person}/mobile-trust/revoke', [PersonMobileTrustController::class, 'revoke'])
         ->middleware('can:person-mobile-trust.revoke');
+
+    // Coordinators (docs/06 §22b, PWA-1H): Staff-side only. The Person's
+    // family-side account is found by the server; a Coordinator never
+    // reaches these routes (staff.side) and never manages another.
+    Route::get('/people/{person}/coordinator', [PersonCoordinatorController::class, 'show'])
+        ->middleware('can:coordinator-scope.view');
+
+    Route::post('/people/{person}/coordinator', [PersonCoordinatorController::class, 'grant'])
+        ->middleware('can:coordinator-scope.manage');
+
+    Route::post('/people/{person}/coordinator/revoke', [PersonCoordinatorController::class, 'revoke'])
+        ->middleware('can:coordinator-scope.manage');
+
+    Route::post('/people/{person}/coordinator/scopes', [PersonCoordinatorController::class, 'assignScope'])
+        ->middleware('can:coordinator-scope.manage');
+
+    Route::post('/coordinator-scopes/{coordinatorScope:uuid}/revoke', [PersonCoordinatorController::class, 'revokeScope'])
+        ->middleware('can:coordinator-scope.manage');
 
     // Person-based health records (docs/06 §40): health-record.* only.
     Route::get('/families/{family}/health-records', [HealthRecordController::class, 'index'])
