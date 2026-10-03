@@ -8,9 +8,13 @@ use App\Enums\AuthSecurityEventType;
 use App\Enums\FingerprintContext;
 use App\Enums\OtpFailure;
 use App\Enums\OtpPurpose;
+use App\Enums\SmsFailureOutcome;
+use App\Enums\SmsFailureReason;
 use App\Models\AuthOtpChallenge;
 use App\Models\Person;
 use App\Models\User;
+use App\Support\Sms\SmsDeliveryException;
+use App\Support\Sms\SmsDeliveryLog;
 use App\Support\Sms\SmsMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -250,15 +254,25 @@ final class OtpChallenges
 
     // ------------------------------------------------------------------ parts
 
-    /** Sends after the challenge is committed. A failed send still counted. */
+    /**
+     * Sends after the challenge is committed. A failed send is still counted
+     * and never retried here: the user's resend is the retry. The failure's
+     * class and reason are recorded (codes only) and logged safely.
+     */
     private function deliver(AuthOtpChallenge $challenge, #[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code): OtpResult
     {
+        $message = new SmsMessage($destination, $this->text($code), $challenge->purpose->value);
         try {
-            app(SmsSender::class)->send(new SmsMessage($destination, $this->text($code), $challenge->purpose->value));
-        } catch (Throwable) {
-            // No retry here, and the send is not un-counted: retries and
-            // idempotency belong to the real provider integration.
-            $this->record($challenge, AuthSecurityEventType::OTP_ISSUED, AuthSecurityEventOutcome::FAILURE, OtpFailure::DELIVERY_FAILED);
+            app(SmsSender::class)->send($message);
+        } catch (Throwable $e) {
+            $failure = $e instanceof SmsDeliveryException
+                ? $e
+                : SmsDeliveryException::classified(SmsFailureOutcome::UNKNOWN, SmsFailureReason::UNEXPECTED_ERROR);
+            SmsDeliveryLog::failed($failure, $message);
+            $this->record($challenge, AuthSecurityEventType::OTP_ISSUED, AuthSecurityEventOutcome::FAILURE, OtpFailure::DELIVERY_FAILED, [
+                'delivery_outcome' => $failure->outcome->value,
+                'delivery_reason' => $failure->reason->value,
+            ]);
 
             return OtpResult::failed(OtpFailure::DELIVERY_FAILED, $challenge);
         }
@@ -326,7 +340,8 @@ final class OtpChallenges
         return "رمز التحقق لبوابة الأسرة: {$code}. صالح لمدة {$minutes} دقائق. لا تشاركه مع أحد.";
     }
 
-    private function record(AuthOtpChallenge $challenge, AuthSecurityEventType $type, AuthSecurityEventOutcome $outcome, ?OtpFailure $reason = null): void
+    /** @param  array<string, string>  $extra  safe codes only */
+    private function record(AuthOtpChallenge $challenge, AuthSecurityEventType $type, AuthSecurityEventOutcome $outcome, ?OtpFailure $reason = null, array $extra = []): void
     {
         AuthSecurityLog::record(
             $type,
@@ -336,7 +351,7 @@ final class OtpChallenges
             user: $challenge->user,
             trust: $challenge->mobileTrust,
             otpChallengeUuid: $challenge->uuid,
-            metadata: ['purpose' => $challenge->purpose->value, 'attempts' => $challenge->attempts, 'send_count' => $challenge->send_count],
+            metadata: ['purpose' => $challenge->purpose->value, 'attempts' => $challenge->attempts, 'send_count' => $challenge->send_count, ...$extra],
         );
     }
 

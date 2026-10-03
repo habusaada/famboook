@@ -39,6 +39,9 @@ class AuthSecurityEvent extends Model
         'send_count',
         'status_from',
         'status_to',
+        // SMS delivery failure class and reason (codes only).
+        'delivery_outcome',
+        'delivery_reason',
     ];
 
     /** Largest counter a metadata value may hold (far below any identifier). */

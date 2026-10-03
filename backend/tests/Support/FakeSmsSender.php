@@ -21,11 +21,14 @@ final class FakeSmsSender implements SmsSender
 
     public bool $failing = false;
 
+    /** The failure thrown while $failing; the generic one by default. */
+    public ?SmsDeliveryException $failure = null;
+
     public function send(SmsMessage $message): void
     {
         $this->attempts++;
         if ($this->failing) {
-            throw SmsDeliveryException::failed();
+            throw $this->failure ?? SmsDeliveryException::failed();
         }
         $this->sent[] = $message;
     }
