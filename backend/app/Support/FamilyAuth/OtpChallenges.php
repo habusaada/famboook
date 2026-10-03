@@ -2,25 +2,21 @@
 
 namespace App\Support\FamilyAuth;
 
-use App\Contracts\SmsSender;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
 use App\Enums\FingerprintContext;
 use App\Enums\OtpFailure;
 use App\Enums\OtpPurpose;
-use App\Enums\SmsFailureOutcome;
-use App\Enums\SmsFailureReason;
 use App\Models\AuthOtpChallenge;
 use App\Models\Person;
 use App\Models\User;
 use App\Support\Sms\SmsDeliveryException;
-use App\Support\Sms\SmsDeliveryLog;
+use App\Support\Sms\SmsDispatcher;
 use App\Support\Sms\SmsMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
-use Throwable;
 
 /**
  * The one OTP service (docs/11 §30a, docs/05 §53b). Activation and password
@@ -55,6 +51,7 @@ final class OtpChallenges
     public function __construct(
         private readonly CurrentTrustedMobile $trustedMobile,
         private readonly OtpThrottle $throttle,
+        private readonly SmsDispatcher $sms,
     ) {}
 
     public function issue(OtpPurpose $purpose, Person $person, ?User $user = null): OtpResult
@@ -255,31 +252,31 @@ final class OtpChallenges
     // ------------------------------------------------------------------ parts
 
     /**
-     * Sends after the challenge is committed. A failed send is still counted
-     * and never retried here: the user's resend is the retry. The failure's
-     * class and reason are recorded (codes only) and logged safely.
+     * Sends after the challenge is committed — on the public routes AFTER the
+     * HTTP response (SmsDispatcher, same process, no queue). The send was
+     * already counted (send_count, throttle) and is never retried here: the
+     * user's resend is the retry. The outcome is recorded when it is known —
+     * the failure's class and reason as codes only. The plaintext code exists
+     * only in this message, in memory.
      */
     private function deliver(AuthOtpChallenge $challenge, #[\SensitiveParameter] string $destination, #[\SensitiveParameter] string $code): OtpResult
     {
         $message = new SmsMessage($destination, $this->text($code), $challenge->purpose->value);
-        try {
-            app(SmsSender::class)->send($message);
-        } catch (Throwable $e) {
-            $failure = $e instanceof SmsDeliveryException
-                ? $e
-                : SmsDeliveryException::classified(SmsFailureOutcome::UNKNOWN, SmsFailureReason::UNEXPECTED_ERROR);
-            SmsDeliveryLog::failed($failure, $message);
+
+        $failure = $this->sms->dispatch($message, function (?SmsDeliveryException $failure) use ($challenge) {
+            if ($failure === null) {
+                $this->record($challenge, AuthSecurityEventType::OTP_ISSUED, AuthSecurityEventOutcome::SUCCESS);
+
+                return;
+            }
             $this->record($challenge, AuthSecurityEventType::OTP_ISSUED, AuthSecurityEventOutcome::FAILURE, OtpFailure::DELIVERY_FAILED, [
                 'delivery_outcome' => $failure->outcome->value,
                 'delivery_reason' => $failure->reason->value,
             ]);
+        });
 
-            return OtpResult::failed(OtpFailure::DELIVERY_FAILED, $challenge);
-        }
-
-        $this->record($challenge, AuthSecurityEventType::OTP_ISSUED, AuthSecurityEventOutcome::SUCCESS);
-
-        return OtpResult::ok($challenge);
+        // Deferred: not known yet — and the public answer never depends on it.
+        return $failure === null ? OtpResult::ok($challenge) : OtpResult::failed(OtpFailure::DELIVERY_FAILED, $challenge);
     }
 
     private function locked(string $challengeUuid): ?AuthOtpChallenge

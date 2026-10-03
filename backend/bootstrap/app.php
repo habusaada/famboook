@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\SendSmsAfterResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -35,6 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'family.password-reset' => EnsurePasswordResetEnabled::class,
             // Coordinator Space (PWA-1H): after family.side, never instead of it.
             'coordinator.space' => EnsureCoordinatorSpace::class,
+            // OTP SMS after the response, same process, no queue (A′).
+            'sms.after-response' => SendSmsAfterResponse::class,
         ]);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.

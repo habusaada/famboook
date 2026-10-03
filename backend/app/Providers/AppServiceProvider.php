@@ -16,6 +16,7 @@ use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
 use App\Support\Sms\LogSmsSender;
+use App\Support\Sms\SmsDispatcher;
 use App\Support\Sms\TweetsSmsSender;
 use App\Support\Sms\UnconfiguredSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -48,6 +49,9 @@ class AppServiceProvider extends ServiceProvider
             'tweetsms' => TweetsSmsSender::fromConfig((array) config('family_auth.sms.tweetsms')),
             default => new UnconfiguredSmsSender,
         });
+        // One dispatcher per request lifecycle: it holds a deferred OTP SMS in
+        // memory until the response has been sent (docs/11 §30a, A′).
+        $this->app->scoped(SmsDispatcher::class);
     }
 
     /**

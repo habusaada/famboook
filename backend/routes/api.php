@@ -45,7 +45,7 @@ Route::prefix('family')->group(function () {
     // Activation (docs/11 §30a): public and generic. The gate runs first —
     // while it is off nothing is looked up, recorded or sent. National IDs,
     // codes and passwords travel in the body, never in a URL.
-    Route::prefix('auth/activation')->middleware('family.activation')->group(function () {
+    Route::prefix('auth/activation')->middleware(['family.activation', 'sms.after-response'])->group(function () {
         Route::post('/start', [FamilyActivationController::class, 'start'])
             ->middleware('throttle:family-activation-start')->name('family.activation.start');
         Route::post('/verify', [FamilyActivationController::class, 'verify'])
@@ -63,7 +63,7 @@ Route::prefix('family')->group(function () {
 
     // Password reset (docs/11 §30a): public and generic, behind its own gate,
     // mirroring activation. The OTP goes only to the trusted mobile.
-    Route::prefix('auth/password/reset')->middleware('family.password-reset')->group(function () {
+    Route::prefix('auth/password/reset')->middleware(['family.password-reset', 'sms.after-response'])->group(function () {
         Route::post('/start', [FamilyPasswordResetController::class, 'start'])
             ->middleware('throttle:family-password-reset-start')->name('family.password-reset.start');
         Route::post('/verify', [FamilyPasswordResetController::class, 'verify'])
