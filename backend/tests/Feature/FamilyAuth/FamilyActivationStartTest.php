@@ -419,7 +419,7 @@ class FamilyActivationStartTest extends TestCase
         $this->assertSame(250, ResponseFloor::remainingMs(0));
     }
 
-    public function test_start_and_resend_wait_out_the_floor_and_verify_does_not(): void
+    public function test_start_verify_and_resend_all_wait_out_the_floor(): void
     {
         Sleep::fake();
         config(['family_auth.activation.min_response_ms' => 60_000]);
@@ -429,18 +429,19 @@ class FamilyActivationStartTest extends TestCase
         $decoy = $this->start(self::UNKNOWN_ID)->assertOk()->json('challenge');
         Sleep::assertSleptTimes(2);
 
+        // Since PWA-1I verify waits too, real or decoy (AuthResponseFloorTest).
         $this->verify($real, $this->wrongCode());
         $this->verify($decoy);
-        Sleep::assertSleptTimes(2);
+        Sleep::assertSleptTimes(4);
 
         // A refused resend waits too.
         $this->resend($real)->assertStatus(429);
         $this->resend($decoy)->assertStatus(429);
-        Sleep::assertSleptTimes(4);
+        Sleep::assertSleptTimes(6);
 
         config(['family_auth.activation.min_response_ms' => 0]);
         $this->start('111111111')->assertOk();
-        Sleep::assertSleptTimes(4);
+        Sleep::assertSleptTimes(6);
     }
 
     // ------------------------------------------- verify / resend: real = decoy

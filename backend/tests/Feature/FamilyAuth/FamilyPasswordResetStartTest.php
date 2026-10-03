@@ -341,7 +341,7 @@ class FamilyPasswordResetStartTest extends TestCase
         $this->assertRefused($this->start('300000000'), 429, 'TOO_MANY_REQUESTS');
     }
 
-    public function test_start_and_resend_wait_out_the_floor(): void
+    public function test_start_verify_and_resend_wait_out_the_floor(): void
     {
         Sleep::fake();
         config(['family_auth.activation.min_response_ms' => 60_000]);
@@ -350,12 +350,13 @@ class FamilyPasswordResetStartTest extends TestCase
         $decoy = $this->start(self::UNKNOWN_ID)->json('challenge');
         Sleep::assertSleptTimes(2);
 
+        // Since PWA-1I verify waits too (AuthResponseFloorTest).
         $this->verify($real, $this->wrongCode());
-        Sleep::assertSleptTimes(2);
+        Sleep::assertSleptTimes(3);
 
         $this->resend($real)->assertStatus(429);
         $this->resend($decoy)->assertStatus(429);
-        Sleep::assertSleptTimes(4);
+        Sleep::assertSleptTimes(5);
     }
 
     // ------------------------------------------- verify / resend: real = decoy

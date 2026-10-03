@@ -37,7 +37,14 @@ class FamilyPasswordResetController extends Controller
 
     public function verify(FamilyChallengeRequest $request, FamilyPasswordReset $reset): JsonResponse
     {
-        return self::json($reset->verify($request->challenge(), (string) $request->code()));
+        // Real, decoy, right or wrong code, locked or expired: one floor, so
+        // the database work of a real challenge does not show (PWA-1I).
+        $startedAt = microtime(true);
+        try {
+            return self::json($reset->verify($request->challenge(), (string) $request->code()));
+        } finally {
+            ResponseFloor::hold($startedAt);
+        }
     }
 
     public function resend(FamilyChallengeRequest $request, FamilyPasswordReset $reset): JsonResponse
@@ -59,15 +66,22 @@ class FamilyPasswordResetController extends Controller
      */
     public function complete(FamilyPasswordRequest $request, ResetFamilyPasswordAction $reset): JsonResponse
     {
-        if (! $request->hasSession()) {
-            AuthSecurityLog::record(AuthSecurityEventType::PASSWORD_RESET_COMPLETED, AuthSecurityEventOutcome::DENIED, LoginDenial::SESSION_REQUIRED);
+        // Every outcome — a decoy, an unverified, consumed or expired grant,
+        // a refusal or the account itself — waits out the same floor.
+        $startedAt = microtime(true);
+        try {
+            if (! $request->hasSession()) {
+                AuthSecurityLog::record(AuthSecurityEventType::PASSWORD_RESET_COMPLETED, AuthSecurityEventOutcome::DENIED, LoginDenial::SESSION_REQUIRED);
 
-            throw new FamilyAuthException(FamilyAuthError::RESET_FAILED);
+                throw new FamilyAuthException(FamilyAuthError::RESET_FAILED);
+            }
+
+            $user = $reset->handle($request->challenge(), (string) $request->input('password'));
+
+            return FamilySessionController::signIn($request, $user);
+        } finally {
+            ResponseFloor::hold($startedAt);
         }
-
-        $user = $reset->handle($request->challenge(), (string) $request->input('password'));
-
-        return FamilySessionController::signIn($request, $user);
     }
 
     /** @param  array<string, mixed>  $body */

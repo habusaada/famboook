@@ -5,14 +5,16 @@ namespace App\Support\FamilyAuth;
 use Illuminate\Support\Sleep;
 
 /**
- * A minimum response time for the public activation steps that may send an
- * SMS (docs/11 §30a). An eligible request does a lookup, a transaction and a
- * synchronous delivery; a denied one does almost nothing — without a floor
- * the difference would tell the two apart.
+ * A minimum response time for the public OTP steps of activation and
+ * password reset (docs/11 §30a): start, verify, resend and complete. A real
+ * challenge costs lookups, a locked transaction and security events; a decoy
+ * costs a few cache operations — without a floor the difference would tell
+ * the two apart. The SMS itself is sent after the response (A′) and no
+ * longer counts; verify and complete are floored since PWA-1I.
  *
- * config family_auth.activation.min_response_ms (0 disables). The default is
- * a development value: the Production value must exceed the real SMS
- * provider's slow-case latency and is reviewed with that integration.
+ * config family_auth.activation.min_response_ms (0 disables), one value for
+ * every step. The default (400) is a development value; the Production value
+ * is set from measurements on Production-like infrastructure (docs/08 §16a).
  */
 final class ResponseFloor
 {

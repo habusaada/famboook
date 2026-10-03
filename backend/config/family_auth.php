@@ -180,7 +180,7 @@ return [
     |
     | limits: the same pattern as activation, with their own counters. They
     | complement the OTP SMS ceilings; they do not replace them. The response
-    | floor of start and resend is activation.min_response_ms.
+    | floor of every step is activation.min_response_ms.
     |
     */
 
@@ -202,11 +202,12 @@ return [
     | Activation abuse controls (docs/11 §30a)
     |--------------------------------------------------------------------------
     |
-    | min_response_ms: the least time an activation or password reset start or
-    | resend takes (one shared value), so an eligible
-    | request (lookup, transaction, SMS) and a denied one answer alike. 400 is
-    | a DEVELOPMENT default — the Production value must exceed the real SMS
-    | provider's slow-case latency and is set with that integration. 0 = off.
+    | min_response_ms: the least time an activation or password reset start,
+    | verify, resend or complete takes (one shared value), so a real
+    | challenge (lookups, locked transaction, events) and a decoy answer
+    | alike. The SMS is sent after the response and does not count. 400 is a
+    | DEVELOPMENT default — the Production value is set from measurements on
+    | Production-like infrastructure (docs/08 §16a). 0 = off.
     |
     | limits: request ceilings of the public endpoints, per IP and — for
     | start — per identifier (its keyed fingerprint, never the National ID).

@@ -37,7 +37,14 @@ class FamilyActivationController extends Controller
 
     public function verify(FamilyChallengeRequest $request, FamilyActivation $activation): JsonResponse
     {
-        return self::json($activation->verify($request->challenge(), (string) $request->code()));
+        // Real, decoy, right or wrong code, locked or expired: one floor, so
+        // the database work of a real challenge does not show (PWA-1I).
+        $startedAt = microtime(true);
+        try {
+            return self::json($activation->verify($request->challenge(), (string) $request->code()));
+        } finally {
+            ResponseFloor::hold($startedAt);
+        }
     }
 
     public function resend(FamilyChallengeRequest $request, FamilyActivation $activation): JsonResponse
@@ -58,16 +65,23 @@ class FamilyActivationController extends Controller
      */
     public function complete(FamilyPasswordRequest $request, ActivateFamilyAccountAction $activate): JsonResponse
     {
-        if (! $request->hasSession()) {
-            AuthSecurityLog::record(AuthSecurityEventType::ACTIVATION_COMPLETED, AuthSecurityEventOutcome::DENIED, ActivationDenial::SESSION_REQUIRED);
+        // Every outcome — a decoy, an unverified, consumed or expired grant,
+        // a refusal or the account itself — waits out the same floor.
+        $startedAt = microtime(true);
+        try {
+            if (! $request->hasSession()) {
+                AuthSecurityLog::record(AuthSecurityEventType::ACTIVATION_COMPLETED, AuthSecurityEventOutcome::DENIED, ActivationDenial::SESSION_REQUIRED);
 
-            throw new FamilyAuthException(FamilyAuthError::ACTIVATION_FAILED);
+                throw new FamilyAuthException(FamilyAuthError::ACTIVATION_FAILED);
+            }
+
+            $user = $activate->handle($request->challenge(), (string) $request->input('password'));
+
+            // Committed: only now the session.
+            return FamilySessionController::signIn($request, $user, 201);
+        } finally {
+            ResponseFloor::hold($startedAt);
         }
-
-        $user = $activate->handle($request->challenge(), (string) $request->input('password'));
-
-        // Committed: only now the session.
-        return FamilySessionController::signIn($request, $user, 201);
     }
 
     /** @param  array<string, mixed>  $body */
