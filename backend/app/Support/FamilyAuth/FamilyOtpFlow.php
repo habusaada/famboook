@@ -66,11 +66,13 @@ final class FamilyOtpFlow
 
         // Per identifier, whether it exists or not: the refusal says nothing.
         [$config, $prefix] = self::SLUGS[$purpose->value];
+        // Counted atomically before anything else: parallel starts cannot
+        // overrun the ceiling (PWA-1I).
         $limit = "{$prefix}|start-identifier|{$loginKey}";
-        if (RateLimiter::tooManyAttempts($limit, (int) config("family_auth.{$config}.limits.start_identifier_hour"))) {
+        $max = (int) config("family_auth.{$config}.limits.start_identifier_hour");
+        if (RateLimiter::tooManyAttempts($limit, $max) || RateLimiter::increment($limit, 3600) > $max) {
             throw new FamilyAuthException(FamilyAuthError::TOO_MANY_REQUESTS);
         }
-        RateLimiter::hit($limit, 3600);
 
         // A new start makes the previous reference of this identifier and
         // purpose unusable — a decoy here, a real challenge inside issue().

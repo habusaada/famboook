@@ -37,8 +37,10 @@ use LogicException;
  * password" cost the same; the context is evaluated only after a correct
  * password. The reason goes to auth_security_events, never to the browser.
  *
- * LOCKOUT, two tiers, FAILURES only, both keyed by the fingerprint and both
- * applied to any identifier, known or not:
+ * LOCKOUT, two tiers, both keyed by the fingerprint and both applied to any
+ * identifier, known or not. Every attempt is counted atomically BEFORE the
+ * password check (so parallel attempts cannot overrun a tier) and a
+ * successful login clears both — in effect they count failures:
  *   identifier + IP      a guesser at one address
  *   identifier, any IP   a distributed guesser — set higher, so that knowing
  *                        someone's National ID is not enough to lock them out
@@ -69,12 +71,20 @@ final class FamilyLogin
             throw new FamilyAuthException(FamilyAuthError::FAMILY_AUTH_UNAVAILABLE);
         }
 
+        // The attempt is COUNTED before the password is verified, with an
+        // atomic increment, and an attempt beyond a ceiling is refused
+        // without any verification: of parallel attempts, at most the
+        // ceiling reach the password check (PWA-1I). A success clears.
         $counters = self::counters($loginKey, $ip);
+        $decay = (int) config('family_auth.login.limits.decay_seconds');
         foreach ($counters as [$key, $max]) {
             if (RateLimiter::tooManyAttempts($key, $max)) {
-                AuthSecurityLog::record(AuthSecurityEventType::LOGIN_FAILED, AuthSecurityEventOutcome::DENIED, LoginDenial::THROTTLED, loginKey: $loginKey);
-
-                throw new FamilyAuthException(FamilyAuthError::TOO_MANY_REQUESTS);
+                $this->throttled($loginKey);
+            }
+        }
+        foreach ($counters as [$key, $max]) {
+            if (RateLimiter::increment($key, $decay) > $max) {
+                $this->throttled($loginKey);
             }
         }
 
@@ -100,10 +110,7 @@ final class FamilyLogin
         }
 
         if ($denial !== null) {
-            $decay = (int) config('family_auth.login.limits.decay_seconds');
-            foreach ($counters as [$key]) {
-                RateLimiter::hit($key, $decay);
-            }
+            // Already counted above.
             $this->failed($denial, $loginKey, $user);
 
             throw new FamilyAuthException(FamilyAuthError::INVALID_CREDENTIALS);
@@ -147,6 +154,13 @@ final class FamilyLogin
             ["family-login|identifier-ip|{$loginKey}|".hash('sha256', (string) $ip), (int) config('family_auth.login.limits.identifier_ip_failures')],
             ["family-login|identifier|{$loginKey}", (int) config('family_auth.login.limits.identifier_failures')],
         ];
+    }
+
+    private function throttled(string $loginKey): never
+    {
+        AuthSecurityLog::record(AuthSecurityEventType::LOGIN_FAILED, AuthSecurityEventOutcome::DENIED, LoginDenial::THROTTLED, loginKey: $loginKey);
+
+        throw new FamilyAuthException(FamilyAuthError::TOO_MANY_REQUESTS);
     }
 
     private function failed(BackedEnum $reason, string $loginKey, ?User $user): void
