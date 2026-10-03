@@ -389,23 +389,32 @@ Recorded 2026-10-02 (docs/11 §30a). Nothing here is deployed; the Family
 Portal is not implemented. This section lists what must exist **before**
 Family Portal activation may be enabled in Production.
 
-- **SMS provider.** None is chosen. PWA-1E sends through the `SmsSender`
-  abstraction. `FAMILY_SMS_DRIVER` empty (the default, and the Production
-  value) binds a sender that always refuses, so nothing can be delivered.
-  `log` is a LOCAL development driver: it appends to its own file
+- **SMS provider: TweetsMS** (integrated 2026-10-03, see "TweetsMS SMS
+  delivery" below). Everything sends through the `SmsSender` abstraction.
+  `FAMILY_SMS_DRIVER` selects the driver: empty (the default, and the value
+  in the Production template) binds a sender that always refuses, so
+  nothing can be delivered; `tweetsms` is the Production driver; `log` is a
+  LOCAL development driver: it appends to its own file
   (`storage/logs/family-sms-dev.log`, destination masked) and refuses to
-  run outside the `local` and `testing` environments. Deploying PWA-1E does
-  not make Production SMS-ready.
-- **Production gate for Family self-activation** — not satisfied by
-  PWA-1E. Activation is not Production-ready until:
-  1. a real SMS provider is selected and integrated;
-  2. its credentials are securely configured;
-  3. delivery-failure behaviour is validated;
+  run outside the `local` and `testing` environments. Deploying the
+  TweetsMS code changes nothing until the server `.env` sets
+  `FAMILY_SMS_DRIVER=tweetsms` and the two TweetsMS values.
+- **Production gate for Family self-activation.** Activation is not
+  Production-ready until:
+  1. a real SMS provider is selected and integrated — **code delivered**
+     (TweetsMS);
+  2. its credentials are securely configured — in the server `.env` only;
+  3. delivery-failure behaviour is validated — with `famboook:sms-check`
+     and one real test SMS (procedure below);
   4. the Production queue / retry architecture is decided and implemented
-     as the provider requires (PWA-1E delivers synchronously, without a
-     retry, precisely so that no plaintext code is written to a queue);
-  5. worker process supervision exists if queued delivery is used;
-  6. the scheduler cron is configured for scheduled maintenance;
+     — **decided and delivered**: the OTP SMS is sent after the HTTP
+     response in the same PHP process, with no queue and no automatic
+     retry (the user's resend is the retry), so no plaintext code is ever
+     written to a queue;
+  5. worker process supervision exists if queued delivery is used — **not
+     applicable**: SMS delivery uses no queue;
+  6. the scheduler cron is configured for scheduled maintenance — still
+     a separate prerequisite, unchanged by TweetsMS;
   7. PWA-1G Family login is delivered and validated — the code is
      delivered (PWA-1G); validating it in the target environment remains;
   8. the response-time floor is set against the real provider;
@@ -446,18 +455,27 @@ Family Portal activation may be enabled in Production.
   `_RESEND_IP_MINUTE` (10) / `_COMPLETE_IP_MINUTE` (10). They use the
   application cache store, as do the decoy activation references.
   `FAMILY_ACTIVATION_MIN_RESPONSE_MS` (400) is a **development default**:
-  the Production value must exceed the real SMS provider's slow-case
-  latency and is reviewed with that integration (gate item 1). It holds a
-  PHP worker for its duration.
+  since TweetsMS is called after the response, the floor no longer has to
+  cover the provider's latency — it covers the difference between a real
+  challenge and a decoy (database work only) and is reviewed against
+  Production measurements (gate item 8). It holds a PHP worker for its
+  duration; the after-response SMS call holds the same worker for up to
+  the TweetsMS timeout (8 s by default) once the client has its answer.
 - **OTP abuse ceilings** are security settings with defaults in
   `config/family_auth.php`, overridable by `FAMILY_OTP_THROTTLE_PERSON_HOUR`
   / `_PERSON_DAY` / `_DESTINATION_HOUR` / `_DESTINATION_DAY` / `_IP_HOUR` /
   `_GLOBAL_HOUR`. They use the application cache store; if it cannot be
   read, no SMS is sent.
-- **Queue worker.** §16 stays true for the Pilot. Activation needs an
-  operational worker (supervised, restarted on deploy) so SMS sending and
-  retries do not run inside web requests.
-- **Delivery-failure handling** for SMS must exist.
+- **Queue worker.** §16 stays true for the Pilot. SMS delivery does not
+  need a worker: it runs after the response, in the web process (PHP-FPM
+  finishes the request first), and nothing is queued. A worker is still
+  needed later for announcement fan-out (PWA-9).
+- **Delivery-failure handling** exists: every failure is classified
+  (TEMPORARY_FAILURE, PERMANENT_FAILURE, PROVIDER_CONFIGURATION_FAILURE,
+  UNKNOWN with a reason code), logged without the number, text, code or key,
+  and recorded on the OTP_ISSUED security event. The public answer never
+  changes. A configuration or credit failure is logged CRITICAL, at most
+  once per reason every 10 minutes.
 - **Secrets**, stored like every other credential (§3, never in the
   repository):
   - a dedicated Family Portal fingerprint secret, separate from `APP_KEY`:
@@ -467,7 +485,9 @@ Family Portal activation may be enabled in Production.
     `FAMILY_AUTH_FINGERPRINT_PREVIOUS_KEY_VERSION`. Losing or changing it
     without the rotation procedure breaks Family login; it must be covered
     by the same custody rules as §14;
-  - the SMS provider credentials.
+  - the SMS provider credentials: `TWEETSMS_API_KEY` and `TWEETSMS_SENDER`,
+    in the server `.env` only — never in `.env.example`, the Production
+    template, the repository, a ticket or a command line.
 - **Activation switch.** `FAMILY_ACTIVATION_ENABLED=false` (the default)
   until the owner approves it, following the same pattern as the Import
   Apply gate (§7a). Since PWA-1F it gates the four public activation
@@ -492,6 +512,62 @@ Family Portal activation may be enabled in Production.
   retained 24 months; their purge is not implemented yet.
 - **Rollout gate.** Head Succession (docs/11 FU-01) must be resolved
   before general Family Portal rollout.
+
+## TweetsMS SMS delivery
+
+Recorded 2026-10-03 (docs/11 §30a). The code is in the repository; nothing
+is configured or enabled on the server by deploying it.
+
+- **Request.** `POST https://www.tweetsms.ps/api.php/office/sendsms`, JSON:
+  `{"api_key", "sender", "message", "to"}` — one destination, nothing else
+  (no groups, date, time, name, National ID or family data).
+- **Number format.** `to` is the registry's own local format,
+  `05XXXXXXXX`, sent as stored. It is never converted to `970…` or
+  `+970…`, and storage is unchanged.
+- **Success.** Only a JSON result `code` of `999` (number or string) is a
+  send. HTTP 2xx, `"status": "success"` or `"msg": "send success"` prove
+  nothing alone; a malformed, missing or unknown result is not a send.
+  `999` means TweetsMS **accepted** the SMS — it is not proof that the
+  handset received it.
+- **Failure classes.** -126 TEMPORARY_FAILURE (PROVIDER_BUSY); -124
+  INSUFFICIENT_CREDIT, -110 INVALID_CREDENTIALS, -111 ACCOUNT_INACTIVE,
+  -112 ACCOUNT_BLOCKED, -114 SENDING_STOPPED, -115 / -116 INVALID_SENDER —
+  all PROVIDER_CONFIGURATION_FAILURE; -100 MISSING_PARAMETERS and -120
+  INVALID_DESTINATION — PERMANENT_FAILURE; anything else UNKNOWN.
+  Provider codes are never shown to Family Portal users.
+- **Transport.** TLS verified, redirects refused, connect timeout 3 s,
+  total timeout 8 s, no automatic retry. A timeout is UNKNOWN (the SMS may
+  have been sent).
+- **Timing.** The OTP SMS of activation and password reset is sent after
+  the HTTP response, in the same PHP process, with no queue. The code
+  exists only in memory until then.
+- **Configuration** (server `.env` only):
+
+  ```dotenv
+  FAMILY_SMS_DRIVER=tweetsms
+  TWEETSMS_API_KEY=<from the TweetsMS account — never in Git>
+  TWEETSMS_SENDER=<the approved sender name>
+  # optional: TWEETSMS_ENDPOINT, TWEETSMS_CONNECT_TIMEOUT=3, TWEETSMS_TIMEOUT=8
+  ```
+
+  With `tweetsms` and a missing key or sender nothing is sent (the failure
+  is logged CRITICAL); the Staff application keeps working.
+- **Validation procedure** (before any Family Auth flag is enabled):
+  1. set the three values in the server `.env`, then
+     `php artisan config:cache`;
+  2. `php artisan famboook:sms-check` — prints the driver and API key /
+     sender as YES/NO, never their values, and sends nothing. It must end
+     with `Configuration: OK`;
+  3. `php artisan famboook:sms-check --send-test=05XXXXXXXX` with a
+     number the operator holds — confirms interactively, sends ONE fixed
+     non-OTP text ("رسالة اختبار من Famboook") and prints `SENT` or the
+     outcome and reason. The full number is never printed;
+  4. confirm the SMS arrived on the handset (`SENT` alone does not prove
+     it);
+  5. only then enable the Family Auth flags, one decision each.
+- **Rollback.** Set `FAMILY_SMS_DRIVER=` (empty), or close the Family Auth
+  flags, then `php artisan config:cache`. No migration and no data change
+  is involved; challenges issued meanwhile simply expire.
 
 ---
 
@@ -637,6 +713,7 @@ Never do this once real data has been entered.
 | 1.1.5 | 2026-10-02 | Approved | §16a: PWA-1F — activation gate now read by the public endpoints; activation limiter and response-floor overrides (400 ms is a development default); PWA-1G Family login added to the Production gate (seven points). Nothing activated |
 | 1.1.6 | 2026-10-03 | Approved | §16a: PWA-1G — three independent Family Auth flags (all false), login lockout and password reset limiter overrides, session notes, gate item 7 code-delivered and items 8–9 added. Nothing activated |
 | 1.1.7 | 2026-10-03 | Approved | §16a: PWA-1H — seed `coordinator-family.view-summary`, no migration or flag, coordinators managed through the Staff API by SUPER_ADMIN and ADMINISTRATOR, no assignment expiry |
+| 1.1.8 | 2026-10-03 | Approved | §16a: TweetsMS SMS delivery — `FAMILY_SMS_DRIVER=tweetsms`, `TWEETSMS_API_KEY` / `TWEETSMS_SENDER` in the server `.env` only, `05XXXXXXXX` unchanged, success only on code 999 (accepted, not handset delivery), failure classes, after-response with no queue and no retry, `famboook:sms-check` validation procedure and rollback; gate items 1, 4 and 5 resolved, scheduler cron still separate. Nothing enabled |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

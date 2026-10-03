@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.7
-**Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); activation, login and password reset are each disabled by default; no real SMS provider
+**Version:** 1.8
+**Date:** 2026-10-03
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
 ---
 
@@ -1224,8 +1224,9 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 Approved design. **Implemented: the PWA-1C foundation, the PWA-1D
 identity domain behaviour, the PWA-1E mobile trust and OTP foundation,
 PWA-1F activation, PWA-1G login and password reset and PWA-1H coordinator
-scope and Coordinator Space** (see the six implementation records below).
-A real SMS provider is still to be built.
+scope and Coordinator Space**, and **TweetsMS SMS delivery** (see the
+seven implementation records below). The provider is configured and
+enabled only in the server environment (docs/08 §16a).
 Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
@@ -1446,7 +1447,9 @@ authorization.
 
 Family self-activation MUST NOT be considered Production-ready until all
 hold (PWA-1E, PWA-1F and PWA-1G do not satisfy this gate; PWA-1G delivers
-the code of item 7):
+the code of item 7; the TweetsMS integration delivers the code of item 1,
+decides item 4 — after the response, no queue, no retry — and makes item 5
+not applicable):
 
 ```text
 1. A real SMS provider is selected and integrated
@@ -1461,8 +1464,8 @@ the code of item 7):
 9. The Family Auth flags are enabled deliberately, never by a deployment
 ```
 
-SMS is an abstraction (`SmsSender`) with a log-only development driver; no
-provider is chosen (docs/08 §16a).
+SMS is an abstraction (`SmsSender`) with a log-only development driver and
+the TweetsMS Production driver (`FAMILY_SMS_DRIVER=tweetsms`; docs/08 §16a).
 
 **FU-01 — Head Succession** is a rollout gate: the 38 families whose
 current head is deceased have no eligible user. It is not part of PWA-1
@@ -1749,7 +1752,8 @@ default** (`FAMILY_ACTIVATION_ENABLED=false`).
 - No Family login: after the session ends an activated user cannot return
   until PWA-1G. This is why PWA-1G is part of the Production gate.
 - The response floor does not cover an SMS provider slower than the floor;
-  its Production value is set with the provider.
+  its Production value is set with the provider. (Superseded by the
+  TweetsMS record: the SMS is now sent after the response.)
 - A decoy follows the per-Person hourly and daily send ceilings by
   counting sends per identifier. The destination, IP and global SMS
   ceilings are not modelled for decoys.
@@ -1918,6 +1922,101 @@ Not implemented by PWA-1H: coordinator notifications and announcements,
 profile-completion follow-up, account-status visibility
 (`coordinator-family.view-account-status` stays PROPOSED), assisted mobile
 trust, any coordinator write.
+
+## TweetsMS SMS delivery implementation record
+
+Implemented 2026-10-03. No migration, no new flag, no frontend change.
+Production SMS stays off until the server `.env` sets
+`FAMILY_SMS_DRIVER=tweetsms`, `TWEETSMS_API_KEY` and `TWEETSMS_SENDER`
+(docs/08 §16a — validation procedure and rollback).
+
+**Driver.** `TweetsSmsSender` behind `SmsSender`, selected by the existing
+`FAMILY_SMS_DRIVER` (no other driver variable). One request per SMS:
+
+```text
+POST https://www.tweetsms.ps/api.php/office/sendsms     (JSON)
+{"api_key", "sender", "message", "to": "05XXXXXXXX"}
+```
+
+One destination in the registry's own local format, sent as stored — never
+converted to `970…` / `+970…`. Nothing else: no groups, date, time,
+National ID, name, family code or family data. With a missing key or
+sender it fails closed: nothing is sent and the application still boots.
+
+**Success criterion.** A send succeeds only when the JSON result `code`
+is `999` (number or digit string, normalized then compared strictly). HTTP
+2xx, `"status": "success"` or `"msg": "send success"` prove nothing alone;
+malformed JSON, a missing or null code, an unexpected structure or an
+unknown code are never a success. `999` means TweetsMS accepted the SMS,
+not that the handset received it.
+
+**Failure classification** (`SmsFailureOutcome` + `SmsFailureReason`):
+
+```text
+-126              TEMPORARY_FAILURE               PROVIDER_BUSY
+-124              PROVIDER_CONFIGURATION_FAILURE  INSUFFICIENT_CREDIT
+-110              PROVIDER_CONFIGURATION_FAILURE  INVALID_CREDENTIALS
+-111              PROVIDER_CONFIGURATION_FAILURE  ACCOUNT_INACTIVE
+-112              PROVIDER_CONFIGURATION_FAILURE  ACCOUNT_BLOCKED
+-114              PROVIDER_CONFIGURATION_FAILURE  SENDING_STOPPED
+-115 / -116       PROVIDER_CONFIGURATION_FAILURE  INVALID_SENDER
+-100              PERMANENT_FAILURE               MISSING_PARAMETERS
+-120              PERMANENT_FAILURE               INVALID_DESTINATION
+other code        UNKNOWN                         UNRECOGNIZED_RESULT
+no valid code     UNKNOWN                         MALFORMED_RESPONSE
+HTTP 5xx / 4xx    TEMPORARY / PROVIDER_CONFIGURATION (HTTP_*_ERROR)
+redirect, other   UNKNOWN                         UNEXPECTED_HTTP_STATUS
+DNS / connect     TEMPORARY_FAILURE               CONNECTION_FAILED
+timeout, other    UNKNOWN                         TRANSPORT_UNCERTAIN
+```
+
+**Transport.** Laravel HTTP client; JSON in and out; TLS verification on;
+redirects refused; connect timeout 3 s, total 8 s (configurable). **No
+automatic retry** of any kind: TweetsMS has no idempotency key, so a retry
+could send a second code; the user's resend is the retry.
+
+**Timing (A′).** On the public activation and password reset routes
+(middleware `sms.after-response`) `SmsDispatcher` keeps the message in
+memory and sends it when the application terminates — after the response
+was sent (PHP-FPM finishes the request first) — in the same PHP process,
+with no queue. The plaintext code is never written to a queue, the cache,
+the database or a log. Outside a request (a command, a direct service
+call) the send is immediate. The challenge, `send_count`, throttle
+accounting, expiry, resend cooldown, send limit and supersession happen
+before the response exactly as before; only the provider call moved.
+
+**Anti-enumeration.** The provider's latency or failure can no longer
+change the public answer or its timing: a real challenge whose SMS fails
+answers exactly like a successful one and like a decoy. Provider codes
+are never shown to Family Portal users.
+
+**Failure recording.** A failure — also one after the response — is
+logged with `provider`, `outcome`, `reason`, `purpose` and `mobile_last2`
+only (never the key, the code, the text or the number), and recorded on the
+`OTP_ISSUED` FAILURE event as `delivery_outcome` / `delivery_reason`
+(allow-listed metadata). A PROVIDER_CONFIGURATION_FAILURE is logged
+CRITICAL at most once per reason per 10 minutes.
+
+**OTP message** (one UCS-2 part, 62 of 70 units; ASCII digits; the minutes
+follow the configured TTL, 5 by default):
+
+```text
+رمز التحقق في Famboook: 123456
+صالح 5 دقائق. لا تشاركه مع أحد.
+```
+
+**Operations.** `php artisan famboook:sms-check` prints the driver and
+API key / sender as YES/NO — never their values — and sends nothing.
+`--send-test=05XXXXXXXX` sends one fixed non-OTP text after an
+interactive confirmation and prints `SENT` or the outcome and reason; the
+full number is never printed and no OTP challenge is created.
+
+**Tests.** All HTTP is faked; every test fails on a stray outgoing request
+(`Http::preventStrayRequests()` in the base test case).
+
+Not implemented: delivery reports (handset receipt), balance monitoring,
+provider failover, a Staff screen for SMS status. The scheduler cron
+remains a separate Production prerequisite.
 
 ---
 
@@ -2198,6 +2297,20 @@ Coordinators are administered by SUPER_ADMIN and ADMINISTRATOR only, as
 Staff acts with recorded events; role and scope are separate layers.
 `person-mobile-trust.assist` stays withheld until a dedicated
 assisted-mobile-trust workflow exists.
+
+FP-ADR-050
+The Production SMS provider is TweetsMS, selected by FAMILY_SMS_DRIVER.
+The destination is sent in the registry's local 05XXXXXXXX format, as
+stored. A send succeeds only on result code 999; anything else is a
+classified failure. Credentials live only in the server environment.
+
+FP-ADR-051
+OTP SMS is handed to the provider after the HTTP response, in the same PHP
+process, with no queue and no automatic retry; the code exists only in
+memory until then. This replaces the "synchronously after commit" timing of
+FP-ADR-040 on the public routes, and makes the queue worker of FP-ADR-035
+unnecessary for SMS (it remains needed for fan-out). The public answer
+never depends on the provider.
 ```
 
 ---
@@ -2211,8 +2324,9 @@ named.
 PFP-001  (PWA-2)
 SMS provider.
 Architecture decided 2026-10-02: an SmsSender abstraction with a log-only
-development driver. The Production provider itself stays OPEN and is a
-Production activation gate (§30a).
+development driver. DECIDED 2026-10-03: TweetsMS (FP-ADR-050), sent after
+the response without a queue (FP-ADR-051). Configuring it on the server
+remains a Production activation gate item (§30a).
 
 PFP-002  (PWA-2)
 Exact OTP TTL, attempt limit, resend cooldown and daily caps.
@@ -2330,7 +2444,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 |---|---|---|
 | FU-01 | **Head Succession.** `RecordPersonDeathAction` does not handle household-head succession and no household-head change action exists; 38 families currently have a deceased head and therefore no eligible user | **Rollout gate**: must be resolved before general Family Portal rollout; not part of PWA-1 (PFP-012) |
 | FU-02 | Whether `UpdateFamilyResidenceAction` preserves residence history as docs/03 §32 requires is unverified | PWA-6 (RESIDENCE_UPDATE apply) |
-| FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker, and there is no SMS provider | **Production activation gate** (§30a, docs/08 §16a); provider choice PFP-001; fan-out PWA-9 (PFP-019) |
+| FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker. SMS no longer needs one (TweetsMS, after the response — FP-ADR-051); the provider is integrated but must be configured and validated on the server | **Production activation gate** (§30a, docs/08 §16a); fan-out PWA-9 (PFP-019) |
 | FU-04 | docs/06 §53 gives FAMILY_USER "scoped view access" to Change Requests; the seeder grants no view permission | PWA-5 |
 | FU-05 | AUTH-ADR-060 is referenced in docs/03, docs/06 and docs/07 but has no entry in the docs/06 decision list | Next docs/06 maintenance |
 | FU-06 | "Document Status" version blocks are stale relative to the change logs (e.g. docs/03) | Next documentation maintenance |
@@ -2350,3 +2464,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.5 | 2026-10-02 | Approved | PWA-1F implementation record in §30a: Family API boundary and `/family/me`, public activation steps with decoys, limiters and the response floor, the completion transaction and session, the `(staff)` route group, the Family theme, the activation flow and the first shell; §25 layout as implemented; Production gate extended with PWA-1G (seven points); FP-ADR-041 … 043; PWA-1F done, PWA-1G next. No migration; activation disabled by default |
 | 1.6 | 2026-10-03 | Approved | PWA-1G implementation record in §30a: Family login (identity lookup, Family context, generic failure, dummy hash, two-tier lockout), password reset on purpose-aware decoys, the reset transaction and session revocation, the 72-byte password ceiling, three independent gates, the login and forgot-password screens; Production gate items 8–9; FP-ADR-044 … 046; PWA-1G done, PWA-1H next. No migration; nothing enabled |
 | 1.7 | 2026-10-03 | Approved | PWA-1H implementation record in §30a: coordinator resolver, administration actions and Staff API, `coordinator.space`, coordinator context and scoped summaries (`coordinator-family.view-summary` approved), `/family/me.coordinator_space`, Coordinator Space in the portal; PFP-022 updated; FP-ADR-047 … 049; PWA-1H done, PWA-1I next. No migration; assist withheld |
+| 1.8 | 2026-10-03 | Approved | TweetsMS SMS delivery record in §30a: `FAMILY_SMS_DRIVER=tweetsms`, `05XXXXXXXX` as stored, success only on code 999 (accepted, not handset delivery), failure classification, no retry, after-response delivery without a queue, safe failure logging and event metadata, shorter one-part OTP message, `famboook:sms-check`; gate items 1/4/5 updated; PFP-001 decided; FU-03 updated; FP-ADR-050, 051. No migration, nothing enabled |

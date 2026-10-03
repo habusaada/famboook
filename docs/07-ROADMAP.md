@@ -2051,6 +2051,7 @@ PWA-1E … PWA-1G. No separate PWA-2 phase remains; PWA-3 follows PWA-1I.
 | PWA-1F | **DONE.** Public activation endpoints (start, verify, resend, complete) behind the activation gate, with cache-backed decoys, request limiters and a response-time floor; the completion transaction (new family-side User, FAMILY_USER, link, identity, grant consumed) and the session after it; `family.side`, `GET /family/me` and logout; the Staff routes moved into a `(staff)` route group; the Family theme, `/family/activate` and the first `/family` shell; Vitest component tests. No migration | Activation matrix; anti-enumeration; Staff URLs unchanged |
 | PWA-1G | **DONE.** Family login through the authentication identity, requiring the Family context, with one generic failure, a dummy-hash verification for unknown identifiers and a two-tier lockout; password reset (start, verify, resend, complete) on purpose-aware decoys shared with activation; reset completion ending every earlier session; the 72-byte password ceiling for activation and reset; three independent gates; `/family/login`, `/family/forgot-password`, the login link on activation and the guest redirect to login. No migration. The family context MIDDLEWARE and the cross-family IDOR tests move to the first family-data endpoint: no such route exists yet | Login and reset matrices; activation regression |
 | PWA-1H | **DONE.** Coordinator scope resolver (union of effective assignments, current hierarchy, fail-closed structure); grant / revoke role and assign / revoke scope actions with a Staff API; `coordinator.space` boundary; coordinator context and scoped family summary endpoints (`coordinator-family.view-summary` approved, COORDINATOR only); `/family/me.coordinator_space`; Coordinator Space in the Family Portal. No migration. `person-mobile-trust.assist` stays withheld: assisted mobile trust becomes a future dedicated workflow | Scope, dual-role, IDOR and privacy matrices |
+| — | **TweetsMS SMS delivery — DONE** (2026-10-03, not a lettered slice). `TweetsSmsSender` behind `SmsSender` (`FAMILY_SMS_DRIVER=tweetsms`), `05XXXXXXXX` as stored, success only on code 999, failure classification, no retry; OTP SMS sent after the response without a queue; shorter one-part OTP text; `famboook:sms-check`. No migration | Production: configure the server `.env` and validate (docs/08 §16a) |
 | — | Assisted mobile trust (future, unscheduled): a dedicated workflow in which a Coordinator opens or assists a verification within scope; only then may `person-mobile-trust.assist` be granted to COORDINATOR | Workflow design approved first |
 | PWA-1I | Security-event coverage, throttling, full regression | Whole suite |
 
@@ -2060,15 +2061,18 @@ identity or trust row was created from existing data.
 
 Gates outside PWA-1:
 
-- **Production activation gate:** SMS provider, operational queue worker,
-  delivery-failure handling, secure credentials (docs/08 §16a).
+- **Production activation gate:** SMS provider (TweetsMS — integrated;
+  to be configured and validated on the server), delivery-failure handling
+  (delivered), secure credentials, the scheduler cron (docs/08 §16a). A
+  queue worker is no longer needed for SMS.
 - **Rollout gate FU-01 — Head Succession:** must be resolved before
   general Family Portal rollout; it is not part of PWA-1C or any PWA-1
   slice (docs/11 §33a).
 
-Infrastructure prerequisites recorded for later phases: an SMS provider
-(PWA-2) and a queue worker in production, which currently runs
-`QUEUE_CONNECTION=sync` with no worker (PWA-2 for SMS, PWA-9 for fan-out).
+Infrastructure prerequisites recorded for later phases: a queue worker in
+production, which currently runs `QUEUE_CONNECTION=sync` with no worker
+(PWA-9 for fan-out). SMS needs none: TweetsMS is called after the
+response, without a queue (docs/11 FP-ADR-051).
 
 The Family PWA lives inside the existing Next.js frontend application; no
 separate repository-level application is created (docs/11 §25). The
@@ -4663,6 +4667,9 @@ The Family Portal is delivered as the Family PWA Program, PWA-0 … PWA-10 (§31
 
 ### RM-ADR-042
 PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA-1I, which also deliver the former PWA-2 authentication scope. Production activation is gated on SMS and queue prerequisites; general rollout is gated on Head Succession (FU-01), which is outside PWA-1.
+
+### RM-ADR-043
+TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 ```
 
 ---
@@ -4892,6 +4899,7 @@ Date: 2026-09-24
 | 1.2.30 | 2026-10-02 | Approved | PWA-1F done (activation endpoints with decoys, limiters and floor; completion transaction and session; Family API boundary and `/family/me`; `(staff)` route group; Family theme, activation flow and first shell; no migration); PWA-1G next and added to the Production activation gate |
 | 1.2.31 | 2026-10-03 | Approved | PWA-1G done (Family login, password reset, purpose-aware decoys, session revocation on reset, 72-byte password ceiling, three independent gates, login and forgot-password screens; no migration); the family context middleware moves to the first family-data endpoint; PWA-1H next |
 | 1.2.32 | 2026-10-03 | Approved | PWA-1H done (coordinator resolver, administration actions and Staff API, Coordinator Space boundary, scoped summaries, Family Portal Coordinator Space; no migration); assisted mobile trust moved to a future dedicated workflow; PWA-1I next |
+| 1.2.33 | 2026-10-03 | Approved | TweetsMS SMS delivery done (driver, code-999 criterion, failure classes, after-response without a queue, OTP text, `famboook:sms-check`; no migration); Production gate updated — queue worker no longer needed for SMS; RM-ADR-043. PWA-1I next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

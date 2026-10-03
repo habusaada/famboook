@@ -1043,6 +1043,24 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
 - `OrganizationalScope` remains a reporting filter and is not used for
   coordinator authorization.
 
+## SMS delivery (TweetsMS)
+
+- **No new permission, route or role** (AUTH-ADR-071). The TweetsMS
+  driver sits behind the existing activation and password reset gates;
+  `sms.after-response` only moves the provider call after the response
+  and authorizes nothing.
+- **The destination is never chosen by a caller**: it is always the
+  Person's current trusted mobile, resolved server-side.
+- **Provider outcomes are not exposed.** Family Portal responses never
+  carry a TweetsMS code, outcome or reason; they are recorded on security
+  events and in the server log only.
+- **`famboook:sms-check`** is a server-side Artisan command for operators
+  with shell access; it has no API or UI. It never prints the API key,
+  the sender or a full mobile number, and its optional test SMS is a fixed
+  non-OTP text that creates no challenge.
+- **Credentials** (`TWEETSMS_API_KEY`, `TWEETSMS_SENDER`) live only in the
+  server environment, never in Git or a template.
+
 ## Seeded mapping (PWA-1C)
 
 ```text
@@ -4080,6 +4098,9 @@ PWA-1G Family login and password reset (§22b): five public routes outside the S
 
 ### AUTH-ADR-070
 PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space from the account's own Family context, the COORDINATOR role, `coordinator-space.access` and the union of effective scope assignments over the current hierarchy; `coordinator.space` fails closed. `coordinator-family.view-summary` is approved and seeded, COORDINATOR only, and means summary access only. Coordinator administration stays with SUPER_ADMIN and ADMINISTRATOR (`coordinator-scope.manage`). `person-mobile-trust.assist` remains withheld from COORDINATOR. A Coordinator is family-side, never Staff, and COORDINATOR ≠ REVIEWER.
+
+### AUTH-ADR-071
+TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 ```
 
 ---
@@ -4452,6 +4473,7 @@ Date: 2026-09-24
 | 1.2.32 | 2026-10-02 | Approved | PWA-1F (AUTH-ADR-068): §22b Family API boundary (`family.side`, fail closed), `/family/me`, logout, the public activation routes with their gate and error contract; no permission mapping changed |
 | 1.2.33 | 2026-10-03 | Approved | PWA-1G (AUTH-ADR-069): §22b Family login and password reset routes, three independent gates, login requires the Family context, public error contract; no permission mapping changed |
 | 1.2.34 | 2026-10-03 | Approved | PWA-1H (AUTH-ADR-070): §22b Coordinator Space and administration routes, `coordinator.space`, `coordinator-family.view-summary` approved and seeded (COORDINATOR only, summary only), §22a proposal marked approved; assist still withheld |
+| 1.2.35 | 2026-10-03 | Approved | TweetsMS (AUTH-ADR-071): §22b SMS delivery — no new permission, role or route; provider outcomes never exposed; `famboook:sms-check` shell-only and non-revealing; credentials in the server environment only |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

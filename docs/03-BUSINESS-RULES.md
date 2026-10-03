@@ -2309,9 +2309,41 @@ the mobile trust lifecycle with its Staff API, the OTP challenge service,
 the SMS abstraction, the OTP throttle and the OTP cleanup. PWA-1F
 implemented activation (below) and the first Family Portal screens. PWA-1G
 implemented Family login and password reset (below). PWA-1H implemented
-coordinator scope and Coordinator Space (below). Still not built:
-coordinator-assisted mobile verification (a future dedicated workflow) and
-any real SMS provider.
+coordinator scope and Coordinator Space (below). TweetsMS SMS delivery
+is integrated (below); it sends only once configured on the server. Still
+not built: coordinator-assisted mobile verification (a future dedicated
+workflow).
+
+## SMS delivery as implemented (TweetsMS)
+
+- **Provider.** TweetsMS is the Production SMS provider, selected by
+  `FAMILY_SMS_DRIVER=tweetsms`. Its API key and sender exist only in the
+  server environment; without them nothing is sent.
+- **Only the code and its validity.** An SMS carries one destination — the
+  Person's current trusted mobile in the registry's own `05XXXXXXXX`
+  format, sent as stored and never converted to an international form —
+  and the text. Never a name, National ID, family code or family data.
+- **The OTP text** is fixed and fits one SMS part:
+  "رمز التحقق في Famboook: {code}" and, on a second line, "صالح {n}
+  دقائق. لا تشاركه مع أحد." — `{n}` follows the configured validity
+  (5 minutes).
+- **What counts as sent.** Only TweetsMS result code 999. Any other answer
+  — another code, an HTTP error, an unreadable response, a timeout — is a
+  failed delivery, classified as a temporary, permanent, provider
+  configuration or unknown failure. Code 999 means TweetsMS accepted the
+  SMS, not that the handset received it.
+- **After the response.** On activation and password reset the SMS is
+  handed to TweetsMS after the answer was sent to the user, by the same
+  server process, without a queue. The challenge, its send count, the
+  throttles and the cooldown are settled before the answer; only the
+  provider call comes later. The answer is the same whether TweetsMS
+  accepts, refuses, is slow or is unreachable.
+- **No automatic retry.** A failed or uncertain send is never repeated by
+  the system; the user may ask for a resend within the usual limits.
+- **Failures are recorded, never shown.** A failure is recorded on the
+  OTP security event and logged with safe codes and the last two digits of
+  the number only. A provider code or reason is never shown to a Family
+  Portal user.
 
 ## Coordinator scope as implemented (PWA-1H)
 
@@ -2555,9 +2587,10 @@ As implemented (PWA-1E):
   not resurrected; a new one is issued.
 - A correct code opens a **10-minute grant**; it does not consume. The
   grant is consumed inside the transaction of the workflow that uses it.
-- The SMS is sent synchronously after the challenge is committed. A failed
-  delivery still counts as a send and toward the throttles; there is no
-  automatic retry.
+- The SMS is sent after the challenge is committed — on the public
+  activation and password reset steps, after the response (TweetsMS, see
+  above). A failed delivery still counts as a send and toward the
+  throttles; there is no automatic retry.
 - Sends are also limited across challenges — configurable security
   settings: per Person 5 per hour and 10 per day; per destination 10 per
   hour and 20 per day; per IP 20 per hour; globally 500 per hour. If the
@@ -2572,8 +2605,11 @@ mobile-trust history are never purged by OTP cleanup.
 ## Production gates
 
 Activation is not enabled in Production before a Production SMS provider,
-an operational queue worker, delivery-failure handling and secure
-credential storage exist (docs/08 §16a).
+delivery-failure handling and secure credential storage exist (docs/08
+§16a). TweetsMS and its failure handling are integrated; its credentials
+must be configured and validated on the server. Because SMS is sent after
+the response without a queue, a queue worker is no longer required for
+SMS.
 
 ---
 
@@ -4776,6 +4812,7 @@ Date: 2026-09-24
 | 1.2.40 | 2026-10-02 | Approved | PWA-1F: §89b activation as implemented (lookup, anti-enumeration with decoy references, completion transaction, always a new family-side User, session rules, display name from the Person, account is not access, request ceilings and response floor, activation gate) |
 | 1.2.41 | 2026-10-03 | Approved | PWA-1G: §89b login and password reset as implemented (identity lookup, full Family context required, one generic login failure, two-tier lockout, reset eligibility and decoys, purpose-bound references, reset transaction ending all sessions, 72-byte password ceiling, three independent gates) |
 | 1.2.42 | 2026-10-03 | Approved | PWA-1H: §89b coordinator rules as implemented (family-side never Staff, four conditions for Coordinator Space, union of scopes, current hierarchy, fail-closed structure, summary-only data, administration by SUPER_ADMIN and ADMINISTRATOR, assist withheld) |
+| 1.2.43 | 2026-10-03 | Approved | TweetsMS: §89b SMS delivery as implemented (provider, `05XXXXXXXX` as stored, success only on code 999, fixed one-part OTP text, after-response delivery without a queue, no automatic retry, failures recorded and never shown); OTP delivery timing and the Production gate updated |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
