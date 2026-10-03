@@ -25,9 +25,21 @@ use Illuminate\Support\Str;
  * PASSWORD_RESET and the reverse. "One open challenge per identifier" is
  * kept per purpose, as it is per Person and purpose for real challenges.
  *
+ * CONCURRENCY PARITY (PWA-1I). A real challenge is row-locked, so parallel
+ * requests against it are exact; a decoy must be exact too, or parallel
+ * requests would tell the two apart. Nothing that parallel requests change
+ * is a read-modify-write of the state record:
+ *
+ *   attempts     an atomic counter of its own (Cache::increment)
+ *   superseded   a flag of its own, only ever set
+ *   resend       one atomic claim per send (Cache::add): exactly one of
+ *                parallel resends wins, the others see the cooldown
+ *
+ * The state record itself is written at creation and by the single winner of
+ * a resend claim only.
+ *
  * Keys hold a random reference or a keyed LOGIN_ID fingerprint — never a
- * National ID. Not atomic under concurrency: a decoy guards no resource, so
- * a lost update only makes a counter slightly generous.
+ * National ID.
  */
 final class ChallengeDecoys
 {
@@ -49,12 +61,10 @@ final class ChallengeDecoys
             'login_key' => $loginKey,
             'sent_at' => $now,
             'send_count' => 1,
-            'attempts' => 0,
             'expires_at' => $now + $this->setting('ttl_seconds'),
-            'locked' => false,
-            'superseded' => false,
             'gone_at' => $now + self::REFERENCE_TTL,
         ]);
+        Cache::put(self::attemptsKey($uuid), 0, self::REFERENCE_TTL);
         Cache::put(self::openKey($purpose, $loginKey), $uuid, self::REFERENCE_TTL);
 
         return $uuid;
@@ -64,9 +74,8 @@ final class ChallengeDecoys
     public function supersede(OtpPurpose $purpose, string $loginKey): void
     {
         $uuid = Cache::pull(self::openKey($purpose, $loginKey));
-        $state = is_string($uuid) ? $this->state($purpose, $uuid) : null;
-        if ($state !== null) {
-            $this->put($uuid, [...$state, 'superseded' => true]);
+        if (is_string($uuid) && $this->state($purpose, $uuid) !== null) {
+            Cache::put(self::supersededKey($uuid), true, self::REFERENCE_TTL);
         }
     }
 
@@ -79,11 +88,26 @@ final class ChallengeDecoys
     public function state(OtpPurpose $purpose, string $uuid): ?array
     {
         $state = Cache::get(self::key($uuid));
+        if (! is_array($state) || ($state['purpose'] ?? null) !== $purpose->value) {
+            return null;
+        }
+        $attempts = (int) Cache::get(self::attemptsKey($uuid), 0);
 
-        return is_array($state) && ($state['purpose'] ?? null) === $purpose->value ? $state : null;
+        return [
+            ...$state,
+            'attempts' => $attempts,
+            'locked' => $attempts >= $this->setting('max_attempts'),
+            'superseded' => Cache::get(self::supersededKey($uuid)) === true,
+        ];
     }
 
-    /** A code entered against a decoy: always a failure, counted like a real one. */
+    /**
+     * A code entered against a decoy: always a failure, counted like a real
+     * one. The count is atomic and each attempt is judged by ITS OWN count,
+     * never by a later re-read: of parallel attempts, those numbered below
+     * the limit are CODE_MISMATCH and the one that reaches it and every later
+     * one are LOCKED — the answers a row-locked real challenge gives.
+     */
     public function verify(OtpPurpose $purpose, string $uuid): OtpFailure
     {
         $state = $this->state($purpose, $uuid);
@@ -91,16 +115,19 @@ final class ChallengeDecoys
             return $failure;
         }
 
-        $attempts = $state['attempts'] + 1;
-        $this->put($uuid, [...$state, 'attempts' => $attempts, 'locked' => $attempts >= $this->setting('max_attempts')]);
+        $attempts = Cache::increment(self::attemptsKey($uuid));
+        if (! is_int($attempts)) {
+            // The counter is gone with the reference.
+            return OtpFailure::NOT_FOUND;
+        }
 
-        return OtpFailure::CODE_MISMATCH;
+        return $attempts >= $this->setting('max_attempts') ? OtpFailure::LOCKED : OtpFailure::CODE_MISMATCH;
     }
 
     /**
      * A resend against a decoy: NULL when it is "sent" (nothing is), else the
      * reason a real challenge in the same state would give. $throttled is the
-     * caller's cross-challenge ceiling for this identifier.
+     * caller's cross-challenge ceiling for this identifier and request.
      */
     public function resend(OtpPurpose $purpose, string $uuid, bool $throttled): ?OtpFailure
     {
@@ -118,9 +145,14 @@ final class ChallengeDecoys
             return OtpFailure::THROTTLED;
         }
 
+        // One winner per send: a parallel resend that read the same state
+        // loses the claim and sees the cooldown, as on a row-locked challenge.
         $now = now()->getTimestamp();
+        if (! Cache::add(self::resendKey($uuid, $state['send_count']), $now, self::REFERENCE_TTL)) {
+            return OtpFailure::COOLDOWN;
+        }
         $this->put($uuid, [
-            ...$state,
+            ...array_diff_key($state, array_flip(['attempts', 'locked', 'superseded'])),
             'send_count' => $state['send_count'] + 1,
             'sent_at' => $now,
             'expires_at' => $now + $this->setting('ttl_seconds'),
@@ -147,13 +179,21 @@ final class ChallengeDecoys
         return (int) ($this->state($purpose, $uuid)['send_count'] ?? 0);
     }
 
+    /**
+     * Seconds until the next resend may be sent. The latest send is the
+     * later of the state's and of a resend claim just won by a parallel
+     * request, whose state write may not be visible yet.
+     */
     public function cooldownRemaining(OtpPurpose $purpose, string $uuid): int
     {
         $state = $this->state($purpose, $uuid);
+        if ($state === null) {
+            return 0;
+        }
+        $claimed = Cache::get(self::resendKey($uuid, $state['send_count']));
+        $sentAt = max($state['sent_at'], is_int($claimed) ? $claimed : 0);
 
-        return $state === null
-            ? 0
-            : max(0, $state['sent_at'] + $this->setting('resend_cooldown_seconds') - now()->getTimestamp());
+        return max(0, $sentAt + $this->setting('resend_cooldown_seconds') - now()->getTimestamp());
     }
 
     /**
@@ -184,6 +224,21 @@ final class ChallengeDecoys
     private static function key(string $uuid): string
     {
         return 'family-auth-decoy|'.$uuid;
+    }
+
+    private static function attemptsKey(string $uuid): string
+    {
+        return 'family-auth-decoy-attempts|'.$uuid;
+    }
+
+    private static function supersededKey(string $uuid): string
+    {
+        return 'family-auth-decoy-superseded|'.$uuid;
+    }
+
+    private static function resendKey(string $uuid, int $sendCount): string
+    {
+        return "family-auth-decoy-resend|{$uuid}|{$sendCount}";
     }
 
     private static function openKey(OtpPurpose $purpose, string $loginKey): string

@@ -90,9 +90,9 @@ final class FamilyOtpFlow
     public function verify(OtpPurpose $purpose, string $reference, #[\SensitiveParameter] string $code): array
     {
         if ($this->decoys->state($purpose, $reference) !== null) {
-            $failure = $this->decoys->verify($purpose, $reference);
-
-            throw $this->refused($failure, $this->decoys->locked($purpose, $reference));
+            // Judged by this attempt's own atomic count (LOCKED at the limit),
+            // never by a re-read a parallel attempt may have moved.
+            throw $this->refused($this->decoys->verify($purpose, $reference));
         }
         if ($this->realChallenge($purpose, $reference) === null) {
             throw new FamilyAuthException(FamilyAuthError::OTP_INVALID);
@@ -129,7 +129,9 @@ final class FamilyOtpFlow
         // A send that failed at the provider is still a send, publicly:
         // only an eligible identifier could ever report a delivery failure.
         if (! $result->succeeded() && $result->failure !== OtpFailure::DELIVERY_FAILED) {
-            $wait = $challenge->last_sent_at->getTimestamp() + (int) config('family_auth.otp.resend_cooldown_seconds') - now()->getTimestamp();
+            // The row as read under its lock: a parallel resend that just won
+            // moved last_sent_at, and the cooldown counts from there.
+            $wait = ($result->challenge ?? $challenge)->last_sent_at->getTimestamp() + (int) config('family_auth.otp.resend_cooldown_seconds') - now()->getTimestamp();
 
             throw $this->refused($result->failure, false, max(0, $wait));
         }
