@@ -56,16 +56,25 @@ return [
     | SMS delivery (docs/11 §30a, docs/08 §16a)
     |--------------------------------------------------------------------------
     |
-    | No provider is chosen. With no driver nothing can be delivered
-    | (UnconfiguredSmsSender), so deploying this code does not make Production
-    | SMS-ready. `log` is a LOCAL / TESTING development driver only: it writes
-    | to its own file and refuses to run in any other environment.
+    | driver: empty (the default) = nothing can be delivered
+    | (UnconfiguredSmsSender). `tweetsms` = the Production provider, TweetsMS
+    | (App\Support\Sms\TweetsSmsSender); it sends only with an API key AND a
+    | sender, both SECRETS of the server .env, never of the repository. `log`
+    | is a LOCAL / TESTING development driver only: it writes to its own file
+    | and refuses to run in any other environment.
     |
     */
 
     'sms' => [
         'driver' => env('FAMILY_SMS_DRIVER'),
         'log_path' => storage_path('logs/family-sms-dev.log'),
+        'tweetsms' => [
+            'api_key' => env('TWEETSMS_API_KEY'),
+            'sender' => env('TWEETSMS_SENDER'),
+            'endpoint' => env('TWEETSMS_ENDPOINT', 'https://www.tweetsms.ps/api.php/office/sendsms'),
+            'connect_timeout' => (int) env('TWEETSMS_CONNECT_TIMEOUT', 3),
+            'timeout' => (int) env('TWEETSMS_TIMEOUT', 8),
+        ],
     ],
 
     /*

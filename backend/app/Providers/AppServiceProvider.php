@@ -16,6 +16,7 @@ use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
 use App\Support\Sms\LogSmsSender;
+use App\Support\Sms\TweetsSmsSender;
 use App\Support\Sms\UnconfiguredSmsSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -39,9 +40,12 @@ class AppServiceProvider extends ServiceProvider
 
         // SMS delivery (docs/11 §30a): fails closed. Only an explicitly
         // configured driver delivers; anything else — unset or unknown — is
-        // the sender that always refuses. No real provider exists yet.
+        // the sender that always refuses. `tweetsms` is the Production
+        // provider; without its key or sender it refuses too (at send time:
+        // the application never fails to boot because of SMS).
         $this->app->bind(SmsSender::class, fn () => match (config('family_auth.sms.driver')) {
             'log' => new LogSmsSender((string) config('family_auth.sms.log_path')),
+            'tweetsms' => TweetsSmsSender::fromConfig((array) config('family_auth.sms.tweetsms')),
             default => new UnconfiguredSmsSender,
         });
     }
