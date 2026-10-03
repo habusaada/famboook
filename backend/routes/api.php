@@ -48,6 +48,8 @@ Route::prefix('family')->group(function () {
     Route::prefix('auth/activation')->middleware(['family.activation', 'sms.after-response'])->group(function () {
         Route::post('/start', [FamilyActivationController::class, 'start'])
             ->middleware('throttle:family-activation-start')->name('family.activation.start');
+        Route::post('/send', [FamilyActivationController::class, 'send'])
+            ->middleware('throttle:family-activation-send')->name('family.activation.send');
         Route::post('/verify', [FamilyActivationController::class, 'verify'])
             ->middleware('throttle:family-activation-verify')->name('family.activation.verify');
         Route::post('/resend', [FamilyActivationController::class, 'resend'])

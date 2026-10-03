@@ -43,6 +43,8 @@ class FamilyActivationStartTest extends TestCase
 
     private const START = '/api/v1/family/auth/activation/start';
 
+    private const SEND = '/api/v1/family/auth/activation/send';
+
     private const VERIFY = '/api/v1/family/auth/activation/verify';
 
     private const RESEND = '/api/v1/family/auth/activation/resend';
@@ -82,9 +84,18 @@ class FamilyActivationStartTest extends TestCase
         return $person;
     }
 
+    /**
+     * Start, confirm the masked number, send (FP-ADR-053): the answer of the
+     * send — a challenge, real or decoy. A refused start is returned as is.
+     */
     private function start(string $nationalId = self::ELIGIBLE_ID): TestResponse
     {
-        return $this->postJson(self::START, ['national_id' => $nationalId]);
+        $confirmation = $this->postJson(self::START, ['national_id' => $nationalId]);
+        if ($confirmation->status() !== 200) {
+            return $confirmation;
+        }
+
+        return $this->postJson(self::SEND, ['confirmation' => $confirmation->json('confirmation')]);
     }
 
     /** A challenge reference of the given kind, after one start. */
@@ -194,10 +205,10 @@ class FamilyActivationStartTest extends TestCase
             'no active membership' => ['no-membership', 'ELIGIBILITY_DENIED', 'NO_ACTIVE_MEMBERSHIP'],
             'inactive family' => ['family-inactive', 'ELIGIBILITY_DENIED', 'FAMILY_NOT_ACTIVE'],
             'deleted family' => ['family-deleted', 'ELIGIBILITY_DENIED', 'FAMILY_DELETED'],
-            'no mobile' => ['no-mobile', 'ELIGIBILITY_DENIED', 'TRUST_NOT_CURRENT'],
-            'mobile never verified' => ['untrusted', 'ELIGIBILITY_DENIED', 'TRUST_NOT_CURRENT'],
-            'stale mobile trust' => ['stale', 'ELIGIBILITY_DENIED', 'TRUST_NOT_CURRENT'],
-            'revoked mobile trust' => ['revoked', 'ELIGIBILITY_DENIED', 'TRUST_NOT_CURRENT'],
+            // A registered but never verified (or stale) number is no longer a
+            // denial: the code itself verifies it (SelfOtpActivationTest).
+            'no mobile' => ['no-mobile', 'ELIGIBILITY_DENIED', 'NO_VALID_MOBILE'],
+            'revoked mobile trust' => ['revoked', 'ELIGIBILITY_DENIED', 'REVOKED'],
             'already activated' => ['activated', 'ELIGIBILITY_DENIED', 'ALREADY_LINKED'],
             'suspended link' => ['suspended', 'ELIGIBILITY_DENIED', 'ALREADY_LINKED'],
             'identifier shared by two persons' => ['duplicate', 'AMBIGUOUS_IDENTITY', null],
@@ -394,7 +405,7 @@ class FamilyActivationStartTest extends TestCase
         $defaults = (require base_path('config/family_auth.php'))['activation'];
         $this->assertSame(400, $defaults['min_response_ms']);
         $this->assertSame([
-            'start_ip_minute' => 10, 'start_ip_hour' => 30, 'start_identifier_hour' => 5,
+            'start_ip_minute' => 10, 'start_ip_hour' => 30, 'start_identifier_hour' => 5, 'send_ip_minute' => 10,
             'verify_ip_minute' => 30, 'resend_ip_minute' => 10, 'complete_ip_minute' => 10,
         ], $defaults['limits']);
 
@@ -427,21 +438,22 @@ class FamilyActivationStartTest extends TestCase
 
         $real = $this->start(self::ELIGIBLE_ID)->assertOk()->json('challenge');
         $decoy = $this->start(self::UNKNOWN_ID)->assertOk()->json('challenge');
-        Sleep::assertSleptTimes(2);
+        // Start and send each wait, real or decoy.
+        Sleep::assertSleptTimes(4);
 
         // Since PWA-1I verify waits too, real or decoy (AuthResponseFloorTest).
         $this->verify($real, $this->wrongCode());
         $this->verify($decoy);
-        Sleep::assertSleptTimes(4);
+        Sleep::assertSleptTimes(6);
 
         // A refused resend waits too.
         $this->resend($real)->assertStatus(429);
         $this->resend($decoy)->assertStatus(429);
-        Sleep::assertSleptTimes(6);
+        Sleep::assertSleptTimes(8);
 
         config(['family_auth.activation.min_response_ms' => 0]);
         $this->start('111111111')->assertOk();
-        Sleep::assertSleptTimes(6);
+        Sleep::assertSleptTimes(8);
     }
 
     // ------------------------------------------- verify / resend: real = decoy

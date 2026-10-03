@@ -31,6 +31,10 @@ class FamilyIdentifierRequest extends FormRequest
                     $fail(self::INVALID);
                 }
             }],
+            // The destination is always the Person's stored number: a number
+            // in the request is refused, never used (FP-ADR-053).
+            'mobile' => ['prohibited'],
+            'phone' => ['prohibited'],
         ];
     }
 

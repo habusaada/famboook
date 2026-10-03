@@ -68,7 +68,10 @@ class DecoyCeilingParityTest extends TestCase
 
     private function start(string $base, string $nationalId): string
     {
-        return $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        // Activation confirms the masked number first (FP-ADR-053).
+        return str_ends_with($base, '/activation')
+            ? $this->startActivationChallenge($nationalId)
+            : $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
     }
 
     private function resend(string $base, string $reference): TestResponse

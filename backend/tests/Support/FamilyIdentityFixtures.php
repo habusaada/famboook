@@ -95,6 +95,19 @@ trait FamilyIdentityFixtures
         ]);
     }
 
+    /**
+     * First self-activation up to the code (FP-ADR-053): start, confirm the
+     * masked number, send. The challenge reference — real or decoy.
+     */
+    protected function startActivationChallenge(string $nationalId): string
+    {
+        $confirmation = $this->postJson('/api/v1/family/auth/activation/start', ['national_id' => $nationalId])
+            ->assertOk()->json('confirmation');
+
+        return $this->postJson('/api/v1/family/auth/activation/send', ['confirmation' => $confirmation])
+            ->assertOk()->json('challenge');
+    }
+
     protected function sessionRowFor(User $user): void
     {
         DB::table('sessions')->insert([

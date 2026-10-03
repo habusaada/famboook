@@ -468,7 +468,7 @@ class FamilyPasswordResetStartTest extends TestCase
             [$other] = $this->eligibleHead('444444444');
             $this->trustedMobile($other, '0597777777');
         }
-        $reference = $this->postJson(self::ACTIVATION.'/start', ['national_id' => $kind === 'real' ? '444444444' : self::UNKNOWN_ID])->assertOk()->json('challenge');
+        $reference = $this->startActivationChallenge($kind === 'real' ? '444444444' : self::UNKNOWN_ID);
         $code = $this->sms->lastCode() ?? '000000';
 
         $this->assertRefused($this->verify($reference, $code), 422, 'OTP_INVALID');
@@ -481,7 +481,7 @@ class FamilyPasswordResetStartTest extends TestCase
 
     public function test_activation_and_reset_decoys_of_one_identifier_do_not_supersede_each_other(): void
     {
-        $activation = $this->postJson(self::ACTIVATION.'/start', ['national_id' => self::UNKNOWN_ID])->json('challenge');
+        $activation = $this->startActivationChallenge(self::UNKNOWN_ID);
         $reset = $this->start(self::UNKNOWN_ID)->json('challenge');
 
         // Each is still open for its own purpose.

@@ -10,6 +10,7 @@ use App\Enums\FamilyAuthError;
 use App\Exceptions\FamilyAuthException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Family\FamilyChallengeRequest;
+use App\Http\Requests\Api\V1\Family\FamilyConfirmationRequest;
 use App\Http\Requests\Api\V1\Family\FamilyIdentifierRequest;
 use App\Http\Requests\Api\V1\Family\FamilyPasswordRequest;
 use App\Support\FamilyAuth\AuthSecurityLog;
@@ -30,7 +31,22 @@ class FamilyActivationController extends Controller
         try {
             return self::json($activation->start($request->nationalId()));
         } finally {
-            // Whatever happened: a sent SMS, a decoy or a refusal.
+            // Whatever happened: a real confirmation, a decoy or a refusal.
+            ResponseFloor::hold($startedAt);
+        }
+    }
+
+    /**
+     * "Yes, send the code" (FP-ADR-053): the code goes to the confirmed
+     * stored number. Confirming creates no trust — only a correct code does.
+     */
+    public function send(FamilyConfirmationRequest $request, FamilyActivation $activation): JsonResponse
+    {
+        $startedAt = microtime(true);
+        try {
+            return self::json($activation->send($request->confirmation()));
+        } finally {
+            // A real send, a decoy or a refusal: one response time.
             ResponseFloor::hold($startedAt);
         }
     }

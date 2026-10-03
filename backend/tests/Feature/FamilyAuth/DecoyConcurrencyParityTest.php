@@ -75,7 +75,10 @@ class DecoyConcurrencyParityTest extends TestCase
 
     private function start(string $base, string $nationalId): string
     {
-        return $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        // Activation confirms the masked number first (FP-ADR-053).
+        return str_ends_with($base, '/activation')
+            ? $this->startActivationChallenge($nationalId)
+            : $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
     }
 
     /** A public outcome: OK or the public error code (with retry_after when given). */

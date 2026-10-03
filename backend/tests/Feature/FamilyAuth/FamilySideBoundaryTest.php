@@ -181,7 +181,8 @@ class FamilySideBoundaryTest extends TestCase
     {
         // Public by design, each behind its own feature gate (PWA-1F, PWA-1G).
         $gates = [
-            'api/v1/family/auth/activation/start' => 'family.activation', 'api/v1/family/auth/activation/verify' => 'family.activation',
+            'api/v1/family/auth/activation/start' => 'family.activation', 'api/v1/family/auth/activation/send' => 'family.activation',
+            'api/v1/family/auth/activation/verify' => 'family.activation',
             'api/v1/family/auth/activation/resend' => 'family.activation', 'api/v1/family/auth/activation/complete' => 'family.activation',
             'api/v1/family/auth/login' => 'family.login',
             'api/v1/family/auth/password/reset/start' => 'family.password-reset', 'api/v1/family/auth/password/reset/verify' => 'family.password-reset',
@@ -208,6 +209,6 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        $this->assertSame(14, $checked);
+        $this->assertSame(15, $checked);
     }
 }

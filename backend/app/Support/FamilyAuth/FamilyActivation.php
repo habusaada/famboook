@@ -6,6 +6,7 @@ use App\Enums\ActivationDenial;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
 use App\Enums\FamilyAuthError;
+use App\Enums\MobileTrustDenial;
 use App\Enums\OtpPurpose;
 use App\Models\AuthOtpChallenge;
 use App\Models\Person;
@@ -18,13 +19,19 @@ use BackedEnum;
  * the account itself — is App\Actions\ActivateFamilyAccountAction.
  *
  * This class holds only the ACTIVATION rule: who gets a real challenge — an
- * eligible household head with a TRUSTED mobile who is not yet activated,
- * found by an exact match on the registry (no authentication identity exists
- * before activation). Everything a caller can observe — the generic answer,
- * decoys, timers, ceilings, public errors — is FamilyOtpFlow, shared with
- * password reset. Why a start was denied is recorded as a security event and
- * never returned. The OTP only ever goes to the Person's current trusted
- * mobile — the caller cannot name a destination.
+ * eligible household head with a valid CURRENT registered mobile who is not
+ * yet activated, found by an exact match on the registry (no authentication
+ * identity exists before activation). Everything a caller can observe — the
+ * generic answer, decoys, timers, ceilings, public errors — is FamilyOtpFlow,
+ * shared with password reset. Why a start was denied is recorded as a
+ * security event and never returned.
+ *
+ * FIRST SELF-ACTIVATION (FP-ADR-053): start answers with a confirmation and
+ * the MASKED current number (05*****123); send — after the user confirmed
+ * it — issues the code to that stored number, and ONLY a correct code makes
+ * it the Person's TRUSTED, SELF_OTP mobile (OtpChallenges::verify). A number
+ * already TRUSTED (e.g. a Staff grant) is used as it is, never replaced. The
+ * caller can never name or replace a destination.
  *
  * No raw National ID reaches a log, an event, a cache key or a limiter key:
  * the identifier is used once for the registry lookup and otherwise only as
@@ -36,19 +43,37 @@ final class FamilyActivation
         private readonly FamilyAccessResolver $resolver,
         private readonly OtpChallenges $otp,
         private readonly FamilyOtpFlow $flow,
+        private readonly FamilyAuthIdentities $identities,
+        private readonly CurrentTrustedMobile $trustedMobile,
     ) {}
 
     /**
+     * Step 1: no SMS — a confirmation and the masked current number.
+     *
      * @param  string  $nationalId  nine digits, already through FamilyNationalId::normalize()
-     * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
+     * @return array{confirmation: string, masked_mobile: string}
      */
     public function start(#[\SensitiveParameter] string $nationalId): array
     {
-        return $this->flow->start(
+        return $this->flow->prepare(
             OtpPurpose::ACTIVATION,
             $nationalId,
             FamilyAuthError::ACTIVATION_UNAVAILABLE,
-            fn (string $loginKey) => $this->issueFor($nationalId, $loginKey),
+            fn (string $loginKey) => $this->eligibleFor($nationalId, $loginKey),
+        );
+    }
+
+    /**
+     * Step 2: the user confirmed the masked number — send the code to it.
+     *
+     * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
+     */
+    public function send(string $confirmation): array
+    {
+        return $this->flow->send(
+            OtpPurpose::ACTIVATION,
+            $confirmation,
+            fn (int $personId, string $loginKey, string $masked) => $this->issueFor($personId, $loginKey, $masked),
         );
     }
 
@@ -64,8 +89,13 @@ final class FamilyActivation
         return $this->flow->resend(OtpPurpose::ACTIVATION, $reference);
     }
 
-    /** The real challenge when the identifier may activate; NULL means "answer with a decoy". */
-    private function issueFor(#[\SensitiveParameter] string $nationalId, string $loginKey): ?AuthOtpChallenge
+    /**
+     * The Person and current number when the identifier may activate; NULL
+     * means "answer with a decoy" (the reason is recorded, never returned).
+     *
+     * @return array{person_id: int, mobile: string}|null
+     */
+    private function eligibleFor(#[\SensitiveParameter] string $nationalId, string $loginKey): ?array
     {
         // Exact match on the stored value; persons.national_id is not unique.
         $persons = Person::query()->where('national_id', $nationalId)->limit(2)->get();
@@ -82,20 +112,46 @@ final class FamilyActivation
 
         /** @var Person $person */
         $person = $persons->first();
-        if ($denial = $this->resolver->headEligibility($person)) {
+        if ($denial = $this->refusal($person)) {
             $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, $denial, $person);
 
             return null;
         }
-        if (UserPersonLink::query()->current()->where('person_id', $person->getKey())->exists()) {
-            $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, ActivationDenial::ALREADY_LINKED, $person);
+
+        return ['person_id' => $person->getKey(), 'mobile' => FamilyMobile::normalize($person->mobile)];
+    }
+
+    /**
+     * The real challenge for a confirmed number; NULL means "answer with a
+     * decoy". Everything is decided again now: the Person still eligible,
+     * still this identifier, and still the very number whose mask the user
+     * confirmed — a changed number is never sent to.
+     */
+    private function issueFor(int $personId, string $loginKey, string $confirmedMask): ?AuthOtpChallenge
+    {
+        $person = Person::query()->find($personId);
+        $digits = FamilyNationalId::normalize($person?->national_id);
+        if ($person === null || $digits === null || ! hash_equals($loginKey, $this->identities->keyFor($digits))) {
+            $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, ActivationDenial::NOT_FOUND, $person, $loginKey);
+
+            return null;
+        }
+        if ($denial = $this->refusal($person)) {
+            $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, $denial, $person);
+
+            return null;
+        }
+        if (ActivationConfirmations::mask((string) FamilyMobile::normalize($person->mobile)) !== $confirmedMask) {
+            $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, MobileTrustDenial::STALE, $person);
 
             return null;
         }
 
-        $result = $this->otp->issue(OtpPurpose::ACTIVATION, $person);
+        // Trusted number: as it is. Otherwise the current registered number,
+        // pending until a correct code proves it.
+        $result = $this->otp->issue(OtpPurpose::ACTIVATION, $person, selfVerification: true);
         if ($result->challenge === null) {
-            // No trusted mobile, or an SMS ceiling.
+            // No valid mobile any more, or an SMS ceiling.
             $this->denied(AuthSecurityEventType::ELIGIBILITY_DENIED, $result->failure, $person);
 
             return null;
@@ -111,6 +167,16 @@ final class FamilyActivation
         );
 
         return $result->challenge;
+    }
+
+    /** Why this Person may not activate now, or NULL. */
+    private function refusal(Person $person): ?BackedEnum
+    {
+        return $this->resolver->headEligibility($person)
+            ?? (UserPersonLink::query()->current()->where('person_id', $person->getKey())->exists() ? ActivationDenial::ALREADY_LINKED : null)
+            ?? (FamilyMobile::normalize($person->mobile) === null ? MobileTrustDenial::NO_VALID_MOBILE : null)
+            // Staff revoked the trust: self-verification never undoes that.
+            ?? ($this->trustedMobile->for($person)->denial === MobileTrustDenial::REVOKED ? MobileTrustDenial::REVOKED : null);
     }
 
     private function denied(AuthSecurityEventType $type, BackedEnum $reason, ?Person $person, ?string $loginKey = null): void

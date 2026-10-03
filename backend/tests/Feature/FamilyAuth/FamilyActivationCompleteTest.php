@@ -82,7 +82,7 @@ class FamilyActivationCompleteTest extends TestCase
 
     private function started(string $nationalId = self::NATIONAL_ID): string
     {
-        return $this->postJson(self::BASE.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        return $this->startActivationChallenge($nationalId);
     }
 
     /** A challenge whose code was verified: the grant is open. */

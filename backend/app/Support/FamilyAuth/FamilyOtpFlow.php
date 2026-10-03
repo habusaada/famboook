@@ -44,6 +44,7 @@ final class FamilyOtpFlow
         private readonly OtpChallenges $otp,
         private readonly ChallengeDecoys $decoys,
         private readonly OtpThrottle $throttle,
+        private readonly ActivationConfirmations $confirmations,
     ) {}
 
     /**
@@ -54,6 +55,59 @@ final class FamilyOtpFlow
      * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
      */
     public function start(OtpPurpose $purpose, #[\SensitiveParameter] string $nationalId, FamilyAuthError $unavailable, Closure $issue): array
+    {
+        $loginKey = $this->admit($purpose, $nationalId, $unavailable);
+
+        return $this->issueOrDecoy($purpose, $loginKey, fn () => $issue($loginKey));
+    }
+
+    /**
+     * First self-activation, step 1 (FP-ADR-053): no SMS yet — a
+     * confirmation reference and the MASKED current mobile, real or fake.
+     * Every well-formed identifier gets one; who gets a real one is the
+     * caller's rule ($eligible returns the Person id and the current number,
+     * or NULL for "answer with a decoy").
+     *
+     * @param  Closure(string): (array{person_id: int, mobile: string}|null)  $eligible  given the login key
+     * @return array{confirmation: string, masked_mobile: string}
+     */
+    public function prepare(OtpPurpose $purpose, #[\SensitiveParameter] string $nationalId, FamilyAuthError $unavailable, Closure $eligible): array
+    {
+        $loginKey = $this->admit($purpose, $nationalId, $unavailable);
+
+        $real = $eligible($loginKey);
+        $masked = $real === null ? ActivationConfirmations::decoyMask($loginKey) : ActivationConfirmations::mask($real['mobile']);
+
+        return [
+            'confirmation' => $this->confirmations->create($loginKey, $real['person_id'] ?? null, $masked),
+            'masked_mobile' => $masked,
+        ];
+    }
+
+    /**
+     * First self-activation, step 2: the user confirmed the masked number —
+     * now the code is sent, exactly as a start sends it (real challenge or
+     * decoy, the same ceilings and answer). A confirmation is used once.
+     * Confirming creates NO trust: only a correct code does (verify).
+     *
+     * @param  Closure(int, string, string): ?AuthOtpChallenge  $issue  given the Person id, the login key and the
+     *                                                                  confirmed mask: the real challenge, or NULL
+     * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
+     */
+    public function send(OtpPurpose $purpose, string $confirmation, Closure $issue): array
+    {
+        $state = $this->confirmations->claim($confirmation);
+        if ($state === null) {
+            throw new FamilyAuthException(FamilyAuthError::OTP_INVALID);
+        }
+
+        return $this->issueOrDecoy($purpose, $state['login_key'], fn () => $state['person_id'] === null
+            ? null
+            : $issue($state['person_id'], $state['login_key'], $state['masked_mobile']));
+    }
+
+    /** The identifier's keyed fingerprint, once its per-identifier ceiling admits one more start. */
+    private function admit(OtpPurpose $purpose, #[\SensitiveParameter] string $nationalId, FamilyAuthError $unavailable): string
     {
         try {
             $loginKey = $this->identities->keyFor($nationalId);
@@ -74,11 +128,23 @@ final class FamilyOtpFlow
             throw new FamilyAuthException(FamilyAuthError::TOO_MANY_REQUESTS);
         }
 
+        return $loginKey;
+    }
+
+    /**
+     * The real challenge — or a decoy — for this identifier and purpose, and
+     * the public answer, identical for both.
+     *
+     * @param  Closure(): ?AuthOtpChallenge  $issue
+     * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
+     */
+    private function issueOrDecoy(OtpPurpose $purpose, string $loginKey, Closure $issue): array
+    {
         // A new start makes the previous reference of this identifier and
         // purpose unusable — a decoy here, a real challenge inside issue().
         $this->decoys->supersede($purpose, $loginKey);
 
-        $challenge = $issue($loginKey);
+        $challenge = $issue();
         $reference = $challenge?->uuid ?? $this->decoys->create($purpose, $loginKey);
         // A decoy "sends" too — unless the ceiling is reached, where a real
         // start would have sent nothing either.

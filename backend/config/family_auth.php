@@ -221,6 +221,7 @@ return [
             'start_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IP_MINUTE', 10),
             'start_ip_hour' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IP_HOUR', 30),
             'start_identifier_hour' => (int) env('FAMILY_ACTIVATION_LIMIT_START_IDENTIFIER_HOUR', 5),
+            'send_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_SEND_IP_MINUTE', 10),
             'verify_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_VERIFY_IP_MINUTE', 30),
             'resend_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_RESEND_IP_MINUTE', 10),
             'complete_ip_minute' => (int) env('FAMILY_ACTIVATION_LIMIT_COMPLETE_IP_MINUTE', 10),

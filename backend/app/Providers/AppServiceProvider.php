@@ -91,7 +91,12 @@ class AppServiceProvider extends ServiceProvider
         // FamilyOtpFlow (keyed fingerprint). OtpThrottle remains the only SMS
         // ceiling.
         foreach (['activation' => 'family-activation', 'password_reset' => 'family-password-reset'] as $config => $prefix) {
-            foreach (['start' => ['minute', 'hour'], 'verify' => ['minute'], 'resend' => ['minute'], 'complete' => ['minute']] as $step => $windows) {
+            $steps = ['start' => ['minute', 'hour'], 'verify' => ['minute'], 'resend' => ['minute'], 'complete' => ['minute']];
+            // First self-activation confirms the masked number before the code is sent.
+            if ($config === 'activation') {
+                $steps['send'] = ['minute'];
+            }
+            foreach ($steps as $step => $windows) {
                 RateLimiter::for("{$prefix}-{$step}", fn (Request $request) => array_map(
                     function (string $window) use ($config, $prefix, $step, $request) {
                         $max = (int) config("family_auth.{$config}.limits.{$step}_ip_{$window}");

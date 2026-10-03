@@ -83,8 +83,15 @@ class SmsAfterResponseTest extends TestCase
         ];
     }
 
+    /** The request that sends the first code: activation's send (after the confirmation), reset's start. */
     private function start(string $base, string $nationalId): TestResponse
     {
+        if ($base === self::ACTIVATION) {
+            $confirmation = $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('confirmation');
+            $this->attemptsAtResponse = null;
+
+            return $this->postJson($base.'/send', ['confirmation' => $confirmation]);
+        }
         $this->attemptsAtResponse = null;
 
         return $this->postJson($base.'/start', ['national_id' => $nationalId]);

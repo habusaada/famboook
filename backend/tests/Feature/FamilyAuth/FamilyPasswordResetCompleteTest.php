@@ -255,7 +255,7 @@ class FamilyPasswordResetCompleteTest extends TestCase
         // Another Person activates: their verified ACTIVATION grant is real and open.
         [$other] = $this->eligibleHead('444444444');
         $this->trustedMobile($other, '0597777777');
-        $activation = $this->postJson(self::ACTIVATION.'/start', ['national_id' => '444444444'])->json('challenge');
+        $activation = $this->startActivationChallenge('444444444');
         $this->postJson(self::ACTIVATION.'/verify', ['challenge' => $activation, 'code' => $this->sms->lastCode()])->assertOk();
 
         $this->assertRefused($this->complete($activation), 422, 'OTP_INVALID');

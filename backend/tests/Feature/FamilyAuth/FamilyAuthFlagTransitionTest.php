@@ -88,7 +88,9 @@ class FamilyAuthFlagTransitionTest extends TestCase
     #[DataProvider('flows')]
     public function test_switched_off_after_start_every_later_step_does_nothing(string $base, string $nationalId, string $flag, string $code): void
     {
-        $reference = $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        $reference = str_ends_with($base, '/activation')
+            ? $this->startActivationChallenge($nationalId)
+            : $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
         $this->travel(61)->seconds();
         config([$flag => false]);
         $before = $this->snapshot();
@@ -105,7 +107,9 @@ class FamilyAuthFlagTransitionTest extends TestCase
     #[DataProvider('flows')]
     public function test_switched_off_after_verify_the_grant_is_not_used(string $base, string $nationalId, string $flag, string $code): void
     {
-        $reference = $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        $reference = str_ends_with($base, '/activation')
+            ? $this->startActivationChallenge($nationalId)
+            : $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
         $this->postJson($base.'/verify', ['challenge' => $reference, 'code' => $this->sms->lastCode()])->assertOk();
         config([$flag => false]);
         $before = $this->snapshot();

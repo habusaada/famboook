@@ -166,7 +166,10 @@ class PostgresConcurrencyTest extends TestCase
     /** @return array{0: string, 1: string} reference, code — committed */
     private function realChallenge(string $base, string $nationalId): array
     {
-        $reference = $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
+        // Activation confirms the masked number first (FP-ADR-053).
+        $reference = str_ends_with($base, '/activation')
+            ? $this->startActivationChallenge($nationalId)
+            : $this->postJson($base.'/start', ['national_id' => $nationalId])->assertOk()->json('challenge');
 
         return [$reference, $this->sms->lastCode()];
     }
@@ -191,6 +194,26 @@ class PostgresConcurrencyTest extends TestCase
         $this->assertSame(0, AuthOtpChallenge::sole()->attempts, 'The waiting attempt counted nothing.');
         // Once released it runs, exactly once.
         $this->assertTrue($this->inOuterTransaction(fn () => app(OtpChallenges::class)->verify($reference, OtpPurpose::ACTIVATION, $code)->succeeded()));
+    }
+
+    public function test_a_self_otp_verify_waits_for_the_person_lock_and_trusts_once(): void
+    {
+        // A registered number that was never verified (FP-ADR-053).
+        [$person] = $this->eligibleHead(self::ACTIVATION_ID);
+        $person->forceFill(['mobile' => '0591234567'])->saveQuietly();
+        $reference = $this->startActivationChallenge(self::ACTIVATION_ID);
+        $code = $this->sms->lastCode();
+
+        // A parallel request holds the Person: this verify waits, trusting nothing.
+        $state = $this->whileLocked('SELECT id FROM persons WHERE id = ?', [$person->id],
+            fn () => app(OtpChallenges::class)->verify($reference, OtpPurpose::ACTIVATION, $code));
+        $this->assertSame(self::LOCK_NOT_AVAILABLE, $state);
+        $this->assertSame(0, DB::table('person_mobile_trusts')->where('status', 'TRUSTED')->count());
+
+        // Once released: exactly one TRUSTED, SELF_OTP row, and the CHECKs accept it.
+        $this->assertTrue(app(OtpChallenges::class)->verify($reference, OtpPurpose::ACTIVATION, $code)->succeeded());
+        $this->assertFalse(app(OtpChallenges::class)->verify($reference, OtpPurpose::ACTIVATION, $code)->succeeded());
+        $this->assertSame(1, DB::table('person_mobile_trusts')->where('status', 'TRUSTED')->where('verification_method', 'SELF_OTP')->whereNull('verified_by')->count());
     }
 
     public function test_a_resend_waits_for_a_verify_holding_the_challenge(): void
