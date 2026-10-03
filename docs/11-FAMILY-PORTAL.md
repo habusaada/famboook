@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.8
+**Version:** 1.9
 **Date:** 2026-10-03
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
 ---
 
@@ -1224,8 +1224,8 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 Approved design. **Implemented: the PWA-1C foundation, the PWA-1D
 identity domain behaviour, the PWA-1E mobile trust and OTP foundation,
 PWA-1F activation, PWA-1G login and password reset and PWA-1H coordinator
-scope and Coordinator Space**, and **TweetsMS SMS delivery** (see the
-seven implementation records below). The provider is configured and
+scope and Coordinator Space**, **TweetsMS SMS delivery** and the **PWA-1I
+security hardening** (see the eight implementation records below). The provider is configured and
 enabled only in the server environment (docs/08 §16a).
 Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
@@ -1482,7 +1482,7 @@ PWA-1E  Mobile trust + OTP / SMS abstraction             DONE
 PWA-1F  Activation + first Family Portal UI              DONE
 PWA-1G  Login / password reset                           DONE
 PWA-1H  Coordinator identity / scope                     DONE
-PWA-1I  Security hardening / full regression             NEXT
+PWA-1I  Security hardening / full regression             DONE
 ```
 
 ## PWA-1C implementation record
@@ -1756,7 +1756,8 @@ default** (`FAMILY_ACTIVATION_ENABLED=false`).
   TweetsMS record: the SMS is now sent after the response.)
 - A decoy follows the per-Person hourly and daily send ceilings by
   counting sends per identifier. The destination, IP and global SMS
-  ceilings are not modelled for decoys.
+  ceilings are not modelled for decoys. (PWA-1I: the IP and global
+  ceilings now are; the destination ceilings cannot be.)
 - True parallel completion is serialized by the Person row lock on
   PostgreSQL; the automated suite runs on SQLite and covers the sequential
   outcomes only.
@@ -2017,6 +2018,100 @@ full number is never printed and no OTP challenge is created.
 Not implemented: delivery reports (handset receipt), balance monitoring,
 provider failover, a Staff screen for SMS status. The scheduler cron
 remains a separate Production prerequisite.
+
+## PWA-1I implementation record — security hardening
+
+Implemented 2026-10-03. No migration, no API shape change, no frontend
+change, no new flag; nothing enabled. Every finding of the PWA-1I preflight
+classified HIGH or MEDIUM in code is closed; the operational ones are
+Production validation items (docs/08 §16a).
+
+**Decoy concurrency parity (A-1, HIGH).** A real challenge is row-locked,
+so its parallel requests behave serialized; a decoy is cache state and used
+to read-modify-write it, so parallel requests could tell the two apart
+(e.g. eight parallel wrong codes: exactly four INVALID then LOCKED on a real
+challenge, more INVALID on a decoy; two parallel resends: one winner on a
+real challenge, two on a decoy). Now nothing parallel requests change is a
+read-modify-write of the decoy record:
+
+```text
+attempts     atomic counter (Cache::increment); each attempt is judged by
+             its own count — below the limit CODE_MISMATCH, at and after it
+             LOCKED — never by a later re-read
+superseded   a flag of its own, only ever set (a racing resend cannot
+             revive a superseded decoy)
+resend       one atomic claim per send (Cache::add): one winner, the others
+             see the cooldown (or the send limit) like a real loser
+```
+
+A real resend that loses the race now reports its cooldown from the row as
+read under its lock (it used the stale pre-read).
+
+**Decoy ceiling parity (A-3).** A decoy resend is refused once the IP or
+the global OTP SMS ceiling is reached, exactly as a real resend is
+(`OtpThrottle::sharedCeilingReached`, read-only — a decoy counts nothing on
+the real SMS counters). The Person ceilings are mirrored per identifier as
+before. The DESTINATION ceilings cannot be mirrored: a decoy has no
+destination and none is invented — a residual, documented limit (an
+attacker would need two eligible heads sharing one trusted phone).
+
+**Response floor (A-2).** Verify and complete now wait out the same floor
+as start and resend, for every outcome (real or decoy, right or wrong code,
+locked, expired, consumed, refused, success). One configured value
+(`FAMILY_ACTIVATION_MIN_RESPONSE_MS`, still 400 ms by default); the
+Production value is set from measurements. Login is unchanged: its single
+bcrypt verification already equalizes it.
+
+**Attempt accounting (L-1, A-4).** Login counts every attempt atomically
+BEFORE the password check (identifier + IP and identifier tiers) and refuses
+an attempt beyond a ceiling without any verification; a success clears both,
+so in effect they count failures. Of parallel attempts at most the ceiling
+reach bcrypt; known and unknown identifiers are accounted identically. The
+per-identifier start ceiling counts the same way. Limits unchanged (5 / 20
+failures per 15 minutes, 20 attempts per IP per 15 minutes, 5 starts per
+identifier per hour).
+
+**Identifier input (N-1).** Before normalization the copy-paste invisibles
+are removed too: U+200B–200D (zero-width space and joiners), U+202A–202E
+(directional embeddings and overrides), U+2066–2069 (directional isolates)
+and U+FEFF (BOM). The result must still be exactly nine ASCII digits; no
+other character is stripped. (Shared by the mobile normalizer; no stored
+trust can depend on the old behaviour, since such a value never normalized.)
+
+**Readiness check.** `php artisan famboook:family-auth-check` — read-only,
+counts and YES/NO only: the fingerprint key (configured, valid, version,
+previous key), ACTIVE identities that no longer match their Person's
+current National ID under the configured key, TRUSTED mobiles that no longer
+match the current mobile, the three flags, the SMS driver and TweetsMS
+configuration, the session, cache and debug settings — with warnings and
+exit code 1. It detects a WRONG key (finding N-2), which otherwise fails
+silently: every login invalid, every trust stale, every reset a decoy.
+
+**Regression coverage.** UUID v4 for real and decoy references (a real one
+silently becoming a time-ordered UUIDv7 would be an oracle), equal lifetime
+and cross-purpose behaviour; flags switched off mid-flow (503, nothing
+changed, the grant left unconsumed); National ID corrected during a reset
+(the obsolete identifier fails at commit, the in-flight grant follows the
+account — Person and User — while it keeps its Family context, and dies
+with a suspended identity; no persons.national_id fallback); death, lost
+headship, ended membership, deactivated Family or User, suspended or ended
+link during a session (context and Coordinator Space gone on the next
+request; sessions revoked where designed); corrupted RBAC (direct
+permissions never change the side; mixed roles refused on both sides); one
+leakage sweep through the whole flow with the real TweetsMS driver.
+
+**PostgreSQL concurrency.** `PostgresConcurrencyTest` (PostgreSQL only;
+skipped elsewhere) proves with a second database session and
+`lock_timeout` that parallel verify and resend wait for the challenge row,
+parallel starts for the Person row, completions for the Person / User row,
+that a grant consumed by a parallel completion is refused under the lock,
+and that one open challenge per Person and purpose is enforced by the
+database. Run on the dedicated `famboook_test` database (docs/08 §16a).
+
+**Data note.** `auth_otp_challenges.ip` holds the raw client IP of the
+request that issued the challenge, for operations and abuse review, at most
+for the 90-day retention of finished challenges (security events keep only
+a digest).
 
 ---
 
@@ -2311,6 +2406,15 @@ memory until then. This replaces the "synchronously after commit" timing of
 FP-ADR-040 on the public routes, and makes the queue worker of FP-ADR-035
 unnecessary for SMS (it remains needed for fan-out). The public answer
 never depends on the provider.
+
+FP-ADR-052
+Real and decoy challenges are indistinguishable also under parallel
+requests and at the ceilings: decoy state that parallel requests change is
+atomic (counter, write-once flag, one claim per send); decoy resends honour
+the IP and global SMS ceilings (never the destination ones, which a decoy
+cannot have); every public OTP step — start, verify, resend, complete —
+waits out one response floor. Authentication attempts are counted before
+the work they limit.
 ```
 
 ---
@@ -2465,3 +2569,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.6 | 2026-10-03 | Approved | PWA-1G implementation record in §30a: Family login (identity lookup, Family context, generic failure, dummy hash, two-tier lockout), password reset on purpose-aware decoys, the reset transaction and session revocation, the 72-byte password ceiling, three independent gates, the login and forgot-password screens; Production gate items 8–9; FP-ADR-044 … 046; PWA-1G done, PWA-1H next. No migration; nothing enabled |
 | 1.7 | 2026-10-03 | Approved | PWA-1H implementation record in §30a: coordinator resolver, administration actions and Staff API, `coordinator.space`, coordinator context and scoped summaries (`coordinator-family.view-summary` approved), `/family/me.coordinator_space`, Coordinator Space in the portal; PFP-022 updated; FP-ADR-047 … 049; PWA-1H done, PWA-1I next. No migration; assist withheld |
 | 1.8 | 2026-10-03 | Approved | TweetsMS SMS delivery record in §30a: `FAMILY_SMS_DRIVER=tweetsms`, `05XXXXXXXX` as stored, success only on code 999 (accepted, not handset delivery), failure classification, no retry, after-response delivery without a queue, safe failure logging and event metadata, shorter one-part OTP message, `famboook:sms-check`; gate items 1/4/5 updated; PFP-001 decided; FU-03 updated; FP-ADR-050, 051. No migration, nothing enabled |
+| 1.9 | 2026-10-03 | Approved | PWA-1I implementation record in §30a: decoy concurrency parity (atomic attempts, write-once supersession, one resend claim per send), IP / global ceiling parity for decoy resends (destination not mirrorable), response floor on verify and complete, attempts counted before the work (login, start), invisible-character normalization, `famboook:family-auth-check`, regression and PostgreSQL concurrency coverage, raw challenge IP retention noted; FP-ADR-052; PWA-1I done. No migration, nothing enabled |

@@ -3975,6 +3975,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
+
+### DB-ADR-050
+PWA-1I added **no migration**. Decoy challenges remain cache state; what parallel requests change is now held in separate cache keys — an atomic attempts counter, a write-once superseded flag and one `Cache::add` claim per resend — so their behaviour matches the row-locked real challenges. The guarantees SQLite cannot prove are covered by PostgreSQL-only tests on the dedicated `famboook_test` database: verify and resend wait for the `auth_otp_challenges` row lock, issue for the `persons` row lock, completions for the Person (and, for reset, the `users`) row lock; a grant consumed by a parallel completion is refused under the lock; `uq_auth_otp_challenges_open` refuses a second open challenge. `auth_otp_challenges.ip` holds the raw client IP of the issuing request, kept at most for the 90-day retention of finished challenges; security events keep only a digest.
 ```
 
 ### 111. Pending Database Decisions
@@ -4240,6 +4243,7 @@ Date: 2026-09-24
 | 1.2.29 | 2026-10-03 | Approved | PWA-1G: no schema change (DB-ADR-047); identity-based lookup, reset lock order and session deletion inside the transaction |
 | 1.2.30 | 2026-10-03 | Approved | PWA-1H: no schema change (DB-ADR-048); typed scope columns kept, no expiry, the scoped EXISTS query and its indexes |
 | 1.2.31 | 2026-10-03 | Approved | TweetsMS: no schema change (DB-ADR-049); plaintext OTP never persisted or queued; `delivery_outcome` / `delivery_reason` allow-listed in `auth_security_events.metadata` |
+| 1.2.32 | 2026-10-03 | Approved | PWA-1I: no schema change (DB-ADR-050); atomic decoy cache keys, PostgreSQL concurrency validation of the row locks and the open-challenge index, raw challenge IP retention recorded |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

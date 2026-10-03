@@ -458,7 +458,9 @@ Family Portal activation may be enabled in Production.
   since TweetsMS is called after the response, the floor no longer has to
   cover the provider's latency — it covers the difference between a real
   challenge and a decoy (database work only) and is reviewed against
-  Production measurements (gate item 8). It holds a PHP worker for its
+  Production measurements (gate item 8). Since PWA-1I it applies to all
+  four public OTP steps — start, verify, resend and complete. It holds a
+  PHP worker for its
   duration; the after-response SMS call holds the same worker for up to
   the TweetsMS timeout (8 s by default) once the client has its answer.
 - **OTP abuse ceilings** are security settings with defaults in
@@ -568,6 +570,66 @@ is configured or enabled on the server by deploying it.
 - **Rollback.** Set `FAMILY_SMS_DRIVER=` (empty), or close the Family Auth
   flags, then `php artisan config:cache`. No migration and no data change
   is involved; challenges issued meanwhile simply expire.
+
+## PWA-1I — security hardening: Production requirements
+
+Recorded 2026-10-03 (docs/11 §30a). PWA-1I adds no migration, no flag and
+no permission; deploying it enables nothing. What it requires of the
+environment, and what must be validated there, is recorded here — none of
+it has been verified on the server yet.
+
+- **Readiness check.** `php artisan famboook:family-auth-check` —
+  read-only; counts and YES/NO only, never a National ID, mobile,
+  fingerprint or secret. Run it after every deploy and before any flag
+  change; it must end with "no warnings". It reports a missing or invalid
+  fingerprint key AND a **wrong** one (ACTIVE identities / TRUSTED mobiles
+  that no longer match), which otherwise fails silently.
+- **PHP-FPM** (after-response SMS, docs/11 FP-ADR-051):
+  - the SAPI serving the API must be `fpm-fcgi` — only PHP-FPM (or
+    LiteSpeed) sends the response before the SMS call;
+  - `request_terminate_timeout` at least 30 seconds, or unset — the SMS
+    call runs after the response for up to the TweetsMS timeout (8 s);
+  - `pm.max_children` with headroom: every OTP request holds a worker for
+    the response floor plus up to 8 s after its response.
+- **Client IP and proxies.** The throttles key on the client IP as nginx
+  passes it (`REMOTE_ADDR`); Laravel trusts no proxy header. This is only
+  correct while nothing sits in front of nginx. If a CDN, load balancer or
+  reverse proxy is ever introduced, Laravel `trustProxies` and nginx
+  `real_ip` (restricted to that proxy's addresses) must be configured
+  BEFORE relying on any IP throttle — otherwise every client shares one IP.
+- **CGNAT risk.** Palestinian mobile users, and users sharing one venue or
+  network, may share a public IP address. The per-IP ceilings (activation /
+  reset start 10 per minute and 30 per hour, OTP SMS 20 per hour, login 20
+  per 15 minutes) may then be reached by legitimate users, and an exhausted
+  SMS ceiling turns a real start into a decoy ("code sent", nothing
+  arrives; the reason is in auth_security_events only). No new values are
+  set without data: a limited-cohort review of these events is required
+  before general rollout.
+- **Response floor.** One value for start, verify, resend and complete.
+  Measure on Production-like infrastructure (same PostgreSQL, PHP-FPM and
+  `CACHE_STORE=database`, synthetic data) with the floor at 0: real and
+  decoy, at least 500 samples each, p50 / p95 / p99. Set the floor above
+  the slowest p99 with a margin; confirm in Production with the single test
+  household against unknown identifiers.
+- **PostgreSQL validation** before the deploy, never against the
+  development database:
+  1. create the dedicated database once, by hand:
+     `createdb -h 127.0.0.1 -p 5433 -U postgres famboook_test`
+     (host, port and user as `phpunit.pgsql.xml` forces them; the
+     application never creates it);
+  2. supply the password outside Git (libpq `pgpass.conf`, or a git-ignored
+     copy of `phpunit.pgsql.xml`);
+  3. run `vendor/bin/phpunit -c phpunit.pgsql.xml tests/Feature/FamilyAuth`
+     (the CHECK constraints and `PostgresConcurrencyTest`), then the whole
+     suite the same way. `TestDatabaseGuard` refuses any database whose name
+     does not end in `_test`, and the development database of `.env`.
+- **Retention.** `auth_otp_challenges.ip` keeps the raw client IP of the
+  issuing request for at most the 90-day retention of finished challenges
+  (`famboook:purge-otp-challenges`, which needs the scheduler cron).
+- **Production validation still owed:** real PHP-FPM early flush
+  (activation start timing with the floor at 0 and TweetsMS live), the
+  settings above, the response-floor measurement, the PostgreSQL suite, the
+  readiness check clean, and the controlled flag rollout (§16a gate).
 
 ---
 
@@ -714,6 +776,7 @@ Never do this once real data has been entered.
 | 1.1.6 | 2026-10-03 | Approved | §16a: PWA-1G — three independent Family Auth flags (all false), login lockout and password reset limiter overrides, session notes, gate item 7 code-delivered and items 8–9 added. Nothing activated |
 | 1.1.7 | 2026-10-03 | Approved | §16a: PWA-1H — seed `coordinator-family.view-summary`, no migration or flag, coordinators managed through the Staff API by SUPER_ADMIN and ADMINISTRATOR, no assignment expiry |
 | 1.1.8 | 2026-10-03 | Approved | §16a: TweetsMS SMS delivery — `FAMILY_SMS_DRIVER=tweetsms`, `TWEETSMS_API_KEY` / `TWEETSMS_SENDER` in the server `.env` only, `05XXXXXXXX` unchanged, success only on code 999 (accepted, not handset delivery), failure classes, after-response with no queue and no retry, `famboook:sms-check` validation procedure and rollback; gate items 1, 4 and 5 resolved, scheduler cron still separate. Nothing enabled |
+| 1.1.9 | 2026-10-03 | Approved | §16a: PWA-1I — `famboook:family-auth-check` (read-only readiness; detects a wrong fingerprint key), PHP-FPM requirements (`fpm-fcgi`, `request_terminate_timeout` >= 30 s or unset, `pm.max_children` headroom), proxy / `trustProxies` rule, CGNAT risk and limited-cohort review, response floor on all four OTP steps and its measurement, `famboook_test` PostgreSQL procedure, raw challenge IP retention. No migration, nothing enabled |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

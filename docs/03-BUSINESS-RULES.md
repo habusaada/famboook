@@ -2314,6 +2314,32 @@ is integrated (below); it sends only once configured on the server. Still
 not built: coordinator-assisted mobile verification (a future dedicated
 workflow).
 
+## Hardening as implemented (PWA-1I)
+
+- **A decoy behaves like a real challenge also under parallel requests.**
+  Parallel wrong codes lock it at exactly the attempt a real challenge locks
+  at; of parallel resends exactly one is sent, the others see the cooldown
+  or the send limit; a decoy replaced by a new start can never come back.
+- **At the ceilings too.** When the IP or the global OTP SMS ceiling is
+  reached, a decoy resend is refused as a real one is. The ceilings per
+  destination cannot apply to a decoy (it has no phone number); this
+  residual limit is accepted and documented.
+- **One response time for every public OTP step.** Start, code
+  verification, resend and completion all wait out the same minimum
+  response time, whatever the outcome.
+- **Attempts are counted before the work they limit.** A login attempt is
+  counted before the password is checked, and refused unchecked beyond a
+  ceiling; a successful login clears the count. The same holds for the
+  starts per identifier. The approved limits are unchanged.
+- **Pasted identifiers.** Invisible formatting characters carried by
+  copy-paste (zero-width characters, directional embeddings and isolates,
+  byte-order mark) are removed before a National ID is checked; it must
+  still be exactly nine digits, and nothing else is removed.
+- **Readiness.** An operator command reports, without revealing any value,
+  whether Family authentication is configured consistently — in particular
+  whether the fingerprint key still matches the existing accounts and
+  trusted mobiles.
+
 ## SMS delivery as implemented (TweetsMS)
 
 - **Provider.** TweetsMS is the Production SMS provider, selected by
@@ -4813,6 +4839,7 @@ Date: 2026-09-24
 | 1.2.41 | 2026-10-03 | Approved | PWA-1G: §89b login and password reset as implemented (identity lookup, full Family context required, one generic login failure, two-tier lockout, reset eligibility and decoys, purpose-bound references, reset transaction ending all sessions, 72-byte password ceiling, three independent gates) |
 | 1.2.42 | 2026-10-03 | Approved | PWA-1H: §89b coordinator rules as implemented (family-side never Staff, four conditions for Coordinator Space, union of scopes, current hierarchy, fail-closed structure, summary-only data, administration by SUPER_ADMIN and ADMINISTRATOR, assist withheld) |
 | 1.2.43 | 2026-10-03 | Approved | TweetsMS: §89b SMS delivery as implemented (provider, `05XXXXXXXX` as stored, success only on code 999, fixed one-part OTP text, after-response delivery without a queue, no automatic retry, failures recorded and never shown); OTP delivery timing and the Production gate updated |
+| 1.2.44 | 2026-10-03 | Approved | PWA-1I: §89b hardening as implemented — decoy parity under parallel requests and at the IP / global ceilings (destination not mirrorable), one response floor for all four OTP steps, attempts counted before the work, invisible-character removal for pasted identifiers, readiness check |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
