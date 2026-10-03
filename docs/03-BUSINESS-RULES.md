@@ -2213,8 +2213,9 @@ Reset        National ID → OTP to the trusted mobile → new password
 
 ## Mobile trust
 
-- An imported mobile is not trusted for activation.
-- Only a trusted mobile receives an activation OTP.
+- An imported mobile is not trusted merely because it exists. For first
+  self-activation an OTP may be sent to the Person's current registered
+  mobile; only its successful verification makes it trusted (SELF_OTP).
 - During activation a person cannot replace the mobile with a new number
   and receive an OTP on it.
 - A change of the authentication mobile is separately authorized and
@@ -2461,17 +2462,29 @@ workflow).
   normalized digits on `persons.national_id` — exactly one live match; zero
   or several deny — who is an eligible household head (the resolver's rule:
   not deleted, active, ALIVE, active membership, household head, Family
-  ACTIVE and not deleted), has a TRUSTED current mobile and has no ACTIVE or
+  ACTIVE and not deleted), has a valid current registered mobile — trusted
+  or not, but never one whose trust Staff revoked — and has no ACTIVE or
   SUSPENDED User-Person Link. UNKNOWN life status is not eligible.
+- **Confirm, then send (first self-activation).** The first answer shows
+  the registered number masked — `05*****` and the last three digits only —
+  and asks "هل هذا رقمك ويمكنك استقبال رمز التحقق عليه؟". Only after the
+  user confirms is the code sent. Confirming is not verification and
+  creates no trust.
 - **Nothing is revealed.** Every well-formed identifier gets the same
-  answer from the first step. A denied start (unknown, ineligible, no or
-  untrusted mobile, already activated, ambiguous, SMS ceiling reached)
-  returns a decoy reference that behaves like a real one in the code and
-  resend steps. The reason is recorded as a security event only. No part of
-  the mobile number is ever shown. A failed SMS delivery is answered like a
-  sent one.
-- **The code goes only to the Person's current trusted mobile.** The caller
-  cannot name a destination.
+  answer at every step. A denied start (unknown, ineligible, no valid
+  mobile, revoked trust, already activated, ambiguous; at send also an SMS
+  ceiling) shows a fake masked number that is stable for that identifier,
+  and continues with a decoy reference that behaves like a real one in the
+  code and resend steps. The reason is recorded as a security event only.
+  The full mobile number is never shown. A failed SMS delivery is answered
+  like a sent one.
+- **The code goes only to the Person's current registered mobile** — the
+  very number whose mask was confirmed. The caller cannot name a
+  destination; a number in the request is refused.
+- **Only a correct code creates trust.** It makes that number the Person's
+  TRUSTED mobile with the method SELF_OTP, and is recorded. A wrong,
+  expired or superseded code never does. A number already TRUSTED (e.g. by
+  Staff) is used as it is and never replaced.
 - **Server state decides the step.** A password can be set only against a
   challenge whose code was verified, inside the 10-minute grant.
 - **Completion is one transaction**: the grant is consumed, eligibility and
@@ -2564,7 +2577,13 @@ assigned (Head Succession, docs/11 FU-01 — a rollout gate).
   trust. Mobile numbers are not unique; shared numbers are valid data.
 - Every imported mobile begins UNVERIFIED. There is no bulk trust.
 - A shared number is trusted only per Person, by individual verification.
-- Methods: `IN_PERSON`, `STAFF_CALLBACK`, `AUTHORIZED_RECORD_REVIEW`.
+- Methods: `IN_PERSON`, `STAFF_CALLBACK`, `AUTHORIZED_RECORD_REVIEW` (Staff
+  grants), and `SELF_OTP` — a successful first-activation code sent to the
+  Person's current registered mobile (never a Staff grant method).
+- Imported/current registered mobile is not trusted merely because it exists. For first self-activation, possession may be established by successful OTP verification sent exclusively to that stored mobile. Successful OTP creates Person-specific TRUSTED status with verification method SELF_OTP. The user's confirmation of the masked number alone is
+  never verification.
+- A number whose trust Staff REVOKED is never self-verified back; password
+  reset always requires an already TRUSTED mobile.
 - Only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED initially. A
   COORDINATOR may assist within scope and never grants.
 - A changed number no longer authorizes an OTP.
@@ -4840,6 +4859,7 @@ Date: 2026-09-24
 | 1.2.42 | 2026-10-03 | Approved | PWA-1H: §89b coordinator rules as implemented (family-side never Staff, four conditions for Coordinator Space, union of scopes, current hierarchy, fail-closed structure, summary-only data, administration by SUPER_ADMIN and ADMINISTRATOR, assist withheld) |
 | 1.2.43 | 2026-10-03 | Approved | TweetsMS: §89b SMS delivery as implemented (provider, `05XXXXXXXX` as stored, success only on code 999, fixed one-part OTP text, after-response delivery without a queue, no automatic retry, failures recorded and never shown); OTP delivery timing and the Production gate updated |
 | 1.2.44 | 2026-10-03 | Approved | PWA-1I: §89b hardening as implemented — decoy parity under parallel requests and at the IP / global ceilings (destination not mirrorable), one response floor for all four OTP steps, attempts counted before the work, invisible-character removal for pasted identifiers, readiness check |
+| 1.2.45 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation, code only to the stored number, SELF_OTP trust only after a correct code, Staff-revoked numbers excluded, password reset unchanged |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

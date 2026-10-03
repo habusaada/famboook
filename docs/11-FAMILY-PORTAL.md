@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.9
+**Version:** 1.10
 **Date:** 2026-10-03
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2113,6 +2113,60 @@ request that issued the challenge, for operations and abuse review, at most
 for the 90-day retention of finished challenges (security events keep only
 a digest).
 
+## First self-activation implementation record — SELF_OTP mobile trust
+
+Implemented 2026-10-04 (FP-ADR-053). Approved product decision:
+
+> Imported/current registered mobile is not trusted merely because it exists. For first self-activation, possession may be established by successful OTP verification sent exclusively to that stored mobile. Successful OTP creates Person-specific TRUSTED status with verification method SELF_OTP.
+
+**User confirmation alone is not verification.** Clicking "نعم، أرسل رمز
+التحقق" only asks for the code; it creates no trust. Only a correct,
+unexpired, unsuperseded code establishes it.
+
+**Flow** (`/family/activate`, four steps and the success screen):
+
+```text
+1  POST activation/start {national_id}      → {confirmation, masked_mobile}   no SMS
+2  user confirms 05*****123                  "هل هذا رقمك ويمكنك استقبال رمز التحقق عليه؟"
+   POST activation/send  {confirmation}      → {challenge, timers}            the code is sent
+3  POST activation/verify {challenge, code}  correct code → TRUSTED, SELF_OTP
+4  POST activation/complete                  password; account; session
+```
+
+- **Who gets a real confirmation:** the existing eligibility (exact
+  National ID match, eligible living head, active membership, ACTIVE
+  Family, no current link) plus a VALID current registered mobile, trusted
+  or not. A number whose trust Staff REVOKED is never self-verified back.
+- **Masking:** `05*****` + the last three digits, shown only after the
+  eligibility checks admit the flow. The full number is never returned,
+  logged or stored in the confirmation.
+- **Anti-enumeration kept:** a denied identifier (unknown, ineligible, no
+  valid mobile, revoked trust, ambiguous) gets the same response with a
+  FAKE mask derived from its keyed fingerprint — stable for that
+  identifier — and its send yields a decoy challenge (no SMS, no row). The
+  start and the send wait out the response floor like every other step.
+  Residual, accepted with the decision: someone who already knows a
+  Person's real number can compare its last three digits.
+- **Destination:** always the Person's stored number, re-checked at send
+  (still eligible, same identifier, the very number whose mask was
+  confirmed). The API refuses any `mobile` or `phone` field. A confirmation
+  is used once and lives 10 minutes.
+- **Trust mechanics:** an already TRUSTED current number (a Staff grant,
+  e.g. the first pilot's IN_PERSON record) is used as it is — never
+  replaced, duplicated or re-labelled. Otherwise the send binds the
+  challenge to a PENDING_VERIFICATION row for the current number
+  (`MobileTrusts::pendingFor`); pending is not trust. A correct code
+  promotes it inside the verify transaction, Person row locked first
+  (`MobileTrusts::confirmSelfVerified`): status TRUSTED, method SELF_OTP,
+  no Staff verifier, a MOBILE_TRUST_GRANTED event (reason SELF_OTP). A Staff
+  grant made meanwhile is kept and the pending row retired; the partial
+  unique index keeps one TRUSTED row per Person. A later number change
+  makes the trust STALE as for any trust.
+- **Unchanged:** the OTP service, challenge, resend, expiry, attempts and
+  all ceilings and TweetsMS delivery; password reset (still requires an
+  already TRUSTED mobile); login; Staff grant and revoke (a Staff grant can
+  never use SELF_OTP); account sides.
+
 ---
 
 # 31. Amendment Register
@@ -2415,6 +2469,17 @@ the IP and global SMS ceilings (never the destination ones, which a decoy
 cannot have); every public OTP step — start, verify, resend, complete —
 waits out one response floor. Authentication attempts are counted before
 the work they limit.
+
+FP-ADR-053
+Imported/current registered mobile is not trusted merely because it exists. For first self-activation, possession may be established by successful OTP verification sent exclusively to that stored mobile. Successful OTP creates Person-specific TRUSTED status with verification method SELF_OTP. User confirmation of the masked number alone is never
+verification. First self-activation shows the masked registered number
+(05*****123, last three digits only) after the eligibility checks, sends the
+code only to that stored number after the user confirms it, and creates the
+trust only on a correct code; a Staff-revoked number is never self-verified;
+password reset still requires an already TRUSTED mobile. This supersedes,
+for first activation only, FP-ADR-041's "no part of the mobile is shown"
+and the TRUSTED-mobile prerequisite of activation; decoys show a stable fake
+mask so the response stays identical.
 ```
 
 ---
@@ -2570,3 +2635,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.7 | 2026-10-03 | Approved | PWA-1H implementation record in §30a: coordinator resolver, administration actions and Staff API, `coordinator.space`, coordinator context and scoped summaries (`coordinator-family.view-summary` approved), `/family/me.coordinator_space`, Coordinator Space in the portal; PFP-022 updated; FP-ADR-047 … 049; PWA-1H done, PWA-1I next. No migration; assist withheld |
 | 1.8 | 2026-10-03 | Approved | TweetsMS SMS delivery record in §30a: `FAMILY_SMS_DRIVER=tweetsms`, `05XXXXXXXX` as stored, success only on code 999 (accepted, not handset delivery), failure classification, no retry, after-response delivery without a queue, safe failure logging and event metadata, shorter one-part OTP message, `famboook:sms-check`; gate items 1/4/5 updated; PFP-001 decided; FU-03 updated; FP-ADR-050, 051. No migration, nothing enabled |
 | 1.9 | 2026-10-03 | Approved | PWA-1I implementation record in §30a: decoy concurrency parity (atomic attempts, write-once supersession, one resend claim per send), IP / global ceiling parity for decoy resends (destination not mirrorable), response floor on verify and complete, attempts counted before the work (login, start), invisible-character normalization, `famboook:family-auth-check`, regression and PostgreSQL concurrency coverage, raw challenge IP retention noted; FP-ADR-052; PWA-1I done. No migration, nothing enabled |
+| 1.10 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation (`start` → `send`), code sent only to the stored number, SELF_OTP trust created only by a correct code (pending row promoted under the Person lock), revoked numbers excluded, existing TRUSTED reused, decoys with a stable fake mask; supersedes FP-ADR-041 for the mask and the trust prerequisite. Migration: `SELF_OTP` allowed in the trust CHECKs |
