@@ -65,10 +65,23 @@ export type ChallengeTimers = {
 
 export type ActivationStart = ChallengeTimers & { challenge: string };
 
+/**
+ * First self-activation (FP-ADR-053): an opaque confirmation reference and
+ * the MASKED registered mobile — only ever `05*****123`, the last three
+ * digits. The full number is never sent to the browser, and no number is
+ * ever sent back: the code always goes to the number the server holds.
+ */
+export type ActivationConfirmation = { confirmation: string; masked_mobile: string };
+
 const BASE = "/api/v1/family/auth/activation";
 
-export function startActivation(nationalId: string): Promise<ActivationStart> {
-  return apiClient.post<ActivationStart>(`${BASE}/start`, { national_id: nationalId });
+export function startActivation(nationalId: string): Promise<ActivationConfirmation> {
+  return apiClient.post<ActivationConfirmation>(`${BASE}/start`, { national_id: nationalId });
+}
+
+/** "Yes, send the code": confirming creates no trust — only the correct code does. */
+export function sendActivationCode(confirmation: string): Promise<ActivationStart> {
+  return apiClient.post<ActivationStart>(`${BASE}/send`, { confirmation });
 }
 
 export function verifyActivation(challenge: string, code: string): Promise<{ verified: true; grant_expires_in_seconds: number }> {

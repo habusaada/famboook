@@ -8,19 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError, FormAlert, StepHeading, fieldClass, primaryButtonClass } from "@/components/family/auth/auth-parts";
-import { type ActivationStart, readFamilyAuthError } from "@/lib/api/family-auth";
+import { readFamilyAuthError } from "@/lib/api/family-auth";
 import { type NationalIdInput, type NationalIdValues, nationalIdSchema } from "@/lib/schemas/family-auth";
 import { cn } from "@/lib/utils";
 
-type Props = {
+type Props<T> = {
   title: string;
   description: string;
   submitLabel: string;
   /** Why the flow came back here (an expired grant, a locked code…). */
   notice: string | null;
   /** The start endpoint of the workflow: activation or password reset. */
-  start: (nationalId: string) => Promise<ActivationStart>;
-  onStarted: (start: ActivationStart) => void;
+  start: (nationalId: string) => Promise<T>;
+  onStarted: (start: T) => void;
 };
 
 /**
@@ -28,7 +28,7 @@ type Props = {
  * The answer is the same for every well-formed number, so nothing here says
  * whether it is known or eligible; only a malformed number is a field error.
  */
-export function NationalIdStep({ title, description, submitLabel, notice, start, onStarted }: Props) {
+export function NationalIdStep<T>({ title, description, submitLabel, notice, start, onStarted }: Props<T>) {
   const [error, setError] = useState<string | null>(null);
   const {
     register,

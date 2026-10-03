@@ -3,17 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { MobileConfirmStep } from "@/components/family/activation/mobile-confirm-step";
 import { FamilyAuthCard, textLinkClass } from "@/components/family/auth/auth-parts";
 import { NationalIdStep } from "@/components/family/auth/national-id-step";
 import { OtpStep } from "@/components/family/auth/otp-step";
 import { PasswordStep } from "@/components/family/auth/password-step";
 import { useFamilySignIn } from "@/components/family/auth/use-family-sign-in";
 import {
+  type ActivationConfirmation,
   type ActivationStart,
   type ChallengeTimers,
   type FamilyUser,
   completeActivation,
   resendActivation,
+  sendActivationCode,
   startActivation,
   verifyActivation,
 } from "@/lib/api/family-auth";
@@ -23,17 +26,23 @@ import {
 // completion is refused.
 type State =
   | { step: "NATIONAL_ID"; notice: string | null }
-  | { step: "OTP"; challenge: string; timers: ChallengeTimers }
+  | { step: "CONFIRM_MOBILE"; confirmation: string; maskedMobile: string }
+  | { step: "OTP"; challenge: string; timers: ChallengeTimers; maskedMobile: string }
   | { step: "PASSWORD"; challenge: string }
   | { step: "ACTIVATED" };
 
-const STEP_NUMBER = { NATIONAL_ID: 1, OTP: 2, PASSWORD: 3 } as const;
+const STEP_NUMBER = { NATIONAL_ID: 1, CONFIRM_MOBILE: 2, OTP: 3, PASSWORD: 4 } as const;
+
+const NOT_MINE =
+  "لا يمكن تغيير رقم الجوال أثناء التفعيل. لتحديث رقمك المسجّل، يرجى التواصل مع إدارة شؤون العائلة، ثم العودة لتفعيل الحساب.";
 
 /**
- * Family account activation (docs/11 §30a): National ID → code → password,
- * on one route. The whole state — including the opaque challenge reference —
+ * Family account activation (docs/11 §30a, FP-ADR-053): National ID →
+ * confirm the masked registered number → code → password, on one route. The
+ * whole state — including the opaque references and the masked number —
  * lives in this component's memory: nothing goes to the URL, localStorage,
- * sessionStorage or a cookie, so a refresh simply starts over.
+ * sessionStorage or a cookie, so a refresh simply starts over. The browser
+ * never receives the full number and never sends one.
  */
 export function ActivationFlow() {
   const signIn = useFamilySignIn();
@@ -41,8 +50,12 @@ export function ActivationFlow() {
 
   const restart = (notice: string | null = null) => setState({ step: "NATIONAL_ID", notice });
 
-  function started({ challenge, ...timers }: ActivationStart) {
-    setState({ step: "OTP", challenge, timers });
+  function confirmed({ confirmation, masked_mobile }: ActivationConfirmation) {
+    setState({ step: "CONFIRM_MOBILE", confirmation, maskedMobile: masked_mobile });
+  }
+
+  function sent(maskedMobile: string, { challenge, ...timers }: ActivationStart) {
+    setState({ step: "OTP", challenge, timers, maskedMobile });
   }
 
   function activated(user: FamilyUser) {
@@ -53,7 +66,7 @@ export function ActivationFlow() {
   return (
     <FamilyAuthCard
       step={state.step}
-      progress={state.step === "ACTIVATED" ? null : `الخطوة ${STEP_NUMBER[state.step]} من 3`}
+      progress={state.step === "ACTIVATED" ? null : `الخطوة ${STEP_NUMBER[state.step]} من 4`}
       below={
         state.step === "NATIONAL_ID" && (
           <p>
@@ -72,7 +85,17 @@ export function ActivationFlow() {
           submitLabel="متابعة وتفعيل الحساب"
           notice={state.notice}
           start={startActivation}
-          onStarted={started}
+          onStarted={confirmed}
+        />
+      )}
+      {state.step === "CONFIRM_MOBILE" && (
+        <MobileConfirmStep
+          key={state.confirmation}
+          maskedMobile={state.maskedMobile}
+          send={() => sendActivationCode(state.confirmation)}
+          onSent={(start) => sent(state.maskedMobile, start)}
+          onNotMine={() => restart(NOT_MINE)}
+          onRestart={restart}
         />
       )}
       {state.step === "OTP" && (
@@ -85,6 +108,15 @@ export function ActivationFlow() {
           resend={resendActivation}
           onVerified={() => setState({ step: "PASSWORD", challenge: state.challenge })}
           onRestart={() => restart()}
+          description={
+            <>
+              أرسلنا رمز تحقق إلى الرقم{" "}
+              <span dir="ltr" className="font-semibold tabular-nums text-foreground">
+                {state.maskedMobile}
+              </span>{" "}
+              إذا كانت البيانات مطابقة لسجلاتنا.
+            </>
+          }
         />
       )}
       {state.step === "PASSWORD" && (

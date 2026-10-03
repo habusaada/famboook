@@ -24,6 +24,12 @@ const CODE = "482915";
 const PASSWORD = "synthetic passphrase";
 const BASE = "/api/v1/family/auth/activation";
 const START = { challenge: CHALLENGE, resend_after_seconds: 60, expires_in_seconds: 300, can_resend: true };
+// First self-activation (FP-ADR-053): the start answers with a confirmation
+// and the MASKED registered number only.
+const CONFIRMATION = "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d";
+const MASKED = "05*****567";
+const FULL_MOBILE = "0591234567";
+const CONFIRM = { confirmation: CONFIRMATION, masked_mobile: MASKED };
 
 type Reply = unknown | (() => unknown);
 
@@ -47,9 +53,15 @@ const idField = () => screen.getByLabelText("رقم الهوية");
 const otpField = () => screen.getByLabelText(/رمز التحقق المكوّن من/);
 const submitId = () => screen.getByRole("button", { name: "متابعة وتفعيل الحساب" });
 
-async function toOtpStep(user: ReturnType<typeof userEvent.setup>) {
+async function toConfirmStep(user: ReturnType<typeof userEvent.setup>) {
   await user.type(idField(), NATIONAL_ID);
   await user.click(submitId());
+  await screen.findByRole("heading", { name: "تأكيد رقم الجوال" });
+}
+
+async function toOtpStep(user: ReturnType<typeof userEvent.setup>) {
+  await toConfirmStep(user);
+  await user.click(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" }));
   await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
 }
 
@@ -109,14 +121,14 @@ describe("step 1 — National ID", () => {
   });
 
   it("sends Arabic digits as nine ASCII digits", async () => {
-    const post = api({ "/start": START });
+    const post = api({ "/start": CONFIRM, "/send": START });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
 
     await user.type(idField(), "١٢٣ ٤٥٦-۷۸۹");
     await user.click(submitId());
 
-    await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
+    await screen.findByRole("heading", { name: "تأكيد رقم الجوال" });
     expect(post).toHaveBeenCalledWith(`${BASE}/start`, { national_id: NATIONAL_ID });
   });
 
@@ -146,8 +158,8 @@ describe("step 1 — National ID", () => {
     const busy = await screen.findByRole("button", { name: /جارٍ المتابعة/ });
     expect(busy).toBeDisabled();
 
-    await act(async () => release(START));
-    await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
+    await act(async () => release(CONFIRM));
+    await screen.findByRole("heading", { name: "تأكيد رقم الجوال" });
   });
 
   it("shows the server's field error and stays on the step", async () => {
@@ -159,7 +171,7 @@ describe("step 1 — National ID", () => {
     await user.click(submitId());
 
     expect(await screen.findByRole("alert")).toHaveTextContent("رقم الهوية يجب أن يتكون من 9 أرقام.");
-    expect(screen.queryByRole("heading", { name: "أدخل رمز التحقق" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "تأكيد رقم الجوال" })).not.toBeInTheDocument();
   });
 
   it.each([
@@ -177,25 +189,109 @@ describe("step 1 — National ID", () => {
   });
 });
 
-describe("step 2 — the code", () => {
-  it("moves to the code step with generic copy and no destination", async () => {
-    api({ "/start": START });
+describe("step 2 — confirm the registered number", () => {
+  it("shows only the masked number, the question and the two choices", async () => {
+    api({ "/start": CONFIRM });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+
+    await toConfirmStep(user);
+
+    expect(screen.getByText("وجدنا رقم جوال مسجلاً لبياناتك")).toBeInTheDocument();
+    expect(screen.getByText(MASKED)).toHaveAttribute("dir", "ltr");
+    expect(screen.getByText("هل هذا رقمك ويمكنك استقبال رمز التحقق عليه؟")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "ليس رقمي أو لا أستطيع استقبال الرمز" })).toBeEnabled();
+    expect(screen.getByText("الخطوة 2 من 4")).toBeInTheDocument();
+    // No field to type a number, and only the last three digits anywhere.
+    expect(document.querySelectorAll("input")).toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/05\d{8}/);
+    expect(document.body.textContent).not.toContain(NATIONAL_ID);
+  });
+
+  it("confirming sends only the confirmation reference — never a number", async () => {
+    const post = api({ "/start": CONFIRM, "/send": START });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
 
     await toOtpStep(user);
 
-    expect(
-      screen.getByText("إذا كانت البيانات مطابقة لسجلاتنا، أرسلنا رمز تحقق إلى رقم الجوال الموثّق المسجّل لدينا.")
-    ).toBeInTheDocument();
-    // No part of any mobile number, masked or not, and not the identifier.
-    expect(document.body.textContent).not.toMatch(/05\d|\*{2,}|\d{2}\*+/);
+    expect(post).toHaveBeenCalledWith(`${BASE}/send`, { confirmation: CONFIRMATION });
+    expect(JSON.stringify(post.mock.calls)).not.toMatch(/mobile|phone|05\d/);
+  });
+
+  it("shows a sending state while the code is requested", async () => {
+    let release: (value: unknown) => void = () => undefined;
+    api({ "/start": CONFIRM, "/send": () => new Promise((resolve) => (release = resolve)) });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toConfirmStep(user);
+
+    await user.click(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" }));
+
+    expect(await screen.findByRole("button", { name: /جارٍ إرسال الرمز/ })).toBeDisabled();
+    await act(async () => release(START));
+    await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
+  });
+
+  it("'not my number' returns to the first step with guidance and sends nothing", async () => {
+    const post = api({ "/start": CONFIRM });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toConfirmStep(user);
+
+    await user.click(screen.getByRole("button", { name: "ليس رقمي أو لا أستطيع استقبال الرمز" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "مرحبًا بك في فامبوك" })).toBeInTheDocument();
+    expect(screen.getByText(/لا يمكن تغيير رقم الجوال أثناء التفعيل/)).toBeInTheDocument();
+    expect(post.mock.calls.map(([path]) => path)).toEqual([`${BASE}/start`]);
+  });
+
+  it("starts over when the confirmation is no longer valid", async () => {
+    api({ "/start": CONFIRM, "/send": refusal(422, "OTP_INVALID") });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toConfirmStep(user);
+
+    await user.click(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" }));
+
+    expect(await screen.findByText("انتهت صلاحية هذه الخطوة. أدخل رقم الهوية من جديد.")).toBeInTheDocument();
+    expect(idField()).toBeInTheDocument();
+  });
+
+  it.each([
+    [429, "TOO_MANY_REQUESTS", "محاولات كثيرة. حاول مجددًا بعد قليل."],
+    [503, "ACTIVATION_UNAVAILABLE", "الخدمة غير متاحة حاليًا."],
+  ])("maps a %i %s on send to its message and stays", async (status, code, message) => {
+    api({ "/start": CONFIRM, "/send": refusal(status, code) });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toConfirmStep(user);
+
+    await user.click(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("heading", { name: "تأكيد رقم الجوال" })).toBeInTheDocument();
+  });
+});
+
+describe("step 3 — the code", () => {
+  it("names the confirmed number masked, never in full, and keeps the delivery conditional", async () => {
+    api({ "/start": CONFIRM, "/send": START });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+
+    await toOtpStep(user);
+
+    expect(screen.getByText(/أرسلنا رمز تحقق إلى الرقم/)).toHaveTextContent("إذا كانت البيانات مطابقة لسجلاتنا");
+    expect(screen.getByText(MASKED)).toHaveAttribute("dir", "ltr");
+    expect(document.body.textContent).not.toMatch(/05\d{8}/);
     expect(document.body.textContent).not.toContain(NATIONAL_ID);
-    expect(screen.getByText("الخطوة 2 من 3")).toBeInTheDocument();
+    expect(screen.getByText("الخطوة 3 من 4")).toBeInTheDocument();
   });
 
   it("uses one accessible input behind six slots", async () => {
-    api({ "/start": START });
+    api({ "/start": CONFIRM, "/send": START });
     const user = userEvent.setup();
     const { container } = renderWithClient(<ActivationFlow />);
 
@@ -211,7 +307,7 @@ describe("step 2 — the code", () => {
   });
 
   it("accepts a pasted code with spaces and Arabic digits", async () => {
-    const post = api({ "/start": START, "/verify": { verified: true, grant_expires_in_seconds: 600 } });
+    const post = api({ "/start": CONFIRM, "/send": START, "/verify": { verified: true, grant_expires_in_seconds: 600 } });
     const user = userEvent.setup();
     const { container } = renderWithClient(<ActivationFlow />);
     await toOtpStep(user);
@@ -232,7 +328,7 @@ describe("step 2 — the code", () => {
     [410, "OTP_EXPIRED", "انتهت صلاحية رمز التحقق. اطلب رمزًا جديدًا أو ابدأ من جديد."],
     [429, "TOO_MANY_REQUESTS", "محاولات كثيرة. حاول مجددًا بعد قليل."],
   ])("maps %i %s, clears the code and lets the user try again", async (status, code, message) => {
-    api({ "/start": START, "/verify": refusal(status, code) });
+    api({ "/start": CONFIRM, "/send": START, "/verify": refusal(status, code) });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toOtpStep(user);
@@ -246,7 +342,7 @@ describe("step 2 — the code", () => {
   });
 
   it("locks the step after OTP_LOCKED and offers only a restart", async () => {
-    api({ "/start": START, "/verify": refusal(423, "OTP_LOCKED") });
+    api({ "/start": CONFIRM, "/send": START, "/verify": refusal(423, "OTP_LOCKED") });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toOtpStep(user);
@@ -276,7 +372,7 @@ describe("step 2 — the code", () => {
     const tick = (seconds: number) => act(async () => void vi.advanceTimersByTime(seconds * 1000));
 
     it("counts down from the server's value before offering a resend", async () => {
-      api({ "/start": { ...START, resend_after_seconds: 45 } });
+      api({ "/start": CONFIRM, "/send": { ...START, resend_after_seconds: 45 } });
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       renderWithClient(<ActivationFlow />);
       await toOtpStep(user);
@@ -294,7 +390,7 @@ describe("step 2 — the code", () => {
 
     it("requests a new code, restarts the countdown and hides resend when none is left", async () => {
       const post = api({
-        "/start": START,
+        "/start": CONFIRM, "/send": START,
         "/resend": { resend_after_seconds: 60, expires_in_seconds: 300, can_resend: false },
       });
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -312,7 +408,7 @@ describe("step 2 — the code", () => {
     });
 
     it("follows the server's cooldown when a resend comes too early", async () => {
-      api({ "/start": START, "/resend": refusal(429, "OTP_COOLDOWN", { retry_after_seconds: 25 }) });
+      api({ "/start": CONFIRM, "/send": START, "/resend": refusal(429, "OTP_COOLDOWN", { retry_after_seconds: 25 }) });
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       renderWithClient(<ActivationFlow />);
       await toOtpStep(user);
@@ -325,7 +421,7 @@ describe("step 2 — the code", () => {
     });
 
     it("stops offering a resend after OTP_SEND_LIMIT", async () => {
-      api({ "/start": START, "/resend": refusal(429, "OTP_SEND_LIMIT") });
+      api({ "/start": CONFIRM, "/send": START, "/resend": refusal(429, "OTP_SEND_LIMIT") });
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       renderWithClient(<ActivationFlow />);
       await toOtpStep(user);
@@ -339,11 +435,11 @@ describe("step 2 — the code", () => {
   });
 });
 
-describe("step 3 — the password", () => {
+describe("step 4 — the password", () => {
   const VERIFIED = { verified: true, grant_expires_in_seconds: 600 };
 
   it("shows only the rules the server enforces", async () => {
-    api({ "/start": START, "/verify": VERIFIED });
+    api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -354,7 +450,7 @@ describe("step 3 — the password", () => {
   });
 
   it("requires eight characters and blocks the request otherwise", async () => {
-    const post = api({ "/start": START, "/verify": VERIFIED });
+    const post = api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -367,7 +463,7 @@ describe("step 3 — the password", () => {
   });
 
   it("refuses a password beyond the bcrypt input limit with a clear message and no byte arithmetic", async () => {
-    const post = api({ "/start": START, "/verify": VERIFIED, "/complete": { user: familyUser() } });
+    const post = api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED, "/complete": { user: familyUser() } });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -392,7 +488,7 @@ describe("step 3 — the password", () => {
   });
 
   it("requires the confirmation to match", async () => {
-    const post = api({ "/start": START, "/verify": VERIFIED });
+    const post = api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -404,7 +500,7 @@ describe("step 3 — the password", () => {
   });
 
   it("shows and hides both passwords", async () => {
-    api({ "/start": START, "/verify": VERIFIED });
+    api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -427,7 +523,7 @@ describe("step 3 — the password", () => {
     [409, "ACTIVATION_FAILED", "تعذّر إكمال التفعيل. ابدأ من جديد أو راجع الإدارة."],
     [423, "OTP_LOCKED", "تم إيقاف هذا الرمز. ابدأ من جديد."],
   ])("returns to the start on %i %s with the reason", async (status, code, message) => {
-    api({ "/start": START, "/verify": VERIFIED, "/complete": refusal(status, code) });
+    api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED, "/complete": refusal(status, code) });
     const user = userEvent.setup();
     renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -442,7 +538,7 @@ describe("step 3 — the password", () => {
 
   it("shows the server's password error and stays on the step", async () => {
     api({
-      "/start": START,
+      "/start": CONFIRM, "/send": START,
       "/verify": VERIFIED,
       "/complete": new ApiError(422, { message: "…", errors: { password: ["كلمة المرور طويلة جدًا."] } }),
     });
@@ -458,7 +554,7 @@ describe("step 3 — the password", () => {
 
   it("completes, seeds the family session and goes to /family", async () => {
     const account = familyUser();
-    const post = api({ "/start": START, "/verify": VERIFIED, "/complete": { user: account } });
+    const post = api({ "/start": CONFIRM, "/send": START, "/verify": VERIFIED, "/complete": { user: account } });
     const user = userEvent.setup();
     const { client } = renderWithClient(<ActivationFlow />);
     await toPasswordStep(user);
@@ -473,15 +569,17 @@ describe("step 3 — the password", () => {
     });
     expect(client.getQueryData(FAMILY_ME_QUERY_KEY)).toEqual(account);
     expect(screen.getByRole("status")).toHaveTextContent("تم تفعيل الحساب");
-    // The National ID was sent once, at the start, and never again.
+    // The National ID was sent once, at the start, and never again; no
+    // request ever carried a number.
     const later = post.mock.calls.filter(([path]) => path !== `${BASE}/start`);
     expect(JSON.stringify(later)).not.toContain(NATIONAL_ID);
+    expect(JSON.stringify(post.mock.calls)).not.toContain(FULL_MOBILE);
   });
 });
 
 describe("browser state", () => {
   it("keeps the whole activation in memory: nothing in storage, cookies or the URL", async () => {
-    api({ "/start": START, "/verify": { verified: true, grant_expires_in_seconds: 600 }, "/complete": { user: familyUser() } });
+    api({ "/start": CONFIRM, "/send": START, "/verify": { verified: true, grant_expires_in_seconds: 600 }, "/complete": { user: familyUser() } });
     const writes = [vi.spyOn(window.localStorage, "setItem"), vi.spyOn(window.sessionStorage, "setItem")];
     const href = window.location.href;
     const user = userEvent.setup();
@@ -493,7 +591,7 @@ describe("browser state", () => {
 
     for (const write of writes) expect(write).not.toHaveBeenCalled();
     const stored = browserStorageDump();
-    for (const secret of [NATIONAL_ID, CHALLENGE, CODE, PASSWORD]) {
+    for (const secret of [NATIONAL_ID, CHALLENGE, CONFIRMATION, MASKED, CODE, PASSWORD]) {
       expect(stored).not.toContain(secret);
     }
     expect(window.location.href).toBe(href);
@@ -502,7 +600,7 @@ describe("browser state", () => {
   });
 
   it("starts over after a remount, as a refresh would", async () => {
-    api({ "/start": START });
+    api({ "/start": CONFIRM, "/send": START });
     const user = userEvent.setup();
     const first = renderWithClient(<ActivationFlow />);
     await toOtpStep(user);

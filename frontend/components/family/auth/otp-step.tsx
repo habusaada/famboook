@@ -17,16 +17,19 @@ type Props = {
   resend: (challenge: string) => Promise<ChallengeTimers>;
   onVerified: () => void;
   onRestart: () => void;
+  /** Activation names the number the user confirmed (masked); reset says nothing about it. */
+  description?: React.ReactNode;
 };
 
 /**
  * The code step, shared by activation and password reset — the same screen,
- * the same rules. Deliberately says nothing about the destination — not
- * even masked digits — and words the delivery conditionally: the same screen
- * is shown whether or not a code was really sent. The countdown runs on the
+ * the same rules. A password reset says nothing about the destination;
+ * activation repeats the MASKED number the user just confirmed. Either way
+ * the delivery is worded conditionally: the same screen is shown whether or
+ * not a code was really sent. The countdown runs on the
  * server's values; the server still enforces the cooldown.
  */
-export function OtpStep({ challenge, timers, verify, resend, onVerified, onRestart }: Props) {
+export function OtpStep({ challenge, timers, verify, resend, onVerified, onRestart, description }: Props) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -87,7 +90,7 @@ export function OtpStep({ challenge, timers, verify, resend, onVerified, onResta
   return (
     <section aria-labelledby="family-otp-title">
       <StepHeading id="family-otp-title" title="أدخل رمز التحقق">
-        إذا كانت البيانات مطابقة لسجلاتنا، أرسلنا رمز تحقق إلى رقم الجوال الموثّق المسجّل لدينا.
+        {description ?? "إذا كانت البيانات مطابقة لسجلاتنا، أرسلنا رمز تحقق إلى رقم الجوال الموثّق المسجّل لدينا."}
       </StepHeading>
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-4" aria-busy={verifying}>
