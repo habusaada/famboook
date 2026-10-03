@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureActivationEnabled;
+use App\Http\Middleware\EnsureCoordinatorSpace;
 use App\Http\Middleware\EnsureFamilyLoginEnabled;
 use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
@@ -32,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Independent gates, each off by default.
             'family.login' => EnsureFamilyLoginEnabled::class,
             'family.password-reset' => EnsurePasswordResetEnabled::class,
+            // Coordinator Space (PWA-1H): after family.side, never instead of it.
+            'coordinator.space' => EnsureCoordinatorSpace::class,
         ]);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.

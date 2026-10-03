@@ -44,6 +44,7 @@ class FamilySideBoundaryTest extends TestCase
             'display_name' => $head['person']->full_name,
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
+            'coordinator_space' => false,
             'context' => [
                 'available' => true,
                 'family' => [
@@ -138,6 +139,7 @@ class FamilySideBoundaryTest extends TestCase
             'display_name' => null,
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
+            'coordinator_space' => false,
             'context' => ['available' => false, 'family' => null],
         ]]);
     }
@@ -206,6 +208,6 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        $this->assertSame(11, $checked);
+        $this->assertSame(12, $checked);
     }
 }

@@ -100,6 +100,7 @@ class FamilyLoginTest extends TestCase
             'display_name' => $this->head['person']->full_name,
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
+            'coordinator_space' => false,
             'context' => ['available' => true, 'family' => [
                 'code' => $this->head['family']->family_code,
                 'name' => $this->head['family']->branch?->name ?? $this->head['family']->clan?->name,

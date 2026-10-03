@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
@@ -77,6 +78,12 @@ Route::prefix('family')->group(function () {
 
     Route::middleware(['auth:sanctum', 'family.side'])->group(function () {
         Route::get('/me', [FamilySessionController::class, 'me']);
+
+        // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
+        // the coordinator.space boundary, never from the client.
+        Route::prefix('coordinator')->middleware('coordinator.space')->group(function () {
+            Route::get('/context', [CoordinatorSpaceController::class, 'context']);
+        });
     });
 });
 

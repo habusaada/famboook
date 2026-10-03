@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\User;
 use App\Support\AccountSide;
+use App\Support\FamilyAuth\CoordinatorScopes;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -15,7 +16,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * - display_name is the linked Person's name, never users.name (a snapshot
  *   taken at activation);
  * - context.available says whether a Family context exists right now. When
- *   it does not, family is null and the reason is NOT sent.
+ *   it does not, family is null and the reason is NOT sent;
+ * - coordinator_space says whether Coordinator Space is open right now — the
+ *   SAME check the coordinator.space boundary runs (CoordinatorScopes), so
+ *   the two cannot disagree. Scope details live in the coordinator context.
  *
  * Never a National ID, a mobile, an internal id, a permission list or any
  * fingerprint. UX only: every family-data endpoint authorizes on its own.
@@ -40,6 +44,8 @@ class FamilyCurrentUserResource extends JsonResource
             'display_name' => $identity->allowed() ? $identity->person->full_name : null,
             'roles' => $roles,
             'coordinator' => in_array(AccountSide::COORDINATOR, $roles, true),
+            'coordinator_space' => in_array(AccountSide::COORDINATOR, $roles, true)
+                && app(CoordinatorScopes::class)->context($this->resource)->allowed(),
             'context' => [
                 'available' => $family !== null,
                 'family' => $family === null ? null : [
