@@ -11,6 +11,7 @@ use App\Http\Middleware\SendSmsAfterResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+        // Laravel's default guest redirect is route('login'), evaluated by the
+        // auth middleware for every request that does not ask for JSON. This
+        // backend has no web login route: for /api there is no redirect at
+        // all — the exception renders as a 401 JSON (withExceptions below).
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route('login'));
 
         // The Staff API boundary (AUTH-ADR-065): family-side accounts never
         // enter Staff routes, whatever permission they hold.
@@ -45,6 +51,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', EnsureUserIsActive::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // The API is JSON-only, whatever the client sends as Accept: an
+        // unauthenticated /api request answers 401 {"message":"Unauthenticated."}
+        // and never attempts a redirect to a web login route (which does not
+        // exist here); validation and other errors render as JSON too.
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, Throwable $e) => $request->is('api/*') || $request->expectsJson(),
+        );
+
         // Typed National IDs (identity verification) must never be flashed
         // back into a session or error context.
         $exceptions->dontFlash([
