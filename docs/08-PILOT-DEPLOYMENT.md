@@ -431,6 +431,14 @@ Family Portal activation may be enabled in Production.
 - **Operational prerequisite.** There is still no Staff screen for
   granting mobile trust — only the API (docs/06 §22b). Nobody can activate
   or reset without a TRUSTED mobile.
+- **Coordinators (PWA-1H).** Deploying PWA-1H adds one permission,
+  `coordinator-family.view-summary`, granted to COORDINATOR: run the
+  RolePermissionSeeder and `famboook:verify-permissions` as usual (§7). No
+  migration, no new flag. Coordinators are managed through the Staff API
+  only (no Staff screen yet) by SUPER_ADMIN and ADMINISTRATOR; a
+  Coordinator must first activate as an ordinary Family account, and
+  Coordinator Space is reachable only once Family login is enabled. An
+  assignment never expires: remove it explicitly when a Coordinator stops.
 - **Activation abuse controls (PWA-1F).** Defaults in
   `config/family_auth.php`, overridable by
   `FAMILY_ACTIVATION_LIMIT_START_IP_MINUTE` (10) / `_START_IP_HOUR` (30) /
@@ -628,6 +636,7 @@ Never do this once real data has been entered.
 | 1.1.4 | 2026-10-02 | Approved | §16a: PWA-1E — `FAMILY_SMS_DRIVER` (empty = no delivery; `log` local only), the six-point Production gate for self-activation, OTP throttle overrides, OTP purge command and the scheduler-cron prerequisite. Nothing activated |
 | 1.1.5 | 2026-10-02 | Approved | §16a: PWA-1F — activation gate now read by the public endpoints; activation limiter and response-floor overrides (400 ms is a development default); PWA-1G Family login added to the Production gate (seven points). Nothing activated |
 | 1.1.6 | 2026-10-03 | Approved | §16a: PWA-1G — three independent Family Auth flags (all false), login lockout and password reset limiter overrides, session notes, gate item 7 code-delivered and items 8–9 added. Nothing activated |
+| 1.1.7 | 2026-10-03 | Approved | §16a: PWA-1H — seed `coordinator-family.view-summary`, no migration or flag, coordinators managed through the Staff API by SUPER_ADMIN and ADMINISTRATOR, no assignment expiry |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

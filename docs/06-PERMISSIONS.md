@@ -712,7 +712,7 @@ finalized separately and moved to §22b.
 
 | Proposed permission | Intended holder | Phase |
 |---|---|---|
-| `coordinator-family.view-summary` | COORDINATOR (scope-bound, limited fields) | PWA-9 |
+| ~~`coordinator-family.view-summary`~~ | **Approved and seeded in PWA-1H** — see §22b | ~~PWA-9~~ |
 | `coordinator-family.view-account-status` | COORDINATOR (scope-bound) | PWA-9 |
 | `family-verification.submit` | FAMILY_USER (own Family) | PWA-4 |
 | `family-verification.view` | Authorized Staff | PWA-4 |
@@ -750,8 +750,12 @@ implemented the mobile trust Staff API, which reads
 `person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067).
 PWA-1F implemented the Family API boundary and the activation endpoints
 below (AUTH-ADR-068). PWA-1G added the Family login and password reset
-routes (AUTH-ADR-069). `person-mobile-trust.assist`, the coordinator
-permissions and `family-portal.access` are not read by any endpoint yet.
+routes (AUTH-ADR-069). PWA-1H implemented coordinator administration and
+Coordinator Space (AUTH-ADR-070): `coordinator-scope.view` / `.manage`,
+`coordinator-space.access` and the newly approved
+`coordinator-family.view-summary` are read by endpoints.
+`person-mobile-trust.assist` and `family-portal.access` are not read by any
+endpoint yet.
 
 ## Account sides
 
@@ -985,6 +989,59 @@ POST /api/v1/family/auth/password/reset/complete    family.password-reset
   `PASSWORD_RESET_UNAVAILABLE` (503).
 - An authenticated "change my password" endpoint does not exist; it belongs
   to the future account module.
+
+## Coordinator Space and administration (PWA-1H)
+
+```text
+FAMILY SIDE — auth:sanctum + family.side + coordinator.space
+GET  /api/v1/family/coordinator/context
+GET  /api/v1/family/coordinator/families              + coordinator-family.view-summary
+GET  /api/v1/family/coordinator/families/{code}       + coordinator-family.view-summary
+
+STAFF SIDE — auth:sanctum + staff.side
+GET  /api/v1/people/{person}/coordinator              coordinator-scope.view
+POST /api/v1/people/{person}/coordinator              coordinator-scope.manage
+POST /api/v1/people/{person}/coordinator/revoke       coordinator-scope.manage
+POST /api/v1/people/{person}/coordinator/scopes       coordinator-scope.manage
+POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
+```
+
+| Permission | Purpose | Holders |
+|---|---|---|
+| `coordinator-family.view-summary` | Read SUMMARIES of the families in the Coordinator's effective scope | COORDINATOR only (**approved and seeded in PWA-1H**) |
+
+- **`coordinator.space`** fails closed: it admits only an account that the
+  coordinator resolver accepts right now — own Family context, COORDINATOR,
+  `coordinator-space.access`, an effective assignment — and passes the
+  resolved scope to the endpoint. A refusal is one generic 403
+  (`COORDINATOR_SPACE_UNAVAILABLE`), not a security event.
+- **Scope answers WHICH families; permissions answer WHAT.** The summary is
+  an explicit allow-list: `family_code`, Clan, Branch Group and Branch
+  names, the household head's display name, the active member count. Never
+  a National ID (in any form), a mobile or contact detail, residence,
+  health, disability, needs, assistance, notes, documents, account or
+  activation status, auth data or an internal id.
+- **IDOR.** No route-model binding: a family code is looked up inside the
+  authorized query only. A family outside the scope and a family that does
+  not exist are the same 404 (`FAMILY_NOT_FOUND`). Sequential ids are not
+  routable. Search (code prefix, head name) and Clan / Group / Branch
+  filters only narrow the authorized query.
+- `/api/v1/family/me` gained `coordinator_space`, computed by the same
+  resolver as the boundary; scope details are only in
+  `/family/coordinator/context` (scope type, public code, names, family
+  count).
+- **Administration** is Staff-side only: SUPER_ADMIN and ADMINISTRATOR
+  through `coordinator-scope.view` / `.manage`. Never REVIEWER,
+  COORDINATOR, FAMILY_USER, REPORTS_VIEWER, DATA_ENTRY or SOCIAL_WORKER. A
+  family-side account — a Coordinator included — cannot reach these routes
+  (`staff.side`) whatever it holds, so no Coordinator manages another.
+- COORDINATOR holds exactly `coordinator-space.access` and
+  `coordinator-family.view-summary`. It never receives `family.*`,
+  `person.*`, `change-request.review`, `export.*`, `report.*`, Filament,
+  user or role administration, imports, or `person-mobile-trust.assist`
+  (withheld until a dedicated assisted-mobile-trust workflow exists).
+- `OrganizationalScope` remains a reporting filter and is not used for
+  coordinator authorization.
 
 ## Seeded mapping (PWA-1C)
 
@@ -4020,6 +4077,9 @@ PWA-1F Family API boundary (§22b): `/api/v1/family` routes live outside the Sta
 
 ### AUTH-ADR-069
 PWA-1G Family login and password reset (§22b): five public routes outside the Staff group, each behind its own gate (`family.login`, `family.password-reset`), independent of `family.activation` and off by default. A session is established only after the full Family context is resolved; every login failure is one generic 401, and the two identifier lockout tiers count failures only. A reset ends every earlier session of the account. No permission mapping changed in PWA-1G, and no account side can cross into the other through these routes.
+
+### AUTH-ADR-070
+PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space from the account's own Family context, the COORDINATOR role, `coordinator-space.access` and the union of effective scope assignments over the current hierarchy; `coordinator.space` fails closed. `coordinator-family.view-summary` is approved and seeded, COORDINATOR only, and means summary access only. Coordinator administration stays with SUPER_ADMIN and ADMINISTRATOR (`coordinator-scope.manage`). `person-mobile-trust.assist` remains withheld from COORDINATOR. A Coordinator is family-side, never Staff, and COORDINATOR ≠ REVIEWER.
 ```
 
 ---
@@ -4391,6 +4451,7 @@ Date: 2026-09-24
 | 1.2.31 | 2026-10-02 | Approved | PWA-1E (AUTH-ADR-067): §22b mobile trust Staff API (view / grant / revoke) behind the Staff boundary; no permission mapping changed; coordinator assistance still deferred to PWA-1H |
 | 1.2.32 | 2026-10-02 | Approved | PWA-1F (AUTH-ADR-068): §22b Family API boundary (`family.side`, fail closed), `/family/me`, logout, the public activation routes with their gate and error contract; no permission mapping changed |
 | 1.2.33 | 2026-10-03 | Approved | PWA-1G (AUTH-ADR-069): §22b Family login and password reset routes, three independent gates, login requires the Family context, public error contract; no permission mapping changed |
+| 1.2.34 | 2026-10-03 | Approved | PWA-1H (AUTH-ADR-070): §22b Coordinator Space and administration routes, `coordinator.space`, `coordinator-family.view-summary` approved and seeded (COORDINATOR only, summary only), §22a proposal marked approved; assist still withheld |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

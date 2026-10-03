@@ -3969,6 +3969,9 @@ PWA-1F added **no migration**. Activation runs on the PWA-1C schema: the pre-act
 
 ### DB-ADR-047
 PWA-1G added **no migration**. Login and password reset read `family_auth_identities` through the partial unique index on the ACTIVE login key and never look an account up by `persons.national_id`. A `PASSWORD_RESET` challenge carries `user_id` (already required by `chk_auth_otp_challenge_reset_user`) and is consumed for that User and Person together. Reset completion locks the Person row, the User row, then the challenge row, and deletes the User's `sessions` rows inside the same transaction when the session driver is `database`. Decoy challenges of both purposes are cache entries only. `users.password` holds a bcrypt hash; the application refuses inputs longer than 72 bytes rather than letting bcrypt ignore the excess.
+
+### DB-ADR-048
+PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coordinator_scope_assignments` unchanged: the typed columns (`clan_id` always, plus `branch_group_id` or `branch_id`, each a composite foreign key with `clan_id`) and the PostgreSQL shape CHECK mean a scope id can never resolve against the wrong table, so no polymorphic reference is introduced. No `expires_at`: an assignment is effective while `revoked_at IS NULL` and its target is active. The scoped family query is one correlated EXISTS over the user's active assignments joined to `clans`, with the family's own Branch and Group required active; it never materializes family ids, uses the existing `(user_id, revoked_at)`, `families (clan_id, branch_id)` and `branches (branch_group_id)` indexes, and no index was added (none is justified at the current volume). The partial unique indexes keep one active assignment per user and target; a revoked scope may be assigned again as a new row.
 ```
 
 ### 111. Pending Database Decisions
@@ -4232,6 +4235,7 @@ Date: 2026-09-24
 | 1.2.27 | 2026-10-02 | Approved | PWA-1E: no schema change (DB-ADR-045); OTP purge deletes finished `auth_otp_challenges` rows only |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1F: no schema change (DB-ADR-046); activation lookup, lock order and unique-index backstops; decoys are cache state only |
 | 1.2.29 | 2026-10-03 | Approved | PWA-1G: no schema change (DB-ADR-047); identity-based lookup, reset lock order and session deletion inside the transaction |
+| 1.2.30 | 2026-10-03 | Approved | PWA-1H: no schema change (DB-ADR-048); typed scope columns kept, no expiry, the scoped EXISTS query and its indexes |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

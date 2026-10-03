@@ -1315,8 +1315,26 @@ correction effect, the death effect and access loss (WF-ADR-041) as Domain
 Actions — no endpoint and no UI. PWA-1E implemented the mobile trust
 lifecycle (with a Staff API) and the OTP challenge state machine
 (WF-ADR-042). PWA-1F implemented activation (WF-ADR-043). PWA-1G
-implemented login and password reset (WF-ADR-044). Coordinator-assisted
-verification is PWA-1H.
+implemented login and password reset (WF-ADR-044). PWA-1H implemented
+coordinator administration and Coordinator Space (WF-ADR-045).
+Coordinator-assisted mobile verification is a future dedicated workflow.
+
+## Coordinator administration (PWA-1H)
+
+```text
+(family account, FAMILY_USER, eligible head)
+   ──grant role (Staff: coordinator-scope.manage)──▶ FAMILY_USER + COORDINATOR
+   ──assign scope (CLAN | BRANCH_GROUP | BRANCH, active target)──▶ Coordinator Space open
+   ──revoke one scope──▶ that scope ends (row kept, reason recorded)
+   ──revoke role──▶ ONE transaction: every active scope revoked (ROLE_REMOVED),
+                    role removed; the household account stays
+```
+
+- Coordinator Space opens and closes on the next request with the role,
+  the assignments, the account's own eligibility and the hierarchy.
+- Every grant, assignment and revocation is recorded as a security event
+  inside its transaction. Entering Coordinator Space and reading summaries
+  are not recorded.
 
 ## User-Person Link
 
@@ -3101,6 +3119,9 @@ PWA-1F implemented Family account activation as four public steps (start, verify
 
 ### WF-ADR-044
 PWA-1G implemented Family login and password reset. Login resolves the account through the authentication identity, verifies the password in every case and requires the full Family context before any session; every failure is one generic 401. Password reset reuses the activation OTP flow for the `PASSWORD_RESET` purpose — decoys included, purpose-bound — and completes in one transaction that consumes the grant, re-checks the context, replaces the password and ends every earlier session; the completing browser then receives a new session.
+
+### WF-ADR-045
+PWA-1H implemented coordinator administration as four Staff Domain Actions — grant role, revoke role, assign scope, revoke scope — on the existing assignment table. The role and the assignments are separate layers; an assignment never grants the role, and removing the role revokes every active assignment in the same transaction. Coordinator Space is decided per request by one resolver over the current hierarchy.
 ```
 
 ---
@@ -3367,3 +3388,4 @@ Date: 2026-09-24
 | 1.2.10 | 2026-10-02 | Approved | PWA-1E: §53b mobile trust lifecycle as implemented and the OTP challenge state machine (resend, grant, supersede, delivery) (WF-ADR-042) |
 | 1.2.11 | 2026-10-02 | Approved | PWA-1F: §53b activation as implemented — public steps, decoy references, completion transaction and session (WF-ADR-043) |
 | 1.2.12 | 2026-10-03 | Approved | PWA-1G: §53b login decision path and password reset as implemented — purpose-bound references, completion transaction, session revocation (WF-ADR-044) |
+| 1.2.13 | 2026-10-03 | Approved | PWA-1H: §53b coordinator administration workflow (grant, assign, revoke scope, revoke role) and Coordinator Space opening per request (WF-ADR-045) |

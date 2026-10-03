@@ -2308,9 +2308,49 @@ account-side rules (including the Staff API boundary). PWA-1E implemented
 the mobile trust lifecycle with its Staff API, the OTP challenge service,
 the SMS abstraction, the OTP throttle and the OTP cleanup. PWA-1F
 implemented activation (below) and the first Family Portal screens. PWA-1G
-implemented Family login and password reset (below). Still not built:
-coordinator scope and coordinator-assisted verification (PWA-1H), and any
-real SMS provider.
+implemented Family login and password reset (below). PWA-1H implemented
+coordinator scope and Coordinator Space (below). Still not built:
+coordinator-assisted mobile verification (a future dedicated workflow) and
+any real SMS provider.
+
+## Coordinator scope as implemented (PWA-1H)
+
+- **A Coordinator is family-side, never Staff.** COORDINATOR lives on a
+  family-side account beside FAMILY_USER; it never combines with a Staff
+  role, and it never opens a Staff route. COORDINATOR ≠ REVIEWER.
+- **Coordinator Space needs ALL of:** the account's own Family context
+  (eligible household head, ACTIVE Family — V1), the COORDINATOR role,
+  `coordinator-space.access`, and at least one effective scope assignment.
+  Role without assignment, assignment without role, a lost eligibility, an
+  inactive own Family: no Coordinator Space, on the next request. There is
+  no Coordinator-only fallback and no Coordinator activation bypass.
+- **Scope is a union** of the effective assignments: a CLAN covers the
+  Clan's families; a BRANCH_GROUP the families whose Branch is in it; a
+  BRANCH that Branch's families. A family without a Branch is reached
+  through its Clan only.
+- **Current hierarchy.** Authorization follows the family's CURRENT Branch
+  and the Branch's CURRENT Group on every request; there is no historical
+  scope.
+- **Inactive structure fails closed.** An inactive Clan, Group or Branch
+  authorizes nothing, and a family whose own Branch — or that Branch's
+  Group — is inactive is outside every scope. Only ACTIVE, not deleted
+  families are in scope.
+- **Scope answers WHICH families; permissions answer WHAT.** In PWA-1H a
+  Coordinator may read family SUMMARIES only (code, hierarchy names, head
+  name, active member count) — never a National ID, a mobile, residence,
+  health, disability, needs, assistance, notes, documents or account
+  status. A Coordinator modifies nothing, reviews nothing, exports nothing
+  and assigns nobody.
+- **The own household is unchanged.** The Family context remains the
+  account's own household only; Coordinator Space is a separate mode and
+  its families never become part of the household.
+- **Administration** (role and scopes) is a Staff act of SUPER_ADMIN and
+  ADMINISTRATOR (`coordinator-scope.manage`). Granting the role requires an
+  eligible family-side head; an assignment requires the role and an active
+  target; removing the role revokes every active assignment in the same
+  transaction. An assignment never grants the role.
+- `person-mobile-trust.assist` stays withheld from COORDINATOR until a
+  dedicated assisted-mobile-trust workflow exists.
 
 ## Login and password reset as implemented (PWA-1G)
 
@@ -4735,6 +4775,7 @@ Date: 2026-09-24
 | 1.2.39 | 2026-10-02 | Approved | PWA-1E: §89b mobile trust rules as implemented (current-number invariant, grant/revoke, STALE on change, change-back never restores, no head requirement), OTP resend and grant semantics, delivery and throttle ceilings |
 | 1.2.40 | 2026-10-02 | Approved | PWA-1F: §89b activation as implemented (lookup, anti-enumeration with decoy references, completion transaction, always a new family-side User, session rules, display name from the Person, account is not access, request ceilings and response floor, activation gate) |
 | 1.2.41 | 2026-10-03 | Approved | PWA-1G: §89b login and password reset as implemented (identity lookup, full Family context required, one generic login failure, two-tier lockout, reset eligibility and decoys, purpose-bound references, reset transaction ending all sessions, 72-byte password ceiling, three independent gates) |
+| 1.2.42 | 2026-10-03 | Approved | PWA-1H: §89b coordinator rules as implemented (family-side never Staff, four conditions for Coordinator Space, union of scopes, current hierarchy, fail-closed structure, summary-only data, administration by SUPER_ADMIN and ADMINISTRATOR, assist withheld) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

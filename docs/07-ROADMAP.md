@@ -2035,8 +2035,8 @@ PWA-1D   Identity resolver + links                       DONE
 PWA-1E   Mobile trust + OTP / SMS abstraction            DONE
 PWA-1F   Activation + first Family Portal UI             DONE
 PWA-1G   Login / password reset                          DONE
-PWA-1H   Coordinator identity / scope                    NEXT
-PWA-1I   Security hardening / full regression
+PWA-1H   Coordinator identity / scope                    DONE
+PWA-1I   Security hardening / full regression            NEXT
 ```
 
 The PWA-1 and PWA-2 rows of the table above are delivered together through
@@ -2050,7 +2050,8 @@ PWA-1E … PWA-1G. No separate PWA-2 phase remains; PWA-3 follows PWA-1I.
 | PWA-1E | **DONE.** Trusted-mobile resolver; grant / revoke actions and Staff API; STALE on a mobile change; `SmsSender` with an unconfigured default and a local-only log driver; OTP challenge service (issue, resend, verify, consume, supersede); OTP throttle; `famboook:purge-otp-challenges` scheduled daily. No migration | Trust and OTP matrices; no real SMS possible |
 | PWA-1F | **DONE.** Public activation endpoints (start, verify, resend, complete) behind the activation gate, with cache-backed decoys, request limiters and a response-time floor; the completion transaction (new family-side User, FAMILY_USER, link, identity, grant consumed) and the session after it; `family.side`, `GET /family/me` and logout; the Staff routes moved into a `(staff)` route group; the Family theme, `/family/activate` and the first `/family` shell; Vitest component tests. No migration | Activation matrix; anti-enumeration; Staff URLs unchanged |
 | PWA-1G | **DONE.** Family login through the authentication identity, requiring the Family context, with one generic failure, a dummy-hash verification for unknown identifiers and a two-tier lockout; password reset (start, verify, resend, complete) on purpose-aware decoys shared with activation; reset completion ending every earlier session; the 72-byte password ceiling for activation and reset; three independent gates; `/family/login`, `/family/forgot-password`, the login link on activation and the guest redirect to login. No migration. The family context MIDDLEWARE and the cross-family IDOR tests move to the first family-data endpoint: no such route exists yet | Login and reset matrices; activation regression |
-| PWA-1H | Scope assignments, scope service, coordinator context; grant `person-mobile-trust.assist` to COORDINATOR once scope is enforced (docs/06 §22b) | Scope and dual-role matrices |
+| PWA-1H | **DONE.** Coordinator scope resolver (union of effective assignments, current hierarchy, fail-closed structure); grant / revoke role and assign / revoke scope actions with a Staff API; `coordinator.space` boundary; coordinator context and scoped family summary endpoints (`coordinator-family.view-summary` approved, COORDINATOR only); `/family/me.coordinator_space`; Coordinator Space in the Family Portal. No migration. `person-mobile-trust.assist` stays withheld: assisted mobile trust becomes a future dedicated workflow | Scope, dual-role, IDOR and privacy matrices |
+| — | Assisted mobile trust (future, unscheduled): a dedicated workflow in which a Coordinator opens or assists a verification within scope; only then may `person-mobile-trust.assist` be granted to COORDINATOR | Workflow design approved first |
 | PWA-1I | Security-event coverage, throttling, full regression | Whole suite |
 
 PWA-1C delivered foundation only: no endpoint, no activation, no OTP, no
@@ -4890,6 +4891,7 @@ Date: 2026-09-24
 | 1.2.29 | 2026-10-02 | Approved | PWA-1E done (mobile trust lifecycle and Staff API, SMS abstraction, OTP challenge service, throttle, cleanup; no migration); PWA-1F next |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1F done (activation endpoints with decoys, limiters and floor; completion transaction and session; Family API boundary and `/family/me`; `(staff)` route group; Family theme, activation flow and first shell; no migration); PWA-1G next and added to the Production activation gate |
 | 1.2.31 | 2026-10-03 | Approved | PWA-1G done (Family login, password reset, purpose-aware decoys, session revocation on reset, 72-byte password ceiling, three independent gates, login and forgot-password screens; no migration); the family context middleware moves to the first family-data endpoint; PWA-1H next |
+| 1.2.32 | 2026-10-03 | Approved | PWA-1H done (coordinator resolver, administration actions and Staff API, Coordinator Space boundary, scoped summaries, Family Portal Coordinator Space; no migration); assisted mobile trust moved to a future dedicated workflow; PWA-1I next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

@@ -2256,8 +2256,9 @@ activation and is never displayed); PWA-1G Family login and password
 reset, which read `family_auth_identities` by the keyed login fingerprint
 and write only `users.password` (no new table or column). A Family password
 is at least 8 characters and at most 72 bytes of UTF-8 — the bcrypt input
-limit; a longer one is refused, never truncated. Physical schema: docs/04
-§55b.
+limit; a longer one is refused, never truncated. PWA-1H coordinator scope
+and Coordinator Space, on the existing `coordinator_scope_assignments` (no
+new table or column). Physical schema: docs/04 §55b.
 Architecture: `11-FAMILY-PORTAL.md` §30a.
 
 ### `user_person_links`
@@ -2372,6 +2373,22 @@ revoked_by / revoked_at / revoke_reason
 
 A coordinator may hold several active assignments; authorization is their
 union.
+
+As implemented (PWA-1H):
+
+- **Effective** = `revoked_at IS NULL` and the target is active: the Clan;
+  for BRANCH_GROUP the Group; for BRANCH the Branch and, when grouped, its
+  Group. There is no expiry: revocation is explicit.
+- `revoke_reason`: `ADMINISTRATIVE`, `NO_LONGER_ELIGIBLE`, `SCOPE_CHANGED`
+  (chosen by an administrator) and `ROLE_REMOVED` (set on every active
+  assignment when the COORDINATOR role is removed).
+- Rows are never deleted; a revoked scope may be assigned again as a new
+  row.
+- **Coordinator family summary** (the only Family projection a Coordinator
+  receives): `family_code`, Clan name, Branch Group name (nullable), Branch
+  name (nullable), household head display name, active member count
+  (derived from active memberships, not stored). Nothing else of the Family
+  or its Persons.
 
 ---
 
@@ -4127,6 +4144,7 @@ Date: 2026-09-24
 | 1.2.28 | 2026-10-02 | Approved | PWA-1E: §45b mobile trust lifecycle (STALE / REVOKED never revert, revoke reasons) and OTP challenge semantics (keyed hash, send attempts, grant window, resend) as implemented |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1F: §45b activation creates the family-side User (email null, `users.name` a non-displayed snapshot), ACTIVE link and ACTIVE identity; no data-model change |
 | 1.2.30 | 2026-10-03 | Approved | PWA-1G: §45b login and password reset use the authentication identity (keyed fingerprint), never `persons.national_id`; Family password length 8 characters to 72 bytes; no data-model change |
+| 1.2.31 | 2026-10-03 | Approved | PWA-1H: §45b coordinator assignment lifecycle (effective = not revoked and target active, no expiry, revoke reasons) and the Coordinator family summary projection; no data-model change |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

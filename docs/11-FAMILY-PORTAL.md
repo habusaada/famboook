@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.6
+**Version:** 1.7
 **Date:** 2026-10-02
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens and PWA-1G Family login and password reset (§30a); activation, login and password reset are each disabled by default; no real SMS provider
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); activation, login and password reset are each disabled by default; no real SMS provider
 
 ---
 
@@ -1223,9 +1223,9 @@ Scope, dependencies and exit criteria: docs/07 §31a.
 
 Approved design. **Implemented: the PWA-1C foundation, the PWA-1D
 identity domain behaviour, the PWA-1E mobile trust and OTP foundation,
-PWA-1F activation and PWA-1G login and password reset** (see the five
-implementation records below). A real SMS provider and coordinator scope
-are still to be built.
+PWA-1F activation, PWA-1G login and password reset and PWA-1H coordinator
+scope and Coordinator Space** (see the six implementation records below).
+A real SMS provider is still to be built.
 Physical
 schema: docs/04 §55b. Entities: docs/02 §45b. Rules: docs/03 §89b.
 Workflows: docs/05 §53b. Permissions: docs/06 §22b. Slices: docs/07 §31a.
@@ -1478,8 +1478,8 @@ PWA-1D  Identity resolver + links                        DONE
 PWA-1E  Mobile trust + OTP / SMS abstraction             DONE
 PWA-1F  Activation + first Family Portal UI              DONE
 PWA-1G  Login / password reset                           DONE
-PWA-1H  Coordinator identity / scope                     NEXT
-PWA-1I  Security hardening / full regression
+PWA-1H  Coordinator identity / scope                     DONE
+PWA-1I  Security hardening / full regression             NEXT
 ```
 
 ## PWA-1C implementation record
@@ -1849,6 +1849,76 @@ Not implemented by PWA-1G: family-data endpoints, the family context
 middleware, the installable PWA, coordinator scope, a real SMS provider,
 "change my password".
 
+## PWA-1H implementation record
+
+Implemented 2026-10-03. No migration.
+
+**Binding decisions.** `coordinator-family.view-summary` approved in PWA-1H,
+summary projection only, COORDINATOR only. No assignment expiry.
+`person-mobile-trust.assist` stays withheld from COORDINATOR (a future
+dedicated assisted-mobile-trust workflow). SUPER_ADMIN and ADMINISTRATOR
+manage coordinators through `coordinator-scope.manage`.
+
+**Backend.**
+
+- `CoordinatorScopes` — the one authority on Coordinator access:
+  - `context(user)`: own Family context (`familyContext`, unchanged),
+    COORDINATOR, `coordinator-space.access`, at least one effective
+    assignment; otherwise an internal denial;
+  - effective assignment = not revoked, target active (Clan; Group; Branch
+    and its Group when grouped);
+  - `families(context)`: ACTIVE, not deleted families covered by the UNION
+    of the assignments — one correlated EXISTS over the assignments, never
+    a list of ids — over the CURRENT hierarchy; a family whose Branch or
+    Group is inactive is outside every scope;
+  - no cache, no lock, no event. `OrganizationalScope` is not used.
+- Domain Actions `GrantCoordinatorRoleAction`, `RevokeCoordinatorRoleAction`,
+  `AssignCoordinatorScopeAction`, `RevokeCoordinatorScopeAction`: Staff-side
+  holders of `coordinator-scope.manage` only; the role needs an eligible
+  family-side head and never lands on a Staff or mixed account; a scope
+  needs the role and an active target; removing the role revokes every
+  active scope (`ROLE_REMOVED`) in the same transaction. Events
+  `COORDINATOR_ROLE_GRANTED` / `_REVOKED` (new codes, no migration) and
+  `COORDINATOR_SCOPE_ASSIGNED` / `_REVOKED`.
+- Staff API under `/api/v1/people/{person}/coordinator…` and
+  `/api/v1/coordinator-scopes/{uuid}/revoke`, behind `staff.side`.
+- `coordinator.space` boundary after `family.side`; `GET
+  /family/coordinator/context` (scope summaries, family count); `GET
+  /family/coordinator/families` (25 per page, search by code prefix or head
+  name, narrowing filters) and `GET /family/coordinator/families/{code}` —
+  both the six-field summary, both only through the authorized query, the
+  same 404 for out of scope and nonexistent.
+- `/family/me.coordinator_space` from the same resolver as the boundary.
+
+**Frontend.**
+
+- `/family`: a "مساحة التنسيق" entry card only when
+  `coordinator_space` is true.
+- `/family/coordinator` (inside the Family Portal, no separate login): a
+  mode strip "أنت في مساحة التنسيق" with "العودة إلى أسرتي"; the household
+  bottom navigation is hidden. Title "مساحة التنسيق"; "نطاق التنسيق" with
+  scope chips ("عشيرة: …", "مجموعة فروع: …", "فرع: …"); "عدد الأسر في
+  النطاق: N"; a searchable, server-paginated list "الأسر في النطاق".
+- `/family/coordinator/families/{code}`: the same six fields as a summary
+  page; "الأسرة غير متاحة." for out of scope and nonexistent alike.
+- The space asks the server every time (`/family/coordinator/context`); a
+  403 shows a neutral notice with the way back to the household.
+
+**Known limits.**
+
+- Assignments do not expire; they must be revoked explicitly.
+- No Staff screen for coordinator administration yet (API only).
+- A Coordinator whose own household is inside the scope sees it in the
+  list like any other family, with the summary projection.
+- The PostgreSQL CHECKs on the assignment table are still proved only by
+  the PostgreSQL-only test class, which needs a `famboook_test` database;
+  the actions validate the same shape.
+
+Not implemented by PWA-1H: coordinator notifications and announcements,
+profile-completion follow-up, account-status visibility
+(`coordinator-family.view-account-status` stays PROPOSED), assisted mobile
+trust, any coordinator write.
+
 ---
 
 # 31. Amendment Register
@@ -2108,6 +2178,26 @@ A Family password is 8 characters to 72 bytes of UTF-8. The upper bound is
 the bcrypt input limit: a longer password is refused, never truncated.
 Activation, login and password reset are three independent gates, all off
 by default.
+
+FP-ADR-047
+A Coordinator is family-side, never Staff, and COORDINATOR ≠ REVIEWER.
+Coordinator Space requires the account's own Family context, the role, the
+space permission and at least one effective assignment; the scope is the
+union of the assignments over the current hierarchy, inactive structure
+fails closed, and assignments do not expire.
+
+FP-ADR-048
+A Coordinator sees family SUMMARIES only (code, hierarchy names, head name,
+active member count) through `coordinator-family.view-summary`. A family is
+reached only through the authorized query; out of scope and nonexistent
+look the same. Coordinator Space is a visibly separate mode and its
+families never join the Coordinator's own household.
+
+FP-ADR-049
+Coordinators are administered by SUPER_ADMIN and ADMINISTRATOR only, as
+Staff acts with recorded events; role and scope are separate layers.
+`person-mobile-trust.assist` stays withheld until a dedicated
+assisted-mobile-trust workflow exists.
 ```
 
 ---
@@ -2219,6 +2309,10 @@ PARTLY DECIDED 2026-10-02: the PWA-1 permission names are final (docs/06
 §22b; documented, not seeded). Names for later phases stay PROPOSED.
 PWA-1C seeded the ten PWA-1 names; the coordinator's assist grant is
 deferred to PWA-1H (docs/06 AUTH-ADR-064).
+UPDATED 2026-10-03 (PWA-1H): `coordinator-family.view-summary` approved and
+seeded (COORDINATOR only, summary only). `person-mobile-trust.assist` stays
+withheld from COORDINATOR until a dedicated assisted-mobile-trust workflow
+is approved. `coordinator-family.view-account-status` stays PROPOSED.
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -2255,3 +2349,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.4 | 2026-10-02 | Approved | PWA-1E implementation record in §30a: trusted-mobile resolver, grant / revoke and the Staff API, STALE semantics, SMS abstraction and drivers, OTP challenge service (resend, 10-minute grant), throttle ceilings, cleanup; the six-point Production gate; FP-ADR-038 … 040; PWA-1E done, PWA-1F next. No migration; no activation, login, reset or provider |
 | 1.5 | 2026-10-02 | Approved | PWA-1F implementation record in §30a: Family API boundary and `/family/me`, public activation steps with decoys, limiters and the response floor, the completion transaction and session, the `(staff)` route group, the Family theme, the activation flow and the first shell; §25 layout as implemented; Production gate extended with PWA-1G (seven points); FP-ADR-041 … 043; PWA-1F done, PWA-1G next. No migration; activation disabled by default |
 | 1.6 | 2026-10-03 | Approved | PWA-1G implementation record in §30a: Family login (identity lookup, Family context, generic failure, dummy hash, two-tier lockout), password reset on purpose-aware decoys, the reset transaction and session revocation, the 72-byte password ceiling, three independent gates, the login and forgot-password screens; Production gate items 8–9; FP-ADR-044 … 046; PWA-1G done, PWA-1H next. No migration; nothing enabled |
+| 1.7 | 2026-10-03 | Approved | PWA-1H implementation record in §30a: coordinator resolver, administration actions and Staff API, `coordinator.space`, coordinator context and scoped summaries (`coordinator-family.view-summary` approved), `/family/me.coordinator_space`, Coordinator Space in the portal; PFP-022 updated; FP-ADR-047 … 049; PWA-1H done, PWA-1I next. No migration; assist withheld |
