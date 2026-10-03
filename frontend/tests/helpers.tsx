@@ -16,6 +16,7 @@ export function familyUser(overrides: Partial<FamilyUser> = {}): FamilyUser {
     display_name: "سالم الاختبار",
     roles: ["FAMILY_USER"],
     coordinator: false,
+    coordinator_space: false,
     context: { available: true, family: { code: "FAM-000123", name: "فرع الاختبار" } },
     ...overrides,
   };

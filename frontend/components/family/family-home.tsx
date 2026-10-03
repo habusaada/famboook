@@ -1,6 +1,7 @@
 "use client";
 
-import { BadgeCheck, Clock3 } from "lucide-react";
+import Link from "next/link";
+import { BadgeCheck, ChevronLeft, Clock3, Network } from "lucide-react";
 import { useFamilyUser } from "@/components/family/family-context";
 
 const UPCOMING = ["بيانات الأسرة وأفرادها", "طلبات تحديث البيانات", "بطاقة رب الأسرة الرقمية"];
@@ -22,6 +23,25 @@ export function FamilyHome() {
           <bdi>{user.display_name ?? "مستخدم بوابة الأسرة"}</bdi>
         </h1>
       </section>
+
+      {user.coordinator_space && (
+        // Shown only when the server says Coordinator Space is open; the space
+        // itself asks the server again.
+        <Link
+          href="/family/coordinator"
+          className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4 transition-colors hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-ring"
+          data-coordinator-entry
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-white" aria-hidden>
+            <Network className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold text-brand-900">مساحة التنسيق</span>
+            <span className="mt-0.5 block text-[13px] text-brand-800">متابعة الأسر ضمن نطاق التنسيق المعيّن لك.</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-brand-700" aria-hidden />
+        </Link>
+      )}
 
       {family && (
         <section className="rounded-2xl border border-border bg-surface-1 p-4" aria-label="الأسرة" data-family-card>

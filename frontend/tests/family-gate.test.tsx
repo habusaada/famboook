@@ -7,7 +7,8 @@ import { ApiError, apiClient } from "@/lib/api/client";
 import { familyUser, renderWithClient } from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const pathname = "/family";
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => pathname }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>

@@ -14,6 +14,12 @@ export type FamilyUser = {
   display_name: string | null;
   roles: string[];
   coordinator: boolean;
+  /**
+   * Coordinator Space is open right now — the same check the server's
+   * coordinator boundary runs. It only decides whether the entry is shown;
+   * Coordinator Space still asks the server.
+   */
+  coordinator_space: boolean;
   context: {
     /** False when no Family context exists right now; the reason is not sent. */
     available: boolean;

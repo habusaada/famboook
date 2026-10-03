@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, LogOut, ShieldAlert } from "lucide-react";
+import { ArrowRight, Loader2, LogOut, Network, ShieldAlert } from "lucide-react";
 import { FamilyBottomNav } from "@/components/family/bottom-nav";
 import { FamilyBrand } from "@/components/family/family-brand";
 import { useFamilyUser } from "@/components/family/family-context";
@@ -64,14 +65,42 @@ function AccessUnavailable() {
 }
 
 /**
+ * Coordinator Space is a separate MODE of the same portal (docs/11 §7–§8): a
+ * strip says so on every Coordinator page and leads back to the household.
+ */
+function CoordinatorModeStrip() {
+  return (
+    <div className="border-b border-brand-100 bg-brand-50" data-coordinator-mode>
+      <div className="mx-auto flex min-h-12 max-w-md items-center justify-between gap-3 px-4 py-1.5">
+        <p className="flex items-center gap-2 text-sm font-semibold text-brand-900">
+          <Network className="size-4 shrink-0" aria-hidden />
+          أنت في مساحة التنسيق
+        </p>
+        <Link
+          href="/family"
+          className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-brand-700 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <ArrowRight className="size-4" aria-hidden />
+          العودة إلى أسرتي
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The authenticated Family Portal shell (docs/11 §23–24): mobile-first, one
  * narrow column at every width, bottom navigation, no sidebar. Without a
  * Family context it renders the neutral notice INSTEAD of the page and the
- * navigation.
+ * navigation. Inside Coordinator Space the household navigation is hidden
+ * and the mode strip is shown: assigned Families never appear as part of the
+ * user's own household.
  */
 export function FamilyShell({ children }: { children: React.ReactNode }) {
   const user = useFamilyUser();
+  const pathname = usePathname();
   const available = user.context.available;
+  const coordinatorMode = available && (pathname === "/family/coordinator" || pathname.startsWith("/family/coordinator/"));
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -80,13 +109,14 @@ export function FamilyShell({ children }: { children: React.ReactNode }) {
           <FamilyBrand />
           <LogoutButton />
         </div>
+        {coordinatorMode && <CoordinatorModeStrip />}
       </header>
 
-      <main className={`mx-auto w-full max-w-md flex-1 px-4 pt-6 ${available ? "pb-28" : "pb-10"}`}>
+      <main className={`mx-auto w-full max-w-md flex-1 px-4 pt-6 ${available && !coordinatorMode ? "pb-28" : "pb-10"}`}>
         {available ? children : <AccessUnavailable />}
       </main>
 
-      {available && <FamilyBottomNav />}
+      {available && !coordinatorMode && <FamilyBottomNav />}
     </div>
   );
 }
