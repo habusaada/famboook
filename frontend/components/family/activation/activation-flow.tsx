@@ -33,8 +33,9 @@ type State =
 
 const STEP_NUMBER = { NATIONAL_ID: 1, CONFIRM_MOBILE: 2, OTP: 3, PASSWORD: 4 } as const;
 
-const NOT_MINE =
-  "لا يمكن تغيير رقم الجوال أثناء التفعيل. لتحديث رقمك المسجّل، يرجى التواصل مع إدارة شؤون العائلة، ثم العودة لتفعيل الحساب.";
+const NOT_MINE = "إذا لم تكن رب الأسرة، فلا يمكنك تفعيل حساب الأسرة. استخدم رقم هوية رب الأسرة للمتابعة.";
+
+const HEAD_ONLY = "التفعيل متاح لرب الأسرة فقط، باستخدام رقم هويته.";
 
 /**
  * Family account activation (docs/11 §30a, FP-ADR-053): National ID →
@@ -86,6 +87,7 @@ export function ActivationFlow() {
           notice={state.notice}
           start={startActivation}
           onStarted={confirmed}
+          helper={HEAD_ONLY}
         />
       )}
       {state.step === "CONFIRM_MOBILE" && (

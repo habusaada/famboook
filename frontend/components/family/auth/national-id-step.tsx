@@ -21,6 +21,8 @@ type Props<T> = {
   /** The start endpoint of the workflow: activation or password reset. */
   start: (nationalId: string) => Promise<T>;
   onStarted: (start: T) => void;
+  /** A short rule shown under the field, the same for everyone. */
+  helper?: string;
 };
 
 /**
@@ -28,7 +30,7 @@ type Props<T> = {
  * The answer is the same for every well-formed number, so nothing here says
  * whether it is known or eligible; only a malformed number is a field error.
  */
-export function NationalIdStep<T>({ title, description, submitLabel, notice, start, onStarted }: Props<T>) {
+export function NationalIdStep<T>({ title, description, submitLabel, notice, start, onStarted, helper }: Props<T>) {
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -75,10 +77,18 @@ export function NationalIdStep<T>({ title, description, submitLabel, notice, sta
             autoFocus
             className={cn(fieldClass, "text-start tracking-wide")}
             aria-invalid={errors.national_id ? true : undefined}
-            aria-describedby={errors.national_id ? "family-national-id-error" : undefined}
+            aria-describedby={
+              [errors.national_id ? "family-national-id-error" : null, helper ? "family-national-id-helper" : null].filter(Boolean).join(" ") ||
+              undefined
+            }
             {...register("national_id")}
           />
           <FieldError id="family-national-id-error" message={errors.national_id?.message} />
+          {helper && (
+            <p id="family-national-id-helper" className="text-sm text-muted-foreground">
+              {helper}
+            </p>
+          )}
         </div>
 
         <Button type="submit" disabled={isSubmitting} className={primaryButtonClass}>

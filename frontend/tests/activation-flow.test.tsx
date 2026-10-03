@@ -118,6 +118,9 @@ describe("step 1 — National ID", () => {
     // The only link: to the Family login, for someone already activated.
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
+    // The head-only rule, up front and attached to the field.
+    expect(screen.getByText("التفعيل متاح لرب الأسرة فقط، باستخدام رقم هويته.")).toBeInTheDocument();
+    expect(idField()).toHaveAccessibleDescription("التفعيل متاح لرب الأسرة فقط، باستخدام رقم هويته.");
   });
 
   it("sends Arabic digits as nine ASCII digits", async () => {
@@ -197,7 +200,8 @@ describe("step 2 — confirm the registered number", () => {
 
     await toConfirmStep(user);
 
-    expect(screen.getByText("وجدنا رقم جوال مسجلاً لبياناتك")).toBeInTheDocument();
+    expect(screen.getByText("سيتم إرسال رمز التحقق إلى رقم الجوال المسجّل لرب الأسرة:")).toBeInTheDocument();
+    expect(screen.queryByText("وجدنا رقم جوال مسجلاً لبياناتك")).not.toBeInTheDocument();
     expect(screen.getByText(MASKED)).toHaveAttribute("dir", "ltr");
     expect(screen.getByText("هل هذا رقمك ويمكنك استقبال رمز التحقق عليه؟")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" })).toBeEnabled();
@@ -207,6 +211,23 @@ describe("step 2 — confirm the registered number", () => {
     expect(document.querySelectorAll("input")).toHaveLength(0);
     expect(document.body.textContent).not.toMatch(/05\d{8}/);
     expect(document.body.textContent).not.toContain(NATIONAL_ID);
+  });
+
+  it("renders the same structure and words whatever the server answered", async () => {
+    // A real and a decoy confirmation differ only in their reference and
+    // digits; the browser cannot tell them apart and shows them alike.
+    const screens: string[] = [];
+    for (const reply of [CONFIRM, { confirmation: "0b1c2d3e-4f5a-4b6c-9d7e-8f9a0b1c2d3e", masked_mobile: "05*****042" }]) {
+      api({ "/start": reply });
+      const user = userEvent.setup();
+      const view = renderWithClient(<ActivationFlow />);
+      await toConfirmStep(user);
+      screens.push(view.container.innerHTML.replace(reply.masked_mobile, "MASK"));
+      view.unmount();
+      vi.restoreAllMocks();
+    }
+
+    expect(screens[0]).toBe(screens[1]);
   });
 
   it("confirming sends only the confirmation reference — never a number", async () => {
@@ -243,7 +264,9 @@ describe("step 2 — confirm the registered number", () => {
     await user.click(screen.getByRole("button", { name: "ليس رقمي أو لا أستطيع استقبال الرمز" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "مرحبًا بك في فامبوك" })).toBeInTheDocument();
-    expect(screen.getByText(/لا يمكن تغيير رقم الجوال أثناء التفعيل/)).toBeInTheDocument();
+    expect(
+      screen.getByText("إذا لم تكن رب الأسرة، فلا يمكنك تفعيل حساب الأسرة. استخدم رقم هوية رب الأسرة للمتابعة.")
+    ).toBeInTheDocument();
     expect(post.mock.calls.map(([path]) => path)).toEqual([`${BASE}/start`]);
   });
 

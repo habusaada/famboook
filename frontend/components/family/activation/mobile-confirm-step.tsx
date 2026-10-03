@@ -46,8 +46,10 @@ export function MobileConfirmStep({ maskedMobile, send, onSent, onNotMine, onRes
 
   return (
     <section aria-labelledby="family-mobile-title">
+      {/* The same words for every identifier: nothing here says whether this
+          one belongs to an eligible household head (FP-ADR-053). */}
       <StepHeading id="family-mobile-title" title="تأكيد رقم الجوال">
-        وجدنا رقم جوال مسجلاً لبياناتك
+        سيتم إرسال رمز التحقق إلى رقم الجوال المسجّل لرب الأسرة:
       </StepHeading>
 
       <div className="flex flex-col gap-5">
