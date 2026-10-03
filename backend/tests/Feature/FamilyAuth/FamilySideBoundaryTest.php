@@ -208,6 +208,6 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        $this->assertSame(12, $checked);
+        $this->assertSame(14, $checked);
     }
 }

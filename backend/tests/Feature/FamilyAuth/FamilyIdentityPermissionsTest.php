@@ -94,13 +94,18 @@ class FamilyIdentityPermissionsTest extends TestCase
         $this->assertSame(['family-portal.access'], $this->held('FAMILY_USER'));
     }
 
-    public function test_coordinator_holds_only_coordinator_space_access(): void
+    public function test_coordinator_holds_only_the_space_and_family_summaries(): void
     {
-        // The whole role, not just the PWA-1 names: nothing else at all.
-        $this->assertSame(
-            ['coordinator-space.access'],
+        // The whole role, not just the PWA-1 names: nothing else at all
+        // (PWA-1H added the scoped family summaries, AUTH-ADR-070).
+        $this->assertEqualsCanonicalizing(
+            ['coordinator-space.access', 'coordinator-family.view-summary'],
             Role::findByName('COORDINATOR', 'web')->permissions->pluck('name')->all(),
         );
+        // No other role holds the summaries — no Staff role either.
+        foreach (RolePermissionSeeder::ROLES as $role) {
+            $this->assertSame($role === 'COORDINATOR', Role::findByName($role, 'web')->hasPermissionTo('coordinator-family.view-summary'), $role);
+        }
     }
 
     public function test_coordinator_assist_is_deliberately_deferred_until_scope_enforcement(): void

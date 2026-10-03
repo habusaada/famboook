@@ -60,12 +60,16 @@ class VerifyPermissions extends Command
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
-            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access'],
+            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary'],
         ],
+        // A Coordinator is family-side and scope-bound (PWA-1H): summaries in
+        // its scope and nothing of the Staff API, review, export or trust.
         'COORDINATOR' => [
-            'has' => ['coordinator-space.access'],
+            'has' => ['coordinator-space.access', 'coordinator-family.view-summary'],
             'lacks' => ['person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
-                'user-person-link.manage', 'coordinator-scope.manage', 'family.view', 'person.view'],
+                'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
+                'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
+                'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access'],
         ],
     ];
 

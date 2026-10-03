@@ -275,6 +275,10 @@ class RolePermissionSeeder extends Seeder
         'user-person-link.manage',
         'coordinator-scope.view',
         'coordinator-scope.manage',
+
+        // §22b PWA-1H: Coordinator Space family SUMMARIES inside the scope
+        // (approved 2026-10-03, AUTH-ADR-070). Summary projection only.
+        'coordinator-family.view-summary',
     ];
 
     /**
@@ -658,8 +662,11 @@ class RolePermissionSeeder extends Seeder
             // deliberately NOT granted here until coordinator scope
             // authorization is enforced — a family-side session shares the
             // guard with the Staff API, and a permission-only endpoint would
-            // otherwise accept it. Never grant, never revoke.
+            // otherwise accept it. Never grant, never revoke. It stays withheld
+            // in PWA-1H: it belongs to a future assisted-trust workflow.
             'coordinator-space.access',
+            // §22b PWA-1H: summaries of the Families in the scope, nothing more.
+            'coordinator-family.view-summary',
         ],
     ];
 

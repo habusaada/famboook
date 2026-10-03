@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -83,6 +84,14 @@ Route::prefix('family')->group(function () {
         // the coordinator.space boundary, never from the client.
         Route::prefix('coordinator')->middleware('coordinator.space')->group(function () {
             Route::get('/context', [CoordinatorSpaceController::class, 'context']);
+
+            // Family SUMMARIES inside the scope. No route-model binding: the
+            // code is looked up inside the authorized query only.
+            Route::middleware('can:coordinator-family.view-summary')->group(function () {
+                Route::get('/families', [CoordinatorFamilyController::class, 'index']);
+                Route::get('/families/{familyCode}', [CoordinatorFamilyController::class, 'show'])
+                    ->where('familyCode', '[A-Za-z0-9_\-]{1,50}');
+            });
         });
     });
 });
