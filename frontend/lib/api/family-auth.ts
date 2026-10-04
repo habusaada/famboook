@@ -137,6 +137,7 @@ export type FamilyAuthErrorCode =
   | "ACTIVATION_FAILED"
   | "TOO_MANY_REQUESTS"
   | "ACTIVATION_UNAVAILABLE"
+  | "ACTIVATION_REFUSED"
   | "INVALID_CREDENTIALS"
   | "FAMILY_AUTH_UNAVAILABLE"
   | "RESET_FAILED"
@@ -152,6 +153,9 @@ const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   ACTIVATION_FAILED: "تعذّر إكمال التفعيل. ابدأ من جديد أو راجع الإدارة.",
   TOO_MANY_REQUESTS: "محاولات كثيرة. حاول مجددًا بعد قليل.",
   ACTIVATION_UNAVAILABLE: "الخدمة غير متاحة حاليًا.",
+  // One refusal for every reason an identifier cannot start activation
+  // (FP-ADR-054); the reason is never sent to the browser.
+  ACTIVATION_REFUSED: "تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى.",
   // One message for every credential, account and context failure.
   INVALID_CREDENTIALS: "رقم الهوية أو كلمة المرور غير صحيحة.",
   FAMILY_AUTH_UNAVAILABLE: "تسجيل الدخول غير متاح حاليًا.",

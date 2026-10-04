@@ -38,8 +38,10 @@ const NOT_MINE = "إذا لم تكن رب الأسرة، فلا يمكنك تف�
 const HEAD_ONLY = "التفعيل متاح لرب الأسرة فقط، باستخدام رقم هويته.";
 
 /**
- * Family account activation (docs/11 §30a, FP-ADR-053): National ID →
- * confirm the masked registered number → code → password, on one route. The
+ * Family account activation (docs/11 §30a, FP-ADR-053/054): National ID →
+ * confirm the masked registered number → code → password, on one route. An
+ * identifier that cannot start activation stays on step 1 with one generic
+ * refusal; step 2 exists only after an eligible start. The
  * whole state — including the opaque references and the masked number —
  * lives in this component's memory: nothing goes to the URL, localStorage,
  * sessionStorage or a cookie, so a refresh simply starts over. The browser

@@ -39,6 +39,12 @@ export function MobileConfirmStep({ maskedMobile, send, onSent, onNotMine, onRes
         onRestart("انتهت صلاحية هذه الخطوة. أدخل رقم الهوية من جديد.");
         return;
       }
+      // Something changed since the start (eligibility, the number): the
+      // same refusal as a refused start, back on step 1.
+      if (failure.code === "ACTIVATION_REFUSED") {
+        onRestart(failure.message);
+        return;
+      }
       setError(failure.message);
       setSending(false);
     }
@@ -46,8 +52,8 @@ export function MobileConfirmStep({ maskedMobile, send, onSent, onNotMine, onRes
 
   return (
     <section aria-labelledby="family-mobile-title">
-      {/* The same words for every identifier: nothing here says whether this
-          one belongs to an eligible household head (FP-ADR-053). */}
+      {/* Shown only after an eligible start: the masked number is real
+          (FP-ADR-054 — a refused identifier never reaches this step). */}
       <StepHeading id="family-mobile-title" title="تأكيد رقم الجوال">
         سيتم إرسال رمز التحقق إلى رقم الجوال المسجّل لرب الأسرة:
       </StepHeading>

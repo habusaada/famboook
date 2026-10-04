@@ -30,6 +30,7 @@ const CONFIRMATION = "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d";
 const MASKED = "05*****567";
 const FULL_MOBILE = "0591234567";
 const CONFIRM = { confirmation: CONFIRMATION, masked_mobile: MASKED };
+const REFUSED = "تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى.";
 
 type Reply = unknown | (() => unknown);
 
@@ -177,6 +178,35 @@ describe("step 1 — National ID", () => {
     expect(screen.queryByRole("heading", { name: "تأكيد رقم الجوال" })).not.toBeInTheDocument();
   });
 
+  it("stays on step 1 with ONE generic refusal when the identifier cannot start activation", async () => {
+    // The server gives the same answer for every reason (not found, not the
+    // head, deceased, no valid number…); the browser shows just that.
+    const post = api({ "/start": refusal(422, "ACTIVATION_REFUSED") });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+
+    await user.type(idField(), NATIONAL_ID);
+    await user.click(submitId());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(REFUSED);
+    expect(screen.getByRole("heading", { level: 1, name: "مرحبًا بك في فامبوك" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "تأكيد رقم الجوال" })).not.toBeInTheDocument();
+    expect(document.querySelector("[data-masked-mobile]")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/05\*/);
+    expect(screen.getByText("الخطوة 1 من 4")).toBeInTheDocument();
+    expect(post.mock.calls.map(([path]) => path)).toEqual([`${BASE}/start`]);
+  });
+
+  it("shows step 2 only after an eligible start with a masked number", async () => {
+    api({ "/start": CONFIRM });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+
+    await toConfirmStep(user);
+
+    expect(document.querySelector("[data-masked-mobile]")).toHaveTextContent(MASKED);
+  });
+
   it.each([
     [503, "ACTIVATION_UNAVAILABLE", "الخدمة غير متاحة حاليًا."],
     [429, "TOO_MANY_REQUESTS", "محاولات كثيرة. حاول مجددًا بعد قليل."],
@@ -213,21 +243,17 @@ describe("step 2 — confirm the registered number", () => {
     expect(document.body.textContent).not.toContain(NATIONAL_ID);
   });
 
-  it("renders the same structure and words whatever the server answered", async () => {
-    // A real and a decoy confirmation differ only in their reference and
-    // digits; the browser cannot tell them apart and shows them alike.
-    const screens: string[] = [];
-    for (const reply of [CONFIRM, { confirmation: "0b1c2d3e-4f5a-4b6c-9d7e-8f9a0b1c2d3e", masked_mobile: "05*****042" }]) {
-      api({ "/start": reply });
-      const user = userEvent.setup();
-      const view = renderWithClient(<ActivationFlow />);
-      await toConfirmStep(user);
-      screens.push(view.container.innerHTML.replace(reply.masked_mobile, "MASK"));
-      view.unmount();
-      vi.restoreAllMocks();
-    }
+  it("returns to step 1 with the generic refusal when the start no longer holds at send", async () => {
+    api({ "/start": CONFIRM, "/send": refusal(422, "ACTIVATION_REFUSED") });
+    const user = userEvent.setup();
+    renderWithClient(<ActivationFlow />);
+    await toConfirmStep(user);
 
-    expect(screens[0]).toBe(screens[1]);
+    await user.click(screen.getByRole("button", { name: "نعم، أرسل رمز التحقق" }));
+
+    expect(await screen.findByText(REFUSED)).toBeInTheDocument();
+    expect(idField()).toBeInTheDocument();
+    expect(screen.queryByText(MASKED)).not.toBeInTheDocument();
   });
 
   it("confirming sends only the confirmation reference — never a number", async () => {
