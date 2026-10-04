@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
+use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
@@ -81,6 +82,12 @@ Route::prefix('family')->group(function () {
 
     Route::middleware(['auth:sanctum', 'family.side'])->group(function () {
         Route::get('/me', [FamilySessionController::class, 'me']);
+
+        // Family data (PWA-3A): the Family comes ONLY from the family.context
+        // boundary (FamilyAccessResolver), never from the client.
+        Route::middleware(['can:family-portal.access', 'family.context'])->group(function () {
+            Route::get('/household', [FamilyHouseholdController::class, 'show']);
+        });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
         // the coordinator.space boundary, never from the client.

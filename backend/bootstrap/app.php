@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureActivationEnabled;
 use App\Http\Middleware\EnsureCoordinatorSpace;
+use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Middleware\EnsureFamilyLoginEnabled;
 use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
@@ -42,6 +43,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'family.password-reset' => EnsurePasswordResetEnabled::class,
             // Coordinator Space (PWA-1H): after family.side, never instead of it.
             'coordinator.space' => EnsureCoordinatorSpace::class,
+            // Family data (PWA-3A): the server-resolved Family context.
+            'family.context' => EnsureFamilyContext::class,
             // OTP SMS after the response, same process, no queue (A′).
             'sms.after-response' => SendSmsAfterResponse::class,
         ]);
