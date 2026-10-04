@@ -81,7 +81,7 @@ describe("FamilyGate", () => {
     expect(home).toHaveAttribute("href", "/family");
     expect(home).toHaveAttribute("aria-current", "page");
     const members = within(nav).getByRole("link", { name: "أسرتي" });
-    expect(members).toHaveAttribute("href", "/family/members");
+    expect(members).toHaveAttribute("href", "/family/household");
     expect(members).not.toHaveAttribute("aria-current");
     // Only the pages that exist are links: no fake route or workflow.
     expect(within(nav).getAllByRole("link")).toHaveLength(2);

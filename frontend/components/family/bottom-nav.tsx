@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { FileText, House, Plus, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 
 // The approved Family Portal navigation (docs/11 §23). Only the pages that
-// exist are links — الرئيسية (/family) and أسرتي (/family/members); every
-// other entry, and the central action, is visible but disabled: no link, no
-// route, no placeholder workflow behind it. The current entry follows the
-// pathname.
+// exist are links — الرئيسية (/family) and أسرتي (/family/household, current
+// on its members page /family/members too); every other entry, and the
+// central action, is visible but disabled: no link, no route, no placeholder
+// workflow behind it. The current entry follows the pathname.
 
 type Entry = { label: string; icon: LucideIcon };
 
@@ -53,7 +53,8 @@ function Disabled({ label, icon: Icon }: Entry) {
 
 export function FamilyBottomNav() {
   const pathname = usePathname();
-  const onMembers = pathname === "/family/members" || pathname.startsWith("/family/members/");
+  const within = (root: string) => pathname === root || pathname.startsWith(`${root}/`);
+  const inHousehold = within("/family/household") || within("/family/members");
 
   return (
     <nav
@@ -63,7 +64,7 @@ export function FamilyBottomNav() {
     >
       <ul className="mx-auto flex max-w-md items-stretch px-2">
         <NavLink href="/family" label="الرئيسية" icon={House} current={pathname === "/family"} />
-        <NavLink href="/family/members" label="أسرتي" icon={UsersRound} current={onMembers} />
+        <NavLink href="/family/household" label="أسرتي" icon={UsersRound} current={inHousehold} />
         <li className="flex flex-1 items-center justify-center">
           <button
             type="button"

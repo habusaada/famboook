@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { FamilyUser } from "@/lib/api/family-auth";
-import type { FamilyHousehold, FamilyMember, FamilyMembers } from "@/lib/api/family-household";
+import type { FamilyHousehold, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
 
 /** Renders inside a fresh, non-retrying query client. */
 export function renderWithClient(ui: ReactElement) {
@@ -70,19 +70,49 @@ export function familyMembers(members?: FamilyMember[]): FamilyMembers {
   };
 }
 
+/** A synthetic, complete «أسرتي» profile; nothing here is real registry data. */
+export function familyProfile(
+  family: Partial<FamilyProfile["family"]> = {},
+  residence: Partial<NonNullable<FamilyProfile["residence"]>> | null = {}
+): FamilyProfile {
+  return {
+    family: {
+      family_code: "FAM-000123",
+      clan_name: "عائلة الاختبار",
+      branch_name: "فرع الاختبار",
+      head: { full_name: "سالم الاختبار" },
+      declared_household_size: 7,
+      declared_at: "2026-09-01",
+      registered_member_count: 2,
+      ...family,
+    },
+    residence:
+      residence === null
+        ? null
+        : {
+            original_residence_text: "بني سهيلا – خانيونس",
+            displacement_status: "DISPLACED",
+            displacement_location_text: "مواصي خانيونس",
+            current_address: { governorate: "خانيونس", city: "خانيونس", area: "المواصي", neighborhood: "حي الاختبار" },
+            ...residence,
+          },
+  };
+}
+
 type Answer = unknown | Error | (() => Promise<unknown>);
 
 /**
  * apiClient.get by path for the Family Portal: /me answers with the user,
- * /household with the summary, /household/members with the members (or an
- * error to throw, or a function for a custom promise). Any other path fails
- * the test loudly.
+ * /household with the summary, /household/members with the members,
+ * /household/profile with the «أسرتي» profile (or an error to throw, or a
+ * function for a custom promise). Any other path fails the test loudly.
  */
 export function familyGet({
   user = familyUser(),
   household = familyHousehold(),
   members = familyMembers(),
-}: { user?: FamilyUser | Error; household?: Answer; members?: Answer } = {}) {
+  profile = familyProfile(),
+}: { user?: FamilyUser | Error; household?: Answer; members?: Answer; profile?: Answer } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
     if (value instanceof Error) throw value;
@@ -96,6 +126,9 @@ export function familyGet({
     }
     if (path === "/api/v1/family/household/members") {
       return typeof members === "function" || members instanceof Error ? answer(members) : { data: members };
+    }
+    if (path === "/api/v1/family/household/profile") {
+      return typeof profile === "function" || profile instanceof Error ? answer(profile) : { data: profile };
     }
     throw new Error(`Unexpected GET ${path}`);
   };

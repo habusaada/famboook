@@ -88,6 +88,7 @@ Route::prefix('family')->group(function () {
         Route::middleware(['can:family-portal.access', 'family.context'])->group(function () {
             Route::get('/household', [FamilyHouseholdController::class, 'show']);
             Route::get('/household/members', [FamilyHouseholdController::class, 'members']);
+            Route::get('/household/profile', [FamilyHouseholdController::class, 'profile']);
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from

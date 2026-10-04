@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Family;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Resources\FamilyHouseholdMemberResource;
+use App\Http\Resources\FamilyHouseholdProfileResource;
 use App\Http\Resources\FamilyHouseholdResource;
 use App\Support\FamilyPortal\HouseholdReadModel;
 use Illuminate\Http\JsonResponse;
@@ -37,5 +38,15 @@ class FamilyHouseholdController extends Controller
             'family_code' => $context->family->family_code,
             'members' => FamilyHouseholdMemberResource::collection($this->household->members($context)),
         ]])->header('Cache-Control', 'no-store');
+    }
+
+    /** The «أسرتي» profile: family facts and the current residence (PWA-3A Step 4). */
+    public function profile(Request $request): JsonResponse
+    {
+        $context = EnsureFamilyContext::context($request);
+
+        return (new FamilyHouseholdProfileResource($this->household->profile($context), $context->person))
+            ->response()
+            ->header('Cache-Control', 'no-store');
     }
 }

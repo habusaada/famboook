@@ -80,8 +80,9 @@ describe("the members list", () => {
     expect(screen.getByRole("heading", { level: 1, name: "أفراد الأسرة" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     const back = container.querySelector("[data-members-back]");
-    expect(back).toHaveTextContent("الرئيسية");
-    expect(back).toHaveAttribute("href", "/family");
+    // Members sit under أسرتي: the way back leads there.
+    expect(back).toHaveTextContent("أسرتي");
+    expect(back).toHaveAttribute("href", "/family/household");
     expect(screen.getByText("FAM-000123")).toHaveAttribute("dir", "ltr");
     // members.length, the unavailable row included; no second count requested.
     expect(container.querySelector("[data-members-count]")?.textContent).toBe("أفراد الأسرة المسجلون (3)");
@@ -299,7 +300,7 @@ describe("navigation and privacy", () => {
 
     const nav = screen.getByRole("navigation", { name: "التنقل الرئيسي" });
     const members = within(nav).getByRole("link", { name: "أسرتي" });
-    expect(members).toHaveAttribute("href", "/family/members");
+    expect(members).toHaveAttribute("href", "/family/household");
     expect(members).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).not.toHaveAttribute("aria-current");
     expect(within(nav).getAllByRole("link")).toHaveLength(2);

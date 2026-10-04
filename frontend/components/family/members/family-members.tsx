@@ -56,12 +56,12 @@ export function FamilyMembers() {
     <div className="flex flex-col gap-5">
       <header>
         <Link
-          href="/family"
+          href="/family/household"
           className="-ms-2 inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
           data-members-back
         >
           <ArrowRight className="size-4" aria-hidden />
-          الرئيسية
+          أسرتي
         </Link>
         <h1 className="mt-1 text-2xl leading-snug font-bold text-foreground">أفراد الأسرة</h1>
         {/* Metadata under the title: the number of rows and the family code. */}

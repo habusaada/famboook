@@ -27,15 +27,22 @@ final class HouseholdReadModel
      */
     public function summary(FamilyAccessResult $context): Family
     {
-        return Family::query()
-            ->whereKey($context->family->getKey())
-            ->select(['families.id', 'families.family_code', 'families.clan_id', 'families.branch_id'])
-            ->addSelect(['registered_member_count' => $this->activeMemberships($context)->selectRaw('count(*)')])
-            ->with([
-                'clan:id,name',
-                'branch:id,name',
-                'currentHouseholdDeclaration:id,family_id,declared_household_size,declared_at',
-            ])
+        return $this->family($context)->firstOrFail();
+    }
+
+    /**
+     * The «أسرتي» profile (PWA-3A Step 4): the summary's Family plus its
+     * CURRENT residence only (is_current; at most one per Family). There is
+     * no residence history to read: residence corrections are made in place.
+     * Only the family-facing residence columns are selected.
+     */
+    public function profile(FamilyAccessResult $context): Family
+    {
+        return $this->family($context)
+            ->with(['currentResidence' => fn ($r) => $r->select([
+                'id', 'family_id', 'original_residence_text', 'displacement_status', 'displacement_location_text',
+                'governorate', 'city', 'area', 'neighborhood',
+            ])])
             ->firstOrFail();
     }
 
@@ -86,6 +93,20 @@ final class HouseholdReadModel
             ->orderBy('family_memberships.paper_sequence_no')
             ->orderBy('family_memberships.id')
             ->get();
+    }
+
+    /** The resolved Family with its lineage names, current declaration and registered count. */
+    private function family(FamilyAccessResult $context): Builder
+    {
+        return Family::query()
+            ->whereKey($context->family->getKey())
+            ->select(['families.id', 'families.family_code', 'families.clan_id', 'families.branch_id'])
+            ->addSelect(['registered_member_count' => $this->activeMemberships($context)->selectRaw('count(*)')])
+            ->with([
+                'clan:id,name',
+                'branch:id,name',
+                'currentHouseholdDeclaration:id,family_id,declared_household_size,declared_at',
+            ]);
     }
 
     /** The authoritative population: the resolved Family's ACTIVE memberships. */

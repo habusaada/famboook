@@ -105,7 +105,7 @@ describe("installation and activation", () => {
 });
 
 describe("Family Portal navigations", () => {
-  it.each(["/family", "/family/login", "/family/activate", "/family/coordinator/families/F-1"])(
+  it.each(["/family", "/family/login", "/family/activate", "/family/household", "/family/members", "/family/coordinator/families/F-1"])(
     "loads %s from the network and stores nothing",
     async (path) => {
       const sw = worker(network);
@@ -152,6 +152,7 @@ describe("everything else is never touched or cached", () => {
     ["the Family Auth API", "https://api.famboook.com/api/v1/family/auth/login", { method: "POST", mode: "cors" as RequestMode }],
     ["family data", "https://api.famboook.com/api/v1/family/me", { mode: "cors" as RequestMode }],
     ["the household summary", "https://api.famboook.com/api/v1/family/household", { mode: "cors" as RequestMode }],
+    ["the household profile", "https://api.famboook.com/api/v1/family/household/profile", { mode: "cors" as RequestMode }],
     ["the household members", "https://api.famboook.com/api/v1/family/household/members", { mode: "cors" as RequestMode }],
     ["coordinator data", "https://api.famboook.com/api/v1/family/coordinator/families", { mode: "cors" as RequestMode }],
     ["the CSRF cookie", "https://api.famboook.com/sanctum/csrf-cookie", { mode: "cors" as RequestMode }],
