@@ -571,6 +571,23 @@ is configured or enabled on the server by deploying it.
   flags, then `php artisan config:cache`. No migration and no data change
   is involved; challenges issued meanwhile simply expire.
 
+## Installable Family app (FP-ADR-055): deployment notes
+
+Recorded 2026-10-04. Frontend only: a normal frontend build and restart.
+
+- New public files: `/manifest.webmanifest`, `/icons/*`, `/family-sw.js`,
+  `/family/offline.html`. `/family-sw.js` must keep being served with
+  `Cache-Control: max-age=0` (the Next.js default for public files) so that
+  updates reach installed apps; nginx needs no change.
+- Check after deploy: `/family-sw.js` answers 200 `application/javascript`;
+  on an Android phone, Chrome offers "تثبيت التطبيق" and Firefox "تثبيت"
+  on `/family/login` after one visit (the worker installs on the first
+  load). An existing home-screen shortcut may keep its old look until it is
+  removed and the app is installed.
+- Rollback: deploy the previous frontend and remove the worker for existing
+  users by serving a `/family-sw.js` that unregisters itself (a worker is
+  never removed by deleting the file alone).
+
 ## First-activation refusal (FP-ADR-054): deployment notes
 
 Recorded 2026-10-04, after the Production pilot.
@@ -828,6 +845,7 @@ Never do this once real data has been entered.
 | 1.1.10 | 2026-10-03 | Approved | §16a PWA-1I: the PostgreSQL validation runs on a physically separate, disposable test cluster (`initdb`, `pg_ctl`, port 5433, localhost only, never a service, never the development server); credentials in `pgpass.conf` only; `TestDatabaseGuard` is a secondary guard (name only) |
 | 1.1.11 | 2026-10-04 | Approved | §16a: first self-activation deployment notes — migration, frontend and backend deployed together, `FAMILY_ACTIVATION_LIMIT_SEND_IP_MINUTE`, pilot impact (no Staff grant needed; activation flag opens it to every eligible household), residual risks |
 | 1.1.12 | 2026-10-04 | Approved | §16a: first-activation refusal (FP-ADR-054) deployment notes — no migration, frontend and backend together, what pilot staff see |
+| 1.1.13 | 2026-10-04 | Approved | §16a: installable Family app (FP-ADR-055) — new public files, cache header of the worker, post-deploy checks, rollback of a service worker |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

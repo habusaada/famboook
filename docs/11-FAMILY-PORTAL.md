@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.11
+**Version:** 1.12
 **Date:** 2026-10-03
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2113,6 +2113,39 @@ request that issued the challenge, for operations and abuse review, at most
 for the 90-day retention of finished challenges (security events keep only
 a digest).
 
+## Installable Family app implementation record — manifest, icon, service worker
+
+Implemented 2026-10-04 (FP-ADR-055). Frontend only; no backend change.
+
+- **Identity:** `public/manifest.webmanifest` — id, start_url and scope
+  `/family`, `display: standalone`, Arabic RTL, theme `#751BD5`; the
+  official Famboook icon (`public/icons/famboook-icon.svg`, kept
+  byte-for-byte) and PNGs rendered from it (192, 512, 512 maskable, 180
+  Apple). Linked from the Family Portal layout only.
+- **Service worker** (`public/family-sw.js`), registered from the Family
+  Portal only, production builds only, scope `/family` — so the start page
+  `/family` itself is controlled; the worker handles only `/family` and
+  `/family/...`, never Staff paths such as `/families`, `/login` or `/`.
+  - precaches ONE file: the static offline page `/family/offline.html`
+    ("لا يوجد اتصال بالإنترنت" / "تحقق من اتصالك بالإنترنت ثم حاول مرة
+    أخرى.");
+  - handles only top-level GET navigations under `/family`, network first;
+    a successful response is never stored; only a network failure returns
+    the offline page — a server error page is shown as is;
+  - touches nothing else: the API (`api.famboook.com`), Family Auth, the
+    CSRF cookie, scripts, styles, images and other origins go to the network
+    as if there were no worker. Nothing private can enter Cache Storage or be
+    shown offline;
+  - versioned cache (`famboook-family-v1`); obsolete `famboook-family-*`
+    caches removed on activate; `skipWaiting` and `clients.claim`.
+- **"تثبيت فامبوك"** on `/family/login` and the portal home: the browser's
+  native install prompt (Chromium `beforeinstallprompt`) when pressed —
+  never automatically; otherwise menu instructions (Firefox Android, iPhone /
+  iPad Safari, others). Hidden in the installed app, after a confirmed
+  install, or once dismissed on that device (a localStorage UI convenience
+  with no account or security meaning). It never claims an install it did
+  not see.
+
 ## First-activation refusal implementation record — no masked-mobile decoy
 
 Implemented 2026-10-04 (FP-ADR-054), after the Production pilot.
@@ -2542,6 +2575,15 @@ decoy, SMS, challenge, trust, account, link or identity. The reasons remain
 server-side security events only. Accepted trade-off: a caller can learn
 whether an input can start family activation, and nothing else. Password
 reset keeps its decoys.
+
+FP-ADR-055
+The Family Portal is an installable app: one manifest (id/start/scope
+/family, standalone), the official Famboook icon, and a minimal service
+worker scoped to /family that caches only a static offline page, handles
+only Family page navigations network-first, never stores a response, and
+never touches the API, authentication or any other request. The install
+action uses the browser's own prompt when pressed, or instructions. The
+Staff application is neither installable nor controlled by the worker.
 ```
 
 ---
@@ -2699,3 +2741,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.9 | 2026-10-03 | Approved | PWA-1I implementation record in §30a: decoy concurrency parity (atomic attempts, write-once supersession, one resend claim per send), IP / global ceiling parity for decoy resends (destination not mirrorable), response floor on verify and complete, attempts counted before the work (login, start), invisible-character normalization, `famboook:family-auth-check`, regression and PostgreSQL concurrency coverage, raw challenge IP retention noted; FP-ADR-052; PWA-1I done. No migration, nothing enabled |
 | 1.10 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation (`start` → `send`), code sent only to the stored number, SELF_OTP trust created only by a correct code (pending row promoted under the Person lock), revoked numbers excluded, existing TRUSTED reused, decoys with a stable fake mask; supersedes FP-ADR-041 for the mask and the trust prerequisite. Migration: `SELF_OTP` allowed in the trust CHECKs |
 | 1.11 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: first activation refuses an input that cannot activate with one generic ACTIVATION_REFUSED answer (422) instead of a synthetic masked-mobile decoy; nothing is created; reasons stay server-side; the decoy clause of FP-ADR-053 is superseded (kept as history); password reset decoys unchanged |
+| 1.12 | 2026-10-04 | Approved | FP-ADR-055: installable Family app — manifest and official icon, minimal service worker (scope /family, offline page only, no response or API caching), "تثبيت فامبوك" with native prompt or instructions; Staff unaffected |
