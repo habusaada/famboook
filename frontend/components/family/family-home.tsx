@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BadgeCheck, ChevronLeft, Clock3, Network } from "lucide-react";
 import { useFamilyUser } from "@/components/family/family-context";
+import { InstallFamboook } from "@/components/family/pwa/install-famboook";
 
 const UPCOMING = ["بيانات الأسرة وأفرادها", "طلبات تحديث البيانات", "بطاقة رب الأسرة الرقمية"];
 
@@ -42,6 +43,8 @@ export function FamilyHome() {
           <ChevronLeft className="size-5 shrink-0 text-brand-700" aria-hidden />
         </Link>
       )}
+
+      <InstallFamboook />
 
       {family && (
         <section className="rounded-2xl border border-border bg-surface-1 p-4" aria-label="الأسرة" data-family-card>

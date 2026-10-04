@@ -22,6 +22,7 @@ import { useFamilySignIn } from "@/components/family/auth/use-family-sign-in";
 import { familyLogin, readFamilyAuthError } from "@/lib/api/family-auth";
 import { type LoginInput, type LoginValues, loginSchema } from "@/lib/schemas/family-auth";
 import { cn } from "@/lib/utils";
+import { InstallFamboook } from "@/components/family/pwa/install-famboook";
 
 /**
  * Family login (docs/11 §30a): National ID + password on the Sanctum
@@ -74,12 +75,15 @@ export function FamilyLoginForm() {
     <FamilyAuthCard
       step="LOGIN"
       below={
-        <p>
-          ليس لديك حساب؟{" "}
-          <Link href="/family/activate" className={textLinkClass}>
-            تفعيل الحساب
-          </Link>
-        </p>
+        <>
+          <p>
+            ليس لديك حساب؟{" "}
+            <Link href="/family/activate" className={textLinkClass}>
+              تفعيل الحساب
+            </Link>
+          </p>
+          <InstallFamboook className="mt-2" />
+        </>
       }
     >
       <section aria-labelledby="family-login-title">

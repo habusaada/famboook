@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { FamilyServiceWorker } from "@/components/family/pwa/family-service-worker";
 
 // The installable Family app: its manifest, the official Famboook icon
 // (public/icons, rendered from famboook-icon.svg) and the Apple home-screen
@@ -33,6 +34,7 @@ export default function FamilyLayout({
 }>) {
   return (
     <div data-portal="family" className="min-h-svh bg-canvas">
+      <FamilyServiceWorker />
       {children}
     </div>
   );
