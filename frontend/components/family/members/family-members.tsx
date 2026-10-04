@@ -15,15 +15,11 @@ function MembersSkeleton() {
       <p role="status" className="sr-only">
         جارٍ تحميل أفراد الأسرة
       </p>
-      <div className="flex items-center justify-between gap-3" aria-hidden>
-        <Skeleton className="h-4 w-36" />
-        <Skeleton className="h-7 w-24 rounded-lg" />
-      </div>
       {[0, 1, 2].map((i) => (
         <div key={i} className={card} aria-hidden>
           <Skeleton className="h-5 w-40" />
           <Skeleton className="mt-2 h-4 w-20" />
-          <Skeleton className="mt-3 h-3.5 w-48" />
+          <Skeleton className="mt-2.5 h-3.5 w-40" />
         </div>
       ))}
     </div>
@@ -58,7 +54,7 @@ export function FamilyMembers() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
+      <header>
         <Link
           href="/family"
           className="-ms-2 inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
@@ -68,19 +64,32 @@ export function FamilyMembers() {
           الرئيسية
         </Link>
         <h1 className="mt-1 text-2xl leading-snug font-bold text-foreground">أفراد الأسرة</h1>
-      </div>
+        {/* Metadata under the title: the number of rows and the family code. */}
+        {data ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground" data-members-meta>
+            <span data-members-count>
+              أفراد الأسرة المسجلون (<span className="tabular-nums">{data.members.length}</span>)
+            </span>
+            <span className="text-subtle-foreground" aria-hidden>
+              ·
+            </span>
+            <span dir="ltr" className="rounded-md bg-brand-50 px-2 py-0.5 font-mono text-[13px] font-medium text-brand-800" data-family-code>
+              {data.family_code}
+            </span>
+          </div>
+        ) : (
+          query.isPending && (
+            <div className="mt-2 flex items-center gap-2" aria-hidden>
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-6 w-24 rounded-md" />
+            </div>
+          )
+        )}
+      </header>
 
       <div aria-busy={query.isPending} data-members>
         {data ? (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground" data-members-count>
-                المسجّلون بالتفصيل: <span className="font-semibold text-foreground tabular-nums">{data.members.length}</span>
-              </p>
-              <span dir="ltr" className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 font-mono text-[13px] font-medium text-brand-800" data-family-code>
-                {data.family_code}
-              </span>
-            </div>
             {data.members.length === 0 ? (
               <section className={`${card} flex flex-col items-center gap-2 py-8 text-center`} data-members-empty>
                 <UsersRound className="size-6 text-subtle-foreground" aria-hidden />

@@ -29,3 +29,10 @@ export function calculateAge(birthDate: string): number {
   }
   return age;
 }
+
+const LONG_DATE = new Intl.DateTimeFormat("ar-u-nu-latn", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+
+/** A calendar date (YYYY-MM-DD) in words with Latin digits, e.g. 28 يناير 1989. No time zone shift. */
+export function formatDateLong(date: string): string {
+  return LONG_DATE.format(new Date(`${date}T00:00:00Z`));
+}

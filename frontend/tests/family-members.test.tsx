@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyGate } from "@/components/family/family-gate";
 import { FamilyMembers } from "@/components/family/members/family-members";
-import { UNAVAILABLE_MEMBER } from "@/components/family/members/member-card";
+import { UNAVAILABLE_MEMBER, ageText } from "@/components/family/members/member-card";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_MEMBERS_QUERY_KEY, type FamilyMember } from "@/lib/api/family-household";
 import { browserStorageDump, familyGet, familyMember, familyMembers, renderWithClient } from "./helpers";
@@ -84,7 +84,11 @@ describe("the members list", () => {
     expect(back).toHaveAttribute("href", "/family");
     expect(screen.getByText("FAM-000123")).toHaveAttribute("dir", "ltr");
     // members.length, the unavailable row included; no second count requested.
-    expect(screen.getByText(/المسجّلون بالتفصيل:/)).toHaveTextContent("المسجّلون بالتفصيل: 3");
+    expect(container.querySelector("[data-members-count]")?.textContent).toBe("أفراد الأسرة المسجلون (3)");
+    // One metadata row under the title: the count and the code.
+    const meta = container.querySelector("header [data-members-meta]");
+    expect(meta).toContainElement(container.querySelector("[data-family-code]") as HTMLElement);
+    expect(screen.queryByText(/المسجّلون بالتفصيل/)).not.toBeInTheDocument();
   });
 
   it("renders the rows exactly in the server's order", async () => {
@@ -120,22 +124,44 @@ describe("the members list", () => {
     expect(member.querySelector("[data-member-relationship]")).toHaveTextContent(label);
   });
 
-  it("shows an ALIVE member's age and birth date", async () => {
-    const born = bornYearsAgo(30);
+  it("shows an ALIVE member's age and birth date as one compact line: «N سنة · day month year»", async () => {
+    const born = bornYearsAgo(37);
     renderMembers([HEAD, familyMember({ birth_date: born })]);
 
     const [, member] = await rows();
-    expect(member.querySelector("[data-member-age]")).toHaveTextContent("العمر:30");
-    expect(within(member).getByText(born)).toHaveAttribute("dir", "ltr");
+    const line = member.querySelector("[data-member-dates]") as HTMLElement;
+    expect(line.querySelector("[data-member-age]")?.textContent).toBe("37 سنة");
+    expect(line.textContent).toMatch(/^37 سنة·\d{1,2} [\u0600-\u06FF]+ \d{4}$/);
+    expect(line.textContent).not.toMatch(/العمر|تاريخ الميلاد|\d{4}-\d{2}-\d{2}/);
     expect(member.querySelector("[data-member-status]")).toBeNull();
   });
 
-  it("says when the birth date is not known, with no age", async () => {
+  it("writes the birth date in words with Latin digits", async () => {
+    renderMembers([HEAD, familyMember({ life_status: "UNKNOWN", birth_date: "1989-01-28" })]);
+
+    const [, member] = await rows();
+    expect(member.querySelector("[data-member-birth-date]")?.textContent).toBe("28 يناير 1989");
+  });
+
+  it.each([
+    [0, "أقل من سنة"],
+    [1, "سنة واحدة"],
+    [2, "سنتان"],
+    [3, "3 سنوات"],
+    [10, "10 سنوات"],
+    [11, "11 سنة"],
+    [37, "37 سنة"],
+  ])("counts %i years as «%s»", (years, text) => {
+    expect(ageText(bornYearsAgo(years))).toBe(text);
+  });
+
+  it("manufactures no date when the birth date is not known", async () => {
     renderMembers([HEAD, familyMember({ birth_date: null })]);
 
     const [, member] = await rows();
     expect(member.querySelector("[data-member-age]")).toBeNull();
-    expect(member.querySelector("[data-member-birth-date]")).toHaveTextContent("غير معروف");
+    expect(member.querySelector("[data-member-birth-date]")?.textContent).toBe("تاريخ الميلاد غير معروف");
+    expect(member.querySelector("[data-member-dates]")?.textContent).not.toMatch(/\d/);
   });
 
   it("shows UNKNOWN as a neutral «الحالة غير مؤكدة» status with an icon", async () => {
@@ -145,6 +171,8 @@ describe("the members list", () => {
     const status = member.querySelector('[data-member-status="unknown"]');
     expect(status).toHaveTextContent("الحالة غير مؤكدة");
     expect(status?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    // Beside the relationship, as part of the member's information.
+    expect(status?.parentElement).toContainElement(member.querySelector("[data-member-relationship]") as HTMLElement);
   });
 
   it.each([
@@ -158,9 +186,10 @@ describe("the members list", () => {
     const status = member.querySelector('[data-member-status="deceased"]');
     expect(status?.textContent).toBe(label);
     expect(status?.querySelector("svg")).not.toBeNull();
+    expect(status?.parentElement).toContainElement(member.querySelector("[data-member-relationship]") as HTMLElement);
     expect(member.querySelector("[data-member-age]")).toBeNull();
-    expect(member.textContent).not.toContain("العمر");
-    expect(within(member).getByText("1950-06-01")).toBeInTheDocument();
+    expect(member.textContent).not.toMatch(/سنة|سنوات|سنتان|العمر/);
+    expect(member.querySelector("[data-member-dates]")?.textContent).toBe("1 يونيو 1950");
   });
 });
 
@@ -211,7 +240,7 @@ describe("loading, empty, errors and access", () => {
     const { container } = renderMembers([]);
 
     expect(await screen.findByText("لا يوجد أفراد مسجّلون لهذه الأسرة حاليًا.")).toBeInTheDocument();
-    expect(screen.getByText(/المسجّلون بالتفصيل:/)).toHaveTextContent("المسجّلون بالتفصيل: 0");
+    expect(container.querySelector("[data-members-count]")?.textContent).toBe("أفراد الأسرة المسجلون (0)");
     expect(screen.queryByRole("list", { name: "أفراد الأسرة" })).not.toBeInTheDocument();
     expect(container.querySelector("[data-member-row]")).toBeNull();
   });

@@ -1,6 +1,6 @@
 import { CircleQuestionMark, EyeOff, Ribbon } from "lucide-react";
 import type { FamilyMember } from "@/lib/api/family-household";
-import { calculateAge } from "@/lib/utils/date";
+import { calculateAge, formatDateLong } from "@/lib/utils/date";
 import { relationshipLabel } from "@/lib/utils/relationship";
 
 export const UNAVAILABLE_MEMBER = "بيانات هذا الفرد غير متاحة حاليًا";
@@ -20,9 +20,14 @@ function Status({ icon: Icon, children, kind }: { icon: typeof Ribbon; children:
   );
 }
 
-function ageText(birthDate: string): string {
+/** An age in years with the Arabic counted-noun form: سنة واحدة، سنتان، 3 سنوات، 37 سنة. */
+export function ageText(birthDate: string): string {
   const age = calculateAge(birthDate);
-  return age < 1 ? "أقل من سنة" : String(age);
+  if (age < 1) return "أقل من سنة";
+  if (age === 1) return "سنة واحدة";
+  if (age === 2) return "سنتان";
+  if (age <= 10) return `${age} سنوات`;
+  return `${age} سنة`;
 }
 
 /**
@@ -53,26 +58,27 @@ export function MemberCard({ member }: { member: FamilyMember }) {
   }
 
   const deceased = member.life_status === "DECEASED";
+  const age = member.life_status === "ALIVE" && member.birth_date ? ageText(member.birth_date) : null;
 
   return (
     <li className={card} data-member-row={member.is_household_head ? "head" : "member"}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-base leading-snug font-semibold text-foreground">
-            <bdi>{member.full_name}</bdi>
-          </p>
-          {member.is_household_head ? (
-            // The Family Portal user is the household head (V1 eligibility).
-            <p className="mt-1 flex items-center gap-1.5" data-member-head>
-              <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">رب الأسرة</span>
-              <span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-subtle-foreground">أنت</span>
-            </p>
-          ) : (
-            <p className="mt-0.5 text-sm text-muted-foreground" data-member-relationship>
-              {relationship}
-            </p>
-          )}
-        </div>
+      <p className="text-base leading-snug font-semibold text-foreground">
+        <bdi>{member.full_name}</bdi>
+      </p>
+
+      {/* Who the member is in the household, with the life status beside it. */}
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {member.is_household_head ? (
+          // The Family Portal user is the household head (V1 eligibility).
+          <span className="flex items-center gap-1.5" data-member-head>
+            <span className="rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">رب الأسرة</span>
+            <span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-subtle-foreground">أنت</span>
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground" data-member-relationship>
+            {relationship}
+          </span>
+        )}
         {deceased && (
           <Status icon={Ribbon} kind="deceased">
             {member.gender === "FEMALE" ? "متوفاة" : "متوفى"}
@@ -85,26 +91,25 @@ export function MemberCard({ member }: { member: FamilyMember }) {
         )}
       </div>
 
-      <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-muted-foreground">
-        {member.life_status === "ALIVE" && member.birth_date && (
-          <div className="flex gap-1" data-member-age>
-            <dt>العمر:</dt>
-            <dd className="font-medium text-foreground tabular-nums">{ageText(member.birth_date)}</dd>
-          </div>
-        )}
-        <div className="flex gap-1" data-member-birth-date>
-          <dt>تاريخ الميلاد:</dt>
-          <dd className="font-medium text-foreground">
-            {member.birth_date ? (
-              <span dir="ltr" className="tabular-nums">
-                {member.birth_date}
-              </span>
-            ) : (
-              "غير معروف"
+      <p className="mt-2 text-[13px] text-muted-foreground tabular-nums" data-member-dates>
+        {member.birth_date ? (
+          <>
+            {age && (
+              <>
+                <span className="font-medium text-foreground" data-member-age>
+                  {age}
+                </span>
+                <span className="mx-1.5 text-subtle-foreground" aria-hidden>
+                  ·
+                </span>
+              </>
             )}
-          </dd>
-        </div>
-      </dl>
+            <span data-member-birth-date>{formatDateLong(member.birth_date)}</span>
+          </>
+        ) : (
+          <span data-member-birth-date>تاريخ الميلاد غير معروف</span>
+        )}
+      </p>
     </li>
   );
 }
