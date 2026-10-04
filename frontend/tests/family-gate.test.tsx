@@ -71,7 +71,7 @@ describe("FamilyGate", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("shows the approved navigation with only the home enabled", async () => {
+  it("shows the approved navigation: the home (current) and أسرتي, everything else disabled", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderPortal();
@@ -80,9 +80,12 @@ describe("FamilyGate", () => {
     const home = within(nav).getByRole("link", { name: "الرئيسية" });
     expect(home).toHaveAttribute("href", "/family");
     expect(home).toHaveAttribute("aria-current", "page");
-    // Nothing else is a link: no fake route or workflow.
-    expect(within(nav).getAllByRole("link")).toHaveLength(1);
-    for (const label of ["أسرتي", "طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
+    const members = within(nav).getByRole("link", { name: "أسرتي" });
+    expect(members).toHaveAttribute("href", "/family/members");
+    expect(members).not.toHaveAttribute("aria-current");
+    // Only the pages that exist are links: no fake route or workflow.
+    expect(within(nav).getAllByRole("link")).toHaveLength(2);
+    for (const label of ["طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
       const item = within(nav).getByRole("button", { name: label });
       expect(item).toBeDisabled();
       expect(item).toHaveAttribute("aria-disabled", "true");

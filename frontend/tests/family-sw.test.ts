@@ -151,9 +151,12 @@ describe("everything else is never touched or cached", () => {
   it.each([
     ["the Family Auth API", "https://api.famboook.com/api/v1/family/auth/login", { method: "POST", mode: "cors" as RequestMode }],
     ["family data", "https://api.famboook.com/api/v1/family/me", { mode: "cors" as RequestMode }],
+    ["the household summary", "https://api.famboook.com/api/v1/family/household", { mode: "cors" as RequestMode }],
+    ["the household members", "https://api.famboook.com/api/v1/family/household/members", { mode: "cors" as RequestMode }],
     ["coordinator data", "https://api.famboook.com/api/v1/family/coordinator/families", { mode: "cors" as RequestMode }],
     ["the CSRF cookie", "https://api.famboook.com/sanctum/csrf-cookie", { mode: "cors" as RequestMode }],
     ["a same-origin fetch under /family", `${ORIGIN}/family/login`, { mode: "cors" as RequestMode }],
+    ["a same-origin fetch of the members page data", `${ORIGIN}/family/members`, { mode: "cors" as RequestMode }],
     ["a script or style", `${ORIGIN}/_next/static/chunks/app.js`, { mode: "no-cors" as RequestMode }],
     ["an icon", `${ORIGIN}/icons/icon-192.png`, { mode: "no-cors" as RequestMode }],
     ["a Staff page", `${ORIGIN}/families`, { mode: "navigate" as RequestMode }],

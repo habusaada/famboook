@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, RotateCw, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, ChevronLeft, RotateCw, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { FamilyHousehold } from "@/lib/api/family-household";
@@ -69,20 +70,17 @@ export function HouseholdSummaryCard({ household }: { household: FamilyHousehold
       <p className="mt-3 text-xs leading-relaxed text-subtle-foreground" data-summary-caption>
         {SUMMARY_CAPTION}
       </p>
-      {/* أسرتي arrives with its own page (PWA-3A Step 4): no link until then. */}
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-medium text-subtle-foreground opacity-70"
+      <Link
+        href="/family/members"
+        className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
         data-members-entry
       >
         <span className="flex items-center gap-2">
           <UsersRound className="size-4" aria-hidden />
           عرض أفراد الأسرة
         </span>
-        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium">قريبًا</span>
-      </button>
+        <ChevronLeft className="size-4" aria-hidden />
+      </Link>
     </section>
   );
 }

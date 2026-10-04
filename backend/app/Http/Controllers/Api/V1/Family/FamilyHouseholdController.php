@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Family;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFamilyContext;
+use App\Http\Resources\FamilyHouseholdMemberResource;
 use App\Http\Resources\FamilyHouseholdResource;
 use App\Support\FamilyPortal\HouseholdReadModel;
 use Illuminate\Http\JsonResponse;
@@ -25,5 +26,16 @@ class FamilyHouseholdController extends Controller
         return (new FamilyHouseholdResource($this->household->summary($context), $context->person))
             ->response()
             ->header('Cache-Control', 'no-store');
+    }
+
+    /** One row per active membership of the resolved Family (PWA-3A Step 3). */
+    public function members(Request $request): JsonResponse
+    {
+        $context = EnsureFamilyContext::context($request);
+
+        return response()->json(['data' => [
+            'family_code' => $context->family->family_code,
+            'members' => FamilyHouseholdMemberResource::collection($this->household->members($context)),
+        ]])->header('Cache-Control', 'no-store');
     }
 }

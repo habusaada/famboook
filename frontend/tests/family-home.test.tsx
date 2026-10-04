@@ -104,19 +104,17 @@ describe("the household summary", () => {
     expect(screen.queryByText(/طلباتك|طلب مفتوح|طلبات مفتوحة/)).not.toBeInTheDocument();
   });
 
-  it("offers the members entry only as a disabled control, never a link", async () => {
+  it("links the members entry to /family/members, without a coming-soon badge", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderHome();
     const card = await summary();
 
-    const entry = within(card).getByRole("button", { name: /عرض أفراد الأسرة/ });
-    expect(entry).toBeDisabled();
-    expect(entry).toHaveTextContent("قريبًا");
-    expect(within(card).queryByRole("link")).not.toBeInTheDocument();
-    await userEvent.click(entry);
-    expect(router.push).not.toHaveBeenCalled();
-    expect(router.replace).not.toHaveBeenCalled();
+    const entry = within(card).getByRole("link", { name: "عرض أفراد الأسرة" });
+    expect(entry).toHaveAttribute("href", "/family/members");
+    expect(entry).not.toHaveTextContent("قريبًا");
+    expect(within(card).queryByText("قريبًا")).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button")).not.toBeInTheDocument();
   });
 });
 
@@ -195,15 +193,16 @@ describe("Coordinator Space and the quick actions", () => {
     expect(within(section).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("keeps the bottom navigation: only الرئيسية is enabled", async () => {
+  it("keeps the bottom navigation: الرئيسية (current) and أسرتي are links, the rest disabled", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderHome();
     await summary();
 
     const nav = screen.getByRole("navigation", { name: "التنقل الرئيسي" });
-    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية"]);
-    for (const label of ["أسرتي", "طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
+    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية", "أسرتي"]);
+    expect(within(nav).getByRole("link", { name: "الرئيسية" })).toHaveAttribute("aria-current", "page");
+    for (const label of ["طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
       expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
     }
   });

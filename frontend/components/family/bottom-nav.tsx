@@ -1,17 +1,40 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FileText, House, Plus, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 
-// The approved Family Portal navigation (docs/11 §23). In PWA-1F only the
-// home exists: every other entry, and the central action, is visible but
-// disabled — no link, no route, no placeholder workflow behind it.
+// The approved Family Portal navigation (docs/11 §23). Only the pages that
+// exist are links — الرئيسية (/family) and أسرتي (/family/members); every
+// other entry, and the central action, is visible but disabled: no link, no
+// route, no placeholder workflow behind it. The current entry follows the
+// pathname.
 
-const LATER: { label: string; icon: LucideIcon }[] = [
-  { label: "أسرتي", icon: UsersRound },
-  { label: "طلباتي", icon: FileText },
-  { label: "حسابي", icon: UserRound },
-];
+type Entry = { label: string; icon: LucideIcon };
 
-function Disabled({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
+const LATER: Record<"requests" | "account", Entry> = {
+  requests: { label: "طلباتي", icon: FileText },
+  account: { label: "حسابي", icon: UserRound },
+};
+
+function NavLink({ href, label, icon: Icon, current }: Entry & { href: string; current: boolean }) {
+  return (
+    <li className="flex flex-1 justify-center">
+      <Link
+        href={href}
+        aria-current={current ? "page" : undefined}
+        className={`flex min-h-14 w-full flex-col items-center justify-center gap-1 text-[11px] focus-visible:outline-2 focus-visible:outline-ring ${
+          current ? "font-semibold text-brand-700" : "font-medium text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <Icon className="size-5" aria-hidden />
+        {label}
+      </Link>
+    </li>
+  );
+}
+
+function Disabled({ label, icon: Icon }: Entry) {
   return (
     <li className="flex flex-1 justify-center">
       <button
@@ -29,6 +52,9 @@ function Disabled({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
 }
 
 export function FamilyBottomNav() {
+  const pathname = usePathname();
+  const onMembers = pathname === "/family/members" || pathname.startsWith("/family/members/");
+
   return (
     <nav
       aria-label="التنقل الرئيسي"
@@ -36,17 +62,8 @@ export function FamilyBottomNav() {
       data-family-nav
     >
       <ul className="mx-auto flex max-w-md items-stretch px-2">
-        <li className="flex flex-1 justify-center">
-          <Link
-            href="/family"
-            aria-current="page"
-            className="flex min-h-14 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold text-brand-700 focus-visible:outline-2 focus-visible:outline-ring"
-          >
-            <House className="size-5" aria-hidden />
-            الرئيسية
-          </Link>
-        </li>
-        <Disabled {...LATER[0]} />
+        <NavLink href="/family" label="الرئيسية" icon={House} current={pathname === "/family"} />
+        <NavLink href="/family/members" label="أسرتي" icon={UsersRound} current={onMembers} />
         <li className="flex flex-1 items-center justify-center">
           <button
             type="button"
@@ -60,8 +77,8 @@ export function FamilyBottomNav() {
             <Plus className="size-6" aria-hidden />
           </button>
         </li>
-        <Disabled {...LATER[1]} />
-        <Disabled {...LATER[2]} />
+        <Disabled {...LATER.requests} />
+        <Disabled {...LATER.account} />
       </ul>
     </nav>
   );
