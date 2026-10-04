@@ -1237,22 +1237,38 @@ performed.
 National ID → OTP to the trusted mobile → new password → sessions ended
 ```
 
-## Profile Completion and Family Verification
+## Family Profile Review
+
+Amended 2026-10-04 (WF-ADR-046; docs/11 §9).
 
 ```text
-INCOMPLETE
-    ↓  required steps completed
-COMPLETE / READY_TO_SUBMIT
-    ↓  Family User submits
-UNDER_REVIEW  ⇄  NEEDS_CLARIFICATION
-    ↓  authorized approval
-VERIFIED
-    ↓  critical later change
-REVERIFICATION_REQUIRED
+Account activation → Family Portal access
+      ↓
+Review a section (FAMILY · HEAD · MEMBERS · RESIDENCE)
+      ├─ correct           → confirm («راجعتُ هذه البيانات وهي صحيحة»)
+      └─ wrong / missing   → Change Request
+                               ↓  Staff review
+                            APPROVED → APPLIED by a Domain Action
+                               ↓
+                            section re-evaluated (NEEDS_REVIEW or INCOMPLETE)
 ```
 
-Completion is calculated; review and result are separate state. Only an
-authorized Famboook user or process grants VERIFIED.
+Section states are derived — PENDING → INCOMPLETE → NEEDS_REVIEW →
+NOT_REVIEWED → CONFIRMED (first that applies). APPROVED but not APPLIED
+stays PENDING; a rejection makes the section NEEDS_REVIEW. A confirmation
+never changes canonical data and becomes stale when the section's data
+change.
+
+## Staff Family Verification (deferred, PFP-017)
+
+```text
+INCOMPLETE → COMPLETE / READY_TO_SUBMIT → UNDER_REVIEW ⇄ NEEDS_CLARIFICATION
+→ VERIFIED → (critical later change) REVERIFICATION_REQUIRED
+```
+
+Only an authorized Famboook user or process grants VERIFIED. Profile
+Review CONFIRMED is never VERIFIED. Neither is an eligibility gate
+(docs/11 §13).
 
 ## Later changes
 
@@ -3122,6 +3138,9 @@ PWA-1G implemented Family login and password reset. Login resolves the account t
 
 ### WF-ADR-045
 PWA-1H implemented coordinator administration as four Staff Domain Actions — grant role, revoke role, assign scope, revoke scope — on the existing assignment table. The role and the assignments are separate layers; an assignment never grants the role, and removing the role revokes every active assignment in the same transaction. Coordinator Space is decided per request by one resolver over the current hierarchy.
+
+### WF-ADR-046
+Family Profile Review is a family workflow separate from Account Verification and Staff Family Verification: section review, confirm or request a change; derived states driven by completeness, confirmations and Change Request status (APPROVED ≠ APPLIED); confirmations never change canonical data (docs/11 FP-ADR-057). First-release request types: RESIDENCE_UPDATE (current residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION, non-head DEATH_REPORT (docs/11 FP-ADR-059).
 ```
 
 ---
@@ -3389,3 +3408,4 @@ Date: 2026-09-24
 | 1.2.11 | 2026-10-02 | Approved | PWA-1F: §53b activation as implemented — public steps, decoy references, completion transaction and session (WF-ADR-043) |
 | 1.2.12 | 2026-10-03 | Approved | PWA-1G: §53b login decision path and password reset as implemented — purpose-bound references, completion transaction, session revocation (WF-ADR-044) |
 | 1.2.13 | 2026-10-03 | Approved | PWA-1H: §53b coordinator administration workflow (grant, assign, revoke scope, revoke role) and Coordinator Space opening per request (WF-ADR-045) |
+| 1.2.14 | 2026-10-04 | Approved | Documentation consolidation: §53a Profile Completion / Family Verification lifecycle replaced by the Family Profile Review workflow and the deferred Staff Family Verification lifecycle (WF-ADR-046; docs/11 FP-ADR-057, FP-ADR-059) |

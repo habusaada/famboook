@@ -648,7 +648,7 @@ A coordinator may, within scope:
 ```text
 View a limited dashboard
 View families with deliberately limited data
-View profile completion and verification status
+View Profile Review and Staff Family Verification summary status (never section contents; exact visibility before PWA-9)
 View whether a family account is activated, where authorized
 Send notifications and announcements
 Assist activation operationally
@@ -714,7 +714,7 @@ finalized separately and moved to §22b.
 |---|---|---|
 | ~~`coordinator-family.view-summary`~~ | **Approved and seeded in PWA-1H** — see §22b | ~~PWA-9~~ |
 | `coordinator-family.view-account-status` | COORDINATOR (scope-bound) | PWA-9 |
-| `family-verification.submit` | FAMILY_USER (own Family) | PWA-4 |
+| `family-verification.submit` | FAMILY_USER (own Family) — candidate name for a Profile Review confirmation (docs/11 PFP-023) | PWA-4 |
 | `family-verification.view` | Authorized Staff | PWA-4 |
 | `family-verification.review` | Authorized Staff | PWA-4 |
 | `family-verification.approve` | Authorized Staff | PWA-4 |
@@ -735,6 +735,13 @@ the `change-request.*` family (§52–§53).
 The coordinator sees verification **status** through
 `coordinator-family.view-summary`; `family-verification.review` and
 `family-verification.approve` are never implied by COORDINATOR.
+
+**Amended 2026-10-04 (AUTH-ADR-075).** `family-verification.view`,
+`.review` and `.approve` belong to **Staff Family Verification** (docs/11
+§11, deferred). Family Profile Review (docs/11 §9) runs behind the existing
+Family boundary (`family.side`, `family-portal.access`, `family.context`);
+the confirmation permission name is open (PFP-023). No review or
+verification permission or state grants eligibility (docs/11 §13).
 
 The Initial Role Matrix (§140) is unchanged until these are seeded.
 
@@ -4136,6 +4143,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-075
+Documentation consolidation (2026-10-04): no permission or role added or seeded. `family-verification.view` / `.review` / `.approve` are reserved for Staff Family Verification; Family Profile Review uses the Family boundary and a confirmation permission still to be named (docs/11 PFP-023); a coordinator may at most see summary status, never section contents (docs/11 FP-ADR-057).
+
 ### AUTH-ADR-074
 First activation refuses an input that cannot activate with one public answer — `ACTIVATION_REFUSED`, HTTP 422, one message — whatever the reason; the reason is recorded server-side only and no confirmation, masked number, decoy or other artifact is produced (docs/11 FP-ADR-054). No permission or route changes.
 
@@ -4520,6 +4530,7 @@ Date: 2026-09-24
 | 1.2.36 | 2026-10-03 | Approved | PWA-1I (AUTH-ADR-072): §22b security hardening — no new permission, role or route; account-side fail-closed against corrupted RBAC proven; eligibility re-evaluated per request; readiness command shell-only and non-revealing |
 | 1.2.37 | 2026-10-04 | Approved | First self-activation (AUTH-ADR-073): `activation/send` route, SELF_OTP never a Staff grant, revoke unchanged; no new permission |
 | 1.2.38 | 2026-10-04 | Approved | AUTH-ADR-074: refused first-activation start answers one public code `ACTIVATION_REFUSED` (422), reasons server-side only; `ACTIVATION_UNAVAILABLE` stays the switched-off answer |
+| 1.2.39 | 2026-10-04 | Approved | Documentation consolidation (AUTH-ADR-075): §22a coordinator status wording; `family-verification.*` reserved for Staff Family Verification; Profile Review confirmation permission open (PFP-023). No permission seeded |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

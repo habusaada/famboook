@@ -115,6 +115,14 @@ Reasoning:
   a user deletes their sessions (AUTH-ADR-057).
 - Consequence: **no other service may be hosted on a `*.famboook.com`
   subdomain** — it would receive the session cookie.
+- Historical incident (recorded 2026-10-04): one browser received `419`
+  on a Family POST while the API was reachable, `/sanctum/csrf-cookie`
+  succeeded and the CORS preflight succeeded; clearing that browser's site
+  data resolved it. It is treated as a stale / duplicate-cookie incident,
+  not a Sanctum or CORS defect, and no configuration change is prescribed
+  without a reproduced defect. **Before the first new Family Portal write
+  endpoint is released, run a production-like CSRF write smoke test**
+  (docs/11 §33a FU-08).
 
 ---
 
@@ -846,6 +854,7 @@ Never do this once real data has been entered.
 | 1.1.11 | 2026-10-04 | Approved | §16a: first self-activation deployment notes — migration, frontend and backend deployed together, `FAMILY_ACTIVATION_LIMIT_SEND_IP_MINUTE`, pilot impact (no Staff grant needed; activation flag opens it to every eligible household), residual risks |
 | 1.1.12 | 2026-10-04 | Approved | §16a: first-activation refusal (FP-ADR-054) deployment notes — no migration, frontend and backend together, what pilot staff see |
 | 1.1.13 | 2026-10-04 | Approved | §16a: installable Family app (FP-ADR-055) — new public files, cache header of the worker, post-deploy checks, rollback of a service worker |
+| 1.1.14 | 2026-10-04 | Approved | Session cookies: the Family 419 incident recorded as a stale / duplicate-cookie incident; production-like CSRF write smoke test required before the first new Family Portal write endpoint (docs/11 FU-08) |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

@@ -1392,8 +1392,10 @@ should normally be derived from canonical data.
 
 Manual duplicated counters should be avoided.
 
-This rule governs the **Registered Household Size** and every other count
-of registered Persons: they are always derived. **Declared Household
+This rule governs **Registered Members** (`registered_member_count`, the
+ACTIVE memberships whatever the Person's life status), **Living Members**
+(not DECEASED, not soft-deleted — targeting and health summaries) and every
+other count of registered Persons: they are always derived. **Declared Household
 Statistics** (§55c) are source declarations, not duplicated counters, and
 never replace these derived figures.
 
@@ -1620,8 +1622,10 @@ Approved 2026-09-29 (Initial Family Import foundation, Phase 1). Fields in
 docs/02 §20a.
 
 ```text
-Registered Household Size   derived from ACTIVE, non-DECEASED memberships;
-                            never stored (§55)
+Registered Members          derived from ACTIVE memberships, whatever the
+                            Person's life status; never stored (§55)
+Living Members              ACTIVE memberships of Persons not DECEASED and
+                            not soft-deleted; targeting / health only
 Declared Household Size     declared by a source at a point in time; stored
 Declared Living Sons        declared by a source; stored
 Declared Living Daughters   declared by a source; stored
@@ -2231,30 +2235,39 @@ Reset        National ID → OTP to the trusted mobile → new password
 - In V1 a coordinator signs in through the Family Portal identity flow,
   not the Staff Login, and works in a visibly distinct Coordinator Space.
 
-## Profile Completion and Family Verification
+## Family Profile Review and Staff Family Verification
 
-- Completion is calculated from business-rule steps, not from a count of
-  filled columns; steps may be conditional.
-- Declared household size and the registered member count are separate
-  facts. Missing people are never inferred from their difference, and
-  equality is never a condition of completion or verification (§55).
-- Verification is separate from completion and is granted only by an
-  authorized Famboook user or process. A Family User cannot self-verify; a
-  coordinator cannot grant it by role.
-- Verification is auditable: who, when, status/version, history.
-- Later changes affect verification by risk class — MINOR, MATERIAL,
-  CRITICAL — from one backend decision table (docs/11 §12, pending
-  approval).
+Amended 2026-10-04 (BD-051, BD-052; docs/11 §9–§13).
 
-## Verified is not beneficiary
+- **Account Verification** (access as the eligible head), **Family Profile
+  Review** (the head reviews and confirms family data) and **Staff Family
+  Verification** (a formal Famboook decision) are separate concepts.
+- Profile Review completeness and section states are derived from rules,
+  never a count of filled columns, never a percentage (docs/11 §9). A head's
+  confirmation is an assertion: it changes no canonical data and can never
+  grant VERIFIED. Canonical data change only through approved Domain
+  Actions after the Change Request workflow.
+- Declared household size and registered members are separate facts.
+  Missing people are never inferred from their difference, and equality is
+  never a condition of completeness, confirmation or verification (§55).
+- Staff Family Verification is granted only by an authorized Famboook user
+  or process; a Family User cannot self-verify and a coordinator cannot
+  grant it by role. It is auditable (who, when, status/version, history).
+  Later changes affect it by risk class (docs/11 §12, pending approval).
+
+## No automatic eligibility
 
 ```text
-VERIFIED ≠ APPROVED FOR ASSISTANCE
+VERIFIED ≠ ELIGIBLE      CONFIRMED ≠ ELIGIBLE      INCOMPLETE ≠ INELIGIBLE
 ```
 
-Verification makes a family eligible to be considered by targeting and
-nomination. Assistance still requires service criteria, nomination, review
-and approval (§47).
+Neither Account Verification, Family Profile Review nor Staff Family
+Verification makes a family eligible or ineligible for any assistance,
+nomination or service. Complete and current information helps the
+accuracy of assessments and nominations for the programmes that depend on
+those data. Each programme keeps its own required data, targeting criteria
+and eligibility rules; Staff targeting (§47b) stays separate. Assistance
+still requires service criteria, nomination, review and approval (§47).
 
 ## Submissions
 
@@ -4644,6 +4657,12 @@ Sensitive files are served only through authorized private-storage mechanisms.
 ### BD-050
 Notification delivery occurs outside the canonical transaction where appropriate and cannot invalidate a committed business operation.
 
+### BD-051
+Family Profile Review is the household head's review of the family data; it is separate from Account Verification and from Staff Family Verification, and a confirmation never changes canonical data or grants VERIFIED (docs/11 FP-ADR-057).
+
+### BD-052
+No review or verification state is an eligibility gate: programmes keep their own required data and criteria (docs/11 FP-ADR-058). Registered Members are ACTIVE memberships whatever the life status; Living Members name the targeting / health population (docs/11 FP-ADR-056).
+
 ---
 
 # 126. Pending Business Decisions
@@ -4866,6 +4885,7 @@ Date: 2026-09-24
 | 1.2.44 | 2026-10-03 | Approved | PWA-1I: §89b hardening as implemented — decoy parity under parallel requests and at the IP / global ceilings (destination not mirrorable), one response floor for all four OTP steps, attempts counted before the work, invisible-character removal for pasted identifiers, readiness check |
 | 1.2.45 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation, code only to the stored number, SELF_OTP trust only after a correct code, Staff-revoked numbers excluded, password reset unchanged |
 | 1.2.46 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: an input that cannot start first activation gets one generic refusal on step 1 instead of a fake masked number and decoy code step; reasons stay server-side; nothing created |
+| 1.2.47 | 2026-10-04 | Approved | Documentation consolidation: "Verified is not beneficiary" replaced by No automatic eligibility; Profile Completion / Family Verification section replaced by Family Profile Review and Staff Family Verification; §55 / §55c Registered Members and Living Members (BD-051, BD-052; docs/11 FP-ADR-056 … FP-ADR-058) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

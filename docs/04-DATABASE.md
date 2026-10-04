@@ -2146,8 +2146,9 @@ documents                §44–§46
 | Trusted mobile | Per-Person trust state with verifier, time and method | PWA-1 / PWA-2 |
 | OTP challenge | Hashed, short-lived, attempt-counted, purpose-bound | PWA-2 |
 | Coordinator scope assignment | User ↔ Clan / Branch Group / Branch; audited | PWA-1 |
-| Family Verification | State, version, verifier, timestamps, history | PWA-4 |
-| Profile Completion | Calculated; a table only if a snapshot proves necessary | PWA-4 |
+| Family Profile Review — completeness and states | Derived on read; never stored | PWA-4 |
+| Family Profile Review — confirmations | `family_profile_confirmations` (concept): id, uuid, family_id, section (FAMILY / HEAD / MEMBERS / RESIDENCE), confirmed_by_user_id, confirmed_by_person_id, confirmed_at, fingerprint, fingerprint_version, key_version, optional acknowledgement codes; append-only; no registry copy | PWA-4 |
+| Staff Family Verification | State, version, verifier, timestamps, history | Deferred (PFP-017) |
 | Card credential and issuance | Opaque public holder ID, verification credential, status, history | PWA-8 |
 | Announcement | Sender, sender context, audience definition, content | PWA-9 |
 | Notification recipient / read state | Per-recipient row with read state | PWA-9 |
@@ -2959,7 +2960,8 @@ should normally be derived.
 
 If later cached/materialized for performance, the cache is not the canonical source of truth.
 
-In particular the **Registered Household Size** is never stored.
+In particular **Registered Members** (active memberships, any life status)
+and **Living Members** are never stored.
 `family_household_declarations` (§25a) stores **Declared** Household
 Statistics — separate source facts, not a cached count — and never feeds
 or replaces a derived count.
@@ -3976,6 +3978,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-052
+Documentation consolidation (2026-10-04) adds **no migration**. Family Profile Review stores only append-only confirmations — a future `family_profile_confirmations` table with a keyed fingerprint (dedicated key, `key_version`, `fingerprint_version`) and no copy of registry values; completeness and states are derived. Registered Members (active memberships) and Living Members stay derived (docs/11 FP-ADR-056, FP-ADR-057).
+
 ### DB-ADR-051
 First self-activation (FP-ADR-053) adds ONE forward-only migration, `2026_10_15_090000_allow_self_otp_mobile_trust`: on PostgreSQL `chk_person_mobile_trust_method` also allows `SELF_OTP`, and `chk_person_mobile_trust_granted` requires `verified_by` for every TRUSTED row except a `SELF_OTP` one (no Staff verifier exists). No row changes; down refuses while a SELF_OTP trust exists. The existing PENDING_VERIFICATION status and its partial unique index (one per Person) hold the not-yet-proven number an activation challenge is bound to; a correct code promotes that row to TRUSTED, and `uq_person_mobile_trusts_trusted` keeps one TRUSTED row per Person. The confirmation step is cache state only (masked number, keyed fingerprint, Person id).
 
@@ -4248,6 +4253,7 @@ Date: 2026-09-24
 | 1.2.31 | 2026-10-03 | Approved | TweetsMS: no schema change (DB-ADR-049); plaintext OTP never persisted or queued; `delivery_outcome` / `delivery_reason` allow-listed in `auth_security_events.metadata` |
 | 1.2.32 | 2026-10-03 | Approved | PWA-1I: no schema change (DB-ADR-050); atomic decoy cache keys, PostgreSQL concurrency validation of the row locks and the open-challenge index, raw challenge IP retention recorded |
 | 1.2.33 | 2026-10-04 | Approved | First self-activation: migration allowing `SELF_OTP` in the trust CHECKs (DB-ADR-051); pending row promoted on a correct code |
+| 1.2.34 | 2026-10-04 | Approved | Documentation consolidation: no schema change (DB-ADR-052); Registered Members / Living Members wording; `family_profile_confirmations` concept and Staff Family Verification deferred in the phase-concept table |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

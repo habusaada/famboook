@@ -2,9 +2,9 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.12
-**Date:** 2026-10-03
-**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
+**Version:** 1.13
+**Date:** 2026-10-04
+**Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
 ---
 
@@ -44,7 +44,8 @@ Documented, not built  User-Person Links, Family access resolution, Change
                        (Roadmap Phases 16–19).
 
 New in this document   COORDINATOR, National ID + OTP activation, trusted
-                       mobile, Profile Completion, Family Verification,
+                       mobile, Family Profile Review, Staff Family
+                       Verification,
                        health and need submissions, Digital Household Head
                        Card, QR verification, PDF card, announcements,
                        Coordinator Space, PWA installability.
@@ -88,7 +89,7 @@ One Next.js application hosts the Staff application, the Family Portal
  1. Home
  2. My Family
  3. Family Members
- 4. Profile Completion & Verification
+ 4. Family Profile Review (Staff Family Verification is separate, §11)
  5. Registry Updates / Life Events
  6. Health & Disability submissions
  7. Needs submissions
@@ -406,8 +407,10 @@ made by an authorized administrator.
 
 - View a limited dashboard for the authorized scope.
 - See the families in scope with deliberately limited data.
-- See profile completion and verification status.
-- Follow up on incomplete profiles.
+- See a family's Profile Review summary status and Staff Family
+  Verification status, where authorized — never section contents or
+  missing-item details (exact visibility decided before PWA-9).
+- Follow up on profiles that need review.
 - Send notifications and announcements within scope.
 - See whether a family account is activated, where authorized.
 - Assist operationally with activation, without ever seeing an OTP or a
@@ -433,99 +436,230 @@ explicit decision; they are never implied by the role.
 
 ---
 
-# 9. Family Profile Completion
+# 9. Family Profile Review (مراجعة ملف الأسرة)
 
-Profile Completion is a formal concept. Completion is **not**
-verification.
-
-Completion is calculated by the system from required steps:
+**Amended 2026-10-04 (FP-ADR-057).** "Profile Completion" is now part of
+**Family Profile Review**. Three concepts are distinct and are never
+interchangeable:
 
 ```text
-1. Identity / account
-2. Household head — basic person data
-3. Family — basic data
-4. Family members review
-5. Contact and residence data
-6. Final review and declaration
+ACCOUNT VERIFICATION         Is this user the eligible household head allowed
+                             into the Family Portal? Family Auth identity,
+                             User-Person Link, trusted mobile, OTP,
+                             activation, password, FamilyAccessResolver /
+                             family.context (§4–§6, §30a). Never called
+                             "profile verification".
+
+FAMILY PROFILE REVIEW        The household head reviews the family data
+مراجعة ملف الأسرة            Famboook holds, sees what is missing, confirms
+                             correct sections and requests corrections or
+                             additions (§9 below).
+
+STAFF FAMILY VERIFICATION    A separate, formal Famboook decision (§11).
+                             VERIFIED / موثّقة belongs to this concept only.
 ```
 
-## Rules
+A household head **never** changes canonical registry data through Profile
+Review. Approved Domain Actions, after the Change Request workflow (§17),
+remain the only mechanism that changes canonical data. A head's
+confirmation is an assertion, recorded as such; it can never grant
+VERIFIED.
 
-- The checklist is derived from business rules; it is not a count of
-  filled database columns.
-- Steps may be conditional. A household without a spouse is not penalized
-  for missing spouse data.
-- The calculation lives in the backend, in one place. The frontend only
-  presents it.
-- The Portal shows completed steps, the current step, remaining steps,
-  progress and a call to action to continue.
+## V1 sections
+
+| Section | Arabic | Content |
+|---|---|---|
+| FAMILY | معلومات الأسرة | family identity for context (code, clan, branch) plus the household declaration under review |
+| HEAD | رب الأسرة | the head's own name, gender, birth date and marital status; the National ID only as recorded / not recorded — never its value |
+| MEMBERS | أفراد الأسرة | the active members, with the visibility of FP-ADR-056 (name, relationship, gender, birth date, life status) |
+| RESIDENCE | السكن | original residence, displacement status and location, current address (the approved Step 4 fields) |
+
+Later: CONTACT / التواصل (with the CONTACT_UPDATE workflow and its mobile
+re-verification). Not part of Profile Review: health and disability (a
+later, dedicated sensitive submission design — §15, PFP-006) and needs (an
+operational matter, never a profile completeness fact — §16).
+
+## Derived completeness
+
+Completeness is **derived** on every read from the rules below. No
+completeness value, percentage or score is stored, and none is shown.
+Completeness never requires coordinates, notes, source or provenance,
+registration metadata, internal ids or any Staff-only field.
+
+```text
+FAMILY      INCOMPLETE when there is no current household declaration, or
+            declared_household_size is null. declared_at is not required.
+
+HEAD        INCOMPLETE when gender is null or birth_date is null.
+            Marital status UNKNOWN is recommended only (not incomplete in
+            V1). The National ID value is never part of review.
+
+MEMBERS     INCOMPLETE when any AVAILABLE active member has no relationship,
+            no birth_date, or life_status UNKNOWN. An unavailable
+            (soft-deleted) Person placeholder is a Staff data-quality
+            concern, not family-fixable incompleteness. A difference between
+            declared_household_size and registered_member_count never makes
+            MEMBERS incomplete (§10).
+
+RESIDENCE   INCOMPLETE when there is no current residence; or
+            displacement_status is null; or DISPLACED without
+            displacement_location_text; or NOT_DISPLACED with every current
+            address part (governorate, city, area, neighborhood) missing.
+            When DISPLACED, the displacement location is sufficient — no
+            current-address part is required. original_residence_text is
+            recommended, not required.
+```
+
+The rules are named rule keys (for example `residence.displacement_status`,
+`members.birth_date`) in one backend evaluator, so a future programme can
+reuse them (§13).
+
+## Section states
+
+States are **derived**; only confirmations are persisted. Precedence — the
+first that applies wins:
+
+| State | Arabic | Meaning |
+|---|---|---|
+| PENDING | طلب قيد المراجعة | an open Change Request touches the section (SUBMITTED, UNDER_REVIEW, RETURNED_FOR_CLARIFICATION, RESUBMITTED, or APPROVED and not yet APPLIED) |
+| INCOMPLETE | بيانات ناقصة | the section fails its completeness rule |
+| NEEDS_REVIEW | تحتاج إلى مراجعة | the section was confirmed, but its data changed since (stale confirmation), or a request for it was rejected after the last confirmation |
+| NOT_REVIEWED | لم تتم المراجعة | complete, never confirmed |
+| CONFIRMED | تمت المراجعة | complete, the latest confirmation is current and nothing is pending |
+
+Overall profile, derived: every V1 section CONFIRMED → «ملف الأسرة محدّث»;
+pending requests with no immediate missing action → «طلبات قيد المراجعة»;
+otherwise → «يحتاج إلى مراجعة». Section status is shown as a checklist with
+icon + text (never colour alone). No percentage is ever used.
+
+## Confirmation
+
+The head confirms one section at a time: «راجعتُ هذه البيانات وهي صحيحة».
+A confirmation:
+
+- changes no canonical registry data;
+- is allowed only for a COMPLETE section with no pending request;
+- is append-only and auditable (who, as which Person, when, which section);
+- becomes stale when the section's portal-visible canonical data change.
+
+Future persistence (concept, not built): `family_profile_confirmations` —
+id, uuid, family_id, section, confirmed_by_user_id, confirmed_by_person_id,
+confirmed_at, fingerprint, fingerprint_version, key_version, and optional
+acknowledgement codes (codes only). No copy or snapshot of registry values
+is stored.
+
+## Staleness fingerprint
+
+Staleness is derived: the server recomputes a keyed fingerprint of exactly
+the section's portal-visible values and compares it with the latest
+confirmation. A change to a Staff-only field outside the section's values
+does not make a confirmation stale. The fingerprint uses a **dedicated,
+independently rotatable key** (configuration concept
+`FAMILY_PROFILE_FINGERPRINT_KEY`, with `key_version`), its own domain
+separation, and a `fingerprint_version` for the field set — never the
+application key, so rotating the application key never invalidates
+confirmations. The secret itself is never documented. Fingerprints are
+never returned to a client.
+
+## Relationship with Change Requests
+
+```text
+Correct section             → confirm
+Incorrect / missing data    → the appropriate Change Request (§14, §17)
+Request pending             → section PENDING
+APPROVED, not yet APPLIED   → still PENDING        (APPROVED ≠ APPLIED)
+APPLIED                     → canonical data change → fingerprint changes
+                              → NEEDS_REVIEW, or INCOMPLETE if still missing
+REJECTED                    → NEEDS_REVIEW, with the family-visible reason
+                              where policy allows
+```
+
+The mapping from request type to section(s) lives in one backend place.
+Profile Review never writes canonical registry data.
+
+## Pages
+
+`/family/verification` hosts Profile Review (checklist, section review,
+confirm, requests). `/family/household` stays primarily read-only and may
+later show small status chips linking to the matching review section.
 
 ---
 
 # 10. Declared Size vs Registered Members
 
-The existing distinction is preserved (docs/02 §20a, docs/03 §55):
+The distinction is preserved (docs/02 §20a, docs/03 §55):
 
 ```text
-declared_household_size ≠ registered detailed member count
+declared_household_size ≠ registered_member_count
 ```
 
-- Missing people are never inferred as `declared − registered`.
-- The two figures are never required to be equal for completion or for
+`registered_member_count` is the number of ACTIVE family memberships —
+whatever the members' life status, activity or soft-deleted state
+(FP-ADR-056). Where a domain needs living persons (targeting, health
+summaries) it uses **living members**, never "registered members".
+
+- The two figures are separate registry facts. Neither is presumed
+  authoritative.
+- Missing people are never inferred: declared 5 and registered 2 never
+  means "3 members are missing".
+- Equality is never a condition of completeness, confirmation or
   verification.
-- During the family-members review both figures may be shown to the
-  household head as separate facts.
-- A household head reports a missing member through the request workflow
-  (§14).
+- When the figures differ, Profile Review may explain, without calculating:
+  «يختلف عدد أفراد الأسرة المعلن (5) عن عدد الأفراد المسجّلين بالتفصيل (2).
+  يمكنك إضافة أفراد غير مسجلين، أو طلب تحديث العدد المعلن إذا لم يعد
+  صحيحًا.» — with the actions ADD_FAMILY_MEMBER / BIRTH_REPORT and
+  HOUSEHOLD_DECLARATION_UPDATE (proposed type, PFP-008).
+- The MEMBERS section may be confirmed while the figures differ. No
+  "other members are non-resident" acknowledgement exists in V1.
 
 ---
 
-# 11. Family Verification
+# 11. Staff Family Verification
 
-Completion and verification are separate concepts.
-
-```text
-A. Profile Completion     system-calculated (§9)
-B. Verification Review    the review process and its state
-C. Verification Result    the outcome and its validity
-```
-
-Conceptual lifecycle:
+**Amended 2026-10-04 (FP-ADR-057).** Staff Family Verification is the
+separate, formal Famboook verification concept. **VERIFIED / موثّقة is
+reserved for it.** It is distinct from:
 
 ```text
-INCOMPLETE
-   ↓
-COMPLETE / READY_TO_SUBMIT
-   ↓
-UNDER_REVIEW  ⇄  NEEDS_CLARIFICATION
-   ↓
-VERIFIED
-   ↓ (later critical change, §12)
-REVERIFICATION_REQUIRED
+Family Profile Review       the head's assertion (§9)
+Change Request approval     Staff review of one requested registry mutation (§17)
+Staff Family Verification   a formal Famboook decision about the family (this section)
 ```
 
-These need not be one enumeration; the physical design may keep
-completion, review and result as separate state (PWA-4).
+Family Profile Review CONFIRMED is never VERIFIED, and no self-confirmation
+can grant it. Whether, when and by whom Staff Family Verification is
+performed stays open (PFP-017); it may use "profile current" as a
+precondition, but is its own audited decision. Conceptual lifecycle, kept
+for that later design:
+
+```text
+INCOMPLETE → COMPLETE / READY_TO_SUBMIT → UNDER_REVIEW ⇄ NEEDS_CLARIFICATION
+→ VERIFIED → (later critical change) REVERIFICATION_REQUIRED
+```
 
 ## Rules
 
 - Only an authorized Famboook user or process grants VERIFIED.
-- A Family User cannot self-verify.
-- A coordinator cannot grant VERIFIED merely by being a coordinator.
-- Verification is auditable. The design must support at least: who
-  verified, when, a status or version of the verification, and a history
-  of verification events.
-- Family-visible clarification text is separate from internal notes, as
-  for Change Requests.
+- A Family User cannot self-verify; a coordinator cannot grant VERIFIED by
+  role.
+- Verification is auditable: who verified, when, status or version, and a
+  history of verification events.
+- Family-visible clarification text is separate from internal notes.
+- If the Digital Household Head Card (§18, PWA-8) requires VERIFIED, it
+  refers to Staff Family Verification — never to Profile Review CONFIRMED.
 
 Proposed permissions (pending approval, PFP-022): docs/06 §22a.
 
 ---
 
-# 12. Verification and Later Changes
+# 12. Staff Verification and Later Changes
 
-Verification is not necessarily permanent. Later changes are classified by
-risk, in one backend decision table — never in frontend code.
+This section applies to **Staff Family Verification** (§11). Profile
+Review confirmations become stale through their fingerprint (§9), not
+through this table.
+
+Staff Verification is not necessarily permanent. Later changes are
+classified by risk, in one backend decision table — never in frontend code.
 
 ```text
 MINOR      keeps VERIFIED; shows that an update is pending
@@ -555,34 +689,48 @@ detail until the product owner approves it (PFP-007).
 
 ---
 
-# 13. Verified Does Not Mean Beneficiary
+# 13. No Automatic Eligibility
+
+**Amended 2026-10-04 (FP-ADR-058).** The former chain "Profile Complete →
+Verified → Eligible for consideration" is withdrawn.
+
+Neither Account Verification, Family Profile Review nor Staff Family
+Verification automatically makes a family eligible — or ineligible — for
+any assistance, nomination or service.
 
 ```text
-VERIFIED ≠ APPROVED FOR ASSISTANCE
+VERIFIED ≠ ELIGIBLE        CONFIRMED ≠ ELIGIBLE        INCOMPLETE ≠ INELIGIBLE
 ```
 
-Verification means the family profile passed the Famboook verification
-process. Nothing more.
+- Complete and current family information helps the accuracy of
+  assessments and nominations for the services and programmes that depend
+  on those data. Nothing more.
+- Each assistance programme has its own required data, targeting criteria
+  and eligibility rules. Staff targeting (`FamilyTargeting`, docs/03 §47b)
+  stays separate.
+- There is no hidden universal eligibility score.
+- Future programme-specific readiness may report «بيانات مطلوبة لهذا
+  البرنامج غير مكتملة» by evaluating that programme's required rule keys
+  (§9) — without changing the family's Profile Review state and without
+  declaring the family ineligible.
+- The separation between Needs and Assistance is preserved (docs/03
+  §46–§47).
+
+Approved wording direction (Arabic):
 
 ```text
-Profile Complete
-   ↓
-Verified
-   ↓
-Eligible for consideration / targeting
-   ↓
-Service-specific criteria
-   ↓
-Nomination
-   ↓
-Review / approval
-   ↓
-Assistance
+Dashboard     «مراجعة بيانات أسرتك وتحديثها تساعد على دقة التقييمات
+              والترشيحات للخدمات التي تعتمد على هذه البيانات.»
+Review page   «تعرض هذه الصفحة البيانات المسجّلة لأسرتك في فامبوك. راجع كل
+              قسم، وأكّد صحته أو اطلب تصحيح ما يلزم. لا تُعدَّل البيانات
+              الرسمية إلا بعد مراجعة الطلب من فريق فامبوك.»
+Governance    «مراجعة الملف لا تعني الاستفادة من مساعدة بعينها، ولكل برنامج
+              معاييره الخاصة.»
 ```
 
-The Portal never promises assistance because a profile is verified, and
-its wording must not imply it. The separation between Needs and Assistance
-is preserved (docs/03 §46–§47).
+Never used: «أكمل ملفك لتحصل على مساعدة», «لن تحصل على مساعدة حتى…»,
+«الأسرة المراجعة مؤهلة», «الأسرة غير المراجعة غير مؤهلة», or any wording
+that presents review, confirmation or verification as eligibility.
 
 ---
 
@@ -601,7 +749,36 @@ Actions.
 | Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist |
 | Add missing family member | ADD_FAMILY_MEMBER | `AddFamilyMemberAction` exists |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
-| Death report | DEATH_REPORT | `RecordPersonDeathAction` exists; head succession is not handled |
+| Death report | DEATH_REPORT | `RecordPersonDeathAction` exists (no Staff route or UI yet); head succession is not handled |
+
+## First-release direction (approved 2026-10-04, FP-ADR-059)
+
+The first Change Request types, in order:
+
+```text
+1. RESIDENCE_UPDATE        correction of the CURRENT residence data
+                           (UpdateFamilyResidenceAction, in place)
+2. BIRTH_REPORT            AddFamilyMemberAction
+3. ADD_FAMILY_MEMBER       AddFamilyMemberAction
+4. PERSON_CORRECTION       UpdatePersonAction / CorrectNationalIdAction;
+                           also the reviewed path to confirm an UNKNOWN
+                           member as ALIVE (prerequisite: a Domain Action
+                           path does not exist yet — §33a FU-07)
+5. DEATH_REPORT            for a member who is NOT the household head
+                           (RecordPersonDeathAction)
+```
+
+Deferred: head death and head succession (FU-01), household-head change,
+member transfer, marital events (PFP-012), CONTACT_UPDATE (mobile
+re-verification), health submissions and need submissions (PFP-008).
+
+RESIDENCE_UPDATE in V1 is a correction of the current residence. A real
+move that preserves residence history needs a future `residence.change`
+Domain Action (end the current residence, create a new one — docs/03 §32);
+no such action exists today (§33a FU-02).
+
+A family never changes UNKNOWN → ALIVE directly. DECEASED is handled by the
+death-report workflow and `RecordPersonDeathAction`.
 
 ## Proposed new types — NOT approved
 
@@ -911,6 +1088,24 @@ Update Data
 Less frequent actions live in the new-action flow. Home does not list
 every service.
 
+## Family Portal structure (approved direction 2026-10-04)
+
+```text
+الرئيسية
+أسرتي                 /family/household — معلومات الأسرة · السكن ·
+                      أفراد الأسرة (/family/members); read-only
+مراجعة ملف الأسرة      /family/verification — FAMILY · HEAD · MEMBERS ·
+                      RESIDENCE (§9)
++ طلب جديد            request types as they become available (§14)
+طلباتي                submitted requests, statuses, returned clarifications,
+                      rejected / applied results (§17)
+حسابي                 later: the account / security subset
+```
+
+No separate Health, Needs, Assistance or Documents areas are planned yet:
+health and need submissions arrive through «+» and are followed in
+«طلباتي»; documents are request evidence, not a standalone area.
+
 ---
 
 # 24. Visual Direction
@@ -1051,6 +1246,9 @@ three public screens live in `frontend/components/family/auth/`.
 
 URL scope stays `/family`, and the future manifest is scoped to `/family`.
 
+PWA-3A added `/family/household` («أسرتي», read-only) and `/family/members`;
+Family Profile Review will live at `/family/verification` (§9).
+
 Route groups (conceptual; no routes exist):
 
 ```text
@@ -1161,8 +1359,9 @@ already defines them.
 | Account activation state | Activation and password-set state on the account or Link | New; names not fixed |
 | Trusted / verified contact | Per-Person mobile trust state, who verified, when, how | New; names not fixed |
 | OTP challenge | Short-lived, hashed, attempt-counted challenge records | New; names not fixed |
-| Profile Completion | Calculated; stored only if a snapshot is needed | New; possibly no table |
-| Family Verification | Verification state, version, verifier, timestamps, history | New; names not fixed |
+| Family Profile Review — completeness and states | Derived on read; never stored (§9) | Approved concept (FP-ADR-057) |
+| Family Profile Review — confirmations | `family_profile_confirmations` (append-only; keyed fingerprint, no registry copy) | Approved concept, not built |
+| Staff Family Verification | Verification state, version, verifier, timestamps, history | Deferred (PFP-017); names not fixed |
 | Coordinator scope assignment | User ↔ Clan / Branch Group / Branch assignment, audited | New; names not fixed |
 | Change Request and types | `change_requests`, `change_request_types` — docs/04 §36–§37 | Documented, not built |
 | Workflow history | `workflow_events` — docs/04 §33 | Documented, not built |
@@ -1204,8 +1403,10 @@ PWA-1   Family identity and access — delivered as slices PWA-1A … PWA-1I
         (§30a); PWA-1A and PWA-1B are DONE
 PWA-2   Family authentication — its scope (activation, OTP, login, reset)
         is delivered inside PWA-1E … PWA-1G; no separate phase remains
-PWA-3   Family shell and read-only portal
-PWA-4   Profile Completion and Family Verification
+PWA-3   Family shell and read-only portal — delivered as PWA-3A
+        (household read views; DONE)
+PWA-4   Family Profile Review (Staff Family Verification deferred) —
+        delivered AFTER PWA-5 and the first PWA-6 request types
 PWA-5   Change Request engine and Staff review workspace
 PWA-6   Registry requests / life events
 PWA-7   Health and disability submissions, Needs submissions
@@ -1214,6 +1415,12 @@ PWA-9   Notifications, announcements, Coordinator Space
 PWA-10  PWA installability; security, performance and accessibility
         hardening
 ```
+
+Delivery order differs from the numbers (approved 2026-10-04): PWA-3A →
+documentation and ADR consolidation → Change Request prerequisites → PWA-5
+→ first PWA-6 request types (FP-ADR-059) → PWA-4 Family Profile Review →
+later account / contact → PWA-7 health and need submissions → optional
+Staff Family Verification and PWA-8 card.
 
 Scope, dependencies and exit criteria: docs/07 §31a.
 
@@ -2113,6 +2320,45 @@ request that issued the challenge, for operations and abuse review, at most
 for the 90-day retention of finished challenges (security events keep only
 a digest).
 
+## PWA-3A implementation record — household read views
+
+Implemented 2026-10-04 (FP-ADR-056), Production-verified. Read-only; no
+migration. Every endpoint sits behind `auth:sanctum` → `family.side` →
+`can:family-portal.access` → `family.context` (the resolver's Family on the
+request; any 403 from these routes means "family data unavailable"), takes
+no identifier from the client and answers `Cache-Control: no-store`.
+
+```text
+GET /api/v1/family/household           summary: family code, clan, branch,
+                                       head name, declared size and date,
+                                       registered_member_count
+GET /api/v1/family/household/members   one row per ACTIVE membership
+GET /api/v1/family/household/profile   family facts + the CURRENT residence
+```
+
+- `registered_member_count` = ACTIVE memberships, whatever the Person's
+  life status, activity or soft-deleted state; one shared population for
+  the summary, the members list and the profile (the members list length
+  always equals the count).
+- Members: name, relationship (from the membership), head flag, gender,
+  birth date, life status. A soft-deleted Person keeps its row as a
+  placeholder (`available: false`) with the membership relationship and no
+  Person data. Order: head; spouses; sons and daughters together; fathers
+  and mothers together; OTHER and future codes; no relationship — then
+  birth date (unknown last), paper sequence, membership id (none exposed).
+  Never person_code, National ID, mobile, marital status, notes or ids.
+- Profile residence: original residence, displacement status (null = not
+  collected, never NOT_DISPLACED) and location, current address parts.
+  Never address_text, residence_type, coordinates, residence dates/flags,
+  source or notes; never declared sons/daughters, status or registration
+  data.
+- Frontend: `/family` dashboard (identity card, household summary with the
+  declared / registered explanation, disabled quick actions),
+  `/family/household` («أسرتي»: معلومات الأسرة · السكن · أفراد الأسرة) and
+  `/family/members`. «أسرتي» in the bottom navigation is current on both.
+  Labels: «السكن الأصلي», «الحالة غير مؤكدة», «متوفى/متوفاة», «بيانات هذا
+  الفرد غير متاحة حاليًا».
+
 ## Installable Family app implementation record — manifest, icon, service worker
 
 Implemented 2026-10-04 (FP-ADR-055). Frontend only; no backend change.
@@ -2270,6 +2516,9 @@ also annotated at its original location.
 | A-12 | docs/06 §59c as amended by A-04 | Staff-side and family-side accounts are disjoint; FAMILY_USER + COORDINATOR share one family-side account | **Refined.** A Staff role is never combined with FAMILY_USER or COORDINATOR on one account |
 | A-13 | docs/04 §51: `users.email` required | `users.email` nullable, unique index kept; Staff creation still requires it | **Amended** (approved design, not yet migrated) |
 | A-14 | Program phases PWA-1 and PWA-2 (§30) | Activation, OTP, login and reset are delivered inside PWA-1E … PWA-1G | **Refined.** PWA-2 is absorbed into the PWA-1 slices |
+| A-15 | docs/03 "Verified is not beneficiary": verification makes a family eligible to be considered by targeting and nomination; docs/11 §13 chain Complete → Verified → Eligible | No review or verification state is an eligibility gate | **Amended (FP-ADR-058).** Neither Account Verification, Family Profile Review nor Staff Family Verification makes a family eligible or ineligible; programmes keep their own criteria |
+| A-16 | docs/02 §20a / §75, docs/03 §55 / §55c, docs/04: Registered Household Size excludes DECEASED | registered_member_count counts every ACTIVE membership | **Amended (FP-ADR-056).** "Registered members" = active memberships; the living population is named "living members" (targeting, health summaries) |
+| A-17 | docs/11 §9–§11, docs/02 §45a, docs/03, docs/05: Profile Completion and Family Verification, VERIFIED after the family submits | Family Profile Review by the head, separate from Staff verification | **Amended (FP-ADR-057).** Profile Review (CONFIRMED, never VERIFIED) is distinct from Account Verification and Staff Family Verification |
 
 ---
 
@@ -2319,7 +2568,8 @@ organizational scope = allowed action. COORDINATOR ≠ REVIEWER.
 
 FP-ADR-011
 Profile Completion is system-calculated from business-rule steps, not from
-a column count.
+a column count. [Amended 2026-10-04: completeness is part of Family Profile
+Review — derived section rules, no score (FP-ADR-057).]
 
 FP-ADR-012
 Declared household size and registered member count are separate facts and
@@ -2327,14 +2577,18 @@ are never reconciled arithmetically.
 
 FP-ADR-013
 Family Verification is separate from completion, granted only by an
-authorized Famboook user or process, and auditable.
+authorized Famboook user or process, and auditable. [Amended 2026-10-04:
+this is Staff Family Verification; Family Profile Review CONFIRMED is never
+VERIFIED (FP-ADR-057).]
 
 FP-ADR-014
 Later changes affect verification according to a backend risk decision
 table (MINOR / MATERIAL / CRITICAL).
 
 FP-ADR-015
-VERIFIED does not mean approved for assistance.
+VERIFIED does not mean approved for assistance. [Extended 2026-10-04: no
+review or verification state makes a family eligible or ineligible
+(FP-ADR-058).]
 
 FP-ADR-016
 Health, disability and need submissions are reviewed before they reach the
@@ -2584,6 +2838,63 @@ only Family page navigations network-first, never stores a response, and
 never touches the API, authentication or any other request. The install
 action uses the browser's own prompt when pressed, or instructions. The
 Staff application is neither installable nor controlled by the worker.
+
+FP-ADR-056
+PWA-3A household read views (implementation record §30a): summary,
+members and profile endpoints behind family.context with an explicit
+allow-list and no-store. registered_member_count is the count of ACTIVE
+family memberships whatever the Person's life status, activity or
+soft-deleted state; "living members" names the targeting / health
+population. One row per active membership; a soft-deleted Person is a
+placeholder that keeps the membership relationship. The profile shows the
+current residence only.
+
+FP-ADR-057
+Family Profile Review (مراجعة ملف الأسرة) is separate from Account
+Verification and from Staff Family Verification (§9, §11).
+Context: the portal must help the head keep family data complete and
+current, while VERIFIED stays a formal Famboook decision.
+Decision: the head reviews four V1 sections — FAMILY, HEAD, MEMBERS,
+RESIDENCE (CONTACT later; health and needs excluded) — with derived
+completeness (§9 rules), derived section states (PENDING → INCOMPLETE →
+NEEDS_REVIEW → NOT_REVIEWED → CONFIRMED) and an overall state; no
+percentage or score. A confirmation («راجعتُ هذه البيانات وهي صحيحة»)
+changes no registry data, is allowed only for a complete section with no
+pending request, is append-only (family_profile_confirmations, concept)
+and becomes stale through a keyed fingerprint of the section's
+portal-visible values. The fingerprint key is dedicated and independently
+rotatable (FAMILY_PROFILE_FINGERPRINT_KEY concept, key_version,
+fingerprint_version, domain separation), never the application key; no
+registry snapshot is stored. Change Requests drive PENDING; APPROVED ≠
+APPLIED; an applied change makes the section NEEDS_REVIEW or INCOMPLETE; a
+rejection makes it NEEDS_REVIEW. Terminology: CONFIRMED = تمت المراجعة;
+«ملف الأسرة محدّث»; never VERIFIED / موثّقة.
+Security: server-resolved Family only; sections expose P1 data only;
+other members' National ID / mobile, health and trust internals never
+appear; coordinator scope grants nothing.
+Consequences: a first family-side write (confirmation) after a CSRF write
+smoke test; the Change Request engine and first request types come first.
+Deferred: CONTACT section, health, programme readiness, Staff Family
+Verification (PFP-017), the confirm permission name (PFP-023).
+
+FP-ADR-058
+No automatic eligibility (§13). Neither Account Verification, Family
+Profile Review nor Staff Family Verification makes a family eligible or
+ineligible for assistance, nomination or service. Programmes keep their
+own required data, criteria and rules; programme readiness may report
+missing required data without changing the Profile Review state.
+Supersedes the former "Profile Complete → Verified → Eligible for
+consideration" chain (§13) and docs/03's "verification makes a family
+eligible to be considered".
+
+FP-ADR-059
+Change Request first-release direction (§14): RESIDENCE_UPDATE (current
+residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION
+(including the reviewed UNKNOWN → ALIVE confirmation, whose Domain Action
+path is a prerequisite), DEATH_REPORT for a non-head member. Deferred:
+head death / succession, head change, transfer, marital events,
+CONTACT_UPDATE, health and need submissions. A residence move with history
+needs a future residence.change action.
 ```
 
 ---
@@ -2627,8 +2938,10 @@ PFP-006  (PWA-7)
 Exact health and disability visibility between adult family members, and
 for minors.
 
-PFP-007  (PWA-4)
-Approval of the verification invalidation decision table (§12).
+PFP-007  (Staff Family Verification)
+Approval of the verification invalidation decision table (§12). Applies to
+Staff Family Verification only; Profile Review staleness is fingerprint-
+based (FP-ADR-057).
 
 PFP-008  (PWA-5)
 Approval of the proposed request types (§14) and whether health and need
@@ -2666,13 +2979,15 @@ DECIDED 2026-10-02 (FP-ADR-032): multiple active assignments, union of
 scopes; a coordinator must be an eligible household head. The permission
 names for PWA-1 are final (docs/06 §22b).
 
-PFP-017  (PWA-4)
-Who reviews and who approves Family Verification, and whether the two must
-differ.
+PFP-017  (later)
+Whether Staff Family Verification is performed at all, when, who reviews
+and who approves it, and whether the two must differ. Profile Review
+(FP-ADR-057) does not depend on it.
 
 PFP-018  (PWA-8)
 Card issuance: automatic on verification or on request; who may revoke and
-reissue.
+reissue. "Verification" here means Staff Family Verification, never
+Profile Review CONFIRMED.
 
 PFP-019  (PWA-9)
 Queue and worker infrastructure for announcement fan-out and SMS.
@@ -2700,6 +3015,14 @@ UPDATED 2026-10-03 (PWA-1H): `coordinator-family.view-summary` approved and
 seeded (COORDINATOR only, summary only). `person-mobile-trust.assist` stays
 withheld from COORDINATOR until a dedicated assisted-mobile-trust workflow
 is approved. `coordinator-family.view-account-status` stays PROPOSED.
+
+PFP-023  (PWA-4)
+The permission name for a Profile Review confirmation (e.g. the proposed
+family-verification.submit, or a new family-profile.confirm).
+
+PFP-024  (PWA-6 prerequisite)
+The Domain Action path for confirming an UNKNOWN member as ALIVE through
+PERSON_CORRECTION with Staff review (direction approved, FP-ADR-059).
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -2716,11 +3039,17 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | # | Finding | Handle in |
 |---|---|---|
 | FU-01 | **Head Succession.** `RecordPersonDeathAction` does not handle household-head succession and no household-head change action exists; 38 families currently have a deceased head and therefore no eligible user | **Rollout gate**: must be resolved before general Family Portal rollout; not part of PWA-1 (PFP-012) |
-| FU-02 | Whether `UpdateFamilyResidenceAction` preserves residence history as docs/03 §32 requires is unverified | PWA-6 (RESIDENCE_UPDATE apply) |
+| FU-02 | **Answered 2026-10-04:** `UpdateFamilyResidenceAction` corrects the current residence in place; no Domain Action records a move with history (`residence.change`). RESIDENCE_UPDATE V1 is a correction (FP-ADR-059) | A move with history needs a future `residence.change` action |
 | FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker. SMS no longer needs one (TweetsMS, after the response — FP-ADR-051); the provider is integrated but must be configured and validated on the server | **Production activation gate** (§30a, docs/08 §16a); fan-out PWA-9 (PFP-019) |
 | FU-04 | docs/06 §53 gives FAMILY_USER "scoped view access" to Change Requests; the seeder grants no view permission | PWA-5 |
 | FU-05 | AUTH-ADR-060 is referenced in docs/03, docs/06 and docs/07 but has no entry in the docs/06 decision list | Next docs/06 maintenance |
 | FU-06 | "Document Status" version blocks are stale relative to the change logs (e.g. docs/03) | Next documentation maintenance |
+| FU-07 | **UNKNOWN → ALIVE gap.** Imported spouses carry `life_status = UNKNOWN` and no birth date; `UpdatePersonAction` cannot change life status and `RecordPersonDeathAction` only records deaths. MEMBERS completeness detects UNKNOWN; a family never changes it directly | **Prerequisite** of PERSON_CORRECTION (PFP-024) |
+| FU-08 | **CSRF write smoke test.** A past Production 419 on one browser was a stale / duplicate-cookie incident (API, `csrf-cookie` and CORS preflight succeeded; clearing site data resolved it) — not a reproduced Sanctum / CORS defect | Before the first new Family Portal write endpoint: a production-like CSRF write smoke test; no proactive Sanctum / CORS change without a reproduced defect (docs/08) |
+| FU-09 | Family lifecycle: no Domain Action archives or restores a Family; a Family soft-deleted outside the application keeps active memberships, `NationalIdGuard::describe()` then answers 500 instead of 422, and import reconciliation and Apply planning disagree about such memberships | Family lifecycle task (PBD-005); the two defects are small fixes |
+| FU-10 | `RecordPersonDeathAction` and `RecordHouseholdDeclarationAction` have no Staff route or UI (the latter is used by import only) | Before DEATH_REPORT and HOUSEHOLD_DECLARATION_UPDATE need a Staff path |
+| FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.record-death` / `.view-history`, `family-membership.transfer` | Reserved for their phases (docs/06) |
+| FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
 
 ---
 
@@ -2742,3 +3071,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.10 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation (`start` → `send`), code sent only to the stored number, SELF_OTP trust created only by a correct code (pending row promoted under the Person lock), revoked numbers excluded, existing TRUSTED reused, decoys with a stable fake mask; supersedes FP-ADR-041 for the mask and the trust prerequisite. Migration: `SELF_OTP` allowed in the trust CHECKs |
 | 1.11 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: first activation refuses an input that cannot activate with one generic ACTIVATION_REFUSED answer (422) instead of a synthetic masked-mobile decoy; nothing is created; reasons stay server-side; the decoy clause of FP-ADR-053 is superseded (kept as history); password reset decoys unchanged |
 | 1.12 | 2026-10-04 | Approved | FP-ADR-055: installable Family app — manifest and official icon, minimal service worker (scope /family, offline page only, no response or API caching), "تثبيت فامبوك" with native prompt or instructions; Staff unaffected |
+| 1.13 | 2026-10-04 | Approved | Documentation and ADR consolidation: §9 Family Profile Review (V1 sections, derived completeness and states, confirmation, dedicated fingerprint key, Change Request relationship) and §11 Staff Family Verification kept separate (FP-ADR-057); §10 registered members = active memberships, living members named (FP-ADR-056); §13 no automatic eligibility (FP-ADR-058); §14 first-release request direction, RESIDENCE_UPDATE = correction, UNKNOWN → ALIVE prerequisite (FP-ADR-059); §23 portal structure; §25 routes; §28 concepts; §30 delivery order; §30a PWA-3A record; §31 A-15 … A-17; PFP-007 / 017 / 018 clarified, PFP-023 / 024; §33a FU-02 answered, FU-07 … FU-12. Documentation only |

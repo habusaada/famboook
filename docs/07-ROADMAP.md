@@ -2015,8 +2015,8 @@ deploys or touches Production by itself.
 | PWA-0 | Baseline | Architecture, business rules, workflows, permissions, product and design direction | None | — | **DONE** (`80235cf`) |
 | PWA-1 | Family identity and access | **Starts with a read-only identity-data discovery** (National ID normalization, null/blank, malformed, duplicates and their cause, login-identifier relation, backfill strategy — docs/11 §4); then User-Person Link, Family access resolver, eligibility, trusted-mobile concept, multi-role fixes, coordinator scope foundation | Link, trust state, scope assignment, login identifier | PWA-0; PFP-003, PFP-004, PFP-016 | Cross-family denial; head change, death, suspended Link and deactivation end access; a dual-role user is handled deterministically; Staff login unchanged |
 | PWA-2 | Family authentication | National ID activation, OTP, password setup, login, reset, rate limiting, SMS provider abstraction, security audit | OTP challenge, activation state, security events | PWA-1; PFP-001, PFP-002, PFP-005, PFP-020 | No enumeration; brute force and resend abuse blocked; untrusted mobile cannot activate; destination cannot be chosen; no secret logged |
-| PWA-3 | Family shell and read-only portal | Route groups, mobile shell, home, family summary, members, account | None expected | PWA-2 | Only the resolved Family is visible; no client Family id; sensitive fields filtered server-side; responses not cached; Staff URLs unchanged |
-| PWA-4 | Profile Completion and Family Verification | Completion calculation, verification submission, Staff review, later-change decision table | Verification state and history | PWA-3; PFP-007, PFP-017 | Completion is rule-derived and conditional; declared ≠ registered respected; only authorized approval grants VERIFIED; fully audited |
+| PWA-3 | Family shell and read-only portal | Route groups, mobile shell, home, family summary, members, account. **PWA-3A DONE** (household summary, dashboard, members, «أسرتي» profile and residence; docs/11 §30a) | None expected | PWA-2 | Only the resolved Family is visible; no client Family id; sensitive fields filtered server-side; responses not cached; Staff URLs unchanged |
+| PWA-4 | Family Profile Review (amended 2026-10-04) | Derived section completeness and states, head confirmations with a keyed fingerprint, `/family/verification`, dashboard status; Staff Family Verification deferred (PFP-017) | Confirmations only | PWA-3, PWA-5, first PWA-6 types; PFP-023 | Completeness rule-derived; no percentage; declared ≠ registered respected; confirmation never changes canonical data and is never VERIFIED; no eligibility gate; fully audited |
 | PWA-5 | Change Request engine and Staff review workspace | Engine, workflow events, lifecycle actions, Staff queue and detail | Change requests, types, workflow events | PWA-1; PFP-008 | All transitions tested; APPROVED ≠ APPLIED; apply transactional and idempotent; rollback and concurrency tested; internal notes never family-visible |
 | PWA-6 | Registry requests / life events | CONTACT_UPDATE, RESIDENCE_UPDATE, PERSON_CORRECTION, ADD_FAMILY_MEMBER, BIRTH_REPORT, DEATH_REPORT; evidence; My Requests | Documents | PWA-3, PWA-5 | Per-type validation; duplicate check on apply; evidence private; authentication-mobile change never self-approved |
 | PWA-7 | Health, disability and need submissions | Reviewed submissions applied through the existing health and Needs actions | Possibly new types or reference rows only | PWA-6; PFP-006, PFP-008, PFP-009 | No direct canonical write; minimum-necessary visibility; temporary conditions end correctly; no Assistance created by a Family User |
@@ -2082,6 +2082,29 @@ PFP-003 is resolved (docs/11 §30a). Other recorded follow-ups: docs/11
 
 Not in V1: marriage, divorce, widowhood, member transfer and
 household-head change flows (docs/11 §14, PFP-012).
+
+## Program status after PWA-3A (2026-10-04, RM-ADR-047)
+
+```text
+PWA-3A  Steps 1–4 household read views            DONE, Production-approved
+        (summary, dashboard, members, «أسرتي» profile and residence)
+Documentation and ADR consolidation               CURRENT
+Change Request prerequisites                      NEXT
+        CSRF write smoke test (docs/11 FU-08); UNKNOWN → ALIVE Domain Action
+        path (FU-07, PFP-024); Staff paths where an apply target lacks one
+        (FU-10); FAMILY_USER request view permission (FU-04)
+PWA-5   Change Request engine + Staff review workspace
+PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
+        (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
+        DEATH_REPORT (non-head); «طلباتي»
+PWA-4   Family Profile Review (/family/verification; docs/11 FP-ADR-057)
+later   account / contact («حسابي», CONTACT_UPDATE)
+PWA-7   health and need submissions (PFP-006, PFP-008, PFP-009)
+later   optional Staff Family Verification (PFP-017) / PWA-8 card
+```
+
+The approved numbering is kept; the delivery order differs from it. None
+of these phases makes a family eligible or ineligible (docs/11 §13).
 
 ---
 
@@ -4671,6 +4694,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-047
+PWA-3A (household read views) is done and Production-approved. Before any update workflow, documentation is consolidated (Family Profile Review separate from Account and Staff Family Verification, no eligibility gate, registered vs living members). Delivery order: Change Request prerequisites → PWA-5 → first PWA-6 types → PWA-4 Family Profile Review → account / contact → PWA-7 → optional Staff Family Verification / PWA-8. Phase numbers are unchanged.
+
 ### RM-ADR-046
 After the Production pilot (2026-10-04), first activation stops answering refused inputs with a synthetic masked-mobile decoy: one generic refusal on step 1 instead (docs/11 FP-ADR-054). Delivered as a correction of the first self-activation work; no migration.
 
@@ -4912,6 +4938,7 @@ Date: 2026-09-24
 | 1.2.34 | 2026-10-03 | Approved | PWA-1I done (decoy concurrency and ceiling parity, response floor on all OTP steps, attempt accounting, invisible-character normalization, readiness command, regression and PostgreSQL concurrency coverage; no migration); RM-ADR-044; PWA-1 complete, PWA-3 next |
 | 1.2.35 | 2026-10-04 | Approved | First self-activation done (masked confirmation, SELF_OTP trust on a correct code; one migration); RM-ADR-045 |
 | 1.2.36 | 2026-10-04 | Approved | RM-ADR-046: first-activation refusal replaces the masked-mobile decoy after the Production pilot; no migration |
+| 1.2.37 | 2026-10-04 | Approved | PWA-3A done; documentation and ADR consolidation; PWA-4 renamed Family Profile Review and sequenced after PWA-5 and the first PWA-6 types; program status after PWA-3A (RM-ADR-047) |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

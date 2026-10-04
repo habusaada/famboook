@@ -1098,17 +1098,19 @@ individual members are not (yet) registered.
 
 ## Terminology
 
-These four terms are distinct and must not be blurred in the API, UI,
-reports or exports:
+These terms are distinct and must not be blurred in the API, UI, reports
+or exports (the former term "Registered Household Size", which excluded
+DECEASED, is superseded by Registered Members and Living Members):
 
 | Term | Meaning | Stored? |
 |---|---|---|
-| Registered Household Size | Number of Persons with an ACTIVE membership in the Family who are not DECEASED — calculated from canonical records | **Never stored** — derived on read (§75) |
+| Registered Members (`registered_member_count`) | Number of ACTIVE memberships in the Family, whatever the Person's life status (ALIVE, UNKNOWN, DECEASED), activity or soft-deleted state — calculated from canonical records (amended 2026-10-04, DD-ADR-033) | **Never stored** — derived on read (§75) |
+| Living Members | ACTIVE memberships whose Person is not DECEASED and not soft-deleted — the population of targeting and family health summaries (`FamilyTargeting`, `FamilyHealthSummary`); never called "registered members" | **Never stored** — derived on read |
 | Declared Household Size | Household size as declared by a source at a point in time | `declared_household_size` |
 | Declared Living Sons | Living sons as declared by a source | `declared_living_sons` |
 | Declared Living Daughters | Living daughters as declared by a source | `declared_living_daughters` |
 
-A difference between the Registered and the Declared Household Size is
+A difference between the Registered Members and the Declared Household Size is
 **expected** (for example declared 7, registered 2 when only the head and
 the wife have detailed records) and is not itself an error.
 
@@ -2202,19 +2204,27 @@ A short-lived, hashed, attempt-counted secret bound to one purpose
 (activation or password reset), one Person and one trusted destination.
 The plaintext is never stored, logged or shown to Staff.
 
-### Profile Completion
+### Family Profile Review
 
-A value calculated by the backend from business-rule steps (docs/11 §9).
-It is not a stored count of filled columns and is distinct from
-verification.
+(Amended 2026-10-04, DD-ADR-033; docs/11 §9.) The household head's review
+of the family data: four V1 sections (FAMILY, HEAD, MEMBERS, RESIDENCE).
+Completeness and section states (PENDING, INCOMPLETE, NEEDS_REVIEW,
+NOT_REVIEWED, CONFIRMED) are **derived** on read and never stored; no
+percentage. Only confirmations are stored (`family_profile_confirmations`,
+concept): who, as which Person, when, which section, and a keyed
+fingerprint of the section's portal-visible values (dedicated key,
+`key_version`, `fingerprint_version`) — never a copy of registry data. A
+confirmation changes no canonical data and is never VERIFIED.
 
-### Family Verification
+### Staff Family Verification
 
-The review state and result of a family profile (docs/11 §11): at least
-the result, its version or equivalent, who verified, when, and the history
-of verification events. Conceptual states: INCOMPLETE, COMPLETE /
+The separate, formal Famboook verification of a family (docs/11 §11),
+deferred (PFP-017): at least the result, its version or equivalent, who
+verified, when, and the history of verification events. VERIFIED belongs
+to this concept only. Conceptual states: INCOMPLETE, COMPLETE /
 READY_TO_SUBMIT, UNDER_REVIEW, NEEDS_CLARIFICATION, VERIFIED,
-REVERIFICATION_REQUIRED.
+REVERIFICATION_REQUIRED. Neither concept is an eligibility signal
+(docs/11 §13).
 
 ### Coordinator scope assignment
 
@@ -3160,7 +3170,7 @@ They should be calculated from canonical records unless a justified performance 
 
 ## Registered vs Declared figures (2026-09-29)
 
-This rule applies to the **Registered Household Size** and to every count
+This rule applies to **Registered Members**, **Living Members** and to every count
 of registered Persons (children, adults, males, females): they stay derived
 and are never stored.
 
@@ -3913,6 +3923,10 @@ Family Portal logical concepts (§45a): National ID login identifier, per-Person
 
 Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIED vs ACTIVE), `family_auth_identities`, `person_mobile_trusts`, `auth_otp_challenges`, `auth_security_events`, `coordinator_scope_assignments`; `users.email` nullable with its unique index kept. Approved design; not implemented.
 
+### DD-ADR-033
+
+Registered Members (`registered_member_count`) are ACTIVE memberships whatever the Person's life status, activity or soft-deleted state; Living Members (not DECEASED, not soft-deleted) is the targeting and health-summary population; "Registered Household Size" is superseded (§20a, §75). Family Profile Review (derived completeness and states, stored confirmations with a keyed fingerprint, no registry copy) is distinct from Staff Family Verification (§45a; docs/11 FP-ADR-056, FP-ADR-057).
+
 ---
 
 # 92. Pending Data Decisions
@@ -4145,6 +4159,7 @@ Date: 2026-09-24
 | 1.2.29 | 2026-10-02 | Approved | PWA-1F: §45b activation creates the family-side User (email null, `users.name` a non-displayed snapshot), ACTIVE link and ACTIVE identity; no data-model change |
 | 1.2.30 | 2026-10-03 | Approved | PWA-1G: §45b login and password reset use the authentication identity (keyed fingerprint), never `persons.national_id`; Family password length 8 characters to 72 bytes; no data-model change |
 | 1.2.31 | 2026-10-03 | Approved | PWA-1H: §45b coordinator assignment lifecycle (effective = not revoked and target active, no expiry, revoke reasons) and the Coordinator family summary projection; no data-model change |
+| 1.2.32 | 2026-10-04 | Approved | Documentation consolidation: §20a Registered Members (active memberships, any life status) and Living Members replace Registered Household Size; §75 wording; §45a Family Profile Review and Staff Family Verification separated (DD-ADR-033; docs/11 FP-ADR-056, FP-ADR-057) |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

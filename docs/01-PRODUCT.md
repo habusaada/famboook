@@ -487,7 +487,7 @@ V1 modules:
 Home
 My Family
 Family Members
-Profile Completion & Verification
+Family Profile Review (Staff Family Verification is separate)
 Registry Updates / Life Events
 Health & Disability submissions
 Needs submissions
@@ -510,10 +510,13 @@ Product rule:
 
 ```text
 VERIFIED ≠ APPROVED FOR ASSISTANCE
+VERIFIED ≠ ELIGIBLE      CONFIRMED ≠ ELIGIBLE      INCOMPLETE ≠ INELIGIBLE
 ```
 
-A verified family profile may be considered by targeting and nomination;
-it is never a promise of assistance (docs/11 §13).
+No review or verification state — Account Verification, Family Profile
+Review or Staff Family Verification — makes a family eligible or
+ineligible; each programme keeps its own required data and criteria, and
+nothing here is a promise of assistance (docs/11 §13, amended 2026-10-04).
 
 §12 is unchanged in substance: knowing a National ID or a phone number
 grants nothing. Activation additionally requires registry eligibility and
@@ -3231,6 +3234,7 @@ Date: 2026-09-22
 |---|---|---|---|
 | 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
+| 1.2.4 | 2026-10-04 | Approved | §16a module list: Family Profile Review replaces Profile Completion & Verification; Staff Family Verification separate; no review or verification state is an eligibility gate (docs/11 FP-ADR-057, FP-ADR-058) |
 | 1.2.3 | 2026-10-02 | Approved | PWA-1B: §16a account separation (Staff-side vs family-side), V1 coordinator is an eligible household head, Production activation and rollout gates (PROD-ADR-048). Documentation only |
 | 1.2.2 | 2026-10-02 | Approved | PWA-0: added §16a Family Portal Program (modules, submissions, card, announcements, VERIFIED ≠ assistance); §95 PWA rule superseded (PROD-ADR-047); PPD-015 and PPD-019 decided. Documentation only |
 | 1.2.1 | 2026-09-25 | Approved | Added §25a "Clan and Branch (V1)": Clan → Branch Groups → Branches → Families → Persons; Clan ≠ Family; required Clan, optional Branch; no multi-tenancy |
