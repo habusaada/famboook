@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.10
+**Version:** 1.11
 **Date:** 2026-10-03
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2113,6 +2113,53 @@ request that issued the challenge, for operations and abuse review, at most
 for the 90-day retention of finished challenges (security events keep only
 a digest).
 
+## First-activation refusal implementation record — no masked-mobile decoy
+
+Implemented 2026-10-04 (FP-ADR-054), after the Production pilot.
+
+**Why.** In the pilot, the National ID of a household member who was NOT the
+head was entered on `/family/activate`. As designed (FP-ADR-053), the start
+answered with a decoy: a synthetic masked number, presented as "the
+registered number of the household head", followed by an OTP step that could
+never receive a code. Technically secure, it read as wrong registry data and
+led people into a dead end. The product owner decided to refuse instead.
+
+**Behaviour.**
+
+```text
+eligible head      POST activation/start → 200 {confirmation, masked_mobile}   (unchanged)
+any other input    POST activation/start → 422 {code: ACTIVATION_REFUSED, message}
+malformed ID       POST activation/start → 422 validation error                 (unchanged)
+```
+
+- **One refusal for every reason** — National ID not found or shared by two
+  Persons, not the household head, inactive / deceased / UNKNOWN Person, no
+  active membership, inactive or deleted Family, no valid registered mobile,
+  a Staff-revoked mobile, an existing account or link: the same status
+  (422), code (`ACTIVATION_REFUSED`) and message:
+  "تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى."
+- **The reason stays server-side:** the same `ELIGIBILITY_DENIED` /
+  `ACTIVATION_REQUESTED` / `AMBIGUOUS_IDENTITY` security events with their
+  safe reason codes; never in the response.
+- **Nothing behind a refusal:** no confirmation, no masked number, no
+  decoy, no SMS, no OTP challenge, no pending or trusted mobile row, no
+  User, link or identity. The refused start still waits out the response
+  floor and counts toward the per-identifier and per-IP start ceilings.
+- **At send** (the start was eligible; everything is re-checked): a change
+  since the start (eligibility, identifier, the confirmed number) answers
+  the same `ACTIVATION_REFUSED`; an SMS ceiling answers `OTP_SEND_LIMIT` —
+  never a fake OTP step.
+- **Removed:** the decoy masked mobile (`ActivationConfirmations::decoyMask`
+  and the `DECOY_MASK` fingerprint context, never stored), decoy
+  confirmations and activation decoy challenges. Password reset keeps its
+  decoys (FP-ADR-041 / -052) unchanged.
+- **Accepted trade-off:** a caller can now learn whether an input can START
+  family activation — nothing more: not why, and no Person, Family or
+  mobile data. Every other guarantee is unchanged (SELF_OTP trust only after
+  a correct code, re-checks at send / verify / complete, Staff-revoked
+  numbers excluded, existing TRUSTED reused, password reset and login
+  unchanged).
+
 ## First self-activation implementation record — SELF_OTP mobile trust
 
 Implemented 2026-10-04 (FP-ADR-053). Approved product decision:
@@ -2140,13 +2187,13 @@ unexpired, unsuperseded code establishes it.
 - **Masking:** `05*****` + the last three digits, shown only after the
   eligibility checks admit the flow. The full number is never returned,
   logged or stored in the confirmation.
-- **Anti-enumeration kept:** a denied identifier (unknown, ineligible, no
-  valid mobile, revoked trust, ambiguous) gets the same response with a
-  FAKE mask derived from its keyed fingerprint — stable for that
-  identifier — and its send yields a decoy challenge (no SMS, no row). The
-  start and the send wait out the response floor like every other step.
-  Residual, accepted with the decision: someone who already knows a
-  Person's real number can compare its last three digits.
+- **Anti-enumeration kept** — *superseded on 2026-10-04 by FP-ADR-054
+  (see the next record); kept here as history:* a denied identifier
+  (unknown, ineligible, no valid mobile, revoked trust, ambiguous) got the
+  same response with a FAKE mask derived from its keyed fingerprint — stable
+  for that identifier — and its send yielded a decoy challenge (no SMS, no
+  row). The start and the send wait out the response floor like every other
+  step.
 - **Destination:** always the Person's stored number, re-checked at send
   (still eligible, same identifier, the very number whose mask was
   confirmed). The API refuses any `mobile` or `phone` field. A confirmation
@@ -2479,7 +2526,22 @@ trust only on a correct code; a Staff-revoked number is never self-verified;
 password reset still requires an already TRUSTED mobile. This supersedes,
 for first activation only, FP-ADR-041's "no part of the mobile is shown"
 and the TRUSTED-mobile prerequisite of activation; decoys show a stable fake
-mask so the response stays identical.
+mask so the response stays identical. [Its decoy clause — the fake mask and
+the decoy OTP journey for a refused identifier — is superseded by
+FP-ADR-054 (2026-10-04); the rest stands.]
+
+FP-ADR-054
+Decided 2026-10-04 after the Production pilot, superseding the decoy clause
+of FP-ADR-053 for first activation only. A synthetic masked mobile shown to
+an identifier that cannot activate (e.g. a household member who is not the
+head) read as wrong registry data and led into an OTP step that could never
+succeed. First activation therefore refuses such an input outright, on step
+1, with ONE generic answer — the same status, code (ACTIVATION_REFUSED) and
+message for every reason — and creates nothing: no confirmation, number,
+decoy, SMS, challenge, trust, account, link or identity. The reasons remain
+server-side security events only. Accepted trade-off: a caller can learn
+whether an input can start family activation, and nothing else. Password
+reset keeps its decoys.
 ```
 
 ---
@@ -2636,3 +2698,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.8 | 2026-10-03 | Approved | TweetsMS SMS delivery record in §30a: `FAMILY_SMS_DRIVER=tweetsms`, `05XXXXXXXX` as stored, success only on code 999 (accepted, not handset delivery), failure classification, no retry, after-response delivery without a queue, safe failure logging and event metadata, shorter one-part OTP message, `famboook:sms-check`; gate items 1/4/5 updated; PFP-001 decided; FU-03 updated; FP-ADR-050, 051. No migration, nothing enabled |
 | 1.9 | 2026-10-03 | Approved | PWA-1I implementation record in §30a: decoy concurrency parity (atomic attempts, write-once supersession, one resend claim per send), IP / global ceiling parity for decoy resends (destination not mirrorable), response floor on verify and complete, attempts counted before the work (login, start), invisible-character normalization, `famboook:family-auth-check`, regression and PostgreSQL concurrency coverage, raw challenge IP retention noted; FP-ADR-052; PWA-1I done. No migration, nothing enabled |
 | 1.10 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation (`start` → `send`), code sent only to the stored number, SELF_OTP trust created only by a correct code (pending row promoted under the Person lock), revoked numbers excluded, existing TRUSTED reused, decoys with a stable fake mask; supersedes FP-ADR-041 for the mask and the trust prerequisite. Migration: `SELF_OTP` allowed in the trust CHECKs |
+| 1.11 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: first activation refuses an input that cannot activate with one generic ACTIVATION_REFUSED answer (422) instead of a synthetic masked-mobile decoy; nothing is created; reasons stay server-side; the decoy clause of FP-ADR-053 is superseded (kept as history); password reset decoys unchanged |

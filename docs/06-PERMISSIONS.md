@@ -1072,6 +1072,11 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
   The Staff grant API and `GrantPersonMobileTrustAction` refuse it.
 - Staff grant and revoke are unchanged; a revoked number is never
   self-verified back.
+- **A refused start answers one public code** (AUTH-ADR-074, after the
+  Production pilot): `ACTIVATION_REFUSED` (422) for every eligibility
+  reason, with no confirmation and no data; the reason is a security event
+  only. `ACTIVATION_UNAVAILABLE` (503) keeps meaning "activation is switched
+  off / not configured".
 
 ## Security hardening (PWA-1I)
 
@@ -4131,6 +4136,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-074
+First activation refuses an input that cannot activate with one public answer — `ACTIVATION_REFUSED`, HTTP 422, one message — whatever the reason; the reason is recorded server-side only and no confirmation, masked number, decoy or other artifact is produced (docs/11 FP-ADR-054). No permission or route changes.
+
 ### AUTH-ADR-073
 First self-activation adds no permission or role: `SELF_OTP` trust is established only by a correct activation code sent to the Person's stored mobile, never by an administrative grant (the Staff grant refuses it), and never for a Staff-revoked number. The added public `activation/send` route sits behind the activation gate and its own limiter and accepts no mobile number.
 
@@ -4511,6 +4519,7 @@ Date: 2026-09-24
 | 1.2.35 | 2026-10-03 | Approved | TweetsMS (AUTH-ADR-071): §22b SMS delivery — no new permission, role or route; provider outcomes never exposed; `famboook:sms-check` shell-only and non-revealing; credentials in the server environment only |
 | 1.2.36 | 2026-10-03 | Approved | PWA-1I (AUTH-ADR-072): §22b security hardening — no new permission, role or route; account-side fail-closed against corrupted RBAC proven; eligibility re-evaluated per request; readiness command shell-only and non-revealing |
 | 1.2.37 | 2026-10-04 | Approved | First self-activation (AUTH-ADR-073): `activation/send` route, SELF_OTP never a Staff grant, revoke unchanged; no new permission |
+| 1.2.38 | 2026-10-04 | Approved | AUTH-ADR-074: refused first-activation start answers one public code `ACTIVATION_REFUSED` (422), reasons server-side only; `ACTIVATION_UNAVAILABLE` stays the switched-off answer |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

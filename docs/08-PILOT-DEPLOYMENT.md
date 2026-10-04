@@ -571,6 +571,19 @@ is configured or enabled on the server by deploying it.
   flags, then `php artisan config:cache`. No migration and no data change
   is involved; challenges issued meanwhile simply expire.
 
+## First-activation refusal (FP-ADR-054): deployment notes
+
+Recorded 2026-10-04, after the Production pilot.
+
+- **No migration, no new env.** The activation `start` now answers an input
+  that cannot activate with `422 ACTIVATION_REFUSED` instead of a decoy
+  confirmation. **Deploy the frontend and the backend together** — the
+  previous frontend does not know the new code.
+- **What staff will see in the pilot:** a non-head, unknown or otherwise
+  ineligible National ID stays on step 1 with "تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى." No SMS is sent and no
+  row is created; the reason is in `auth_security_events`
+  (`ELIGIBILITY_DENIED`, count-only queries).
+
 ## First self-activation (SELF_OTP): deployment notes
 
 Recorded 2026-10-04 (docs/11 FP-ADR-053).
@@ -814,6 +827,7 @@ Never do this once real data has been entered.
 | 1.1.9 | 2026-10-03 | Approved | §16a: PWA-1I — `famboook:family-auth-check` (read-only readiness; detects a wrong fingerprint key), PHP-FPM requirements (`fpm-fcgi`, `request_terminate_timeout` >= 30 s or unset, `pm.max_children` headroom), proxy / `trustProxies` rule, CGNAT risk and limited-cohort review, response floor on all four OTP steps and its measurement, `famboook_test` PostgreSQL procedure, raw challenge IP retention. No migration, nothing enabled |
 | 1.1.10 | 2026-10-03 | Approved | §16a PWA-1I: the PostgreSQL validation runs on a physically separate, disposable test cluster (`initdb`, `pg_ctl`, port 5433, localhost only, never a service, never the development server); credentials in `pgpass.conf` only; `TestDatabaseGuard` is a secondary guard (name only) |
 | 1.1.11 | 2026-10-04 | Approved | §16a: first self-activation deployment notes — migration, frontend and backend deployed together, `FAMILY_ACTIVATION_LIMIT_SEND_IP_MINUTE`, pilot impact (no Staff grant needed; activation flag opens it to every eligible household), residual risks |
+| 1.1.12 | 2026-10-04 | Approved | §16a: first-activation refusal (FP-ADR-054) deployment notes — no migration, frontend and backend together, what pilot staff see |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

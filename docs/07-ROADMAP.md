@@ -4671,6 +4671,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-046
+After the Production pilot (2026-10-04), first activation stops answering refused inputs with a synthetic masked-mobile decoy: one generic refusal on step 1 instead (docs/11 FP-ADR-054). Delivered as a correction of the first self-activation work; no migration.
+
 ### RM-ADR-045
 First self-activation (FP-ADR-053) is delivered after PWA-1I without a slice letter: activation no longer needs a Staff-granted mobile trust; a correct code to the confirmed registered number creates SELF_OTP trust. Staff trust grants stay available, and a Staff mobile-trust UI is no longer a prerequisite for a pilot cohort (it remains useful for revocation and corrections).
 
@@ -4908,6 +4911,7 @@ Date: 2026-09-24
 | 1.2.33 | 2026-10-03 | Approved | TweetsMS SMS delivery done (driver, code-999 criterion, failure classes, after-response without a queue, OTP text, `famboook:sms-check`; no migration); Production gate updated — queue worker no longer needed for SMS; RM-ADR-043. PWA-1I next |
 | 1.2.34 | 2026-10-03 | Approved | PWA-1I done (decoy concurrency and ceiling parity, response floor on all OTP steps, attempt accounting, invisible-character normalization, readiness command, regression and PostgreSQL concurrency coverage; no migration); RM-ADR-044; PWA-1 complete, PWA-3 next |
 | 1.2.35 | 2026-10-04 | Approved | First self-activation done (masked confirmation, SELF_OTP trust on a correct code; one migration); RM-ADR-045 |
+| 1.2.36 | 2026-10-04 | Approved | RM-ADR-046: first-activation refusal replaces the masked-mobile decoy after the Production pilot; no migration |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

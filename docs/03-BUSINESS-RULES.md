@@ -2470,14 +2470,19 @@ workflow).
   and asks "هل هذا رقمك ويمكنك استقبال رمز التحقق عليه؟". Only after the
   user confirms is the code sent. Confirming is not verification and
   creates no trust.
-- **Nothing is revealed.** Every well-formed identifier gets the same
-  answer at every step. A denied start (unknown, ineligible, no valid
-  mobile, revoked trust, already activated, ambiguous; at send also an SMS
-  ceiling) shows a fake masked number that is stable for that identifier,
-  and continues with a decoy reference that behaves like a real one in the
-  code and resend steps. The reason is recorded as a security event only.
-  The full mobile number is never shown. A failed SMS delivery is answered
-  like a sent one.
+- **One refusal, no reason (FP-ADR-054, after the Production pilot).** An
+  input that cannot start activation — unknown or shared National ID, not
+  the household head, inactive, deceased or UNKNOWN Person, no active
+  membership, inactive or deleted Family, no valid registered mobile, a
+  Staff-revoked mobile, an existing account or link — stays on step 1 with
+  ONE generic answer: "تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى." The reason is recorded as a security event only
+  and never shown. Nothing is created and no SMS is sent. Accepted
+  trade-off: a caller can learn whether an input can start activation, and
+  nothing more. (Until 2026-10-04 such an input was shown a fake masked
+  number and a decoy code step; the pilot showed this misleads users.)
+- **The full mobile number is never shown.** A failed SMS delivery is
+  answered like a sent one. A change between the start and the send is
+  refused the same way; an SMS ceiling is reported as such.
 - **The code goes only to the Person's current registered mobile** — the
   very number whose mask was confirmed. The caller cannot name a
   destination; a number in the request is refused.
@@ -4860,6 +4865,7 @@ Date: 2026-09-24
 | 1.2.43 | 2026-10-03 | Approved | TweetsMS: §89b SMS delivery as implemented (provider, `05XXXXXXXX` as stored, success only on code 999, fixed one-part OTP text, after-response delivery without a queue, no automatic retry, failures recorded and never shown); OTP delivery timing and the Production gate updated |
 | 1.2.44 | 2026-10-03 | Approved | PWA-1I: §89b hardening as implemented — decoy parity under parallel requests and at the IP / global ceilings (destination not mirrorable), one response floor for all four OTP steps, attempts counted before the work, invisible-character removal for pasted identifiers, readiness check |
 | 1.2.45 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation, code only to the stored number, SELF_OTP trust only after a correct code, Staff-revoked numbers excluded, password reset unchanged |
+| 1.2.46 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: an input that cannot start first activation gets one generic refusal on step 1 instead of a fake masked number and decoy code step; reasons stay server-side; nothing created |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
