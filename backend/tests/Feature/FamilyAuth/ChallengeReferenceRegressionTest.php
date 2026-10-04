@@ -60,8 +60,10 @@ class ChallengeReferenceRegressionTest extends TestCase
     /** @return array<string, array{0: string, 1: string, 2: string}> */
     public static function flows(): array
     {
+        // Password reset only: first activation hands out no decoy since
+        // FP-ADR-054 (a refused start answers ACTIVATION_REFUSED).
+        // (Real activation references are checked below.)
         return [
-            'activation' => [self::ACTIVATION, self::ACTIVATION_ID, self::RESET],
             'password reset' => [self::RESET, self::RESET_ID, self::ACTIVATION],
         ];
     }

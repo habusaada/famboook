@@ -31,7 +31,7 @@ class FamilyActivationController extends Controller
         try {
             return self::json($activation->start($request->nationalId()));
         } finally {
-            // Whatever happened: a real confirmation, a decoy or a refusal.
+            // Whatever happened: a confirmation or a refusal (FP-ADR-054).
             ResponseFloor::hold($startedAt);
         }
     }
@@ -46,15 +46,15 @@ class FamilyActivationController extends Controller
         try {
             return self::json($activation->send($request->confirmation()));
         } finally {
-            // A real send, a decoy or a refusal: one response time.
+            // A send or a refusal: one response time.
             ResponseFloor::hold($startedAt);
         }
     }
 
     public function verify(FamilyChallengeRequest $request, FamilyActivation $activation): JsonResponse
     {
-        // Real, decoy, right or wrong code, locked or expired: one floor, so
-        // the database work of a real challenge does not show (PWA-1I).
+        // Right or wrong code, locked, expired or unknown reference: one
+        // floor, so the database work of a real challenge does not show.
         $startedAt = microtime(true);
         try {
             return self::json($activation->verify($request->challenge(), (string) $request->code()));
@@ -81,7 +81,7 @@ class FamilyActivationController extends Controller
      */
     public function complete(FamilyPasswordRequest $request, ActivateFamilyAccountAction $activate): JsonResponse
     {
-        // Every outcome — a decoy, an unverified, consumed or expired grant,
+        // Every outcome — an unknown reference, an unverified, consumed or expired grant,
         // a refusal or the account itself — waits out the same floor.
         $startedAt = microtime(true);
         try {

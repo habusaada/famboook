@@ -4,6 +4,7 @@ namespace Tests\Feature\FamilyAuth;
 
 use App\Actions\RevokePersonMobileTrustAction;
 use App\Contracts\SmsSender;
+use App\Enums\FamilyAuthError;
 use App\Enums\FamilyStatus;
 use App\Enums\LifeStatus;
 use App\Enums\MobileTrustRevokeReason;
@@ -133,7 +134,9 @@ class FamilyActivationStartTest extends TestCase
     /** @return array<string, array{0: string}> */
     public static function kinds(): array
     {
-        return ['real challenge' => ['real'], 'decoy' => ['decoy']];
+        // Activation hands out no decoy since FP-ADR-054: a refused start
+        // answers ACTIVATION_REFUSED (SelfOtpActivationTest covers it).
+        return ['real challenge' => ['real']];
     }
 
     // ------------------------------------------------------------------ start
@@ -254,30 +257,27 @@ class FamilyActivationStartTest extends TestCase
     }
 
     #[DataProvider('denials')]
-    public function test_a_denied_start_answers_exactly_like_an_eligible_one(string $case, string $eventType, ?string $reason): void
+    public function test_a_denied_start_is_one_generic_refusal(string $case, string $eventType, ?string $reason): void
     {
         $this->arrangeDenial($case);
         $users = User::count();
 
-        $response = $this->start($case === 'unknown' ? self::UNKNOWN_ID : self::ELIGIBLE_ID)->assertOk();
+        $response = $this->start($case === 'unknown' ? self::UNKNOWN_ID : self::ELIGIBLE_ID);
 
-        // The same body as an eligible start, to the key.
-        $response->assertExactJson([
-            'challenge' => $response->json('challenge'),
-            'resend_after_seconds' => 60,
-            'expires_in_seconds' => 300,
-            'can_resend' => true,
-        ]);
-        $this->assertTrue(Str::isUuid($response->json('challenge')));
+        // ONE answer for every reason (FP-ADR-054). An SMS ceiling is met only
+        // at send, by an eligible head who already saw their masked number.
+        if ($case === 'throttled') {
+            $this->assertRefused($response, 429, 'OTP_SEND_LIMIT');
+        } else {
+            $this->assertRefused($response, 422, 'ACTIVATION_REFUSED');
+            $this->assertSame(FamilyAuthError::ACTIVATION_REFUSED->message(), $response->json('message'));
+        }
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
 
-        // Nothing real happened: no SMS, no OTP row, no account.
+        // Nothing happened: no SMS, no OTP row, no account, no decoy.
         $this->assertSame(0, $this->sms->attempts);
         $this->assertSame(0, AuthOtpChallenge::count());
         $this->assertSame($users, User::count());
-        $this->assertNotNull(app(ChallengeDecoys::class)->state(OtpPurpose::ACTIVATION, $response->json('challenge')));
-        // Purpose-bound: the same reference does not exist for a password reset.
-        $this->assertNull(app(ChallengeDecoys::class)->state(OtpPurpose::PASSWORD_RESET, $response->json('challenge')));
 
         // The reason is recorded, never returned.
         $event = AuthSecurityEvent::where('event_type', $eventType)->sole();
@@ -306,11 +306,10 @@ class FamilyActivationStartTest extends TestCase
         $first = $this->start()->json('challenge');
         $code = $this->sms->lastCode();
 
-        // The Person stops being eligible; the next start is a decoy.
+        // The Person stops being eligible; the next start is refused.
         $person->forceFill(['is_active' => false])->save();
-        $second = $this->start()->assertOk()->json('challenge');
+        $this->assertRefused($this->start(), 422, 'ACTIVATION_REFUSED');
 
-        $this->assertNotSame($first, $second);
         $this->assertRefused($this->verify($first, $code), 423, 'OTP_LOCKED');
     }
 
@@ -318,7 +317,7 @@ class FamilyActivationStartTest extends TestCase
     {
         $this->eligible();
         $this->start(self::ELIGIBLE_ID)->assertOk();
-        $this->start(self::UNKNOWN_ID)->assertOk();
+        $this->assertRefused($this->start(self::UNKNOWN_ID), 422, 'ACTIVATION_REFUSED');
 
         $events = AuthSecurityEvent::all()->map(fn ($e) => json_encode($e->getAttributes()))->implode("\n");
         $storage = new ReflectionProperty(Cache::getStore(), 'storage');
@@ -379,22 +378,24 @@ class FamilyActivationStartTest extends TestCase
             $this->eligible();
         }
         $id = $kind === 'real' ? self::ELIGIBLE_ID : self::UNKNOWN_ID;
+        // The same ceiling for an identifier that is refused.
 
+        // Admitted (answered or refused) five times; then the ceiling.
         for ($i = 0; $i < 5; $i++) {
-            $this->start($id)->assertOk();
+            $this->assertNotSame(429, $this->start($id)->status());
         }
         $this->assertRefused($this->start($id), 429, 'TOO_MANY_REQUESTS');
 
         // Another identifier is unaffected; the hour passes and it reopens.
-        $this->start('111111111')->assertOk();
+        $this->assertRefused($this->start('111111111'), 422, 'ACTIVATION_REFUSED');
         $this->travel(3601)->seconds();
-        $this->start($id)->assertOk();
+        $this->assertNotSame(429, $this->start($id)->status());
     }
 
     public function test_the_ip_ceiling_limits_starts_across_identifiers(): void
     {
         for ($i = 0; $i < 10; $i++) {
-            $this->start('20000000'.$i)->assertOk();
+            $this->assertRefused($this->start('20000000'.$i), 422, 'ACTIVATION_REFUSED');
         }
 
         $this->assertRefused($this->start('300000000'), 429, 'TOO_MANY_REQUESTS');
@@ -410,8 +411,8 @@ class FamilyActivationStartTest extends TestCase
         ], $defaults['limits']);
 
         config(['family_auth.activation.limits.start_ip_minute' => 2]);
-        $this->start('200000001')->assertOk();
-        $this->start('200000002')->assertOk();
+        $this->assertRefused($this->start('200000001'), 422, 'ACTIVATION_REFUSED');
+        $this->assertRefused($this->start('200000002'), 422, 'ACTIVATION_REFUSED');
         $this->assertRefused($this->start('200000003'), 429, 'TOO_MANY_REQUESTS');
     }
 
@@ -437,23 +438,23 @@ class FamilyActivationStartTest extends TestCase
         $this->eligible();
 
         $real = $this->start(self::ELIGIBLE_ID)->assertOk()->json('challenge');
-        $decoy = $this->start(self::UNKNOWN_ID)->assertOk()->json('challenge');
-        // Start and send each wait, real or decoy.
-        Sleep::assertSleptTimes(4);
+        // Start and send each wait.
+        Sleep::assertSleptTimes(2);
+        // A refused start waits too (FP-ADR-054).
+        $this->assertRefused($this->start(self::UNKNOWN_ID), 422, 'ACTIVATION_REFUSED');
+        Sleep::assertSleptTimes(3);
 
-        // Since PWA-1I verify waits too, real or decoy (AuthResponseFloorTest).
+        // Since PWA-1I verify waits too (AuthResponseFloorTest).
         $this->verify($real, $this->wrongCode());
-        $this->verify($decoy);
-        Sleep::assertSleptTimes(6);
+        Sleep::assertSleptTimes(4);
 
         // A refused resend waits too.
         $this->resend($real)->assertStatus(429);
-        $this->resend($decoy)->assertStatus(429);
-        Sleep::assertSleptTimes(8);
+        Sleep::assertSleptTimes(5);
 
         config(['family_auth.activation.min_response_ms' => 0]);
-        $this->start('111111111')->assertOk();
-        Sleep::assertSleptTimes(8);
+        $this->start('111111111');
+        Sleep::assertSleptTimes(5);
     }
 
     // ------------------------------------------- verify / resend: real = decoy

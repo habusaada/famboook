@@ -306,18 +306,13 @@ class FamilyActivationCompleteTest extends TestCase
         $this->assertNothingWasCreated($reference);
     }
 
-    public function test_a_decoy_or_unknown_reference_answers_like_an_unverified_challenge(): void
+    public function test_a_refused_identifier_gets_nothing_to_complete_with(): void
     {
-        $decoy = $this->started('987654321');
+        // No decoy since FP-ADR-054: a refused start hands out no reference.
+        $this->postJson(self::BASE.'/start', ['national_id' => '987654321'])
+            ->assertStatus(422)->assertJsonPath('code', 'ACTIVATION_REFUSED')->assertJsonMissingPath('confirmation');
 
-        $this->assertRefused($this->complete($decoy), 422, 'OTP_INVALID');
         $this->assertRefused($this->complete('3f0e2a6c-5b1d-4c7e-9a8b-1d2e3f4a5b6c'), 422, 'OTP_INVALID');
-
-        // Locked, a decoy answers as a locked real challenge does.
-        for ($i = 0; $i < 5; $i++) {
-            $this->postJson(self::BASE.'/verify', ['challenge' => $decoy, 'code' => '000000']);
-        }
-        $this->assertRefused($this->complete($decoy), 423, 'OTP_LOCKED');
         $this->assertNothingWasCreated();
     }
 
@@ -432,17 +427,18 @@ class FamilyActivationCompleteTest extends TestCase
         $this->assertSame(1, FamilyAuthIdentity::count());
     }
 
-    public function test_after_activation_a_new_start_is_a_decoy_and_cannot_activate_again(): void
+    public function test_after_activation_a_new_start_is_refused_and_cannot_activate_again(): void
     {
         $this->complete($this->verified())->assertCreated();
         $sent = $this->sms->attempts;
 
-        $again = $this->started();
+        $this->postJson(self::BASE.'/start', ['national_id' => self::NATIONAL_ID])
+            ->assertStatus(422)->assertJsonPath('code', 'ACTIVATION_REFUSED');
 
         $this->assertSame($sent, $this->sms->attempts);
         $this->assertSame(1, AuthOtpChallenge::count());
-        $this->assertRefused($this->complete($again), 422, 'OTP_INVALID');
         $this->assertSame(1, $this->familyAccounts());
+        $this->assertSame('ALREADY_LINKED', AuthSecurityEvent::where('event_type', 'ELIGIBILITY_DENIED')->latest('id')->first()->reason_code);
     }
 
     public function test_only_the_latest_challenge_of_a_person_can_complete(): void

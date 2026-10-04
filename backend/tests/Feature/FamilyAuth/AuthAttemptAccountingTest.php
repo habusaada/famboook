@@ -197,7 +197,8 @@ class AuthAttemptAccountingTest extends TestCase
 
         $counts = array_count_values($outcomes);
         $this->assertSame(8, $started);
-        $this->assertSame(5, $counts['OK'] ?? 0, 'Ceiling: 5 starts per identifier per hour.');
+        // Five admitted (an unknown identifier is refused, FP-ADR-054), then the ceiling.
+        $this->assertSame(5, $counts[FamilyAuthError::ACTIVATION_REFUSED->value] ?? 0, 'Ceiling: 5 starts per identifier per hour.');
         $this->assertSame(3, $counts[FamilyAuthError::TOO_MANY_REQUESTS->value] ?? 0);
         $this->assertNotNull(OtpPurpose::ACTIVATION);
     }

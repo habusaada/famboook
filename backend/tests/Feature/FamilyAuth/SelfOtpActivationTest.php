@@ -4,17 +4,21 @@ namespace Tests\Feature\FamilyAuth;
 
 use App\Actions\GrantPersonMobileTrustAction;
 use App\Contracts\SmsSender;
+use App\Enums\FamilyStatus;
 use App\Enums\LifeStatus;
 use App\Enums\MobileVerificationMethod;
 use App\Models\AuthOtpChallenge;
 use App\Models\AuthSecurityEvent;
+use App\Models\FamilyAuthIdentity;
 use App\Models\Person;
 use App\Models\PersonMobileTrust;
 use App\Models\User;
+use App\Models\UserPersonLink;
 use App\Support\FamilyAuth\CurrentTrustedMobile;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Sleep;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\FakeSmsSender;
@@ -44,6 +48,11 @@ class SelfOtpActivationTest extends TestCase
     private const MASKED = '05*****567';
 
     private const PASSWORD = 'synthetic-pass-1';
+
+    private const REFUSAL = [
+        'code' => 'ACTIVATION_REFUSED',
+        'message' => 'تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى.',
+    ];
 
     private FakeSmsSender $sms;
 
@@ -145,13 +154,22 @@ class SelfOtpActivationTest extends TestCase
         $this->assertFalse(app(CurrentTrustedMobile::class)->for($this->person->fresh())->isTrusted());
     }
 
-    public function test_a_confirmation_is_used_once_real_or_decoy(): void
+    public function test_a_confirmation_is_used_once(): void
     {
-        foreach ([self::NATIONAL_ID, self::UNKNOWN_ID] as $id) {
-            $confirmation = $this->start($id)->json('confirmation');
-            $this->send($confirmation)->assertOk();
-            $this->send($confirmation)->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
-        }
+        $confirmation = $this->start()->json('confirmation');
+        $this->send($confirmation)->assertOk();
+        $this->send($confirmation)->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
+    }
+
+    public function test_send_cannot_be_reached_without_an_eligible_start(): void
+    {
+        // A refused start hands out nothing to send with; an invented
+        // reference is unknown.
+        $this->start(self::UNKNOWN_ID)->assertStatus(422)->assertJsonMissingPath('confirmation');
+        $this->send('00000000-0000-4000-8000-000000000000')->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
+
+        $this->assertSame(0, $this->sms->attempts);
+        $this->assertSame(0, AuthOtpChallenge::count());
     }
 
     // ------------------------------------------------- only a correct code
@@ -297,7 +315,20 @@ class SelfOtpActivationTest extends TestCase
         $confirmation = $this->start()->json('confirmation');
         $this->person->forceFill(['mobile' => '0597777777'])->saveQuietly();
 
-        $this->send($confirmation)->assertOk();
+        $this->send($confirmation)->assertStatus(422)->assertExactJson(self::REFUSAL);
+
+        $this->assertSame(0, $this->sms->attempts);
+        $this->assertSame(0, AuthOtpChallenge::count());
+        $this->assertSame(0, PersonMobileTrust::count());
+        $this->assertSame('STALE', AuthSecurityEvent::where('event_type', 'ELIGIBILITY_DENIED')->latest('id')->first()->reason_code);
+    }
+
+    public function test_an_eligibility_change_after_the_confirmation_is_refused_at_send(): void
+    {
+        $confirmation = $this->start()->json('confirmation');
+        $this->person->activeMembership()->first()->forceFill(['is_household_head' => false])->save();
+
+        $this->send($confirmation)->assertStatus(422)->assertExactJson(self::REFUSAL);
 
         $this->assertSame(0, $this->sms->attempts);
         $this->assertSame(0, AuthOtpChallenge::count());
@@ -314,57 +345,98 @@ class SelfOtpActivationTest extends TestCase
         $this->assertSame('STALE', $trust->fresh()->status->value);
     }
 
-    // ------------------------------------------------------ denied = decoy
+    // --------------------------------------------- refused = one answer
 
-    /** @return array<string, array{0: string}> */
-    public static function denials(): array
+    /** @return array<string, array{0: string, 1: string, 2: ?string}> case, event type, recorded reason */
+    public static function refusals(): array
     {
         return [
-            'no valid mobile' => ['no-mobile'],
-            'invalid mobile' => ['bad-mobile'],
-            'deceased' => ['deceased'],
-            'unknown life status' => ['life-unknown'],
-            'inactive person' => ['inactive'],
-            'not the head' => ['non-head'],
-            'unknown national id' => ['unknown'],
+            'unknown national id' => ['unknown', 'ACTIVATION_REQUESTED', 'NOT_FOUND'],
+            'not the head' => ['non-head', 'ELIGIBILITY_DENIED', 'NOT_HOUSEHOLD_HEAD'],
+            'inactive person' => ['inactive', 'ELIGIBILITY_DENIED', 'PERSON_INACTIVE'],
+            'deceased' => ['deceased', 'ELIGIBILITY_DENIED', 'PERSON_NOT_ALIVE'],
+            'unknown life status' => ['life-unknown', 'ELIGIBILITY_DENIED', 'PERSON_NOT_ALIVE'],
+            'no active membership' => ['no-membership', 'ELIGIBILITY_DENIED', 'NO_ACTIVE_MEMBERSHIP'],
+            'inactive family' => ['family-inactive', 'ELIGIBILITY_DENIED', 'FAMILY_NOT_ACTIVE'],
+            'deleted family' => ['family-deleted', 'ELIGIBILITY_DENIED', 'FAMILY_DELETED'],
+            'no registered mobile' => ['no-mobile', 'ELIGIBILITY_DENIED', 'NO_VALID_MOBILE'],
+            'invalid registered mobile' => ['bad-mobile', 'ELIGIBILITY_DENIED', 'NO_VALID_MOBILE'],
             // Staff revoked the trust: self-verification never undoes that.
-            'revoked by staff' => ['revoked'],
+            'revoked by staff' => ['revoked', 'ELIGIBILITY_DENIED', 'REVOKED'],
+            'already activated' => ['linked', 'ELIGIBILITY_DENIED', 'ALREADY_LINKED'],
+            'identifier shared by two persons' => ['duplicate', 'AMBIGUOUS_IDENTITY', null],
         ];
     }
 
-    #[DataProvider('denials')]
-    public function test_a_denied_identifier_answers_alike_and_nothing_is_sent_or_trusted(string $case): void
+    private function arrangeRefusal(string $case): string
     {
-        $eligible = $this->start()->assertOk()->json();
-        AuthSecurityEvent::query()->delete();
-        $id = self::NATIONAL_ID;
+        $membership = $this->person->activeMembership()->first();
         match ($case) {
-            'no-mobile' => $this->person->forceFill(['mobile' => null])->saveQuietly(),
-            'bad-mobile' => $this->person->forceFill(['mobile' => '12345'])->saveQuietly(),
+            'unknown' => null,
+            'non-head' => $membership->forceFill(['is_household_head' => false])->save(),
+            'inactive' => $this->person->forceFill(['is_active' => false])->saveQuietly(),
             'deceased' => $this->person->forceFill(['life_status' => LifeStatus::DECEASED, 'death_date' => now()->toDateString()])->saveQuietly(),
             'life-unknown' => $this->person->forceFill(['life_status' => LifeStatus::UNKNOWN])->saveQuietly(),
-            'inactive' => $this->person->forceFill(['is_active' => false])->saveQuietly(),
-            'non-head' => $this->person->activeMembership()->first()->forceFill(['is_household_head' => false])->save(),
-            'unknown' => $id = self::UNKNOWN_ID,
+            'no-membership' => $membership->forceFill(['is_active' => false])->save(),
+            'family-inactive' => $membership->family->forceFill(['status' => FamilyStatus::INACTIVE])->save(),
+            'family-deleted' => $membership->family->delete(),
+            'no-mobile' => $this->person->forceFill(['mobile' => null])->saveQuietly(),
+            'bad-mobile' => $this->person->forceFill(['mobile' => '12345'])->saveQuietly(),
             'revoked' => $this->trustedMobile($this->person, self::MOBILE)->forceFill([
                 'status' => 'REVOKED', 'revoked_by' => User::factory()->create()->id, 'revoked_at' => now(), 'revoke_reason' => 'REPORTED_COMPROMISE',
             ])->save(),
+            'linked' => UserPersonLink::factory()->create(['person_id' => $this->person->id, 'user_id' => $this->familyUser()->id]),
+            'duplicate' => Person::factory()->create(['national_id' => self::NATIONAL_ID]),
         };
-        $trustsBefore = PersonMobileTrust::count();
 
-        $denied = $this->start($id)->assertOk();
+        return $case === 'unknown' ? self::UNKNOWN_ID : self::NATIONAL_ID;
+    }
 
-        $this->assertSame(array_keys($eligible), array_keys($denied->json()));
-        $this->assertMatchesRegularExpression('/\A05\*{5}[0-9]{3}\z/', $denied->json('masked_mobile'));
-        // A stable mask: repeating the start reveals nothing.
-        $this->assertSame($denied->json('masked_mobile'), $this->start($id)->json('masked_mobile'));
-        $challenge = $this->send($denied->json('confirmation'))->assertOk();
-        $this->assertSame(['challenge', 'resend_after_seconds', 'expires_in_seconds', 'can_resend'], array_keys($challenge->json()));
+    #[DataProvider('refusals')]
+    public function test_every_refusal_is_one_identical_answer_with_nothing_behind_it(string $case, string $eventType, ?string $reason): void
+    {
+        $id = $this->arrangeRefusal($case);
+        $counts = fn () => [
+            'trusts' => PersonMobileTrust::count(),
+            'challenges' => AuthOtpChallenge::count(),
+            'users' => User::count(),
+            'links' => UserPersonLink::count(),
+            'identities' => FamilyAuthIdentity::count(),
+        ];
+        $before = $counts();
+
+        $refused = $this->start($id);
+
+        // ONE answer: the same status, code and message for every reason.
+        $refused->assertStatus(422)->assertExactJson(self::REFUSAL);
+        $this->assertStringContainsString('no-store', (string) $refused->headers->get('Cache-Control'));
+        // (assertExactJson already proves there is no other field, e.g. an id.)
+        $body = json_encode($refused->json(), JSON_UNESCAPED_UNICODE);
+        foreach (['confirmation', 'masked_mobile', '05*', self::MOBILE, self::NATIONAL_ID, (string) $this->person->person_code] as $leak) {
+            $this->assertStringNotContainsString($leak, $body);
+        }
+        if ($reason !== null) {
+            $this->assertStringNotContainsString($reason, $body);
+        }
+        // Nothing behind it: no SMS, no OTP, no trust, no account, link or identity.
         $this->assertSame(0, $this->sms->attempts);
-        $this->assertSame(0, AuthOtpChallenge::count());
-        $this->assertSame($trustsBefore, PersonMobileTrust::count(), 'No pending or trusted row is created.');
-        $this->assertSame(0, $this->trustedCount());
-        $this->assertGreaterThan(0, AuthSecurityEvent::where('outcome', 'DENIED')->count());
+        $this->assertSame($before, $counts());
+        // The actual reason is kept server-side.
+        $event = AuthSecurityEvent::where('event_type', $eventType)->latest('id')->first();
+        $this->assertNotNull($event);
+        $this->assertSame('DENIED', $event->outcome->value);
+        $this->assertSame($reason, $event->reason_code);
+    }
+
+    public function test_a_refused_start_waits_out_the_response_floor(): void
+    {
+        Sleep::fake();
+        config(['family_auth.activation.min_response_ms' => 60_000]);
+
+        $this->start(self::UNKNOWN_ID)->assertStatus(422);
+        Sleep::assertSleptTimes(1);
+        $this->start()->assertOk();
+        Sleep::assertSleptTimes(2);
     }
 
     // ------------------------------------------------- other flows unchanged

@@ -28,6 +28,12 @@ use LogicException;
  * A reference belongs to its purpose: an ACTIVATION reference — real or
  * decoy — is simply unknown to PASSWORD_RESET, and the reverse.
  *
+ * FIRST ACTIVATION is the exception (FP-ADR-054, after the Production
+ * pilot): it never answers with a decoy. prepare() returns a confirmation
+ * and the masked number to an identifier that may activate, and ONE generic
+ * refusal (ACTIVATION_REFUSED) to every other; the decoys below serve
+ * password reset.
+ *
  * No raw National ID reaches a cache key or a limiter key: only its keyed
  * LOGIN_ID fingerprint.
  */
@@ -62,11 +68,11 @@ final class FamilyOtpFlow
     }
 
     /**
-     * First self-activation, step 1 (FP-ADR-053): no SMS yet — a
-     * confirmation reference and the MASKED current mobile, real or fake.
-     * Every well-formed identifier gets one; who gets a real one is the
-     * caller's rule ($eligible returns the Person id and the current number,
-     * or NULL for "answer with a decoy").
+     * First self-activation, step 1 (FP-ADR-053/054): no SMS yet — for an
+     * identifier that may activate, a confirmation reference and the MASKED
+     * current mobile. Any other identifier gets ONE refusal
+     * (ACTIVATION_REFUSED) whatever the reason, which the caller records
+     * server-side only; it never receives a confirmation or a number.
      *
      * @param  Closure(string): (array{person_id: int, mobile: string}|null)  $eligible  given the login key
      * @return array{confirmation: string, masked_mobile: string}
@@ -75,23 +81,26 @@ final class FamilyOtpFlow
     {
         $loginKey = $this->admit($purpose, $nationalId, $unavailable);
 
-        $real = $eligible($loginKey);
-        $masked = $real === null ? ActivationConfirmations::decoyMask($loginKey) : ActivationConfirmations::mask($real['mobile']);
+        $eligibleFor = $eligible($loginKey);
+        if ($eligibleFor === null) {
+            throw new FamilyAuthException(FamilyAuthError::ACTIVATION_REFUSED);
+        }
+        $masked = ActivationConfirmations::mask($eligibleFor['mobile']);
 
         return [
-            'confirmation' => $this->confirmations->create($loginKey, $real['person_id'] ?? null, $masked),
+            'confirmation' => $this->confirmations->create($loginKey, $eligibleFor['person_id'], $masked),
             'masked_mobile' => $masked,
         ];
     }
 
     /**
      * First self-activation, step 2: the user confirmed the masked number —
-     * now the code is sent, exactly as a start sends it (real challenge or
-     * decoy, the same ceilings and answer). A confirmation is used once.
+     * now the code is sent to it. A confirmation is used once; everything is
+     * re-checked by $issue, which refuses (throws) rather than pretending.
      * Confirming creates NO trust: only a correct code does (verify).
      *
-     * @param  Closure(int, string, string): ?AuthOtpChallenge  $issue  given the Person id, the login key and the
-     *                                                                  confirmed mask: the real challenge, or NULL
+     * @param  Closure(int, string, string): AuthOtpChallenge  $issue  given the Person id, the login key and the
+     *                                                                 confirmed mask: the real challenge
      * @return array{challenge: string, resend_after_seconds: int, expires_in_seconds: int, can_resend: bool}
      */
     public function send(OtpPurpose $purpose, string $confirmation, Closure $issue): array
@@ -101,9 +110,12 @@ final class FamilyOtpFlow
             throw new FamilyAuthException(FamilyAuthError::OTP_INVALID);
         }
 
-        return $this->issueOrDecoy($purpose, $state['login_key'], fn () => $state['person_id'] === null
-            ? null
-            : $issue($state['person_id'], $state['login_key'], $state['masked_mobile']));
+        $challenge = $issue($state['person_id'], $state['login_key'], $state['masked_mobile']);
+        // Counted with the sends of this identifier, which the password reset
+        // decoys mirror (the Person ceilings are shared across purposes).
+        $this->countSend($state['login_key']);
+
+        return ['challenge' => $challenge->uuid, ...$this->timers(sendCount: 1)];
     }
 
     /** The identifier's keyed fingerprint, once its per-identifier ceiling admits one more start. */

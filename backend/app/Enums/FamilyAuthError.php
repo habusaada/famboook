@@ -19,6 +19,9 @@ enum FamilyAuthError: string
     case ACTIVATION_FAILED = 'ACTIVATION_FAILED';
     case TOO_MANY_REQUESTS = 'TOO_MANY_REQUESTS';
     case ACTIVATION_UNAVAILABLE = 'ACTIVATION_UNAVAILABLE';
+    // First self-activation cannot start for this input (FP-ADR-054): ONE
+    // answer for every eligibility reason, which stays server-side.
+    case ACTIVATION_REFUSED = 'ACTIVATION_REFUSED';
     // Login: ONE answer for every credential, account and context failure.
     case INVALID_CREDENTIALS = 'INVALID_CREDENTIALS';
     case FAMILY_AUTH_UNAVAILABLE = 'FAMILY_AUTH_UNAVAILABLE';
@@ -29,7 +32,7 @@ enum FamilyAuthError: string
     public function status(): int
     {
         return match ($this) {
-            self::OTP_INVALID => 422,
+            self::OTP_INVALID, self::ACTIVATION_REFUSED => 422,
             self::OTP_EXPIRED, self::GRANT_EXPIRED => 410,
             self::OTP_LOCKED => 423,
             self::OTP_COOLDOWN, self::OTP_SEND_LIMIT, self::TOO_MANY_REQUESTS => 429,
@@ -43,6 +46,7 @@ enum FamilyAuthError: string
     {
         return match ($this) {
             self::OTP_INVALID => 'رمز التحقق غير صحيح.',
+            self::ACTIVATION_REFUSED => 'تعذّر متابعة التفعيل بهذه البيانات. تأكد من إدخال رقم هوية رب الأسرة المسجل في فامبوك، ثم حاول مرة أخرى.',
             self::OTP_EXPIRED => 'انتهت صلاحية رمز التحقق.',
             self::OTP_LOCKED => 'تم إيقاف هذا الرمز. ابدأ من جديد.',
             self::OTP_COOLDOWN => 'يمكن طلب رمز جديد بعد قليل.',

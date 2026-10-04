@@ -4,7 +4,6 @@ namespace Tests\Feature\FamilyAuth;
 
 use App\Contracts\SmsSender;
 use App\Exceptions\FamilyAuthException;
-use App\Support\FamilyAuth\FamilyActivation;
 use App\Support\FamilyAuth\FamilyPasswordReset;
 use Closure;
 use Database\Seeders\RolePermissionSeeder;
@@ -67,8 +66,9 @@ class DecoyConcurrencyParityTest extends TestCase
     /** @return array<string, array{0: string, 1: string, 2: class-string}> */
     public static function flows(): array
     {
+        // Password reset only: first activation hands out no decoy since
+        // FP-ADR-054 (a refused start answers ACTIVATION_REFUSED).
         return [
-            'activation' => [self::ACTIVATION, self::ACTIVATION_ID, FamilyActivation::class],
             'password reset' => [self::RESET, self::RESET_ID, FamilyPasswordReset::class],
         ];
     }
@@ -229,10 +229,10 @@ class DecoyConcurrencyParityTest extends TestCase
 
     public function test_attempts_are_counted_by_an_atomic_counter_not_the_state_record(): void
     {
-        $decoy = $this->start(self::ACTIVATION, self::UNKNOWN_ID);
+        $decoy = $this->start(self::RESET, self::UNKNOWN_ID);
         $before = Cache::get('family-auth-decoy|'.$decoy);
 
-        self::outcome(fn () => app(FamilyActivation::class)->verify($decoy, '000000'));
+        self::outcome(fn () => app(FamilyPasswordReset::class)->verify($decoy, '000000'));
 
         // The state record is untouched by an attempt; the counter moved.
         $this->assertSame($before, Cache::get('family-auth-decoy|'.$decoy));

@@ -149,7 +149,15 @@ class SmsAfterResponseTest extends TestCase
         $this->assertStringNotContainsString('UNKNOWN', json_encode($failing));
     }
 
-    #[DataProvider('flows')]
+    /** @return array<string, array{0: string, 1: string}> */
+    public static function decoyFlows(): array
+    {
+        // First activation answers a refused identifier with a refusal, not a
+        // decoy (FP-ADR-054); password reset keeps its decoys.
+        return ['password reset' => [self::RESET, self::RESET_ID]];
+    }
+
+    #[DataProvider('decoyFlows')]
     public function test_a_real_challenge_with_a_failing_provider_answers_like_a_decoy(string $base, string $nationalId): void
     {
         $decoy = $this->start($base, self::UNKNOWN_ID)->assertOk()->json();

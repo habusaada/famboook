@@ -105,8 +105,8 @@ class FamilyAuthLeakageSweepTest extends TestCase
         $codes = [];
         $this->provider(999);
 
-        // Activation: a decoy, then the real head with a wrong and a right code.
-        $this->startActivationChallenge(self::UNKNOWN_ID);
+        // Activation: a refused identifier, then the real head with a wrong and a right code.
+        $this->postJson(self::ACTIVATION.'/start', ['national_id' => self::UNKNOWN_ID])->assertStatus(422);
         $reference = $this->startActivationChallenge(self::ACTIVATION_ID);
         $codes[] = $code = $this->lastCode();
         $this->postJson(self::ACTIVATION.'/verify', ['challenge' => $reference, 'code' => $code === '000000' ? '111111' : '000000']);

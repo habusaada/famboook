@@ -119,34 +119,41 @@ class AuthResponseFloorTest extends TestCase
     {
         $real = $this->start($base, $nationalId);
         $code = $this->sms->lastCode();
-        $decoy = $this->start($base, self::UNKNOWN_ID);
-        $other = $this->start($base, self::UNKNOWN_ID === '987654321' ? '987654322' : '987654321');
+        // Password reset answers a refused identifier with a decoy; first
+        // activation refuses it outright (FP-ADR-054), so it has none.
+        $decoys = $base === self::RESET;
+        $decoy = $decoys ? $this->start($base, self::UNKNOWN_ID) : null;
+        $other = $decoys ? $this->start($base, '987654322') : null;
         $this->floorOn();
 
-        $this->verify($base, $decoy, '000000')->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
         $this->verify($base, $real, $this->wrong())->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
         $this->verify($base, $real, $code)->assertOk();
-        // Locked: five wrong codes on the decoy.
-        for ($i = 0; $i < 4; $i++) {
-            $this->verify($base, $decoy, '000000');
-        }
-        $this->verify($base, $decoy, '000000')->assertJsonPath('code', 'OTP_LOCKED');
         // Unknown reference.
         $this->verify($base, '00000000-0000-4000-8000-000000000000', '000000')->assertJsonPath('code', 'OTP_INVALID');
-        // Expired.
-        $this->travel(301)->seconds();
-        $this->verify($base, $other, '000000')->assertJsonPath('code', 'OTP_EXPIRED');
+        if ($decoys) {
+            $this->verify($base, $decoy, '000000')->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
+            // Locked: five wrong codes on the decoy.
+            for ($i = 0; $i < 3; $i++) {
+                $this->verify($base, $decoy, '000000');
+            }
+            $this->verify($base, $decoy, '000000')->assertJsonPath('code', 'OTP_LOCKED');
+            // Expired.
+            $this->travel(301)->seconds();
+            $this->verify($base, $other, '000000')->assertJsonPath('code', 'OTP_EXPIRED');
+        }
     }
 
     #[DataProvider('flows')]
     public function test_complete_is_floored_for_every_outcome_real_or_decoy(string $base, string $nationalId): void
     {
-        $decoy = $this->start($base, self::UNKNOWN_ID);
+        // A decoy for password reset; an unknown reference for activation,
+        // which hands out no decoy (FP-ADR-054).
+        $decoy = $base === self::RESET ? $this->start($base, self::UNKNOWN_ID) : '00000000-0000-4000-8000-000000000000';
         $real = $this->start($base, $nationalId);
         $code = $this->sms->lastCode();
         $this->floorOn();
 
-        // A decoy, and a real challenge not verified yet.
+        // A decoy (or unknown reference), and a real challenge not verified yet.
         $this->complete($base, $decoy)->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
         $this->complete($base, $real)->assertStatus(422)->assertJsonPath('code', 'OTP_INVALID');
         // No session: refused before anything.

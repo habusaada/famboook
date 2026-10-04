@@ -324,8 +324,9 @@ class FamilyPasswordResetStartTest extends TestCase
         }
         $this->assertRefused($this->start($id), 429, 'TOO_MANY_REQUESTS');
 
-        // Activation keeps its own counter for the same identifier.
-        $this->postJson(self::ACTIVATION.'/start', ['national_id' => $id])->assertOk();
+        // Activation keeps its own counter for the same identifier: it is
+        // admitted (and refused, as no first activation is possible here).
+        $this->postJson(self::ACTIVATION.'/start', ['national_id' => $id])->assertStatus(422)->assertJsonPath('code', 'ACTIVATION_REFUSED');
     }
 
     public function test_the_ip_ceiling_and_its_configuration(): void
@@ -460,33 +461,28 @@ class FamilyPasswordResetStartTest extends TestCase
         }
     }
 
-    #[DataProvider('kinds')]
-    public function test_an_activation_reference_is_unknown_to_reset(string $kind): void
+    public function test_an_activation_reference_is_unknown_to_reset(): void
     {
-        // An activation flow for another Person (real) or an unknown identifier (decoy).
-        if ($kind === 'real') {
-            [$other] = $this->eligibleHead('444444444');
-            $this->trustedMobile($other, '0597777777');
-        }
-        $reference = $this->startActivationChallenge($kind === 'real' ? '444444444' : self::UNKNOWN_ID);
-        $code = $this->sms->lastCode() ?? '000000';
+        // A real activation flow for another Person (activation has no decoy
+        // since FP-ADR-054).
+        [$other] = $this->eligibleHead('444444444');
+        $this->trustedMobile($other, '0597777777');
+        $reference = $this->startActivationChallenge('444444444');
+        $code = $this->sms->lastCode();
 
         $this->assertRefused($this->verify($reference, $code), 422, 'OTP_INVALID');
         $this->assertRefused($this->resend($reference), 422, 'OTP_INVALID');
 
-        if ($kind === 'real') {
-            $this->assertSame([0, null], [AuthOtpChallenge::sole()->attempts, AuthOtpChallenge::sole()->verified_at]);
-        }
+        $this->assertSame([0, null], [AuthOtpChallenge::sole()->attempts, AuthOtpChallenge::sole()->verified_at]);
     }
 
-    public function test_activation_and_reset_decoys_of_one_identifier_do_not_supersede_each_other(): void
+    public function test_a_refused_activation_start_leaves_the_reset_decoy_of_that_identifier_open(): void
     {
-        $activation = $this->startActivationChallenge(self::UNKNOWN_ID);
         $reset = $this->start(self::UNKNOWN_ID)->json('challenge');
+        $this->postJson(self::ACTIVATION.'/start', ['national_id' => self::UNKNOWN_ID])->assertStatus(422)->assertJsonPath('code', 'ACTIVATION_REFUSED');
 
-        // Each is still open for its own purpose.
-        $this->assertRefused($this->verify($activation, '000000', self::ACTIVATION), 422, 'OTP_INVALID');
         $this->assertRefused($this->verify($reset), 422, 'OTP_INVALID');
+        $this->assertSame(1, app(ChallengeDecoys::class)->state(OtpPurpose::PASSWORD_RESET, $reset)['attempts']);
     }
 
     // ------------------------------------------------------------- real only

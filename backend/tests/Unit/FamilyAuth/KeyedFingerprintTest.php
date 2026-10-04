@@ -52,8 +52,8 @@ class KeyedFingerprintTest extends TestCase
             FingerprintContext::cases(),
         );
 
-        $this->assertCount(4, FingerprintContext::cases());
-        $this->assertCount(4, array_unique($values));
+        $this->assertCount(3, FingerprintContext::cases());
+        $this->assertCount(3, array_unique($values));
     }
 
     public function test_it_is_independent_of_app_key_and_of_the_import_fingerprint(): void
