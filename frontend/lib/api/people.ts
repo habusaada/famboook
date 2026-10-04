@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { ApiError, apiClient } from "@/lib/api/client";
 import type { PaginatedResponse, ResourceResponse } from "@/lib/types/api/family";
 import type {
+  ConfirmPersonAlivePayload,
   CorrectNationalIdPayload,
   NationalIdMatch,
   PersonDetail,
@@ -36,6 +37,28 @@ export function useUpdatePerson(personCode: string) {
       queryClient.invalidateQueries({ queryKey: ["people", personCode] });
       // Person data (e.g. the household head's name) also appears in
       // family views; ["families"] prefix-matches every family query.
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+    },
+  });
+}
+
+/**
+ * Staff confirmation that a Person whose life status is UNKNOWN is alive
+ * (person.record-death). Only the verification method is sent; the API
+ * decides the outcome (UNKNOWN → ALIVE or a 409).
+ */
+export function useConfirmPersonAlive(personCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: ConfirmPersonAlivePayload) =>
+      apiClient.post<ResourceResponse<PersonDetail>>(
+        `/api/v1/people/${encodeURIComponent(personCode)}/confirm-alive`,
+        payload
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people", personCode] });
+      // Life status also appears in family views and the family timeline.
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
   });

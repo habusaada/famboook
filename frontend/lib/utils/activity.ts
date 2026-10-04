@@ -26,6 +26,7 @@ import {
   UserMinus,
   UserPen,
   UserPlus,
+  UserRoundCheck,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -45,6 +46,7 @@ export const familyActivityPresentation: Record<
   MEMBERSHIP_ENDED: { label: "تم إنهاء عضوية فرد في الأسرة (بقي مسجلًا في النظام)", icon: UserRoundX },
   NATIONAL_ID_CORRECTED: { label: "تم تصحيح رقم الهوية لأحد الأفراد", icon: IdCard },
   PERSON_DEATH_RECORDED: { label: "تم تسجيل وفاة أحد الأفراد", icon: Flower },
+  PERSON_ALIVE_CONFIRMED: { label: "تم تأكيد أن أحد الأفراد على قيد الحياة", icon: UserRoundCheck },
   HOUSEHOLD_DECLARATION_RECORDED: { label: "تم تسجيل بيانات معلنة عن حجم الأسرة", icon: UsersRound },
   RESIDENCE_UPDATED: { label: "تم تعديل بيانات السكن", icon: MapPin },
   DISPLACEMENT_UPDATED: { label: "تم تعديل بيانات النزوح", icon: Tent },

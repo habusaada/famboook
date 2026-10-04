@@ -162,6 +162,11 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     Route::put('/people/{person}/national-id', [PersonController::class, 'correctNationalId'])
         ->middleware(['can:person.national-id.update', 'throttle:national-id-check']);
 
+    // Life status UNKNOWN → ALIVE (docs/03 §30a, FU-07): the lifecycle
+    // authority person.record-death; the verification method is required.
+    Route::post('/people/{person}/confirm-alive', [PersonController::class, 'confirmAlive'])
+        ->middleware('can:person.record-death');
+
     // Mobile trust (docs/06 §22b, PWA-1E): Staff-side only. The mobile number
     // is never an input — the Person's stored mobile is what gets trusted.
     Route::get('/people/{person}/mobile-trust', [PersonMobileTrustController::class, 'show'])

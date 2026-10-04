@@ -580,9 +580,11 @@ Audit
 
 ## V1 implementation (2026-09-29)
 
-`RecordPersonDeathAction` is the only write path to `DECEASED`
-(permission `person.record-death`, docs/06 §96). Family registration and
-member creation always create ALIVE Persons.
+`RecordPersonDeathAction` is the only path that changes an EXISTING Person
+to `DECEASED` (permission `person.record-death`, docs/06 §96). Family
+registration and member creation always create ALIVE Persons; import
+creation may create a Person UNKNOWN or DECEASED (`CreatePersonAction`,
+§96b).
 
 ```text
 life_status   → DECEASED
@@ -604,6 +606,32 @@ death_date    → the given date, or NULL when the exact date is unknown (§29)
   Person without a current Family records no activity.
 - V1 exposes no staff endpoint yet; callers are the controlled import and,
   later, the staff operation and the DEATH_REPORT Change Request (§31).
+
+## Confirming life status: UNKNOWN → ALIVE (2026-10-04)
+
+`ConfirmPersonAliveAction` is the only path from `UNKNOWN` to `ALIVE`
+(docs/11 FP-ADR-059, FP-ADR-060; permission `person.record-death`).
+
+- Only from `UNKNOWN`: `ALIVE` is refused (`PERSON_ALREADY_ALIVE`),
+  `DECEASED` is refused (`PERSON_DECEASED`) — no path brings a recorded
+  death back — and an `UNKNOWN` Person with a `death_date` is refused
+  (`INCONSISTENT_LIFE_RECORD`). All answer 409.
+- The Person row is locked and re-read; it serializes with
+  `RecordPersonDeathAction` on the same row. A soft-deleted Person is not
+  found. `is_active` and an active membership are not required (§27).
+- Nothing else changes: memberships, `is_household_head`, marital status,
+  mobile and mobile trust, the User-Person Link, the Family Auth identity
+  and sessions.
+- Records `PERSON_ALIVE_CONFIRMED` (§97a) on the current Family with the
+  verification method as its only metadata: `IN_PERSON`,
+  `STAFF_CALLBACK` or `AUTHORIZED_RECORD_REVIEW`.
+- Staff: `POST /api/v1/people/{person}/confirm-alive` (verification method
+  required). An UNKNOWN household head is confirmed only this way; it
+  creates no account, Link, identity, OTP or session. Later, a family's
+  PERSON_CORRECTION / CONFIRM_ALIVE request (non-head member, statement +
+  Staff review, no mandatory document) calls the same action on APPLY.
+- `UpdatePersonAction` writes only its own field allow-list and never
+  life status or death date.
 
 ---
 
@@ -3852,6 +3880,8 @@ MEMBERSHIP_RELATIONSHIP_CORRECTED  member relationship corrected (§93b)
 MEMBERSHIP_ENDED        incorrect membership ended; Person kept (§93b)
 NATIONAL_ID_CORRECTED   administrative National ID correction (§93b)
 PERSON_DEATH_RECORDED   official death recorded (§30); subject = Person
+PERSON_ALIVE_CONFIRMED  UNKNOWN → ALIVE confirmed (§30); subject = Person;
+                        metadata: verification_method (a code)
 HOUSEHOLD_DECLARATION_RECORDED  Declared Household Statistics recorded (§55c); subject = Family
 RESIDENCE_UPDATED       current-address correction
 DISPLACEMENT_UPDATED    displacement-field correction
@@ -4886,6 +4916,7 @@ Date: 2026-09-24
 | 1.2.45 | 2026-10-04 | Approved | First self-activation (FP-ADR-053): masked registered number confirmation, code only to the stored number, SELF_OTP trust only after a correct code, Staff-revoked numbers excluded, password reset unchanged |
 | 1.2.46 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: an input that cannot start first activation gets one generic refusal on step 1 instead of a fake masked number and decoy code step; reasons stay server-side; nothing created |
 | 1.2.47 | 2026-10-04 | Approved | Documentation consolidation: "Verified is not beneficiary" replaced by No automatic eligibility; Profile Completion / Family Verification section replaced by Family Profile Review and Staff Family Verification; §55 / §55c Registered Members and Living Members (BD-051, BD-052; docs/11 FP-ADR-056 … FP-ADR-058) |
+| 1.2.48 | 2026-10-04 | Approved | §30: RecordPersonDeathAction is the only path that changes an EXISTING Person to DECEASED (import creation may create UNKNOWN / DECEASED); UNKNOWN → ALIVE through ConfirmPersonAliveAction only; §97a PERSON_ALIVE_CONFIRMED (docs/11 FP-ADR-060) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

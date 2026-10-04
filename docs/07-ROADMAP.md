@@ -2090,8 +2090,8 @@ PWA-3A  Steps 1–4 household read views            DONE, Production-approved
         (summary, dashboard, members, «أسرتي» profile and residence)
 Documentation and ADR consolidation               CURRENT
 Change Request prerequisites                      NEXT
-        CSRF write smoke test (docs/11 FU-08); UNKNOWN → ALIVE Domain Action
-        path (FU-07, PFP-024); Staff paths where an apply target lacks one
+        CSRF write smoke test (docs/11 FU-08); UNKNOWN → ALIVE — DONE
+        (FU-07, PFP-024, FP-ADR-060); Staff paths where an apply target lacks one
         (FU-10); FAMILY_USER request view permission (FU-04)
 PWA-5   Change Request engine + Staff review workspace
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
@@ -4939,6 +4939,7 @@ Date: 2026-09-24
 | 1.2.35 | 2026-10-04 | Approved | First self-activation done (masked confirmation, SELF_OTP trust on a correct code; one migration); RM-ADR-045 |
 | 1.2.36 | 2026-10-04 | Approved | RM-ADR-046: first-activation refusal replaces the masked-mobile decoy after the Production pilot; no migration |
 | 1.2.37 | 2026-10-04 | Approved | PWA-3A done; documentation and ADR consolidation; PWA-4 renamed Family Profile Review and sequenced after PWA-5 and the first PWA-6 types; program status after PWA-3A (RM-ADR-047) |
+| 1.2.38 | 2026-10-04 | Approved | Change Request prerequisite FU-07 / PFP-024 done: ConfirmPersonAliveAction with a Staff endpoint and action (docs/11 FP-ADR-060) |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

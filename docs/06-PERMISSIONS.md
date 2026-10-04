@@ -1617,7 +1617,9 @@ It does **not** grant:
   `person.national-id.*` permissions (§39): since AUTH-ADR-059 masked view
   and correction for SUPER_ADMIN and ADMINISTRATOR only; full view unassigned.
 - Life status or death recording. These need `person.record-death` and the
-  controlled death operation (§96; docs/03 §30).
+  controlled operations (§96; docs/03 §30): death recording, and — the V1
+  authority since 2026-10-04 — confirming an UNKNOWN Person as ALIVE, which
+  requires a recorded verification method (AUTH-ADR-076).
 - Household-head or membership changes (§97, §98).
 
 REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER do not receive it.
@@ -4143,6 +4145,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-076
+Confirming UNKNOWN → ALIVE (`POST /api/v1/people/{person}/confirm-alive`) is authorized by `person.record-death` behind the Staff boundary (SUPER_ADMIN, ADMINISTRATOR); `person.correct` stays unassigned. The request carries only a verification method (`IN_PERSON`, `STAFF_CALLBACK`, `AUTHORIZED_RECORD_REVIEW`); a life status, death date, family or person id in the body is refused. Family-side, coordinator and mixed accounts never reach it (docs/11 FP-ADR-060).
+
 ### AUTH-ADR-075
 Documentation consolidation (2026-10-04): no permission or role added or seeded. `family-verification.view` / `.review` / `.approve` are reserved for Staff Family Verification; Family Profile Review uses the Family boundary and a confirmation permission still to be named (docs/11 PFP-023); a coordinator may at most see summary status, never section contents (docs/11 FP-ADR-057).
 
@@ -4531,6 +4536,7 @@ Date: 2026-09-24
 | 1.2.37 | 2026-10-04 | Approved | First self-activation (AUTH-ADR-073): `activation/send` route, SELF_OTP never a Staff grant, revoke unchanged; no new permission |
 | 1.2.38 | 2026-10-04 | Approved | AUTH-ADR-074: refused first-activation start answers one public code `ACTIVATION_REFUSED` (422), reasons server-side only; `ACTIVATION_UNAVAILABLE` stays the switched-off answer |
 | 1.2.39 | 2026-10-04 | Approved | Documentation consolidation (AUTH-ADR-075): §22a coordinator status wording; `family-verification.*` reserved for Staff Family Verification; Profile Review confirmation permission open (PFP-023). No permission seeded |
+| 1.2.40 | 2026-10-04 | Approved | AUTH-ADR-076: `person.record-death` is also the V1 authority for confirming UNKNOWN → ALIVE, with a required verification method; `person.correct` stays unassigned |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\FamilyActivityType;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Models\FamilyActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,17 @@ class FamilyActivityLog
     ];
 
     /**
+     * Events whose metadata is controlled codes: only these keys, each value
+     * a case of the given enum (never free text). These keys are rejected on
+     * every other event.
+     *
+     * @var array<string, array<string, class-string<\BackedEnum>>>
+     */
+    public const EVENT_CODE_METADATA = [
+        'PERSON_ALIVE_CONFIRMED' => ['verification_method' => LifeStatusVerificationMethod::class],
+    ];
+
+    /**
      * @param  array<string, string|int>  $metadata
      */
     public static function record(
@@ -48,6 +60,21 @@ class FamilyActivityLog
     ): FamilyActivity {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Family activity must be recorded inside the Domain Action transaction.');
+        }
+
+        $codeKeys = self::EVENT_CODE_METADATA[$type->value] ?? null;
+        if ($codeKeys !== null) {
+            foreach ($metadata as $key => $value) {
+                $enum = $codeKeys[$key] ?? null;
+                if ($enum === null) {
+                    throw new InvalidArgumentException('Metadata key not allowed: '.$key);
+                }
+                if (! is_string($value) || $enum::tryFrom($value) === null) {
+                    throw new InvalidArgumentException("Metadata {$key} must be a controlled code.");
+                }
+            }
+
+            return self::create($familyId, $type, $subject, $actorUserId, $metadata);
         }
 
         $eventKeys = self::EVENT_METADATA[$type->value] ?? null;
@@ -63,6 +90,12 @@ class FamilyActivityLog
             }
         }
 
+        return self::create($familyId, $type, $subject, $actorUserId, $metadata);
+    }
+
+    /** @param array<string, string|int> $metadata already validated */
+    private static function create(int $familyId, FamilyActivityType $type, ?Model $subject, ?int $actorUserId, array $metadata): FamilyActivity
+    {
         return FamilyActivity::create([
             'family_id' => $familyId,
             'actor_user_id' => $actorUserId,

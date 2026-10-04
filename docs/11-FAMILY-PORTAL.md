@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.13
+**Version:** 1.14
 **Date:** 2026-10-04
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -746,7 +746,7 @@ Actions.
 |---|---|---|
 | Contact update | CONTACT_UPDATE | `UpdatePersonAction` exists |
 | Residence / displacement update | RESIDENCE_UPDATE | `UpdateFamilyResidenceAction` exists; history-preserving change to be confirmed against docs/03 §32 |
-| Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist |
+| Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist; CONFIRM_ALIVE → `ConfirmPersonAliveAction` (exists) |
 | Add missing family member | ADD_FAMILY_MEMBER | `AddFamilyMemberAction` exists |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
 | Death report | DEATH_REPORT | `RecordPersonDeathAction` exists (no Staff route or UI yet); head succession is not handled |
@@ -761,9 +761,11 @@ The first Change Request types, in order:
 2. BIRTH_REPORT            AddFamilyMemberAction
 3. ADD_FAMILY_MEMBER       AddFamilyMemberAction
 4. PERSON_CORRECTION       UpdatePersonAction / CorrectNationalIdAction;
-                           also the reviewed path to confirm an UNKNOWN
-                           member as ALIVE (prerequisite: a Domain Action
-                           path does not exist yet — §33a FU-07)
+                           CONFIRM_ALIVE, an explicit operation (never a
+                           generic life_status field), for a non-head
+                           member: the family's statement + Staff review,
+                           no mandatory document; APPLY calls
+                           ConfirmPersonAliveAction (FP-ADR-060)
 5. DEATH_REPORT            for a member who is NOT the household head
                            (RecordPersonDeathAction)
 ```
@@ -2890,11 +2892,29 @@ eligible to be considered".
 FP-ADR-059
 Change Request first-release direction (§14): RESIDENCE_UPDATE (current
 residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION
-(including the reviewed UNKNOWN → ALIVE confirmation, whose Domain Action
-path is a prerequisite), DEATH_REPORT for a non-head member. Deferred:
+(including CONFIRM_ALIVE, applied through ConfirmPersonAliveAction —
+FP-ADR-060), DEATH_REPORT for a non-head member. Deferred:
 head death / succession, head change, transfer, marital events,
 CONTACT_UPDATE, health and need submissions. A residence move with history
 needs a future residence.change action.
+
+FP-ADR-060
+UNKNOWN → ALIVE (FU-07, PFP-024 — resolved 2026-10-04). A dedicated
+ConfirmPersonAliveAction performs exactly UNKNOWN → ALIVE: row lock and
+re-read; ALIVE refused (PERSON_ALREADY_ALIVE), DECEASED refused
+(PERSON_DECEASED — never brought back), UNKNOWN with a death date refused
+(INCONSISTENT_LIFE_RECORD); is_active and an active membership are not
+required; nothing else changes (memberships, head flag, mobile and trust,
+Link, identity, sessions). PERSON_ALIVE_CONFIRMED records the verification
+method (IN_PERSON, STAFF_CALLBACK, AUTHORIZED_RECORD_REVIEW — the Staff
+verification bases of mobile trust) as its only metadata. Staff use
+POST /api/v1/people/{person}/confirm-alive (person.record-death). An
+UNKNOWN household head cannot reach the Family Portal and is confirmed
+only through this Staff path; confirming creates no account, Link,
+identity, OTP or session — the normal activation flow may then succeed.
+A family's CONFIRM_ALIVE request (non-head members) needs its statement
+plus Staff review, no mandatory document, and calls the same action on
+APPLY. UpdatePersonAction never writes life status or death date.
 ```
 
 ---
@@ -3020,9 +3040,10 @@ PFP-023  (PWA-4)
 The permission name for a Profile Review confirmation (e.g. the proposed
 family-verification.submit, or a new family-profile.confirm).
 
-PFP-024  (PWA-6 prerequisite)
-The Domain Action path for confirming an UNKNOWN member as ALIVE through
-PERSON_CORRECTION with Staff review (direction approved, FP-ADR-059).
+PFP-024  — RESOLVED 2026-10-04 (FP-ADR-060)
+The Domain Action path for confirming an UNKNOWN member as ALIVE:
+ConfirmPersonAliveAction, Staff endpoint with a verification method, and
+PERSON_CORRECTION / CONFIRM_ALIVE (statement + Staff review) later.
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -3044,7 +3065,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-04 | docs/06 §53 gives FAMILY_USER "scoped view access" to Change Requests; the seeder grants no view permission | PWA-5 |
 | FU-05 | AUTH-ADR-060 is referenced in docs/03, docs/06 and docs/07 but has no entry in the docs/06 decision list | Next docs/06 maintenance |
 | FU-06 | "Document Status" version blocks are stale relative to the change logs (e.g. docs/03) | Next documentation maintenance |
-| FU-07 | **UNKNOWN → ALIVE gap.** Imported spouses carry `life_status = UNKNOWN` and no birth date; `UpdatePersonAction` cannot change life status and `RecordPersonDeathAction` only records deaths. MEMBERS completeness detects UNKNOWN; a family never changes it directly | **Prerequisite** of PERSON_CORRECTION (PFP-024) |
+| FU-07 | **Resolved 2026-10-04 (FP-ADR-060).** UNKNOWN life status comes from import: spouses are always created UNKNOWN, and a household head is UNKNOWN when the source life-status cell is empty. An UNKNOWN head is not eligible (ALIVE only) and cannot reach the Family Portal, so it is confirmed only by Staff (`POST /api/v1/people/{person}/confirm-alive`, `person.record-death`, verification method required). `ConfirmPersonAliveAction` is the only UNKNOWN → ALIVE path; `UpdatePersonAction` never writes life status | Done; family CONFIRM_ALIVE requests with the Change Request engine (PWA-6) |
 | FU-08 | **CSRF write smoke test.** A past Production 419 on one browser was a stale / duplicate-cookie incident (API, `csrf-cookie` and CORS preflight succeeded; clearing site data resolved it) — not a reproduced Sanctum / CORS defect | Before the first new Family Portal write endpoint: a production-like CSRF write smoke test; no proactive Sanctum / CORS change without a reproduced defect (docs/08) |
 | FU-09 | Family lifecycle: no Domain Action archives or restores a Family; a Family soft-deleted outside the application keeps active memberships, `NationalIdGuard::describe()` then answers 500 instead of 422, and import reconciliation and Apply planning disagree about such memberships | Family lifecycle task (PBD-005); the two defects are small fixes |
 | FU-10 | `RecordPersonDeathAction` and `RecordHouseholdDeclarationAction` have no Staff route or UI (the latter is used by import only) | Before DEATH_REPORT and HOUSEHOLD_DECLARATION_UPDATE need a Staff path |
@@ -3072,3 +3093,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.11 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: first activation refuses an input that cannot activate with one generic ACTIVATION_REFUSED answer (422) instead of a synthetic masked-mobile decoy; nothing is created; reasons stay server-side; the decoy clause of FP-ADR-053 is superseded (kept as history); password reset decoys unchanged |
 | 1.12 | 2026-10-04 | Approved | FP-ADR-055: installable Family app — manifest and official icon, minimal service worker (scope /family, offline page only, no response or API caching), "تثبيت فامبوك" with native prompt or instructions; Staff unaffected |
 | 1.13 | 2026-10-04 | Approved | Documentation and ADR consolidation: §9 Family Profile Review (V1 sections, derived completeness and states, confirmation, dedicated fingerprint key, Change Request relationship) and §11 Staff Family Verification kept separate (FP-ADR-057); §10 registered members = active memberships, living members named (FP-ADR-056); §13 no automatic eligibility (FP-ADR-058); §14 first-release request direction, RESIDENCE_UPDATE = correction, UNKNOWN → ALIVE prerequisite (FP-ADR-059); §23 portal structure; §25 routes; §28 concepts; §30 delivery order; §30a PWA-3A record; §31 A-15 … A-17; PFP-007 / 017 / 018 clarified, PFP-023 / 024; §33a FU-02 answered, FU-07 … FU-12. Documentation only |
+| 1.14 | 2026-10-04 | Approved | FU-07 / PFP-024 resolved (FP-ADR-060): ConfirmPersonAliveAction (UNKNOWN → ALIVE only), Staff endpoint and action with a recorded verification method, UNKNOWN heads confirmed only by Staff; §14 PERSON_CORRECTION / CONFIRM_ALIVE apply target |

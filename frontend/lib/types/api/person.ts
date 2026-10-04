@@ -9,6 +9,14 @@ import type { RelationshipType } from "@/lib/types/api/reference";
 
 export type LifeStatus = "ALIVE" | "DECEASED" | "UNKNOWN";
 
+// POST /api/v1/people/{person}/confirm-alive (ConfirmPersonAliveRequest):
+// how Staff verified that a Person whose life status is UNKNOWN is alive.
+export type LifeStatusVerificationMethod = "IN_PERSON" | "STAFF_CALLBACK" | "AUTHORIZED_RECORD_REVIEW";
+
+export interface ConfirmPersonAlivePayload {
+  verification_method: LifeStatusVerificationMethod;
+}
+
 export interface PersonFamilyMembership {
   family_code: string;
   is_household_head: boolean;

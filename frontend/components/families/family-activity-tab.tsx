@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api/client";
 import type { FamilyActivity } from "@/lib/types/api/activity";
 import { familyActivityPresentation, formatActivityTime } from "@/lib/utils/activity";
 import { healthRecordTypeLabels } from "@/lib/utils/health";
+import { lifeStatusVerificationLabels } from "@/lib/utils/life-status";
 
 /**
  * Safe subject line: the Need title (if any), the person's name and, for
@@ -23,6 +24,8 @@ export function activitySubject(activity: FamilyActivity): string | null {
   if (activity.subject.title) parts.push(activity.subject.title);
   const healthType = activity.metadata.health_record_type;
   if (healthType) parts.push(healthRecordTypeLabels[healthType]);
+  const verification = activity.metadata.verification_method;
+  if (verification) parts.push(lifeStatusVerificationLabels[verification]);
   if (activity.subject.person) parts.push(activity.subject.person.full_name);
   return parts.length > 0 ? parts.join(" — ") : null;
 }

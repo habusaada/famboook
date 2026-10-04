@@ -3,6 +3,7 @@
 // payload types because the Staff App never writes activity.
 
 import type { HealthRecordType } from "@/lib/types/api/health";
+import type { LifeStatusVerificationMethod } from "@/lib/types/api/person";
 
 // Canonical event codes (backend/app/Enums/FamilyActivityType.php). Arabic
 // wording lives in lib/utils/activity.ts, never in the stored event.
@@ -16,6 +17,7 @@ export type FamilyActivityType =
   | "MEMBERSHIP_ENDED"
   | "NATIONAL_ID_CORRECTED"
   | "PERSON_DEATH_RECORDED"
+  | "PERSON_ALIVE_CONFIRMED"
   | "HOUSEHOLD_DECLARATION_RECORDED"
   | "RESIDENCE_UPDATED"
   | "DISPLACEMENT_UPDATED"
@@ -55,5 +57,6 @@ export interface FamilyActivity {
   };
   // Allow-listed keys only: the broad health category, never details.
   // Assessment events carry no metadata (no ratings, no notes).
-  metadata: { health_record_type?: HealthRecordType };
+  // A life-status confirmation carries its verification method (a code).
+  metadata: { health_record_type?: HealthRecordType; verification_method?: LifeStatusVerificationMethod };
 }

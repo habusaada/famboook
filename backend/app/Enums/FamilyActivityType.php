@@ -21,6 +21,10 @@ enum FamilyActivityType: string
     case NATIONAL_ID_CORRECTED = 'NATIONAL_ID_CORRECTED';
     // Official death recorded (docs/03 §30). No metadata: never the date.
     case PERSON_DEATH_RECORDED = 'PERSON_DEATH_RECORDED';
+    // A Person whose life status was UNKNOWN confirmed alive by Staff
+    // (ConfirmPersonAliveAction). Metadata: verification_method only, a
+    // controlled code (FamilyActivityLog::EVENT_CODE_METADATA).
+    case PERSON_ALIVE_CONFIRMED = 'PERSON_ALIVE_CONFIRMED';
     // Declared Household Statistics recorded (docs/03 §55c). No metadata:
     // never the declared counts.
     case HOUSEHOLD_DECLARATION_RECORDED = 'HOUSEHOLD_DECLARATION_RECORDED';

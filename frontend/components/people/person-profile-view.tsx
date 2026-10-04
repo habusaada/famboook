@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { IconBox } from "@/components/shared/icon-box";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Code, DetailItem, DetailList, SectionHeader } from "@/components/shared/page-layout";
+import { ConfirmAliveDialog } from "@/components/people/confirm-alive-dialog";
 import { CorrectNationalIdDialog } from "@/components/people/correct-national-id-dialog";
 import { PersonIdentityHeader, genderLabel, lifeStatusLabels } from "@/components/people/person-identity-header";
 import { usePerson } from "@/lib/api/people";
@@ -106,9 +107,17 @@ function CurrentFamily({ person }: { person: PersonDetail }) {
 }
 
 function PersonalInformation({ person }: { person: PersonDetail }) {
+  const { can } = useAuth();
+  // UNKNOWN only: there is no action for ALIVE, and never one for DECEASED.
+  const canConfirmAlive = person.life_status === "UNKNOWN" && can("person.record-death");
+
   return (
     <AppCard aria-labelledby="person-info-title">
-      <SectionHeader title={<span id="person-info-title">البيانات الشخصية</span>} description="المعلومات المسجّلة في سجل الفرد" />
+      <SectionHeader
+        title={<span id="person-info-title">البيانات الشخصية</span>}
+        description="المعلومات المسجّلة في سجل الفرد"
+        action={canConfirmAlive ? <ConfirmAliveDialog person={person} /> : undefined}
+      />
       <DetailList className="mt-3">
         <DetailItem label="الاسم الكامل">{person.full_name}</DetailItem>
         <DetailItem label="رقم الفرد">

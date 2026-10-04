@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\ConfirmPersonAliveAction;
 use App\Actions\CorrectNationalIdAction;
 use App\Actions\UpdatePersonAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ConfirmPersonAliveRequest;
 use App\Http\Requests\Api\V1\CorrectNationalIdRequest;
 use App\Http\Requests\Api\V1\NationalIdCheckRequest;
 use App\Http\Requests\Api\V1\UpdatePersonRequest;
@@ -87,5 +89,18 @@ class PersonController extends Controller
 
         return (new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS)))
             ->additional(['message' => 'تم تصحيح رقم الهوية']);
+    }
+
+    /**
+     * Staff confirmation that a Person whose life status is UNKNOWN is alive
+     * (ConfirmPersonAliveAction, docs/03 §30a). The verification method is
+     * recorded; nothing about the Family Portal account changes.
+     */
+    public function confirmAlive(ConfirmPersonAliveRequest $request, Person $person, ConfirmPersonAliveAction $action): PersonResource
+    {
+        $person = $action->handle($person, $request->verificationMethod(), $request->user()?->id);
+
+        return (new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS)))
+            ->additional(['message' => 'تم تأكيد أن الشخص على قيد الحياة']);
     }
 }
