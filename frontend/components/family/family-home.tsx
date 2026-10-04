@@ -1,20 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { BadgeCheck, ChevronLeft, Clock3, Network } from "lucide-react";
+import { ChevronLeft, Network } from "lucide-react";
 import { useFamilyUser } from "@/components/family/family-context";
+import {
+  FamilyIdentityCard,
+  HouseholdError,
+  HouseholdSkeleton,
+  HouseholdSummaryCard,
+} from "@/components/family/home/household-cards";
+import { QuickActions } from "@/components/family/home/quick-actions";
 import { InstallFamboook } from "@/components/family/pwa/install-famboook";
-
-const UPCOMING = ["بيانات الأسرة وأفرادها", "طلبات تحديث البيانات", "بطاقة رب الأسرة الرقمية"];
+import { isAccessFailure, useFamilyHouseholdQuery } from "@/lib/api/family-household";
 
 /**
- * The first Family Portal home (PWA-1F): it proves the session and the
- * server-resolved Family context, nothing more. No family data is loaded
- * here — the deeper modules come with their own authorized endpoints.
+ * The Family Portal home (docs/11 §23, PWA-3A): the greeting, the install
+ * suggestion, the household from GET /api/v1/family/household, Coordinator
+ * Space where open, and the quick actions to come. The server resolves the
+ * Family; a 401 or 403 is handled by the session/access flow (the gate and
+ * the shell), any other failure inline.
  */
 export function FamilyHome() {
   const user = useFamilyUser();
-  const family = user.context.family;
+  const household = useFamilyHouseholdQuery();
 
   return (
     <div className="flex flex-col gap-6">
@@ -25,9 +33,26 @@ export function FamilyHome() {
         </h1>
       </section>
 
+      <InstallFamboook />
+
+      <div aria-busy={household.isPending} className="flex flex-col gap-6" data-household>
+        {household.data ? (
+          <>
+            <FamilyIdentityCard household={household.data} />
+            <HouseholdSummaryCard household={household.data} />
+          </>
+        ) : household.isError ? (
+          !isAccessFailure(household.error) && (
+            <HouseholdError onRetry={() => household.refetch()} retrying={household.isFetching} />
+          )
+        ) : (
+          <HouseholdSkeleton />
+        )}
+      </div>
+
       {user.coordinator_space && (
         // Shown only when the server says Coordinator Space is open; the space
-        // itself asks the server again.
+        // itself asks the server again. It never feeds the household figures.
         <Link
           href="/family/coordinator"
           className="flex items-center gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4 transition-colors hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-ring"
@@ -44,49 +69,7 @@ export function FamilyHome() {
         </Link>
       )}
 
-      <InstallFamboook />
-
-      {family && (
-        <section className="rounded-2xl border border-border bg-surface-1 p-4" aria-label="الأسرة" data-family-card>
-          <p className="text-xs font-medium text-subtle-foreground">الأسرة</p>
-          <div className="mt-1.5 flex items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-base font-semibold text-foreground">
-              <bdi>{family.name ?? "أسرتي"}</bdi>
-            </p>
-            <span dir="ltr" className="shrink-0 rounded-lg bg-brand-50 px-2.5 py-1 font-mono text-[13px] font-medium text-brand-800" data-family-code>
-              {family.code}
-            </span>
-          </div>
-        </section>
-      )}
-
-      <section className="rounded-2xl border border-border bg-surface-1 p-4" aria-labelledby="family-status-title">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success" aria-hidden>
-            <BadgeCheck className="size-5" />
-          </span>
-          <div>
-            <h2 id="family-status-title" className="text-base font-semibold text-foreground">
-              حسابك مفعّل
-            </h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">تم تفعيل حساب الأسرة بنجاح. ستتوفر خدمات البوابة هنا تباعًا.</p>
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="family-upcoming-title">
-        <h2 id="family-upcoming-title" className="mb-2 text-sm font-semibold text-foreground">
-          قريبًا في البوابة
-        </h2>
-        <ul className="divide-y divide-stroke-subtle rounded-2xl border border-border bg-surface-1">
-          {UPCOMING.map((item) => (
-            <li key={item} className="flex items-center gap-3 px-4 py-3.5 text-sm text-muted-foreground">
-              <Clock3 className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
-              {item}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <QuickActions />
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { FamilyGate } from "@/components/family/family-gate";
 import { FamilyHome } from "@/components/family/family-home";
 import { ApiError, apiClient } from "@/lib/api/client";
 import type { CoordinatorFamily } from "@/lib/api/coordinator";
-import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
+import { browserStorageDump, familyHousehold, familyUser, renderWithClient } from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
 const location = { pathname: "/family" };
@@ -75,7 +75,7 @@ beforeEach(() => {
 
 describe("the entry point", () => {
   it("is shown only when /family/me says Coordinator Space is open", async () => {
-    api({ "/api/v1/family/me": { user: COORDINATOR } });
+    api({ "/api/v1/family/me": { user: COORDINATOR }, "/api/v1/family/household": { data: familyHousehold() } });
     renderWithClient(
       <FamilyGate>
         <FamilyHome />
@@ -90,14 +90,14 @@ describe("the entry point", () => {
     ["a family user", familyUser()],
     ["a coordinator without an effective scope", familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: false })],
   ])("is absent for %s, and the household stays as it is", async (_label, user) => {
-    api({ "/api/v1/family/me": { user } });
+    api({ "/api/v1/family/me": { user }, "/api/v1/family/household": { data: familyHousehold() } });
     renderWithClient(
       <FamilyGate>
         <FamilyHome />
       </FamilyGate>
     );
 
-    expect(await screen.findByText("حسابك مفعّل")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "ملخص الأسرة" })).toBeInTheDocument();
     expect(screen.queryByText("مساحة التنسيق")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "التنقل الرئيسي" })).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe("Coordinator Space", () => {
   });
 
   it("is a separate mode: the strip, the way back, no household navigation", async () => {
-    api({
+    const get = api({
       "/api/v1/family/me": { user: COORDINATOR },
       "/api/v1/family/coordinator/context": { data: CONTEXT },
       "/api/v1/family/coordinator/families": page([family(1)]),
@@ -121,8 +121,9 @@ describe("Coordinator Space", () => {
     expect(screen.getByRole("link", { name: /العودة إلى أسرتي/ })).toHaveAttribute("href", "/family");
     expect(screen.queryByRole("navigation", { name: "التنقل الرئيسي" })).not.toBeInTheDocument();
     // The Coordinator's own household is not presented here.
-    expect(screen.queryByText("حسابك مفعّل")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "ملخص الأسرة" })).not.toBeInTheDocument();
     expect(screen.queryByText("FAM-000123")).not.toBeInTheDocument();
+    expect(get).not.toHaveBeenCalledWith("/api/v1/family/household");
   });
 
   it("shows the effective scopes and the family count from the server", async () => {
