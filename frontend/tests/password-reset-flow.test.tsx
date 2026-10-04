@@ -246,6 +246,10 @@ describe("step 3 — the new password", () => {
     expect(screen.getByLabelText("تأكيد كلمة المرور")).toHaveAttribute("autocomplete", "new-password");
     expect(screen.getByText(/لا تقل عن 8 أحرف/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/حرف كبير|رمز خاص|أرقام وحروف/);
+    // The show/hide control is on the right, and the text keeps clear of it.
+    expect(screen.getByRole("button", { name: "إظهار كلمة المرور" })).toHaveClass("right-1");
+    expect(screen.getByLabelText("كلمة المرور الجديدة")).toHaveClass("pr-12");
+    expect(document.querySelector("[data-field-icon]")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "إظهار كلمة المرور" }));
     expect(screen.getByLabelText("كلمة المرور الجديدة")).toHaveAttribute("type", "text");

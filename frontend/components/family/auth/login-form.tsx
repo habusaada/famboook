@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2 } from "lucide-react";
+import { IdCard, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,18 +98,26 @@ export function FamilyLoginForm() {
             <Label htmlFor="family-login-national-id" className="text-sm font-medium">
               رقم الهوية
             </Label>
-            <Input
-              id="family-login-national-id"
-              type="text"
-              inputMode="numeric"
-              dir="ltr"
-              autoComplete="username"
-              autoFocus
-              className={cn(fieldClass, "text-start tracking-wide")}
-              aria-invalid={errors.national_id ? true : undefined}
-              aria-describedby={errors.national_id ? "family-login-national-id-error" : undefined}
-              {...register("national_id")}
-            />
+            {/* The value is LTR; the icon sits on the right (physical sides, see PasswordField). */}
+            <div className="relative">
+              <Input
+                id="family-login-national-id"
+                type="text"
+                inputMode="numeric"
+                dir="ltr"
+                autoComplete="username"
+                autoFocus
+                className={cn(fieldClass, "pr-11 text-start tracking-wide")}
+                aria-invalid={errors.national_id ? true : undefined}
+                aria-describedby={errors.national_id ? "family-login-national-id-error" : undefined}
+                {...register("national_id")}
+              />
+              <IdCard
+                className="pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+                data-field-icon="national-id"
+              />
+            </div>
             <FieldError id="family-login-national-id-error" message={errors.national_id?.message} />
           </div>
 
@@ -125,6 +133,9 @@ export function FamilyLoginForm() {
             <PasswordField
               id="family-login-password"
               autoComplete="current-password"
+              // Passwords may be Arabic, English or mixed.
+              dir="auto"
+              withLockIcon
               visible={visible}
               onToggle={() => setVisible((v) => !v)}
               aria-invalid={errors.password ? true : undefined}
@@ -135,15 +146,20 @@ export function FamilyLoginForm() {
           </div>
 
           <Button type="submit" disabled={busy} className={primaryButtonClass}>
+            {/* Full-width, fixed-height button: the label swap cannot shift the layout. */}
             {busy ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                جارٍ تسجيل الدخول…
-              </>
+              <span className="inline-flex items-center justify-center gap-2">
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                <span>جارٍ تسجيل الدخول...</span>
+              </span>
             ) : (
               "تسجيل الدخول"
             )}
           </Button>
+          {/* A disabled button may lose focus: announce the wait to assistive tech. */}
+          <p role="status" className="sr-only">
+            {busy ? "جارٍ تسجيل الدخول..." : ""}
+          </p>
         </form>
       </section>
     </FamilyAuthCard>

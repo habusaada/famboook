@@ -557,6 +557,11 @@ describe("step 4 — the password", () => {
     const password = screen.getByLabelText("كلمة المرور");
     const confirmation = screen.getByLabelText("تأكيد كلمة المرور");
     expect(password).toHaveAttribute("type", "password");
+    // The show/hide control is on the right, and the text keeps clear of it.
+    expect(screen.getByRole("button", { name: "إظهار كلمة المرور" })).toHaveClass("right-1");
+    expect(password).toHaveClass("pr-12");
+    expect(password).not.toHaveClass("ps-12", "pl-12");
+    expect(document.querySelector("[data-field-icon]")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "إظهار كلمة المرور" }));
     expect(password).toHaveAttribute("type", "text");

@@ -94,6 +94,36 @@ describe("/family/login", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it("decorates the fields with icons that never take focus, clicks or text space", () => {
+    const { container } = renderWithClient(<FamilyLoginForm />);
+    const idIcon = container.querySelector('[data-field-icon="national-id"]')!;
+    const lockIcon = container.querySelector('[data-field-icon="lock"]')!;
+
+    for (const icon of [idIcon, lockIcon]) {
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).not.toHaveAttribute("tabindex");
+      expect(icon).toHaveClass("pointer-events-none", "right-3.5");
+    }
+    // Physical padding: logical padding would flip inside an LTR / auto input.
+    expect(idField()).toHaveAttribute("dir", "ltr");
+    expect(idField()).toHaveClass("pr-11");
+    expect(passwordField()).toHaveAttribute("dir", "auto");
+    expect(passwordField()).toHaveClass("pr-11", "pl-12");
+    // The show/hide control stays on the left and is the only extra control.
+    expect(screen.getByRole("button", { name: "إظهار كلمة المرور" })).toHaveClass("left-1");
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("keeps Arabic and mixed passwords exactly as typed", async () => {
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ user: familyUser() });
+    const user = userEvent.setup();
+    renderWithClient(<FamilyLoginForm />);
+
+    await signIn(user, NATIONAL_ID, "كلمة سر Synthetic 12");
+
+    await waitFor(() => expect(post).toHaveBeenCalledWith(LOGIN, { national_id: NATIONAL_ID, password: "كلمة سر Synthetic 12" }));
+  });
+
   it("shows and hides the password", async () => {
     const user = userEvent.setup();
     renderWithClient(<FamilyLoginForm />);
@@ -112,7 +142,15 @@ describe("/family/login", () => {
 
     await signIn(user);
 
-    expect(await screen.findByRole("button", { name: /جارٍ تسجيل الدخول/ })).toBeDisabled();
+    const button = await screen.findByRole("button", { name: "جارٍ تسجيل الدخول..." });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent(/^جارٍ تسجيل الدخول\.\.\.$/);
+    // The spinner is decorative; the wait is announced in a status region.
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("جارٍ تسجيل الدخول...");
+    // A second press sends nothing more.
+    await user.click(button);
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
     await act(async () => release({ user: familyUser() }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family"));
   });
