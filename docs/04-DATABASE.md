@@ -3994,6 +3994,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-056
+PWA-3B.4 household-member sensitive reveal (2026-10-05) adds **no migration**: the new `auth_security_events.event_type` `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` (35 characters) fits `string(40)` and `chk_auth_security_event_codes`; the target Person is the existing `person_id`; the metadata key `field` is already allow-listed. The revealed value is never stored.
+
 ### DB-ADR-055
 FU-13 (2026-10-05) adds **no migration**: the Family Portal household-member reference `member_ref` is the keyed HMAC-SHA256 of `family_id:membership_id` (Family Auth key, `MEMBER_REF` context), recomputed on every request and never stored, so `family_memberships` gains no column. A persisted UUID was considered and not needed (docs/11 FP-ADR-063). Server-side records store the internal membership id.
 
@@ -4282,6 +4285,7 @@ Date: 2026-09-24
 | 1.2.35 | 2026-10-05 | Approved | FU-10: no schema change (DB-ADR-053); §25a stale-state check for household declarations; §69 death transaction as implemented (head review and access re-evaluation passive) |
 | 1.2.36 | 2026-10-05 | Approved | PWA-3B.2: no schema change (DB-ADR-054); `SELF_SENSITIVE_REVEALED` event type and `field` metadata key within the existing constraints |
 | 1.2.37 | 2026-10-05 | Approved | FU-13: no schema change (DB-ADR-055); `member_ref` is computed, never stored |
+| 1.2.38 | 2026-10-05 | Approved | PWA-3B.4: no schema change (DB-ADR-056); `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` within the existing constraints |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

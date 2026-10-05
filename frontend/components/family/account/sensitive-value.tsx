@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { ApiError } from "@/lib/api/client";
 import { useFamilyAccessFailure } from "@/lib/api/family-household";
-import { type SelfRevealField, revealSelfValue } from "@/lib/api/family-self";
+import type { SelfRevealField } from "@/lib/api/family-self";
 
 /**
  * Field labels used in the control's accessible name, e.g. «إظهار رقم الهوية».
@@ -26,14 +26,23 @@ type State =
   | { status: "failed"; error: unknown };
 
 /**
- * One own sensitive value (PWA-3B.2, docs/11 §23a): masked by default, with
- * its own Eye control. Showing asks the server for that one field; hiding
- * discards the full value at once, and showing again asks again. Nothing is
- * cached, persisted, copied or put in an attribute; an answer that arrives
- * after a hide or after the component is gone is dropped. Only this field's
- * control is busy while its request runs.
+ * One sensitive value (docs/11 §23a): masked by default, with its own Eye
+ * control. `reveal` asks the server for that one field — the head's own value
+ * (PWA-3B.2, self reveal) or another household member's (PWA-3B.4, member
+ * reveal); hiding discards the full value at once, and showing again asks
+ * again. Nothing is cached, persisted, copied or put in an attribute; an
+ * answer that arrives after a hide or after the component is gone is dropped.
+ * Only this field's control is busy while its request runs.
  */
-export function SensitiveValue({ field, masked }: { field: SelfRevealField; masked: string }) {
+export function SensitiveValue({
+  field,
+  masked,
+  reveal,
+}: {
+  field: SelfRevealField;
+  masked: string;
+  reveal: () => Promise<string | null>;
+}) {
   const [state, setState] = useState<State>({ status: "hidden" });
   // Incremented on every request and every hide: a late answer for an older
   // request, or for a field hidden meanwhile, is never shown.
@@ -64,7 +73,7 @@ export function SensitiveValue({ field, masked }: { field: SelfRevealField; mask
     const mine = ++ticket.current;
     setState({ status: "loading" });
     try {
-      const value = await revealSelfValue(field);
+      const value = await reveal();
       if (mounted.current && ticket.current === mine) setState({ status: "shown", value });
     } catch (error) {
       if (mounted.current && ticket.current === mine) setState({ status: "failed", error });

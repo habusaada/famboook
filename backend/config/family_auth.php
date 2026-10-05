@@ -247,4 +247,24 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Household-member sensitive-value reveal (docs/11 §23a, PWA-3B.4)
+    |--------------------------------------------------------------------------
+    |
+    | POST /api/v1/family/household/members/{memberRef}/reveal returns one
+    | full value of ANOTHER member of the signed-in head's household. Its own
+    | ceilings per authenticated user (never per member reference), separate
+    | from the self reveal: enough to review a whole household, too few for
+    | automated extraction.
+    |
+    */
+
+    'member_reveal' => [
+        'limits' => [
+            'user_minute' => (int) env('FAMILY_MEMBER_REVEAL_LIMIT_USER_MINUTE', 20),
+            'user_hour' => (int) env('FAMILY_MEMBER_REVEAL_LIMIT_USER_HOUR', 120),
+        ],
+    ],
+
 ];

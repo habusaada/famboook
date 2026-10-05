@@ -132,17 +132,21 @@ describe("the details", () => {
     expect(sheet.querySelector('[data-field="death_date"]')).toBeNull();
   });
 
-  it("show the identity and contact values MASKED only, with no reveal control and no request", async () => {
+  it("show the identity and contact values masked, with a reveal control only for recorded values and no request", async () => {
     const { post } = renderMembers([HEAD, SPOUSE]);
     const sheet = await openDetails("زوجة الاختبار");
 
     expect(field(sheet, "national_id")).toHaveTextContent("*****6554");
     expect(field(sheet, "mobile")).toHaveTextContent("05*****334");
     expect(field(sheet, "alternate_mobile")).toHaveTextContent("غير مسجّل");
-    expect(within(sheet).queryByRole("button", { name: /إظهار|إخفاء/ })).not.toBeInTheDocument();
-    expect(sheet.querySelector("[aria-pressed]")).toBeNull();
-    // Only the close control: nothing else to press.
-    expect(within(sheet).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["إغلاق"]);
+    // PWA-3B.4: the close control plus one unpressed Eye per recorded value.
+    expect(within(sheet).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "إغلاق",
+      "إظهار رقم الهوية",
+      "إظهار رقم الجوال",
+    ]);
+    expect(sheet.querySelectorAll('[aria-pressed="true"]')).toHaveLength(0);
+    // Nothing is requested until an Eye is pressed.
     expect(post).not.toHaveBeenCalled();
     expect(sheet.textContent).not.toMatch(/PER-|person_code|\d{9}|05\d{8}/);
   });

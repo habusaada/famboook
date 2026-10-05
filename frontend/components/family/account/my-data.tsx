@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SensitiveValue } from "@/components/family/account/sensitive-value";
 import { ageText } from "@/components/family/members/member-card";
 import { isAccessFailure } from "@/lib/api/family-household";
-import { type FamilySelf, type SelfRevealField, useFamilySelfQuery } from "@/lib/api/family-self";
+import { type FamilySelf, type SelfRevealField, revealSelfValue, useFamilySelfQuery } from "@/lib/api/family-self";
 import { formatDateLong } from "@/lib/utils/date";
 import { maritalStatusLabels } from "@/lib/utils/marital-status";
 import { relationshipLabel } from "@/lib/utils/relationship";
@@ -39,7 +39,7 @@ function Row({ label, children, field }: { label: string; children: React.ReactN
 function Sensitive({ field, masked }: { field: SelfRevealField; masked: string | null }) {
   if (masked === null) return <Missing />;
 
-  return <SensitiveValue field={field} masked={masked} />;
+  return <SensitiveValue field={field} masked={masked} reveal={() => revealSelfValue(field)} />;
 }
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {

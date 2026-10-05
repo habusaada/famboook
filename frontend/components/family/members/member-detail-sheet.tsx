@@ -1,9 +1,13 @@
 "use client";
 
-import { X } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, IdCard, X } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SensitiveValue } from "@/components/family/account/sensitive-value";
 import { ageText } from "@/components/family/members/member-card";
 import type { FamilyMember } from "@/lib/api/family-household";
+import { revealMemberValue } from "@/lib/api/family-member-reveal";
+import type { SelfRevealField } from "@/lib/api/family-self";
 import { formatDateLong } from "@/lib/utils/date";
 import {
   DEATH_DATE_UNKNOWN,
@@ -38,7 +42,7 @@ function Group({ id, title, children }: { id: string; title: string; children: R
   );
 }
 
-/** A masked registry value exactly as received; the member reveal is PWA-3B.4. */
+/** A masked registry value exactly as received, with no reveal control. */
 function Masked({ value }: { value: string | null }) {
   if (value === null) return <Missing />;
 
@@ -49,6 +53,28 @@ function Masked({ value }: { value: string | null }) {
   );
 }
 
+/**
+ * A member's sensitive value (PWA-3B.4): the mask with its own Eye control
+ * for ANOTHER member, revealed through the member reveal by member_ref; the
+ * head's own values are masked only here (their reveal is «بياناتي الشخصية»).
+ * No control when nothing is recorded. The full value lives only in the
+ * control's state, keyed by member_ref, so closing the sheet or switching
+ * member discards it.
+ */
+function MemberSensitive({ member, field, masked }: { member: FamilyMember; field: SelfRevealField; masked: string | null }) {
+  if (masked === null) return <Missing />;
+  if (member.is_household_head) return <Masked value={masked} />;
+
+  return (
+    <SensitiveValue
+      key={`${member.member_ref}:${field}`}
+      field={field}
+      masked={masked}
+      reveal={() => revealMemberValue(member.member_ref, field)}
+    />
+  );
+}
+
 function DateValue({ value }: { value: string | null }) {
   return value ? <span className="tabular-nums">{formatDateLong(value)}</span> : <Missing />;
 }
@@ -56,9 +82,9 @@ function DateValue({ value }: { value: string | null }) {
 /**
  * The registry details of ONE household member (PWA-3B.3, docs/11 §23a), in
  * an in-page sheet fed by the member list — no member identifier, no URL and
- * no extra request. Read-only. The National ID and mobiles are shown MASKED
- * only, with no reveal control: revealing a member's value is PWA-3B.4
- * (docs/11 FU-13). The head's own reveal stays on «بياناتي الشخصية».
+ * no extra request. Read-only. The National ID and mobiles are shown masked;
+ * another member's can be revealed field by field (PWA-3B.4); the head's own
+ * are revealed only on «بياناتي الشخصية» (a link here).
  */
 export function MemberDetailSheet({ member, onClose }: { member: FamilyMember | null; onClose: () => void }) {
   return (
@@ -69,7 +95,8 @@ export function MemberDetailSheet({ member, onClose }: { member: FamilyMember | 
         className="mx-auto max-h-[85dvh] max-w-md gap-0 overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
         data-member-detail
       >
-        {member && <Details member={member} />}
+        {/* Keyed by member: another member — or a closed sheet — discards every revealed value. */}
+        {member && <Details key={member.member_ref} member={member} />}
       </SheetContent>
     </Sheet>
   );
@@ -140,18 +167,32 @@ function Details({ member }: { member: FamilyMember }) {
 
         <Group id="identity" title="بيانات الهوية والاتصال">
           <Row label="رقم الهوية" field="national_id">
-            <Masked value={member.national_id_masked} />
+            <MemberSensitive member={member} field="NATIONAL_ID" masked={member.national_id_masked} />
           </Row>
           <Row label="رقم الجوال" field="mobile">
-            <Masked value={member.mobile_masked} />
+            <MemberSensitive member={member} field="MOBILE" masked={member.mobile_masked} />
           </Row>
           <Row label="الجوال البديل" field="alternate_mobile">
-            <Masked value={member.alternate_mobile_masked} />
+            <MemberSensitive member={member} field="ALTERNATE_MOBILE" masked={member.alternate_mobile_masked} />
           </Row>
           {member.alternate_mobile_masked !== null && (
             <Row label="صلة صاحب الجوال البديل" field="alternate_mobile_owner_relation">
               {member.alternate_mobile_owner_relation ? <bdi>{member.alternate_mobile_owner_relation}</bdi> : <Missing />}
             </Row>
+          )}
+          {member.is_household_head && (
+            // The head's own values: revealed only on «بياناتي الشخصية».
+            <Link
+              href="/family/account/me"
+              className="mt-2 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
+              data-my-data-link
+            >
+              <span className="flex items-center gap-2">
+                <IdCard className="size-4" aria-hidden />
+                لإظهار بياناتك استخدم «بياناتي الشخصية»
+              </span>
+              <ChevronLeft className="size-4" aria-hidden />
+            </Link>
           )}
         </Group>
 

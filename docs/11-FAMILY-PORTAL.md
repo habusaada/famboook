@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.20
+**Version:** 1.21
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2897,6 +2897,39 @@ reveal (PWA-3B.4).
   detail sheet is chosen by it (the member read from the loaded list). It
   is never put in the DOM, a URL or a query key.
 
+## PWA-3B.4 implementation record — household-member sensitive reveal
+
+Implemented 2026-10-05 (FP-ADR-064). No migration; no registry write.
+
+```text
+POST /api/v1/family/household/members/{memberRef}/reveal
+  auth:sanctum → family.side → can:family-portal.access → family.context
+  → throttle:family-member-reveal; memberRef is a plain string
+  body      {"field": "NATIONAL_ID" | "MOBILE" | "ALTERNATE_MOBILE"}
+  200       {"data": {"field": "…", "value": "…" | null}}   no-store, private
+  404       {"message": "بيانات هذا الفرد غير متاحة.", "code": "HOUSEHOLD_MEMBER_UNAVAILABLE"}
+```
+
+- `HouseholdMemberSensitiveReveal` resolves the target (FU-13 resolver →
+  not the head's membership → Person not soft-deleted), records the event,
+  then returns the value; `HouseholdMemberUnavailableException` is the one
+  404 for every failure; `FamilyMemberRevealRequest` validates the field
+  and the prohibited keys; `FamilyMemberRevealController` answers no-store,
+  private.
+- Throttle `family-member-reveal`: `family_auth.member_reveal.limits`
+  `user_minute` (default 20) and `user_hour` (default 120), env
+  `FAMILY_MEMBER_REVEAL_LIMIT_USER_MINUTE` / `_HOUR` (examples only).
+- Security event `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` within the existing
+  `auth_security_events` constraints (DB-ADR-056).
+- Frontend: `SensitiveValue` takes a `reveal` callback (the self reveal on
+  «بياناتي الشخصية», `revealMemberValue(member_ref, field)` in the member
+  sheet). Another member's recorded values get their own Eye; the head's
+  row shows masks and a link to «بياناتي الشخصية». Field controls are keyed
+  by member_ref and the sheet's details by member, so closing the sheet or
+  switching member discards every revealed value; late answers after hide,
+  close, switch or unmount are dropped. Plain request only — never the
+  query or mutation cache, storage, a URL, an attribute or the clipboard.
+
 ---
 
 # 31. Amendment Register
@@ -3435,6 +3468,35 @@ Portal references a household member by `member_ref`:
 - no migration;
 - a Change Request (and any other server-side record) stores the internal
   membership id, never `member_ref`.
+
+FP-ADR-064
+Household-member sensitive-value reveal (PWA-3B.4 — approved 2026-10-05).
+The household head reveals, field by field, the National ID, mobile and
+alternate mobile of ANOTHER member of their household:
+- POST /api/v1/family/household/members/{memberRef}/reveal, body
+  {"field": NATIONAL_ID | MOBILE | ALTERNATE_MOBILE} (SelfRevealField, the
+  fixed column mapping); any family, person, membership or user id, any
+  target, member_ref or value in the body or query is refused (422);
+- resolution order: family.context Family → HouseholdMemberReference::resolve
+  (ACTIVE memberships of that Family only) → never the head's own
+  membership → an available (not soft-deleted) Person → the one field;
+  member_ref grants nothing and is never route-model bound;
+- every unavailable target — malformed, random, foreign, ended, unavailable
+  or soft-deleted Person, the head's own reference — is ONE identical 404
+  HOUSEHOLD_MEMBER_UNAVAILABLE «بيانات هذا الفرد غير متاحة.», no-store;
+- the head's own values stay on the self path only (/family/account/me,
+  POST /family/self/reveal): one path, one event type for self data;
+- 200 {"data": {"field", "value" | null}}, Cache-Control: no-store,
+  private; a null stored value is still an authorized reveal;
+- one HOUSEHOLD_MEMBER_SENSITIVE_REVEALED security event per authorized
+  reveal (null included): person = the TARGET Person, user / actor = the
+  head, link = the head's link, metadata = {field} only; nothing for 404,
+  422, 429 or boundary refusals; no Family Activity;
+- its own throttle family-member-reveal, per authenticated user (never per
+  member_ref): 20 / minute and 120 / hour by default, independent of the
+  self reveal; 429 TOO_MANY_REQUESTS, no-store;
+- no adult / minor rule in V1; no re-authentication; no migration; the
+  masked GET payloads are unchanged.
 ```
 
 ---
@@ -3623,3 +3685,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.18 | 2026-10-05 | Approved | PWA-3B.2 implementation record in §30a: POST /api/v1/family/self/reveal (SELF only, one field, strict field mapping, prohibited targets, per-user throttle, no-store, private), SELF_SENSITIVE_REVEALED security event with the field code only (null reveals recorded too), per-field Eye on «بياناتي الشخصية» with transient component state only; no migration |
 | 1.19 | 2026-10-05 | Approved | PWA-3B.3 implementation record in §30a: complete «أسرتي» (family registration, branch group, current declaration with sons / daughters / source, full current residence), member rows with marital status, death date, masked National ID and mobiles and membership start, in-page member detail sheet; null birth date wording fixed; no member reveal, no migration |
 | 1.20 | 2026-10-05 | Approved | FU-13 resolved (FP-ADR-063): `member_ref`, the full 64-hex keyed HMAC-SHA256 of a family membership (MEMBER_REF domain separation, Family Auth key and versions), resolved only among the ACTIVE memberships of the family.context Family; never an id, never stored, never authorization; Change Requests store the internal membership id; implementation record in §30a; no migration |
+| 1.21 | 2026-10-05 | Approved | PWA-3B.4 (FP-ADR-064): household-member sensitive reveal — POST /api/v1/family/household/members/{memberRef}/reveal resolved only inside the family.context Family, one generic 404 HOUSEHOLD_MEMBER_UNAVAILABLE, head's own values on the self path only, HOUSEHOLD_MEMBER_SENSITIVE_REVEALED event (target Person, field only), per-user family-member-reveal throttle 20 / minute and 120 / hour; implementation record in §30a; no migration |

@@ -129,5 +129,17 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
             ['minute', 'hour'],
         ));
+
+        // Household-member sensitive-value reveal (docs/11 §23a, PWA-3B.4): its
+        // own buckets, per signed-in user — never per member reference, so a
+        // different reference never resets the count.
+        RateLimiter::for('family-member-reveal', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('family_auth.member_reveal.limits.user_hour'))
+                : Limit::perMinute((int) config('family_auth.member_reveal.limits.user_minute')))
+                ->by("family-member-reveal|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
+            ['minute', 'hour'],
+        ));
     }
 }

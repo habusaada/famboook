@@ -40,4 +40,8 @@ enum AuthSecurityEventType: string
     // The household head revealed one of their OWN sensitive values
     // (PWA-3B.2); metadata: the field code only, never the value.
     case SELF_SENSITIVE_REVEALED = 'SELF_SENSITIVE_REVEALED';
+    // The household head revealed a sensitive value of ANOTHER member of
+    // their household (PWA-3B.4); person = the target Person; metadata: the
+    // field code only, never the value or the member reference.
+    case HOUSEHOLD_MEMBER_SENSITIVE_REVEALED = 'HOUSEHOLD_MEMBER_SENSITIVE_REVEALED';
 }

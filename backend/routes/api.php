@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
+use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
 use App\Http\Controllers\Api\V1\Family\FamilySelfController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
@@ -91,6 +92,13 @@ Route::prefix('family')->group(function () {
             Route::get('/household', [FamilyHouseholdController::class, 'show']);
             Route::get('/household/members', [FamilyHouseholdController::class, 'members']);
             Route::get('/household/profile', [FamilyHouseholdController::class, 'profile']);
+
+            // Household-member sensitive-value reveal (PWA-3B.4): one field of
+            // ANOTHER member, named by the opaque member_ref (FU-13) and
+            // resolved only inside this Family — never route-model bound; any
+            // unavailable target is one generic 404; throttled per user.
+            Route::post('/household/members/{memberRef}/reveal', [FamilyMemberRevealController::class, 'reveal'])
+                ->middleware('throttle:family-member-reveal');
 
             // «بياناتي الشخصية» (PWA-3B.1): SELF only, masked sensitive
             // values; the full values are a separate reveal (PWA-3B.2).
