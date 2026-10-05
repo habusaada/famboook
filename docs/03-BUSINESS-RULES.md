@@ -594,18 +594,42 @@ death_date    → the given date, or NULL when the exact date is unknown (§29)
 - A supplied date must be a valid calendar date, not in the future and not
   before `birth_date` (§28; also a PostgreSQL CHECK). With an unknown
   birth date only the "not in the future" rule applies.
-- A Person already `DECEASED` is refused (409). Correcting a recorded
-  death is a separate operation, not built in V1.
+- From `ALIVE` or `UNKNOWN` only. A Person already `DECEASED` is refused
+  (`PERSON_ALREADY_DECEASED`, 409). The Person row is locked and re-read;
+  it serializes with `ConfirmPersonAliveAction` on the same row. A
+  soft-deleted Person is not found.
+- **A recorded death is irreversible in V1** (2026-10-05, docs/11
+  FP-ADR-061): no path leads from `DECEASED` back to `ALIVE`. Correcting an
+  erroneous death needs a future, dedicated Domain Operation — never
+  `UpdatePersonAction`, which never writes life status or death date.
 - Nothing else changes: memberships, `is_household_head`, other Persons
   (no spouse is made WIDOWED or household head automatically) and
   `is_active` (§27: life status is independent of record status). A
   deceased active head is surfaced by the Data Quality check
   `HOUSEHOLD_HEAD_DECEASED` for Household Head review (§16).
+- **The current household head's death may be recorded** (FP-ADR-061). The
+  deceased stays the head — no successor is selected (§16; Head
+  Succession, docs/11 FU-01) — and the family has no eligible Family
+  Portal user until a new head is assigned (§89b). Head review and access
+  re-evaluation are passive today: the Data Quality check above and the
+  access resolver on every request; no workflow is triggered.
+- The current User-Person Link of the deceased is ended in the same
+  transaction (`PERSON_DECEASED`): its Family Auth identity is superseded
+  and its sessions are revoked (§89b).
 - Transactional; records `PERSON_DEATH_RECORDED` (§97a) on the Person's
-  current Family, subject = the Person, no metadata (never the date). A
-  Person without a current Family records no activity.
-- V1 exposes no staff endpoint yet; callers are the controlled import and,
-  later, the staff operation and the DEATH_REPORT Change Request (§31).
+  current Family, subject = the Person, with the verification method as
+  its only metadata (a code; never the date or free text). A Person
+  without a current Family records no activity.
+- Callers: the Staff operation and, later, the DEATH_REPORT Change Request
+  application (§31). The import never calls it: a Person known to be
+  deceased when first imported is **created** `DECEASED` by
+  `CreatePersonAction` (§96b).
+- Staff: `POST /api/v1/people/{person}/record-death` (`person.record-death`,
+  docs/11 FU-10). The request sends `death_date` explicitly — a date, or
+  `null` when the exact date is unknown; an omitted field is refused, never
+  read as "unknown" — and a required verification method: `IN_PERSON`,
+  `STAFF_CALLBACK` or `AUTHORIZED_RECORD_REVIEW` (never `SELF_OTP`). A life
+  status, family id or person id in the body is refused.
 
 ## Confirming life status: UNKNOWN → ALIVE (2026-10-04)
 
@@ -661,6 +685,18 @@ RecordPersonDeathAction
     ↓
 Canonical Registry
 ```
+
+Direction recorded with FU-10 (2026-10-05); DEATH_REPORT itself is not
+implemented yet (PWA-6, docs/11 FP-ADR-059):
+
+- V1 targets an active member who is **not** the household head; head
+  death and succession stay with FU-01.
+- APPROVED is not APPLIED: approval changes nothing. APPLY calls
+  `RecordPersonDeathAction` server-side — never the Staff HTTP route —
+  with a Staff verification method and its own controlled provenance next
+  to it.
+- A Person already `DECEASED` at APPLY time is refused
+  (`PERSON_ALREADY_DECEASED`); the request is not applied twice.
 
 ---
 
@@ -1681,6 +1717,28 @@ Rules:
 - Written only through `RecordHouseholdDeclarationAction`, which records
   `HOUSEHOLD_DECLARATION_RECORDED` (§97a) with no metadata — never the
   declared counts.
+- **Stale-write protection** (2026-10-05, docs/11 FU-10): every caller
+  states which declaration it expects to be current — its id, or none.
+  Under the Family row lock the current declaration is re-read; a
+  different one is refused (`HOUSEHOLD_DECLARATION_CHANGED`, 409) and
+  nothing is written. The partial unique index stays the final guard. The
+  import passes "none": it records the declaration of a Family it has just
+  created.
+- **Staff** (FU-10, docs/11 FP-ADR-061): `POST
+  /api/v1/families/{family}/household-declarations`, permission
+  `family.update`. Counts each optional (at least one), whole numbers from
+  0; `declared_at` optional (NULL = unknown, never in the future);
+  `source` required and one of `PAPER_FORM`, `MANUAL_ENTRY`,
+  `VERIFIED_SOURCE` — `IMPORT` belongs to the import;
+  `expected_current_declaration_id` always sent (null = none). Lifecycle
+  and provenance fields and notes are refused. The Staff Family profile
+  returns `declared_at`, `declaration_source` and `current_declaration_id`
+  (a Staff-only stale-write reference, never sent to the Family Portal).
+- A family's request to change its declaration
+  (`HOUSEHOLD_DECLARATION_UPDATE`) stays a proposed type (docs/11 PFP-008);
+  once approved, its APPLY calls the same action server-side. No source
+  value for a family statement exists yet; adding one is part of that
+  decision.
 - Using declared figures in targeting, nominations, eligibility or reports
   is a later, explicit decision; any such use must label them "Declared".
   Current V1 figures (targeting family size, `member_count`,
@@ -3348,7 +3406,9 @@ by default; docs/08 §7a).
 المدينة            family_residences.original_residence_text — the ORIGINAL
                    city; never city, never current residence, never
                    displacement status or location
-حالة الوفاة        حي → ALIVE, متوفي → DECEASED (via RecordPersonDeathAction);
+حالة الوفاة        حي → ALIVE, متوفي → DECEASED (the Person is CREATED
+                   DECEASED by CreatePersonAction — the import never calls
+                   RecordPersonDeathAction, §30);
                    the 2026-09-29 source spells it متوفى — Phase 2C decides
                    the exact accepted spellings
 الوفاة             head persons.death_date (never invented)
@@ -3879,7 +3939,8 @@ PERSON_UPDATED          basic Person data correction (current family)
 MEMBERSHIP_RELATIONSHIP_CORRECTED  member relationship corrected (§93b)
 MEMBERSHIP_ENDED        incorrect membership ended; Person kept (§93b)
 NATIONAL_ID_CORRECTED   administrative National ID correction (§93b)
-PERSON_DEATH_RECORDED   official death recorded (§30); subject = Person
+PERSON_DEATH_RECORDED   official death recorded (§30); subject = Person;
+                        metadata: verification_method (a code)
 PERSON_ALIVE_CONFIRMED  UNKNOWN → ALIVE confirmed (§30); subject = Person;
                         metadata: verification_method (a code)
 HOUSEHOLD_DECLARATION_RECORDED  Declared Household Statistics recorded (§55c); subject = Family
@@ -4917,6 +4978,7 @@ Date: 2026-09-24
 | 1.2.46 | 2026-10-04 | Approved | FP-ADR-054 after the Production pilot: an input that cannot start first activation gets one generic refusal on step 1 instead of a fake masked number and decoy code step; reasons stay server-side; nothing created |
 | 1.2.47 | 2026-10-04 | Approved | Documentation consolidation: "Verified is not beneficiary" replaced by No automatic eligibility; Profile Completion / Family Verification section replaced by Family Profile Review and Staff Family Verification; §55 / §55c Registered Members and Living Members (BD-051, BD-052; docs/11 FP-ADR-056 … FP-ADR-058) |
 | 1.2.48 | 2026-10-04 | Approved | §30: RecordPersonDeathAction is the only path that changes an EXISTING Person to DECEASED (import creation may create UNKNOWN / DECEASED); UNKNOWN → ALIVE through ConfirmPersonAliveAction only; §97a PERSON_ALIVE_CONFIRMED (docs/11 FP-ADR-060) |
+| 1.2.49 | 2026-10-05 | Approved | FU-10 (docs/11 FP-ADR-061): §30 Staff death recording with an explicit death date and a required verification method, `PERSON_ALREADY_DECEASED`, death irreversible in V1, head death allowed without succession, the import is not a caller (also §96a); §31 DEATH_REPORT direction; §55c stale-write protection and Staff declaration endpoint (`family.update`, Staff sources only); §97a PERSON_DEATH_RECORDED metadata |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

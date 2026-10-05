@@ -619,9 +619,13 @@ The system must never invent a death date.
 
 A Family User death report does not directly populate this canonical field.
 
-`life_status = DECEASED` and `death_date` are written only by
-`RecordPersonDeathAction` (docs/03 §30); family registration and member
-creation always create ALIVE Persons.
+Changing an EXISTING Person to `life_status = DECEASED` (with its
+`death_date`) is done only by `RecordPersonDeathAction` (docs/03 §30) —
+the Staff operation and, later, the DEATH_REPORT application. A Person
+known to be deceased when first imported is created `DECEASED` by
+`CreatePersonAction` (docs/03 §96b); the import never calls
+`RecordPersonDeathAction`. Family registration and member creation always
+create ALIVE Persons. No path leads from `DECEASED` back to `ALIVE` in V1.
 
 ---
 
@@ -1143,7 +1147,11 @@ At least one of the three declared values must be present.
   members (e.g. declared size below 1 + registered spouses, or sons +
   daughters exceeding the declared size) is a review finding, not a
   rejection.
-- Written only through `RecordHouseholdDeclarationAction` (docs/03 §55c).
+- Written only through `RecordHouseholdDeclarationAction` (docs/03 §55c),
+  which refuses a write whose expected current declaration is no longer
+  current (`HOUSEHOLD_DECLARATION_CHANGED`). Staff record declarations
+  with `PAPER_FORM`, `MANUAL_ENTRY` or `VERIFIED_SOURCE`; `IMPORT` is the
+  import's. `notes` is not part of the Staff capability.
 
 ---
 
@@ -4160,6 +4168,7 @@ Date: 2026-09-24
 | 1.2.30 | 2026-10-03 | Approved | PWA-1G: §45b login and password reset use the authentication identity (keyed fingerprint), never `persons.national_id`; Family password length 8 characters to 72 bytes; no data-model change |
 | 1.2.31 | 2026-10-03 | Approved | PWA-1H: §45b coordinator assignment lifecycle (effective = not revoked and target active, no expiry, revoke reasons) and the Coordinator family summary projection; no data-model change |
 | 1.2.32 | 2026-10-04 | Approved | Documentation consolidation: §20a Registered Members (active memberships, any life status) and Living Members replace Registered Household Size; §75 wording; §45a Family Profile Review and Staff Family Verification separated (DD-ADR-033; docs/11 FP-ADR-056, FP-ADR-057) |
+| 1.2.33 | 2026-10-05 | Approved | FU-10: §10 death writes scoped — `RecordPersonDeathAction` changes an EXISTING Person to DECEASED; import creation may create DECEASED; no path back to ALIVE. §20a stale-write refusal and Staff declaration sources. No data-model change |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

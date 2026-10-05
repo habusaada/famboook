@@ -2,8 +2,8 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.14
-**Date:** 2026-10-04
+**Version:** 1.15
+**Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
 ---
@@ -514,6 +514,13 @@ The rules are named rule keys (for example `residence.displacement_status`,
 `members.birth_date`) in one backend evaluator, so a future programme can
 reuse them (§13).
 
+FAMILY completeness depends on a current household declaration, which a
+family cannot create itself. The Staff declaration path (FU-10,
+FP-ADR-061: `POST /api/v1/families/{family}/household-declarations`) is
+therefore a prerequisite of Profile Review: before it, only the import
+could record one. A family's own correction stays the proposed
+`HOUSEHOLD_DECLARATION_UPDATE` (§14, PFP-008).
+
 ## Section states
 
 States are **derived**; only confirmations are persisted. Precedence — the
@@ -749,7 +756,7 @@ Actions.
 | Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist; CONFIRM_ALIVE → `ConfirmPersonAliveAction` (exists) |
 | Add missing family member | ADD_FAMILY_MEMBER | `AddFamilyMemberAction` exists |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
-| Death report | DEATH_REPORT | `RecordPersonDeathAction` exists (no Staff route or UI yet); head succession is not handled |
+| Death report | DEATH_REPORT | `RecordPersonDeathAction` exists, with a Staff route and action (FU-10, FP-ADR-061); head succession is not handled |
 
 ## First-release direction (approved 2026-10-04, FP-ADR-059)
 
@@ -791,7 +798,7 @@ implemented before it.
 | Proposed type | Purpose | Apply target |
 |---|---|---|
 | `FAMILY_DATA_UPDATE` | Family basic data | `UpdateFamilyAction` exists |
-| `HOUSEHOLD_DECLARATION_UPDATE` | Declared household information | `RecordHouseholdDeclarationAction` exists |
+| `HOUSEHOLD_DECLARATION_UPDATE` | Declared household information | `RecordHouseholdDeclarationAction` exists, with a Staff route and stale-write protection (FU-10); a source value for a family statement is part of this decision |
 | `HEALTH_RECORD_SUBMISSION` | Health and disability (§15) | `CreateHealthRecordAction`, `CloseHealthRecordAction` exist |
 | `NEED_SUBMISSION` | Needs (§16) | `CreateNeedAction` exists |
 
@@ -2915,6 +2922,33 @@ identity, OTP or session — the normal activation flow may then succeed.
 A family's CONFIRM_ALIVE request (non-head members) needs its statement
 plus Staff review, no mandatory document, and calls the same action on
 APPLY. UpdatePersonAction never writes life status or death date.
+
+FP-ADR-061
+Staff paths for the DEATH_REPORT and HOUSEHOLD_DECLARATION_UPDATE apply
+targets (FU-10 — resolved 2026-10-05). Product decisions:
+D1  A household declaration is recorded with the existing family.update
+    (no new permission). POST /api/v1/families/{family}/household-
+    declarations creates a NEW current declaration (history kept, values as
+    declared, no arithmetic); Staff sources PAPER_FORM, MANUAL_ENTRY,
+    VERIFIED_SOURCE — never IMPORT; no notes. The caller always states the
+    current declaration it expects (or none); a different one is refused
+    (HOUSEHOLD_DECLARATION_CHANGED, 409) under the Family lock.
+D2  Staff death recording requires a verification method (IN_PERSON,
+    STAFF_CALLBACK, AUTHORIZED_RECORD_REVIEW; never SELF_OTP), recorded as
+    the only metadata of PERSON_DEATH_RECORDED. POST /api/v1/people/
+    {person}/record-death (person.record-death) sends the death date
+    explicitly: a date, or null when unknown.
+D3  A recorded death is irreversible in V1: no DECEASED → ALIVE path
+    (PERSON_ALREADY_DECEASED, 409, on a second recording). Correcting an
+    erroneous death needs a future dedicated Domain Operation, never
+    UpdatePersonAction. The Staff UI warns before recording.
+D4  Staff may record the current household head's death. No successor is
+    selected; membership and is_household_head do not change; the family
+    may have no eligible Family Portal user until Head Succession (FU-01,
+    still open). The Staff UI shows a stronger warning for a head.
+DEATH_REPORT (non-head, PWA-6) will APPLY through RecordPersonDeathAction
+server-side; HOUSEHOLD_DECLARATION_UPDATE stays proposed (PFP-008). Change
+Request APPLY never calls the Staff routes.
 ```
 
 ---
@@ -3068,8 +3102,8 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-07 | **Resolved 2026-10-04 (FP-ADR-060).** UNKNOWN life status comes from import: spouses are always created UNKNOWN, and a household head is UNKNOWN when the source life-status cell is empty. An UNKNOWN head is not eligible (ALIVE only) and cannot reach the Family Portal, so it is confirmed only by Staff (`POST /api/v1/people/{person}/confirm-alive`, `person.record-death`, verification method required). `ConfirmPersonAliveAction` is the only UNKNOWN → ALIVE path; `UpdatePersonAction` never writes life status | Done; family CONFIRM_ALIVE requests with the Change Request engine (PWA-6) |
 | FU-08 | **CSRF write smoke test.** A past Production 419 on one browser was a stale / duplicate-cookie incident (API, `csrf-cookie` and CORS preflight succeeded; clearing site data resolved it) — not a reproduced Sanctum / CORS defect | Before the first new Family Portal write endpoint: a production-like CSRF write smoke test; no proactive Sanctum / CORS change without a reproduced defect (docs/08) |
 | FU-09 | Family lifecycle: no Domain Action archives or restores a Family; a Family soft-deleted outside the application keeps active memberships, `NationalIdGuard::describe()` then answers 500 instead of 422, and import reconciliation and Apply planning disagree about such memberships | Family lifecycle task (PBD-005); the two defects are small fixes |
-| FU-10 | `RecordPersonDeathAction` and `RecordHouseholdDeclarationAction` have no Staff route or UI (the latter is used by import only) | Before DEATH_REPORT and HOUSEHOLD_DECLARATION_UPDATE need a Staff path |
-| FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.record-death` / `.view-history`, `family-membership.transfer` | Reserved for their phases (docs/06) |
+| FU-10 | **Resolved 2026-10-05 (FP-ADR-061).** Staff paths exist for both apply targets: `POST /api/v1/people/{person}/record-death` (`person.record-death`, verification method required, death date explicit, irreversible, head death allowed without succession) and `POST /api/v1/families/{family}/household-declarations` (`family.update`, Staff sources only, stale-write protected); Staff UI actions «تسجيل وفاة» and «تسجيل إقرار أسرة». No migration | Done; DEATH_REPORT (PWA-6) and HOUSEHOLD_DECLARATION_UPDATE (PFP-008) apply through the same actions server-side |
+| FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.view-history`, `family-membership.transfer`. (`person.record-death` is now read by `confirm-alive` and `record-death`.) | Reserved for their phases (docs/06) |
 | FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
 
 ---
@@ -3094,3 +3128,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.12 | 2026-10-04 | Approved | FP-ADR-055: installable Family app — manifest and official icon, minimal service worker (scope /family, offline page only, no response or API caching), "تثبيت فامبوك" with native prompt or instructions; Staff unaffected |
 | 1.13 | 2026-10-04 | Approved | Documentation and ADR consolidation: §9 Family Profile Review (V1 sections, derived completeness and states, confirmation, dedicated fingerprint key, Change Request relationship) and §11 Staff Family Verification kept separate (FP-ADR-057); §10 registered members = active memberships, living members named (FP-ADR-056); §13 no automatic eligibility (FP-ADR-058); §14 first-release request direction, RESIDENCE_UPDATE = correction, UNKNOWN → ALIVE prerequisite (FP-ADR-059); §23 portal structure; §25 routes; §28 concepts; §30 delivery order; §30a PWA-3A record; §31 A-15 … A-17; PFP-007 / 017 / 018 clarified, PFP-023 / 024; §33a FU-02 answered, FU-07 … FU-12. Documentation only |
 | 1.14 | 2026-10-04 | Approved | FU-07 / PFP-024 resolved (FP-ADR-060): ConfirmPersonAliveAction (UNKNOWN → ALIVE only), Staff endpoint and action with a recorded verification method, UNKNOWN heads confirmed only by Staff; §14 PERSON_CORRECTION / CONFIRM_ALIVE apply target |
+| 1.15 | 2026-10-05 | Approved | FU-10 resolved (FP-ADR-061): Staff death recording (verification method, explicit death date, irreversible in V1, head death allowed without succession — FU-01 still open) and Staff household declarations (`family.update`, Staff sources, stale-write protection); §9 Staff declaration path is a Profile Review prerequisite; §14 apply targets; FU-11 updated. No migration |
