@@ -3,6 +3,7 @@
 namespace Tests\Feature\People;
 
 use App\Actions\ConfirmPersonAliveAction;
+use App\Actions\RecordPersonDeathAction;
 use App\Enums\LifeStatus;
 use App\Enums\LifeStatusVerificationMethod;
 use App\Exceptions\PersonLifeStatusException;
@@ -133,5 +134,50 @@ class LifeStatusConcurrencyTest extends TestCase
             $this->assertSame(PersonLifeStatusException::PERSON_DECEASED, $e->reason);
         }
         $this->assertSame(LifeStatus::DECEASED, $person->fresh()->life_status);
+    }
+
+    // FU-10: the death recording takes the same lock.
+
+    private function recordDeath(Person $person): Person
+    {
+        return app(RecordPersonDeathAction::class)->handle($person, null, LifeStatusVerificationMethod::IN_PERSON, null);
+    }
+
+    public function test_a_death_waits_for_a_parallel_lock_on_the_person(): void
+    {
+        $person = Person::factory()->create(['life_status' => LifeStatus::UNKNOWN->value]);
+
+        $state = $this->whilePersonLocked($person, fn () => $this->recordDeath($person));
+
+        $this->assertSame(self::LOCK_NOT_AVAILABLE, $state);
+        $this->assertSame(LifeStatus::UNKNOWN, $person->fresh()->life_status, 'The waiting death recording changed nothing.');
+        $this->assertSame(LifeStatus::DECEASED, $this->recordDeath($person)->life_status);
+    }
+
+    public function test_a_confirmation_committed_first_is_followed_by_a_valid_death(): void
+    {
+        $person = Person::factory()->create(['life_status' => LifeStatus::UNKNOWN->value]);
+        // The parallel session confirms the Person alive and commits first.
+        $this->other()->transaction(fn () => $this->other()->table('persons')->where('id', $person->id)->lockForUpdate()->update([
+            'life_status' => LifeStatus::ALIVE->value,
+        ]));
+
+        $this->assertSame(LifeStatus::DECEASED, $this->recordDeath($person)->life_status);
+    }
+
+    public function test_a_death_committed_by_a_parallel_session_refuses_a_second_death(): void
+    {
+        $person = Person::factory()->create(['life_status' => LifeStatus::ALIVE->value]);
+        $this->other()->transaction(fn () => $this->other()->table('persons')->where('id', $person->id)->lockForUpdate()->update([
+            'life_status' => LifeStatus::DECEASED->value, 'death_date' => '2024-01-01',
+        ]));
+
+        try {
+            $this->recordDeath($person);
+            $this->fail('Expected PERSON_ALREADY_DECEASED.');
+        } catch (PersonLifeStatusException $e) {
+            $this->assertSame(PersonLifeStatusException::PERSON_ALREADY_DECEASED, $e->reason);
+        }
+        $this->assertSame('2024-01-01', $person->fresh()->death_date->toDateString());
     }
 }

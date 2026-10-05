@@ -3,6 +3,7 @@
 namespace Tests\Feature\FamilyAuth;
 
 use App\Actions\RecordPersonDeathAction;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Models\Branch;
@@ -131,7 +132,7 @@ class FamilySideBoundaryTest extends TestCase
         $head = $this->activatedHead();
         $admin = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         // The head dies: identity and context are both gone.
-        app(RecordPersonDeathAction::class)->handle($head['person'], now()->toDateString(), $admin->id);
+        app(RecordPersonDeathAction::class)->handle($head['person'], now()->toDateString(), LifeStatusVerificationMethod::IN_PERSON, $admin->id);
 
         $response = $this->actingAs($head['user'])->getJson(self::ME)->assertOk();
 

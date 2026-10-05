@@ -46,6 +46,7 @@ class FamilyActivityLog
      */
     public const EVENT_CODE_METADATA = [
         'PERSON_ALIVE_CONFIRMED' => ['verification_method' => LifeStatusVerificationMethod::class],
+        'PERSON_DEATH_RECORDED' => ['verification_method' => LifeStatusVerificationMethod::class],
     ];
 
     /**

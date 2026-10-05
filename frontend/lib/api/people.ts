@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiClient } from "@/lib/api/client";
 import type { PaginatedResponse, ResourceResponse } from "@/lib/types/api/family";
 import type {
@@ -9,6 +9,7 @@ import type {
   NationalIdMatch,
   PersonDetail,
   PersonSummary,
+  RecordPersonDeathPayload,
   UpdatePersonPayload,
 } from "@/lib/types/api/person";
 
@@ -61,6 +62,32 @@ export function useConfirmPersonAlive(personCode: string) {
       // Life status also appears in family views and the family timeline.
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },
+  });
+}
+
+/** Refetches everything that shows a Person's life status. */
+export function refreshPersonLifeStatus(queryClient: QueryClient, personCode: string) {
+  queryClient.invalidateQueries({ queryKey: ["people", personCode] });
+  // Life status appears in family views, the family timeline and the registry.
+  queryClient.invalidateQueries({ queryKey: ["families"] });
+  queryClient.invalidateQueries({ queryKey: ["people", "registry"] });
+}
+
+/**
+ * Staff recording of an existing Person's death (person.record-death).
+ * Irreversible: there is no path back to ALIVE. After a 409 (already
+ * recorded deceased) the dialog refreshes the person when it closes.
+ */
+export function useRecordPersonDeath(personCode: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: RecordPersonDeathPayload) =>
+      apiClient.post<ResourceResponse<PersonDetail>>(
+        `/api/v1/people/${encodeURIComponent(personCode)}/record-death`,
+        payload
+      ),
+    onSuccess: () => refreshPersonLifeStatus(queryClient, personCode),
   });
 }
 

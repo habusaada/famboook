@@ -7,9 +7,9 @@ use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
- * A life-status confirmation was refused (ConfirmPersonAliveAction). Thrown
- * inside the Domain Action's transaction, so nothing changed. Rendered as
- * 409 with a stable code and fixed text.
+ * A life-status change was refused (ConfirmPersonAliveAction,
+ * RecordPersonDeathAction). Thrown inside the Domain Action's transaction,
+ * so nothing changed. Rendered as 409 with a stable code and fixed text.
  */
 class PersonLifeStatusException extends RuntimeException
 {
@@ -19,10 +19,14 @@ class PersonLifeStatusException extends RuntimeException
 
     public const INCONSISTENT_LIFE_RECORD = 'INCONSISTENT_LIFE_RECORD';
 
+    // RecordPersonDeathAction: a recorded death is never recorded again.
+    public const PERSON_ALREADY_DECEASED = 'PERSON_ALREADY_DECEASED';
+
     private const MESSAGES = [
         self::PERSON_ALREADY_ALIVE => 'الحالة الحياتية لهذا الشخص مسجّلة مسبقًا: حي.',
         self::PERSON_DECEASED => 'وفاة هذا الشخص مسجّلة، ولا يمكن تأكيد أنه على قيد الحياة.',
         self::INCONSISTENT_LIFE_RECORD => 'سجل الحالة الحياتية لهذا الشخص غير متّسق (يحمل تاريخ وفاة). يلزم تصحيح السجل أولًا.',
+        self::PERSON_ALREADY_DECEASED => 'وفاة هذا الشخص مسجّلة مسبقًا.',
     ];
 
     public function __construct(public readonly string $reason)

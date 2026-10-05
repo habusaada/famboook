@@ -5,25 +5,30 @@ namespace Tests\Feature\People;
 use App\Actions\RecordPersonDeathAction;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Enums\MaritalStatus;
+use App\Exceptions\PersonLifeStatusException;
 use App\Models\Family;
 use App\Models\FamilyActivity;
 use App\Models\FamilyMembership;
 use App\Models\Person;
 use App\Models\RelationshipType;
+use App\Support\FamilyActivityLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Feature\Registry\BuildsRegistryFixtures;
 use Tests\TestCase;
 
 /**
- * RecordPersonDeathAction (docs/03 §28-§30): the only write path to
- * DECEASED. The death date is optional and never invented; nothing but the
- * Person's life status/death date changes — no spouse becomes WIDOWED or
- * head, no membership is touched.
+ * RecordPersonDeathAction (docs/03 §28-§30): the only path that changes an
+ * EXISTING Person to DECEASED. The death date is optional and never
+ * invented; nothing but the Person's life status/death date changes — no
+ * spouse becomes WIDOWED or head, no membership is touched. The Staff
+ * endpoint is covered in RecordPersonDeathEndpointTest.
  */
 class RecordPersonDeathTest extends TestCase
 {
@@ -58,7 +63,7 @@ class RecordPersonDeathTest extends TestCase
 
     private function record(Person $person, ?string $date): Person
     {
-        return app(RecordPersonDeathAction::class)->handle($person, $date, $this->staff->id);
+        return app(RecordPersonDeathAction::class)->handle($person, $date, LifeStatusVerificationMethod::IN_PERSON, $this->staff->id);
     }
 
     private function deathActivities(): Collection
@@ -132,31 +137,59 @@ class RecordPersonDeathTest extends TestCase
         $this->assertSame('1950-06-01', $this->head->fresh()->death_date->toDateString());
     }
 
-    public function test_an_already_deceased_person_is_refused(): void
+    public function test_an_unknown_life_status_is_recorded_deceased(): void
+    {
+        $this->spouse->forceFill(['life_status' => LifeStatus::UNKNOWN->value])->save();
+
+        $this->record($this->spouse, null);
+
+        $this->assertSame(LifeStatus::DECEASED, $this->spouse->fresh()->life_status);
+        $this->assertCount(1, $this->deathActivities());
+    }
+
+    public function test_an_already_deceased_person_is_refused_with_its_code(): void
     {
         $this->record($this->head, '2024-11-20');
 
-        try {
-            $this->record($this->head, '2023-01-01');
-            $this->fail('Expected 409.');
-        } catch (HttpException $e) {
-            $this->assertSame(409, $e->getStatusCode());
+        foreach (['2023-01-01', null] as $date) {
+            try {
+                $this->record($this->head, $date);
+                $this->fail('Expected PERSON_ALREADY_DECEASED.');
+            } catch (PersonLifeStatusException $e) {
+                $this->assertSame(PersonLifeStatusException::PERSON_ALREADY_DECEASED, $e->reason);
+                $this->assertSame(409, $e->render(request())->getStatusCode());
+            }
         }
 
+        $this->assertSame(LifeStatus::DECEASED, $this->head->fresh()->life_status);
         $this->assertSame('2024-11-20', $this->head->fresh()->death_date->toDateString());
         $this->assertCount(1, $this->deathActivities());
     }
 
-    public function test_records_one_activity_without_metadata(): void
+    public function test_records_one_activity_with_only_the_verification_method(): void
     {
-        $this->record($this->spouse, '2024-11-20');
+        app(RecordPersonDeathAction::class)->handle($this->spouse, '2024-11-20', LifeStatusVerificationMethod::AUTHORIZED_RECORD_REVIEW, $this->staff->id);
 
         $activity = $this->deathActivities()->sole();
         $this->assertSame($this->staff->id, $activity->actor_user_id);
         $this->assertSame('person', $activity->subject_type);
         $this->assertSame($this->spouse->id, $activity->subject_id);
-        $this->assertNull($activity->metadata);
+        $this->assertSame(['verification_method' => 'AUTHORIZED_RECORD_REVIEW'], $activity->metadata);
         $this->assertStringNotContainsString('2024-11-20', json_encode($activity->getAttributes()));
+    }
+
+    public function test_the_death_activity_accepts_only_the_controlled_code(): void
+    {
+        DB::transaction(function () {
+            foreach ([['verification_method' => 'SELF_OTP'], ['verification_method' => 'IN_PERSON', 'evidence' => 'شهادة وفاة'], ['death_date' => '2024-01-01']] as $metadata) {
+                try {
+                    FamilyActivityLog::record($this->family->id, FamilyActivityType::PERSON_DEATH_RECORDED, $this->head, $this->staff->id, $metadata);
+                    $this->fail('Expected the metadata to be refused: '.json_encode($metadata));
+                } catch (InvalidArgumentException) {
+                    $this->addToAssertionCount(1);
+                }
+            }
+        });
     }
 
     public function test_person_without_a_current_family_records_no_activity(): void

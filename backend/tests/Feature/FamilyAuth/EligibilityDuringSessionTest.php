@@ -7,6 +7,7 @@ use App\Actions\EndUserPersonLinkAction;
 use App\Actions\RecordPersonDeathAction;
 use App\Actions\SuspendUserPersonLinkAction;
 use App\Enums\FamilyStatus;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Enums\UserPersonLinkEndReason;
 use App\Enums\UserPersonLinkSuspensionReason;
 use App\Models\User;
@@ -76,7 +77,7 @@ class EligibilityDuringSessionTest extends TestCase
     {
         $person = $this->head['person'];
         match ($transition) {
-            'death' => app(RecordPersonDeathAction::class)->handle($person, '2026-09-01', null),
+            'death' => app(RecordPersonDeathAction::class)->handle($person, '2026-09-01', LifeStatusVerificationMethod::IN_PERSON, null),
             'headship' => $this->head['membership']->forceFill(['is_household_head' => false])->save(),
             'membership' => $this->head['membership']->forceFill(['is_active' => false, 'is_household_head' => false])->save(),
             'family' => $this->head['family']->forceFill(['status' => FamilyStatus::INACTIVE])->save(),

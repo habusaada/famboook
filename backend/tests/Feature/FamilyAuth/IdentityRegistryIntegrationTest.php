@@ -9,6 +9,7 @@ use App\Enums\AuthIdentitySupersedeReason;
 use App\Enums\FamilyAccessDenial;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Enums\UserPersonLinkStatus;
 use App\Exceptions\FamilyIdentityException;
 use App\Models\AuthSecurityEvent;
@@ -266,7 +267,7 @@ class IdentityRegistryIntegrationTest extends TestCase
         $this->sessionRowFor($a['user']);
         $this->sessionRowFor($a['user']);
 
-        app(RecordPersonDeathAction::class)->handle($a['person'], null, $this->admin->id);
+        app(RecordPersonDeathAction::class)->handle($a['person'], null, LifeStatusVerificationMethod::IN_PERSON, $this->admin->id);
 
         $this->assertSame(LifeStatus::DECEASED, $a['person']->fresh()->life_status);
 
@@ -290,7 +291,7 @@ class IdentityRegistryIntegrationTest extends TestCase
     {
         $a = $this->activatedHead('123456789');
 
-        app(RecordPersonDeathAction::class)->handle($a['person'], null, $this->admin->id);
+        app(RecordPersonDeathAction::class)->handle($a['person'], null, LifeStatusVerificationMethod::IN_PERSON, $this->admin->id);
 
         // Head Succession is a separate rollout gate (FU-01).
         $membership = $a['membership']->fresh();
@@ -308,7 +309,7 @@ class IdentityRegistryIntegrationTest extends TestCase
         $a = $this->activatedHead('123456789');
         $a['link']->forceFill(['status' => UserPersonLinkStatus::SUSPENDED->value, 'suspended_at' => now()])->save();
 
-        app(RecordPersonDeathAction::class)->handle($a['person'], null, null);
+        app(RecordPersonDeathAction::class)->handle($a['person'], null, LifeStatusVerificationMethod::IN_PERSON, null);
 
         $this->assertSame(UserPersonLinkStatus::ENDED, $a['link']->fresh()->status);
         $this->assertNull($a['link']->fresh()->ended_by);
@@ -319,7 +320,7 @@ class IdentityRegistryIntegrationTest extends TestCase
     {
         [$person] = $this->eligibleHead('123456789');
 
-        app(RecordPersonDeathAction::class)->handle($person, null, $this->admin->id);
+        app(RecordPersonDeathAction::class)->handle($person, null, LifeStatusVerificationMethod::IN_PERSON, $this->admin->id);
 
         $this->assertSame(LifeStatus::DECEASED, $person->fresh()->life_status);
         $this->assertSame([], $this->events());
@@ -332,7 +333,7 @@ class IdentityRegistryIntegrationTest extends TestCase
 
         try {
             // A death date before the birth date is refused by the action.
-            app(RecordPersonDeathAction::class)->handle($a['person'], '1990-01-01', $this->admin->id);
+            app(RecordPersonDeathAction::class)->handle($a['person'], '1990-01-01', LifeStatusVerificationMethod::IN_PERSON, $this->admin->id);
             $this->fail('An invalid death date was accepted.');
         } catch (\Throwable) {
         }

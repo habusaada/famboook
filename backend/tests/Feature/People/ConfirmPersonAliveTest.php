@@ -165,7 +165,7 @@ class ConfirmPersonAliveTest extends TestCase
     public function test_deceased_is_refused_and_never_brought_back(): void
     {
         [, $member] = $this->unknownMember();
-        app(RecordPersonDeathAction::class)->handle($member, '2024-01-01', $this->staff->id);
+        app(RecordPersonDeathAction::class)->handle($member, '2024-01-01', LifeStatusVerificationMethod::IN_PERSON, $this->staff->id);
 
         $this->refused($member, PersonLifeStatusException::PERSON_DECEASED);
 
@@ -192,8 +192,8 @@ class ConfirmPersonAliveTest extends TestCase
         [, $unknown] = $this->unknownMember();
         $alive = Person::factory()->create(['life_status' => LifeStatus::ALIVE->value]);
 
-        app(RecordPersonDeathAction::class)->handle($unknown, null, $this->staff->id);
-        app(RecordPersonDeathAction::class)->handle($alive, null, $this->staff->id);
+        app(RecordPersonDeathAction::class)->handle($unknown, null, LifeStatusVerificationMethod::IN_PERSON, $this->staff->id);
+        app(RecordPersonDeathAction::class)->handle($alive, null, LifeStatusVerificationMethod::IN_PERSON, $this->staff->id);
 
         $this->assertSame(LifeStatus::DECEASED, $unknown->fresh()->life_status);
         $this->assertSame(LifeStatus::DECEASED, $alive->fresh()->life_status);

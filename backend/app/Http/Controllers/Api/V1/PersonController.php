@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\ConfirmPersonAliveAction;
 use App\Actions\CorrectNationalIdAction;
+use App\Actions\RecordPersonDeathAction;
 use App\Actions\UpdatePersonAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ConfirmPersonAliveRequest;
 use App\Http\Requests\Api\V1\CorrectNationalIdRequest;
 use App\Http\Requests\Api\V1\NationalIdCheckRequest;
+use App\Http\Requests\Api\V1\RecordPersonDeathRequest;
 use App\Http\Requests\Api\V1\UpdatePersonRequest;
 use App\Http\Resources\PersonResource;
 use App\Http\Resources\PersonSummaryResource;
@@ -102,5 +104,13 @@ class PersonController extends Controller
 
         return (new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS)))
             ->additional(['message' => 'تم تأكيد أن الشخص على قيد الحياة']);
+    }
+
+    public function recordDeath(RecordPersonDeathRequest $request, Person $person, RecordPersonDeathAction $action): PersonResource
+    {
+        $person = $action->handle($person, $request->deathDate(), $request->verificationMethod(), $request->user()?->id);
+
+        return (new PersonResource($person->fresh(self::MEMBERSHIP_RELATIONS)))
+            ->additional(['message' => 'تم تسجيل الوفاة']);
     }
 }

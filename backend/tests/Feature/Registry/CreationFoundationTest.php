@@ -9,6 +9,7 @@ use App\Actions\RecordPersonDeathAction;
 use App\Actions\RegisterFamilyAction;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatus;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Exceptions\DuplicateNationalIdException;
 use App\Exceptions\MissingRelationshipTypeException;
 use App\Models\Branch;
@@ -117,12 +118,12 @@ class CreationFoundationTest extends TestCase
         $person = $this->person(['life_status' => 'ALIVE', 'birth_date' => '1990-01-01']);
 
         try {
-            app(RecordPersonDeathAction::class)->handle($person, '1980-01-01', null);
+            app(RecordPersonDeathAction::class)->handle($person, '1980-01-01', LifeStatusVerificationMethod::IN_PERSON, null);
             $this->fail('Expected a validation error.');
         } catch (ValidationException $e) {
             $this->assertSame(['تاريخ الوفاة لا يمكن أن يسبق تاريخ الميلاد.'], $e->errors()['death_date']);
         }
-        $this->assertSame(LifeStatus::DECEASED, app(RecordPersonDeathAction::class)->handle($person, '2020-01-01', null)->life_status);
+        $this->assertSame(LifeStatus::DECEASED, app(RecordPersonDeathAction::class)->handle($person, '2020-01-01', LifeStatusVerificationMethod::IN_PERSON, null)->life_status);
     }
 
     // ================================================== CreateFamilyAction

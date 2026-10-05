@@ -167,6 +167,13 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     Route::post('/people/{person}/confirm-alive', [PersonController::class, 'confirmAlive'])
         ->middleware('can:person.record-death');
 
+    // Official death of an existing Person (docs/03 §30, FU-10): ALIVE or
+    // UNKNOWN → DECEASED, irreversible in V1. The death date is sent
+    // explicitly (a date, or null = unknown); the verification method is
+    // required. A household head stays head: no successor (FU-01).
+    Route::post('/people/{person}/record-death', [PersonController::class, 'recordDeath'])
+        ->middleware('can:person.record-death');
+
     // Mobile trust (docs/06 §22b, PWA-1E): Staff-side only. The mobile number
     // is never an input — the Person's stored mobile is what gets trusted.
     Route::get('/people/{person}/mobile-trust', [PersonMobileTrustController::class, 'show'])
