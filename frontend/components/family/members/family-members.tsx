@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MemberCard } from "@/components/family/members/member-card";
 import { MemberDetailSheet } from "@/components/family/members/member-detail-sheet";
-import { type FamilyMember, isAccessFailure, useFamilyMembersQuery } from "@/lib/api/family-household";
+import { isAccessFailure, useFamilyMembersQuery } from "@/lib/api/family-household";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 
@@ -53,9 +53,11 @@ function MembersError({ onRetry, retrying }: { onRetry: () => void; retrying: bo
 export function FamilyMembers() {
   const query = useFamilyMembersQuery();
   const data = query.data;
-  // The member whose registry details are open (PWA-3B.3): taken from the
-  // loaded list itself — no identifier, no URL, no extra request.
-  const [selected, setSelected] = useState<FamilyMember | null>(null);
+  // The member whose registry details are open (PWA-3B.3), by its opaque
+  // member_ref (FU-13) and read from the loaded list itself — no URL, no
+  // extra request. If the list no longer has it, the sheet simply closes.
+  const [selectedRef, setSelectedRef] = useState<string | null>(null);
+  const selected = data?.members.find((member) => member.member_ref === selectedRef) ?? null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -102,13 +104,13 @@ export function FamilyMembers() {
               </section>
             ) : (
               <ul className="flex flex-col gap-3" aria-label="أفراد الأسرة">
-                {/* Server order, never re-sorted; rows carry no identifier. */}
-                {data.members.map((member, index) => (
+                {/* Server order, never re-sorted; keyed by member_ref, which never reaches the DOM. */}
+                {data.members.map((member) => (
                   <MemberCard
-                    key={index}
+                    key={member.member_ref}
                     member={member}
                     // An unavailable Person has no details to show.
-                    onShowDetails={member.available ? () => setSelected(member) : undefined}
+                    onShowDetails={member.available ? () => setSelectedRef(member.member_ref) : undefined}
                   />
                 ))}
               </ul>
@@ -121,7 +123,7 @@ export function FamilyMembers() {
         )}
       </div>
 
-      <MemberDetailSheet member={selected} onClose={() => setSelected(null)} />
+      <MemberDetailSheet member={selected} onClose={() => setSelectedRef(null)} />
     </div>
   );
 }

@@ -72,7 +72,9 @@ final class HouseholdReadModel
             ->leftJoin('persons', 'persons.id', '=', 'family_memberships.person_id')
             ->leftJoin('relationship_types', 'relationship_types.id', '=', 'family_memberships.relationship_type_id')
             ->select([
+                // For ordering and the opaque member_ref (FU-13); never returned.
                 'family_memberships.id',
+                'family_memberships.family_id',
                 'family_memberships.is_household_head',
                 'family_memberships.started_at as membership_started_at',
                 'persons.full_name as person_full_name',

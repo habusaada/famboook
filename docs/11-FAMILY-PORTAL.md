@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.19
+**Version:** 1.20
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2881,6 +2881,22 @@ GET /api/v1/family/household           the dashboard summary (unchanged shape)
 - **Vocabulary fix done:** a null birth date reads «تاريخ الميلاد غير
   مسجّل» (no longer «غير معروف»).
 
+## FU-13 implementation record — safe household-member reference
+
+Implemented 2026-10-05 (FP-ADR-063). No migration; no new endpoint; no
+reveal (PWA-3B.4).
+
+- `App\Support\FamilyPortal\HouseholdMemberReference`:
+  `of(familyId, membershipId)` and `resolve(FamilyAccessResult, ref)`;
+  `FingerprintContext::MEMBER_REF = famboook.family-portal.member-ref.v1:`.
+- `GET /api/v1/family/household/members`: every row starts with
+  `member_ref`, placeholders included, computed from the already-selected
+  membership `id` / `family_id` — no extra query (the query-count test is
+  unchanged).
+- Frontend: `FamilyMember.member_ref`; the list is keyed by it and the
+  detail sheet is chosen by it (the member read from the loaded list). It
+  is never put in the DOM, a URL or a query key.
+
 ---
 
 # 31. Amendment Register
@@ -3392,6 +3408,33 @@ Supersedes in part: FP-ADR-056 (its allow-list exclusions), the §9 HEAD
 "never its value" rule, the §15 health reading rules, the §23 "no Health /
 Needs / Assistance areas" note, docs/06 §38 / §121 / §123–§125 as they
 apply to the Family Portal (§31 A-18).
+
+FP-ADR-063
+Safe household-member reference (FU-13 — resolved 2026-10-05). The Family
+Portal references a household member by `member_ref`:
+- it identifies the FAMILY MEMBERSHIP ("this person as part of this
+  household"), never the Person: an ended membership stops resolving, a
+  transfer (a new membership) has a new reference, and an active
+  membership whose Person is unavailable keeps its reference (the safe
+  placeholder);
+- HMAC-SHA256 over the domain-separated context
+  `FingerprintContext::MEMBER_REF` and `family_id:membership_id`, through
+  the existing KeyedFingerprint service, Family Auth key and key versions —
+  no new secret; the FULL digest, 64 lowercase hex characters (256 bits),
+  never truncated;
+- never stored and never logged: recomputed on every request; it exposes no
+  Person or membership id, person_code, National ID or mobile;
+- NOT authorization: `HouseholdMemberReference::resolve` compares it (with
+  hash_equals, current and configured previous key version) only against
+  the ACTIVE memberships of the Family the family.context boundary
+  resolved — never a global lookup followed by a family check, never route
+  model binding; every failure (malformed, uppercase, random, foreign,
+  ended) is the same NULL, so nothing reveals why;
+- key rotation changes every reference; old ones resolve during the
+  configured overlap only;
+- no migration;
+- a Change Request (and any other server-side record) stores the internal
+  membership id, never `member_ref`.
 ```
 
 ---
@@ -3550,7 +3593,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-10 | **Resolved 2026-10-05 (FP-ADR-061).** Staff paths exist for both apply targets: `POST /api/v1/people/{person}/record-death` (`person.record-death`, verification method required, death date explicit, irreversible, head death allowed without succession) and `POST /api/v1/families/{family}/household-declarations` (`family.update`, Staff sources only, stale-write protected); Staff UI actions «تسجيل وفاة» and «تسجيل إقرار أسرة». No migration | Done; DEATH_REPORT (PWA-6) and HOUSEHOLD_DECLARATION_UPDATE (PFP-008) apply through the same actions server-side |
 | FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.view-history`, `family-membership.transfer`. (`person.record-death` is now read by `confirm-alive` and `record-death`.) | Reserved for their phases (docs/06) |
 | FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
-| FU-13 | Member reveal reference: `family_memberships` and `persons` have no public identifier the Family Portal may use (`person_code` is INTERNAL_ONLY, numeric ids are never exposed); the member-reveal boundary needs a safe target reference | PWA-3B.4 design; no migration decided yet |
+| FU-13 | **Resolved 2026-10-05 (FP-ADR-063).** The Family Portal member reference is `member_ref`: the full keyed HMAC-SHA256 (64 lowercase hex characters) of a FAMILY MEMBERSHIP (`FingerprintContext::MEMBER_REF`, Family Auth key and versions), resolved only among the ACTIVE memberships of the `family.context` Family. Never an id, never stored, never authorization. No migration | Done; the member reveal (PWA-3B.4) and member-specific Change Requests use it |
 
 ---
 
@@ -3579,3 +3622,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.17 | 2026-10-05 | Approved | PWA-3B.1 implementation record in §30a: GET /api/v1/family/self (SELF only, masked National ID and mobiles, no-store, private), shared MobileMask, «بياناتي الشخصية» at /family/account/me reached from the head's own member card; no reveal, no migration |
 | 1.18 | 2026-10-05 | Approved | PWA-3B.2 implementation record in §30a: POST /api/v1/family/self/reveal (SELF only, one field, strict field mapping, prohibited targets, per-user throttle, no-store, private), SELF_SENSITIVE_REVEALED security event with the field code only (null reveals recorded too), per-field Eye on «بياناتي الشخصية» with transient component state only; no migration |
 | 1.19 | 2026-10-05 | Approved | PWA-3B.3 implementation record in §30a: complete «أسرتي» (family registration, branch group, current declaration with sons / daughters / source, full current residence), member rows with marital status, death date, masked National ID and mobiles and membership start, in-page member detail sheet; null birth date wording fixed; no member reveal, no migration |
+| 1.20 | 2026-10-05 | Approved | FU-13 resolved (FP-ADR-063): `member_ref`, the full 64-hex keyed HMAC-SHA256 of a family membership (MEMBER_REF domain separation, Family Auth key and versions), resolved only among the ACTIVE memberships of the family.context Family; never an id, never stored, never authorization; Change Requests store the internal membership id; implementation record in §30a; no migration |

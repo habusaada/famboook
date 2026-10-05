@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\FamilyMembership;
+use App\Support\FamilyPortal\HouseholdMemberReference;
 use App\Support\MobileMask;
 use App\Support\NationalIdMask;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ use Illuminate\Support\Carbon;
  * /api/v1/family/household/members; PWA-3A, completed by PWA-3B.3, docs/11
  * §23a): one row per active membership, an explicit allow-list built from
  * HouseholdReadModel::members().
+ *
+ * member_ref is the opaque reference of the MEMBERSHIP (FU-13,
+ * HouseholdMemberReference): present on every row, placeholders included;
+ * it grants nothing by itself.
  *
  * The relationship, the household-head flag and the membership start belong
  * to the MEMBERSHIP and are always returned. The Person fields are returned
@@ -42,6 +47,8 @@ class FamilyHouseholdMemberResource extends JsonResource
         $person = fn (mixed $value): mixed => $available ? $value : null;
 
         return [
+            // The opaque membership reference (FU-13): computed, never an id.
+            'member_ref' => HouseholdMemberReference::of((int) $this->family_id, (int) $this->id),
             'available' => $available,
             'full_name' => $person($this->person_full_name),
             'relationship' => $this->relationship_code === null ? null : [

@@ -14,6 +14,7 @@ use App\Models\Person;
 use App\Models\PersonHealthRecord;
 use App\Models\RelationshipType;
 use App\Models\User;
+use App\Support\FamilyPortal\HouseholdMemberReference;
 use App\Support\StaffRoles;
 use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -41,7 +42,7 @@ class FamilyHouseholdMembersTest extends TestCase
     private const URI = '/api/v1/family/household/members';
 
     private const ROW_KEYS = [
-        'available', 'full_name', 'relationship', 'is_household_head', 'gender', 'birth_date', 'marital_status', 'life_status',
+        'member_ref', 'available', 'full_name', 'relationship', 'is_household_head', 'gender', 'birth_date', 'marital_status', 'life_status',
         'death_date', 'national_id_masked', 'mobile_masked', 'alternate_mobile_masked', 'alternate_mobile_owner_relation',
         'membership_started_at',
     ];
@@ -109,7 +110,7 @@ class FamilyHouseholdMembersTest extends TestCase
             'marital_status' => 'MARRIED', 'mobile' => '0591234567', 'alternate_mobile' => '0567654321', 'alternate_mobile_owner_relation' => 'أخ',
         ]);
         $head['membership']->forceFill(['started_at' => '2001-03-04'])->save();
-        $this->member($head['family'], 'زوجة تجريبية', 'SPOUSE', [
+        $spouse = $this->member($head['family'], 'زوجة تجريبية', 'SPOUSE', [
             'gender' => 'FEMALE', 'birth_date' => '1975-03-04', 'marital_status' => 'UNKNOWN', 'national_id' => '807766554', 'mobile' => null,
         ], ['started_at' => null]);
 
@@ -119,12 +120,14 @@ class FamilyHouseholdMembersTest extends TestCase
             'family_code' => $head['family']->family_code,
             'members' => [
                 [
+                    'member_ref' => HouseholdMemberReference::of($head['family']->id, $head['membership']->id),
                     'available' => true, 'full_name' => 'رب الأسرة التجريبي', 'relationship' => ['code' => 'HEAD', 'name' => 'رب الأسرة'],
                     'is_household_head' => true, 'gender' => 'MALE', 'birth_date' => '1970-01-01', 'marital_status' => 'MARRIED',
                     'life_status' => 'ALIVE', 'death_date' => null, 'national_id_masked' => '*****6789', 'mobile_masked' => '05*****567',
                     'alternate_mobile_masked' => '05*****321', 'alternate_mobile_owner_relation' => 'أخ', 'membership_started_at' => '2001-03-04',
                 ],
                 [
+                    'member_ref' => HouseholdMemberReference::of($head['family']->id, $spouse->id),
                     'available' => true, 'full_name' => 'زوجة تجريبية', 'relationship' => ['code' => 'SPOUSE', 'name' => 'زوج/زوجة'],
                     'is_household_head' => false, 'gender' => 'FEMALE', 'birth_date' => '1975-03-04', 'marital_status' => 'UNKNOWN',
                     'life_status' => 'ALIVE', 'death_date' => null, 'national_id_masked' => '*****6554', 'mobile_masked' => null,
@@ -198,11 +201,13 @@ class FamilyHouseholdMembersTest extends TestCase
 
         $this->assertCount(3, $rows);
         $this->assertEquals([
+            'member_ref' => HouseholdMemberReference::of($head['family']->id, $deleted->id),
             'available' => false, 'relationship' => ['code' => 'DAUGHTER', 'name' => 'ابنة'], 'is_household_head' => false,
             'membership_started_at' => null, ...self::NO_PERSON,
         ], $rows[1]);
         $this->assertSame(self::ROW_KEYS, array_keys($rows[1]));
         $this->assertEquals([
+            'member_ref' => HouseholdMemberReference::of($head['family']->id, $unrelated->id),
             'available' => false, 'relationship' => null, 'is_household_head' => false, 'membership_started_at' => null, ...self::NO_PERSON,
         ], $rows[2]);
         // Not even the placeholder Person's masks (the head's own row is masked legitimately).

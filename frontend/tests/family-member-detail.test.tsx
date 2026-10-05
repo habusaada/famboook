@@ -193,3 +193,32 @@ describe("a deceased member", () => {
     expect(field(sheet, "death_date")?.textContent).not.toMatch(/\d/);
   });
 });
+
+describe("the member reference (FU-13)", () => {
+  it("identifies the opened member without ever reaching the DOM or a URL", async () => {
+    const refs = ["1".repeat(64), "2".repeat(64)];
+    const { get } = renderMembers([
+      { ...HEAD, member_ref: refs[0] },
+      { ...SPOUSE, member_ref: refs[1] },
+    ]);
+
+    const sheet = await openDetails("زوجة الاختبار");
+
+    // The second member's details, chosen by its reference.
+    expect(within(sheet).getByRole("heading", { name: "زوجة الاختبار" })).toBeInTheDocument();
+    for (const ref of refs) {
+      expect(document.body.innerHTML).not.toContain(ref);
+    }
+    expect(get.mock.calls.map(([path]) => String(path)).join(" ")).not.toMatch(/[0-9a-f]{64}/);
+  });
+
+  it("keeps two members with identical names apart", async () => {
+    renderMembers([HEAD, { ...SPOUSE, member_ref: "3".repeat(64) }, { ...SPOUSE, full_name: "زوجة الاختبار", mobile_masked: "05*****999", member_ref: "4".repeat(64) }]);
+    const buttons = await screen.findAllByRole("button", { name: "تفاصيل زوجة الاختبار" });
+
+    await userEvent.click(buttons[1]);
+    const sheet = await screen.findByRole("dialog");
+
+    expect(field(sheet, "mobile")).toHaveTextContent("05*****999");
+  });
+});

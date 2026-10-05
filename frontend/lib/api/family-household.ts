@@ -34,6 +34,12 @@ export type FamilyMemberRelationship = { code: string; name: string };
  * only — a member reveal is PWA-3B.4, never this payload.
  */
 export type FamilyMember = {
+  /**
+   * The opaque reference of this MEMBERSHIP (FU-13): 64 lowercase hex
+   * characters, stable while the membership is active. An identity for the
+   * client only — never an id, never authorization, never put in the DOM.
+   */
+  member_ref: string;
   available: boolean;
   full_name: string | null;
   relationship: FamilyMemberRelationship | null;

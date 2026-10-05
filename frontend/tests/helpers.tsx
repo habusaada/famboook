@@ -46,9 +46,19 @@ export function familyHousehold(overrides: Partial<FamilyHousehold> = {}): Famil
   };
 }
 
+/**
+ * A well-formed but meaningless member_ref for fixtures: 64 lowercase hex
+ * characters derived from the seed, so the same synthetic member always gets
+ * the same reference.
+ */
+export function syntheticRef(seed: string): string {
+  const hex = Array.from(seed, (c) => (c.codePointAt(0) ?? 0).toString(16)).join("");
+  return hex.slice(-64).padStart(64, "0");
+}
+
 /** A synthetic household member (an available ALIVE son unless overridden). */
 export function familyMember(overrides: Partial<FamilyMember> = {}): FamilyMember {
-  return {
+  const member: Omit<FamilyMember, "member_ref"> = {
     available: true,
     full_name: "فرد الاختبار",
     relationship: { code: "SON", name: "ابن" },
@@ -64,6 +74,12 @@ export function familyMember(overrides: Partial<FamilyMember> = {}): FamilyMembe
     alternate_mobile_owner_relation: null,
     membership_started_at: "2010-01-01",
     ...overrides,
+  };
+
+  return {
+    // Deterministic per synthetic member unless a test sets its own.
+    member_ref: overrides.member_ref ?? syntheticRef(`${member.full_name}|${member.relationship?.code}|${member.birth_date}`),
+    ...member,
   };
 }
 
