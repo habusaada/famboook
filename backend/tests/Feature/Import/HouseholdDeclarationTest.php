@@ -5,6 +5,7 @@ namespace Tests\Feature\Import;
 use App\Actions\RecordHouseholdDeclarationAction;
 use App\Enums\FamilyActivityType;
 use App\Enums\RegistrationSource;
+use App\Exceptions\HouseholdDeclarationException;
 use App\Models\Family;
 use App\Models\FamilyActivity;
 use App\Models\FamilyHouseholdDeclaration;
@@ -40,8 +41,18 @@ class HouseholdDeclarationTest extends TestCase
         $this->family = Family::where('family_code', $this->familyCode)->sole();
     }
 
-    /** @param array<string, mixed> $data */
-    private function declare(array $data = []): FamilyHouseholdDeclaration
+    /** The id of the Family's current declaration, NULL when there is none. */
+    private function currentId(?Family $family = null): ?int
+    {
+        return ($family ?? $this->family)->fresh()->currentHouseholdDeclaration?->id;
+    }
+
+    /**
+     * Records against what is current now, unless an expectation is given.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function declare(array $data = [], int|null|false $expected = false): FamilyHouseholdDeclaration
     {
         return app(RecordHouseholdDeclarationAction::class)->handle($this->family, [
             'declared_household_size' => 7,
@@ -49,7 +60,7 @@ class HouseholdDeclarationTest extends TestCase
             'declared_living_daughters' => 2,
             'source' => 'IMPORT',
             ...$data,
-        ], $this->staff->id);
+        ], $expected === false ? $this->currentId() : $expected, $this->staff->id);
     }
 
     public function test_creates_a_current_declaration(): void
@@ -107,7 +118,7 @@ class HouseholdDeclarationTest extends TestCase
         $other = Family::where('family_code', $this->family('رب أسرة أخرى')['family_code'])->sole();
 
         $this->declare();
-        app(RecordHouseholdDeclarationAction::class)->handle($other, ['declared_household_size' => 3, 'source' => 'IMPORT'], null);
+        app(RecordHouseholdDeclarationAction::class)->handle($other, ['declared_household_size' => 3, 'source' => 'IMPORT'], null, null);
 
         $this->assertSame(2, FamilyHouseholdDeclaration::current()->count());
         $this->assertTrue($this->family->fresh()->currentHouseholdDeclaration->is_current);
@@ -175,6 +186,56 @@ class HouseholdDeclarationTest extends TestCase
         $this->actingAs($this->staff)->getJson("/api/v1/families/{$this->familyCode}")
             ->assertOk()
             ->assertJsonPath('data.member_count', 1);
+    }
+
+    // ------------------------------------------------- stale-write protection
+
+    /** @return array<string, array{0: bool, 1: string}> */
+    public static function staleExpectations(): array
+    {
+        return [
+            'expects none, one exists' => [true, 'none'],
+            'expects an older one' => [true, 'older'],
+            'expects one, none exists' => [false, 'some'],
+        ];
+    }
+
+    #[DataProvider('staleExpectations')]
+    public function test_a_stale_expectation_is_refused_and_writes_nothing(bool $withCurrent, string $expectation): void
+    {
+        $older = $this->declare(['declared_household_size' => 4]);
+        if ($withCurrent) {
+            $this->declare(['declared_household_size' => 5]);
+        } else {
+            // History only: no current declaration.
+            FamilyHouseholdDeclaration::whereKey($older->id)->update(['is_current' => false]);
+        }
+        $before = FamilyHouseholdDeclaration::orderBy('id')->get()->map->only(['id', 'declared_household_size', 'is_current'])->all();
+        $activities = FamilyActivity::where('event_type', FamilyActivityType::HOUSEHOLD_DECLARATION_RECORDED)->count();
+
+        try {
+            $this->declare(['declared_household_size' => 9], match ($expectation) {
+                'none' => null,
+                'older', 'some' => $older->id,
+            });
+            $this->fail('Expected HOUSEHOLD_DECLARATION_CHANGED.');
+        } catch (HouseholdDeclarationException $e) {
+            $this->assertSame(HouseholdDeclarationException::HOUSEHOLD_DECLARATION_CHANGED, $e->reason);
+            $this->assertSame(409, $e->render(request())->getStatusCode());
+        }
+
+        $this->assertSame($before, FamilyHouseholdDeclaration::orderBy('id')->get()->map->only(['id', 'declared_household_size', 'is_current'])->all());
+        $this->assertSame($activities, FamilyActivity::where('event_type', FamilyActivityType::HOUSEHOLD_DECLARATION_RECORDED)->count());
+    }
+
+    public function test_the_first_declaration_expects_none_and_the_next_expects_the_current_one(): void
+    {
+        $first = $this->declare(['declared_household_size' => 4], null);
+        $second = $this->declare(['declared_household_size' => 6], $first->id);
+
+        $this->assertFalse($first->fresh()->is_current);
+        $this->assertTrue($second->fresh()->is_current);
+        $this->assertSame($second->id, $this->currentId());
     }
 
     public function test_records_one_activity_without_the_declared_values(): void

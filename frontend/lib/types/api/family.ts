@@ -83,6 +83,12 @@ export interface FamilyDetail {
   declared_household_size: number | null;
   declared_living_sons: number | null;
   declared_living_daughters: number | null;
+  // When and by which source it was declared; null date = unknown.
+  declared_at: string | null;
+  declaration_source: RegistrationSource | null;
+  // Staff-only stale-write reference: sent back as
+  // expected_current_declaration_id; null = no current declaration.
+  current_declaration_id: number | null;
   male_count: number;
   female_count: number;
   members: FamilyMemberDetail[];
@@ -166,6 +172,22 @@ export interface UpdateFamilyPayload {
   // Changing clan_code requires a branch_code of that Clan, or null.
   clan_code?: string;
   branch_code?: string | null;
+}
+
+// POST /api/v1/families/{family}/household-declarations
+// (backend/app/Http/Requests/Api/V1/RecordHouseholdDeclarationRequest.php).
+// A NEW current declaration; values are sent as declared (null = not
+// declared, 0 is a value). Staff sources only — never IMPORT. No notes.
+export type StaffDeclarationSource = Exclude<RegistrationSource, "IMPORT">;
+
+export interface RecordHouseholdDeclarationPayload {
+  declared_household_size: number | null;
+  declared_living_sons: number | null;
+  declared_living_daughters: number | null;
+  declared_at: string | null;
+  source: StaffDeclarationSource;
+  // The current declaration the screen showed (null = none yet).
+  expected_current_declaration_id: number | null;
 }
 
 // Partial payload for PATCH /api/v1/families/{family}/residence

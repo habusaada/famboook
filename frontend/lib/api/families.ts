@@ -1,12 +1,13 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/client";
+import { ApiError, apiClient } from "@/lib/api/client";
 import type {
   AddFamilyMemberPayload,
   FamiliesListResponse,
   FamilyDetail,
   FamilyMemberDetail,
+  RecordHouseholdDeclarationPayload,
   RegisterFamilyPayload,
   ResourceResponse,
   UpdateFamilyPayload,
@@ -122,6 +123,29 @@ function invalidateMember(queryClient: ReturnType<typeof useQueryClient>, person
   queryClient.invalidateQueries({ queryKey: ["families"] });
   queryClient.invalidateQueries({ queryKey: ["people", personCode] });
   queryClient.invalidateQueries({ queryKey: ["people", "registry"] });
+}
+
+/**
+ * A new current household declaration (family.update). On a 409
+ * (HOUSEHOLD_DECLARATION_CHANGED: another declaration was recorded since
+ * the screen loaded) nothing was written and the family is refreshed.
+ */
+export function useRecordHouseholdDeclaration(familyCode: string) {
+  const queryClient = useQueryClient();
+  // ["families"] prefix-matches the profile, its timeline and the registry.
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["families"] });
+
+  return useMutation({
+    mutationFn: (payload: RecordHouseholdDeclarationPayload) =>
+      apiClient.post<ResourceResponse<FamilyDetail>>(
+        `/api/v1/families/${encodeURIComponent(familyCode)}/household-declarations`,
+        payload
+      ),
+    onSuccess: refresh,
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) refresh();
+    },
+  });
 }
 
 export function useUpdateFamilyResidence(familyCode: string) {

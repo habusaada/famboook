@@ -11,11 +11,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AddMemberDialog } from "@/components/families/add-member-dialog";
 import { EditFamilyRegistrationDialog } from "@/components/families/edit-family-registration-dialog";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
+import { RecordHouseholdDeclarationDialog } from "@/components/families/record-household-declaration-dialog";
 import { AssessmentStatusBadge } from "@/components/assessments/assessment-badges";
 import type { FamilySnapshot } from "@/components/families/family-snapshot";
 import type { FamilyDetail } from "@/lib/types/api/family";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
 import { healthRecordTypeLabels } from "@/lib/utils/health";
+import { registrationSourceLabels } from "@/lib/utils/registration-source";
 import { cn } from "@/lib/utils";
 
 const nf = new Intl.NumberFormat("ar");
@@ -76,6 +78,16 @@ function QuickFacts({ family, snapshot }: { family: FamilyDetail; snapshot: Fami
     family.declared_living_sons != null ? `الأبناء الذكور ${fmt(family.declared_living_sons)}` : null,
     family.declared_living_daughters != null ? `البنات ${fmt(family.declared_living_daughters)}` : null,
   ].filter((part): part is string => part !== null);
+  // When and from which source the current declaration was made.
+  const declaredBasis =
+    family.current_declaration_id == null
+      ? null
+      : [
+          family.declared_at ? `بتاريخ ${family.declared_at}` : "تاريخ الإقرار غير معروف",
+          family.declaration_source ? registrationSourceLabels[family.declaration_source] : null,
+        ]
+          .filter((part): part is string => part !== null)
+          .join(" · ");
 
   const facts: React.ReactNode[] = [
     <Fact
@@ -84,7 +96,14 @@ function QuickFacts({ family, snapshot }: { family: FamilyDetail; snapshot: Fami
       tone="text-brand-700"
       label="عدد أفراد الأسرة (المعلن)"
       value={family.declared_household_size == null ? "غير معلن" : <span className="tabular-nums">{fmt(family.declared_household_size)}</span>}
-      context={declaredChildren.length > 0 ? declaredChildren.join(" · ") : undefined}
+      context={
+        declaredChildren.length > 0 || declaredBasis ? (
+          <span className="flex flex-col" data-declaration-context>
+            {declaredChildren.length > 0 && <span className="truncate">{declaredChildren.join(" · ")}</span>}
+            {declaredBasis && <span className="truncate">{declaredBasis}</span>}
+          </span>
+        ) : undefined
+      }
     />,
     <Fact
       key="members"
@@ -219,6 +238,7 @@ export function FamilyIdentityHeader({ family, snapshot }: { family: FamilyDetai
         {(canAddMember || canEdit) && (
           <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
             {canEdit && <EditFamilyRegistrationDialog family={family} triggerLabel="تعديل بيانات الأسرة" />}
+            {canEdit && <RecordHouseholdDeclarationDialog family={family} />}
             {canAddMember && <AddMemberDialog familyCode={family.family_code} />}
           </div>
         )}

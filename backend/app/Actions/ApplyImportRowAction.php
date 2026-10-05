@@ -175,7 +175,8 @@ class ApplyImportRowAction
         // ---- declaration, residence --------------------------------------------------
         $declarationPlan = $rowPlan->effect(E::HOUSEHOLD_DECLARATION);
         if ($declarationPlan->intent === I::CREATE) {
-            $declaration = $this->attempt(fn () => $this->declarations->handle($family, $declarationPlan->values, $uid), $n, 'DECLARATION_INVALID');
+            // The Family was created by this row: no declaration is current yet (null).
+            $declaration = $this->attempt(fn () => $this->declarations->handle($family, $declarationPlan->values, null, $uid), $n, 'DECLARATION_INVALID');
             $record($declarationPlan, O::CREATED, $declaration);
         } else {
             $record($declarationPlan, O::OMITTED, null, $declarationPlan->reason);

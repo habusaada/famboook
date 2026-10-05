@@ -21,14 +21,8 @@ import { familyActivityPresentation, formatActivityTime } from "@/lib/utils/acti
 import { birthDateLabel, formatDateTime } from "@/lib/utils/date";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
 import { lifeStatusLabel } from "@/lib/utils/life-status";
+import { registrationSourceLabels } from "@/lib/utils/registration-source";
 import { cn } from "@/lib/utils";
-
-const registrationSourceLabels: Record<string, string> = {
-  PAPER_FORM: "نموذج ورقي",
-  MANUAL_ENTRY: "إدخال يدوي",
-  IMPORT: "استيراد بيانات",
-  VERIFIED_SOURCE: "مصدر موثّق",
-};
 
 // Established wording: "غير مسجّل" = not recorded (optional fields are not
 // errors); "غير محدد" / "غير معروف" keep their domain meanings.

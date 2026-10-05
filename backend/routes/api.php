@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
 use App\Http\Controllers\Api\V1\FamilyController;
+use App\Http\Controllers\Api\V1\FamilyHouseholdDeclarationController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
 use App\Http\Controllers\Api\V1\HealthRecordController;
@@ -129,6 +130,12 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
 
     Route::patch('/families/{family}/residence', [FamilyResidenceController::class, 'update'])
         ->middleware('can:residence.update');
+
+    // Declared Household Statistics (docs/03 §55c, FU-10): a NEW current
+    // declaration; the previous one stays as history. Stale-write protected
+    // by expected_current_declaration_id (409 HOUSEHOLD_DECLARATION_CHANGED).
+    Route::post('/families/{family}/household-declarations', [FamilyHouseholdDeclarationController::class, 'store'])
+        ->middleware('can:family.update');
 
     Route::post('/families/{family}/members', [FamilyMemberController::class, 'store'])
         ->middleware('can:person.create');

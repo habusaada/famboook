@@ -48,6 +48,12 @@ class FamilyDetailResource extends JsonResource
             'declared_household_size' => $declaration?->declared_household_size,
             'declared_living_sons' => $declaration?->declared_living_sons,
             'declared_living_daughters' => $declaration?->declared_living_daughters,
+            // When and by which source it was declared (NULL date = unknown).
+            'declared_at' => $declaration?->declared_at?->toDateString(),
+            'declaration_source' => $declaration?->source,
+            // Staff-only stale-write reference for the next declaration
+            // (expected_current_declaration_id); never in the Family Portal.
+            'current_declaration_id' => $declaration?->id,
             'male_count' => $members->filter(
                 fn ($m) => $m->person->gender?->value === 'MALE'
             )->count(),

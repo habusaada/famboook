@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\FamilyActivityType;
 use App\Enums\RegistrationSource;
+use App\Exceptions\HouseholdDeclarationException;
 use App\Models\Family;
 use App\Models\FamilyHouseholdDeclaration;
 use App\Support\FamilyActivityLog;
@@ -16,12 +17,21 @@ use Illuminate\Validation\ValidationException;
  * Records a new Declared Household Statistics entry for a Family (docs/03
  * §55c) and makes it the current one. The previous current declaration is
  * kept as history (is_current = false), never edited or deleted, so the
- * values behind past eligibility/assistance decisions survive.
+ * values behind past eligibility/assistance decisions survive. Callers: the
+ * Staff endpoint (permission family.update, docs/11 FU-10), the import
+ * (a Family it has just created) and, later, a Change Request application.
  *
  * Declared values are accepted as declared: consistency with the
  * registered members (e.g. size below 1 + spouses) is a review flag for
  * the caller, not a refusal here. They never create Persons and never
  * replace the derived Registered Household Size.
+ *
+ * Stale-write protection: the caller states which declaration it expects
+ * to be current — its id, or NULL for "none yet". Under the Family lock the
+ * current declaration is re-read; a different one is refused
+ * (HOUSEHOLD_DECLARATION_CHANGED, 409), so a stale screen or a request
+ * reviewed against an older declaration never silently replaces a newer
+ * one. The partial unique index stays the final guard.
  *
  * HOUSEHOLD_DECLARATION_RECORDED is recorded with no metadata (never the
  * declared counts).
@@ -41,8 +51,9 @@ class RecordHouseholdDeclarationAction
      *     source: string,
      *     notes?: string|null,
      * }  $data
+     * @param  int|null  $expectedCurrentId  the current declaration the caller saw; NULL = none
      */
-    public function handle(Family $family, array $data, ?int $actingUserId): FamilyHouseholdDeclaration
+    public function handle(Family $family, array $data, ?int $expectedCurrentId, ?int $actingUserId): FamilyHouseholdDeclaration
     {
         // Mirrors the Postgres CHECK constraints for every write path.
         $data = Validator::make($data, [
@@ -60,14 +71,25 @@ class RecordHouseholdDeclarationAction
             ]);
         }
 
-        return DB::transaction(function () use ($family, $data, $actingUserId) {
+        return DB::transaction(function () use ($family, $data, $expectedCurrentId, $actingUserId) {
             // Serializes concurrent declarations for the same Family.
             Family::query()->whereKey($family->id)->lockForUpdate()->firstOrFail();
 
-            FamilyHouseholdDeclaration::query()
+            // Re-read under the lock: the expectation is checked against
+            // committed state, never against what the caller loaded.
+            $currentId = FamilyHouseholdDeclaration::query()
                 ->where('family_id', $family->id)
                 ->where('is_current', true)
-                ->update(['is_current' => false, 'updated_by' => $actingUserId, 'updated_at' => now()]);
+                ->first(['id'])?->id;
+            if ($currentId !== $expectedCurrentId) {
+                throw new HouseholdDeclarationException(HouseholdDeclarationException::HOUSEHOLD_DECLARATION_CHANGED);
+            }
+
+            if ($currentId !== null) {
+                FamilyHouseholdDeclaration::query()
+                    ->whereKey($currentId)
+                    ->update(['is_current' => false, 'updated_by' => $actingUserId, 'updated_at' => now()]);
+            }
 
             $declaration = FamilyHouseholdDeclaration::create([
                 'family_id' => $family->id,
