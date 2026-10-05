@@ -944,6 +944,16 @@ GET  /api/v1/family/me
   `family` is null; the reason is not sent. Never a National ID, a mobile,
   an internal id, a permission list or a fingerprint. `Cache-Control:
   no-store`.
+- **Full Data Visibility (PWA-3B, AUTH-ADR-078, docs/11 §23a).** Family
+  data read routes stay behind `family.context`, take no Family or Person
+  identifier for the household itself, and carry masked National ID and
+  mobile values only. A full value leaves the server only through a
+  dedicated reveal endpoint: the self reveal (`POST
+  /api/v1/family/self/reveal`, owner from the Family context's Person) or
+  the member reveal designed in PWA-3B.4 (target checked against the
+  authenticated household's memberships; Coordinator scope never widens
+  it). Both: throttled, `no-store, private`, a security event without the
+  value. No new permission: `family-portal.access` + `family.context`.
 - **Activation gate.** `family.activation` runs first on the four
   activation routes: while `family_auth.activation_enabled` is false they
   answer 503 `ACTIVATION_UNAVAILABLE` with no lookup, event or SMS.
@@ -1420,6 +1430,22 @@ Example baseline:
 | Audit Metadata | Permission-based | HIDDEN | HIDDEN |
 
 Final visibility may be further restricted.
+
+**Family Portal amendment (2026-10-05, AUTH-ADR-078, docs/11 FP-ADR-062,
+A-18).** In the Family Portal "Family User Self" is the household head and
+"Other Family Member" an ACTIVE member of the head's household:
+
+| Field | Family User Self | Other Family Member |
+|---|---|---|
+| Person Code | **HIDDEN** (Family Portal `person_code` = INTERNAL_ONLY; supersedes FULL above) | **HIDDEN** |
+| Mobile, Alternate Mobile | MASKED by default, full value through the self reveal | MASKED by default, full value through the member reveal (PWA-3B.4) |
+| National ID | MASKED by default, full value through the self reveal | MASKED by default, full value through the member reveal (PWA-3B.4) |
+| Health, Disability | structured facts FULL; free-text details HIDDEN | structured facts FULL; free-text details HIDDEN |
+| Staff Notes, Audit Metadata | HIDDEN | HIDDEN |
+
+MASKED here is screen privacy, not withholding: the full value never
+travels in an ordinary payload (§36–§37 still hold) and is returned only
+by the dedicated, server-authorized reveal endpoint.
 
 ---
 
@@ -3588,6 +3614,12 @@ HIDDEN
 
 for other Family members.
 
+**Resolved for the Family Portal (2026-10-05, AUTH-ADR-078).** The
+household head reviews the household registry: other ACTIVE members'
+National ID and mobiles are MASKED with reveal (§38 amendment) and their
+structured health facts are visible (§123). The blanket HIDDEN default no
+longer applies to these fields there.
+
 ---
 
 # 122. Minor Privacy
@@ -3595,6 +3627,12 @@ for other Family members.
 Guardian/parent access rules for minors require explicit policy.
 
 Family membership alone must not be used as the only sensitive-data authorization rule.
+
+**Family Portal V1 (2026-10-05, AUTH-ADR-078).** The rule is the
+authenticated, eligible household head acting in their own resolved Family
+context (`family.context`) over the ACTIVE members of that household — not
+membership alone. No adult / minor distinction is made for Family Portal
+visibility in V1. Guardian rules for any other user remain open.
 
 ---
 
@@ -3616,6 +3654,15 @@ a Family User may **submit** health and disability information for review
 (docs/11 §15). A COORDINATOR sees no health, disability, pregnancy or
 breastfeeding details.
 
+**Amended 2026-10-05 (AUTH-ADR-078, docs/11 FP-ADR-062, PFP-006
+resolved).** Reading is no longer limited to the head's own submissions:
+in PWA-3B.6 the household head sees the structured health facts of their
+household's members — type, disability type, condition_name, started_at,
+ended_at, active state — with no adult / minor distinction.
+`person_health_records.details` stays HIDDEN. Seeing is not editing. A
+COORDINATOR still sees no health, disability, pregnancy or breastfeeding
+details.
+
 ---
 
 # 124. Needs Portal Visibility
@@ -3626,6 +3673,11 @@ Exact rules remain pending.
 
 Internal scoring, confidential notes, or prioritization logic should not automatically be exposed.
 
+**Decided 2026-10-05 (AUTH-ADR-078, PWA-3B.7).** Visible: need category,
+title, quantity, unit, status, created_at, resolved_at, related person
+name. HIDDEN: priority, description, closure_reason, source assessment,
+resolved_by and internal ids. Seeing a need is not mutating it.
+
 ---
 
 # 125. Assistance Portal Visibility
@@ -3633,6 +3685,15 @@ Internal scoring, confidential notes, or prioritization logic should not automat
 Assistance records may later be selectively visible.
 
 Internal operational information remains separate from Family-visible assistance history.
+
+**Decided 2026-10-05 (AUTH-ADR-078, PWA-3B.7).** Visible: actual,
+non-reversed deliveries to the household — assistance title, category,
+type, provider_name, delivered_at, item name, quantity, unit, unit_value,
+currency, receipt_mode, recipient / delegate name. HIDDEN: nomination
+source, targeting criteria, beneficiary statuses, approval / rejection /
+not-delivered decisions and reasons, export fields, beneficiary-list
+snapshots, Staff notes, reversal internals. Nothing is presented as an
+eligibility signal. Assessments (ratings, results, notes) stay HIDDEN.
 
 ---
 
@@ -4163,6 +4224,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-078
+Family Portal Full Data Visibility (2026-10-05, docs/11 §23a, FP-ADR-062): no permission or role added or seeded; Family Portal reads stay `family-portal.access` + `family.context`. The household head reviews family-facing canonical data of themselves and their ACTIVE household members; personal data is not hidden for being personal. National ID, mobile and alternate mobile are masked in ordinary payloads; full values only through `POST /api/v1/family/self/reveal` (field only, owner from the Family context's Person) and a PWA-3B.4 member reveal (household membership check, no Coordinator widening, no numeric id); both throttled, `no-store, private`, security-evented without the value, no re-authentication in V1. Structured health facts (§123), recorded needs (§124) and received assistance (§125) are visible; health details, need priority / description, targeting, assessments, Staff notes, audit and security data stay hidden. Family Portal `person_code` is INTERNAL_ONLY (§38 amended). Amends §38, §121, §122 (Family Portal V1), §123–§125.
+
 ### AUTH-ADR-077
 FU-10 (2026-10-05): no permission or role added or seeded. Recording a death (`POST /api/v1/people/{person}/record-death`) uses `person.record-death` (SUPER_ADMIN, ADMINISTRATOR) with a required verification method recorded as controlled activity metadata; the death is irreversible in V1 and a household head's death is allowed without succession (docs/11 FP-ADR-061). Recording a household declaration (`POST /api/v1/families/{family}/household-declarations`) uses the existing `family.update` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER). Both routes sit behind `auth:sanctum` and `staff.side`; Family Portal requests never call them — their APPLY calls the Domain Actions server-side.
 
@@ -4559,6 +4623,7 @@ Date: 2026-09-24
 | 1.2.39 | 2026-10-04 | Approved | Documentation consolidation (AUTH-ADR-075): §22a coordinator status wording; `family-verification.*` reserved for Staff Family Verification; Profile Review confirmation permission open (PFP-023). No permission seeded |
 | 1.2.40 | 2026-10-04 | Approved | AUTH-ADR-076: `person.record-death` is also the V1 authority for confirming UNKNOWN → ALIVE, with a required verification method; `person.correct` stays unassigned |
 | 1.2.41 | 2026-10-05 | Approved | FU-10 (AUTH-ADR-077): §96 Staff death recording with `person.record-death` and a required verification method; §43 `family.update` also authorizes a new household declaration. No permission seeded |
+| 1.2.42 | 2026-10-05 | Approved | Family Portal Full Data Visibility (AUTH-ADR-078, docs/11 FP-ADR-062): §22b reveal boundary; §38 Family Portal amendment (masked with reveal, person_code hidden, structured health visible); §121–§122 resolved for the Family Portal; §123 health, §124 needs and §125 received assistance decided. No permission seeded |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

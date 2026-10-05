@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.15
+**Version:** 1.16
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -470,7 +470,7 @@ VERIFIED.
 | Section | Arabic | Content |
 |---|---|---|
 | FAMILY | معلومات الأسرة | family identity for context (code, clan, branch) plus the household declaration under review |
-| HEAD | رب الأسرة | the head's own name, gender, birth date and marital status; the National ID only as recorded / not recorded — never its value |
+| HEAD | رب الأسرة | the head's own name, gender, birth date and marital status; the National ID masked with reveal (amended 2026-10-05, FP-ADR-062 — formerly "only as recorded / not recorded, never its value"), outside completeness and the staleness fingerprint |
 | MEMBERS | أفراد الأسرة | the active members, with the visibility of FP-ADR-056 (name, relationship, gender, birth date, life status) |
 | RESIDENCE | السكن | original residence, displacement status and location, current address (the approved Step 4 fields) |
 
@@ -492,7 +492,9 @@ FAMILY      INCOMPLETE when there is no current household declaration, or
 
 HEAD        INCOMPLETE when gender is null or birth_date is null.
             Marital status UNKNOWN is recommended only (not incomplete in
-            V1). The National ID value is never part of review.
+            V1). The National ID value is never part of completeness or
+            of the fingerprint; it may be displayed masked with reveal
+            (FP-ADR-062).
 
 MEMBERS     INCOMPLETE when any AVAILABLE active member has no relationship,
             no birth_date, or life_status UNKNOWN. An unavailable
@@ -851,6 +853,15 @@ BREASTFEEDING
 
 This amends docs/06 §123 (see §31, A-05).
 
+**Amended 2026-10-05 (FP-ADR-062, PFP-006 resolved, §31 A-18).** The two
+reading rules above are superseded for PWA-3B.6: the household head may
+review the structured health facts held about members of their household
+— type, disability type, condition_name, started_at, ended_at, active
+state — with no adult / minor distinction in V1. `details` (free text)
+stays internal. Visibility is not editing: family submissions remain the
+Change Request / health workflow (PWA-7). The coordinator rule is
+unchanged.
+
 ---
 
 # 16. Needs
@@ -879,7 +890,11 @@ is preserved.
 Whether formula and diapers stay titles under existing categories or
 become reference-data categories is a later product decision (PFP-009).
 Portal visibility of official needs and of assistance history remains
-governed by docs/06 §124–§125.
+governed by docs/06 §124–§125. **Decided 2026-10-05 (FP-ADR-062, §23a):**
+PWA-3B.7 shows recorded needs (category, title, quantity, unit, status,
+created_at, resolved_at, related person) — never priority, description,
+closure reason or source assessment — and actual non-reversed received
+assistance, never targeting, nomination or approval state.
 
 ---
 
@@ -1114,6 +1129,224 @@ every service.
 No separate Health, Needs, Assistance or Documents areas are planned yet:
 health and need submissions arrive through «+» and are followed in
 «طلباتي»; documents are request evidence, not a standalone area.
+
+**Amended 2026-10-05 (FP-ADR-062, §23a).** «حسابي» is the account view
+(PWA-3B.5) and holds «بياناتي الشخصية» (/family/account/me). Health facts,
+recorded needs and received assistance become READ views in PWA-3B (§23a);
+health and need *submissions* still arrive through «+» and «طلباتي».
+Documents stay request evidence, not an area.
+
+---
+
+# 23a. Full Data Visibility (PWA-3B — approved 2026-10-05)
+
+## Principle (FP-ADR-062)
+
+The Family Portal is intended to replace, as much as reasonably possible,
+a household head's visit to a data-update center. An authenticated
+household head must be able to review, from their phone, the family
+registry information needed to verify that their own and their
+household's records are correct.
+
+```text
+VIEW     the head reviews family-facing canonical registry data
+UPDATE   never directly: corrections and new events are submitted as
+         Change Requests, reviewed by Staff and APPLIED through canonical
+         Domain Actions (APPROVED ≠ APPLIED)
+```
+
+- Personally identifying data is **not** hidden merely because it is
+  personally identifying. Authorization, household isolation and the
+  authenticated Family context (`family.context`) are the protection
+  boundaries.
+- Internal Staff, audit, security, targeting, workflow and implementation
+  metadata stay hidden (below).
+- The head sees the current canonical value before being asked to submit a
+  correction for it; every family-facing correctable field should
+  eventually have an explicit request path (§14). Documenting visibility
+  approves no proposed request type.
+- PWA-3B is read visibility only and is delivered before PWA-5 (docs/07
+  RM-ADR-048).
+
+## Structure
+
+```text
+الرئيسية                summary only (identity card, declared vs registered,
+                        quick actions, Coordinator entry)
+أسرتي                   /family/household — the full family record: family,
+                        current declaration, current residence, members
+                        entry, household health summary (3B.6)
+أفراد الأسرة            /family/members — list + in-page member detail sheet
+الاحتياجات والمساعدات   recorded needs and received assistance (3B.7)
+طلباتي                  PWA-5 / PWA-6
+حسابي                   /family/account — account state (3B.5)
+  بياناتي الشخصية        /family/account/me — the head's own Person and
+                        membership data (3B.1); also linked from the head's
+                        own member card
+```
+
+«بياناتي الشخصية» is canonical Person / membership registry data; «حسابي»
+is authentication / account state, activation and trust status, roles and
+capabilities, the Coordinator entry and logout. A route-addressed member
+detail screen is not required: the initial direction is an in-page sheet
+fed by the member list, unless PWA-3B.4 proves a safe public member
+identifier is needed.
+
+## Family-facing data
+
+```text
+FAMILY        family_code; clan; branch group (when present); branch;
+              household head; registration_date; paper_form_no (when
+              present). Never registration_source or import machinery.
+
+DECLARATION   the CURRENT declaration only: declared_household_size,
+              declared_living_sons, declared_living_daughters, declared_at,
+              source. declared_household_size is the source-declared total:
+              never compared with, derived from or subtracted from the
+              registered members (§10). Historical declarations stay
+              internal. Source labels: PAPER_FORM «استمارة ورقية»,
+              MANUAL_ENTRY «إدخال يدوي», IMPORT «مستورد من السجل السابق»,
+              VERIFIED_SOURCE «مصدر موثّق».
+
+HEAD (self)   full_name; national_id, mobile, alternate_mobile (masked with
+              reveal); alternate_mobile_owner_relation; gender; birth_date
+              and age; marital_status; relationship; membership started_at.
+              life_status stays implicit while the head is eligible (ALIVE).
+
+MEMBERS       every ACTIVE membership, deceased included: full name;
+              relationship; household-head status; gender; birth date and
+              age; marital status; life status; death date (DECEASED with a
+              null date: «تاريخ الوفاة غير معروف», never inferred);
+              membership started_at; national_id, mobile, alternate_mobile
+              (masked with reveal, PWA-3B.4); structured health facts
+              (PWA-3B.6).
+
+RESIDENCE     the CURRENT residence: original_residence_text,
+              displacement_status, displacement_location_text, governorate,
+              city, area, neighborhood, address_text, residence_type,
+              started_at (when present). No residence history is invented:
+              UpdateFamilyResidenceAction corrects in place (FU-02).
+
+HEALTH        (PWA-3B.6, PFP-006 resolved) structured facts of household
+              members, no adult / minor distinction in V1: type
+              (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING),
+              disability type, condition_name, started_at, ended_at,
+              active / ended. No infant or milk fields are invented;
+              formula and diapers are needs.
+
+NEEDS         (PWA-3B.7) recorded family needs: category, title, quantity,
+              unit, status, created_at, resolved_at, related person name.
+
+ASSISTANCE    (PWA-3B.7) actual, non-reversed deliveries only: assistance
+              title, category, type, provider_name, delivered_at, item
+              name, quantity, unit, unit_value, currency, receipt_mode,
+              recipient / delegate name. Never presented as an eligibility
+              signal.
+
+ACCOUNT       (PWA-3B.5) account active state, activation date, login
+              mobile trust summary, roles and capabilities, Coordinator
+              capability, scope summary and entry, entry to «بياناتي
+              الشخصية», logout. Coordinator scope never mixes with
+              household registry data.
+```
+
+Not in PWA-3B: assessments (INTERNAL_ONLY; a neutral "last assessment
+date" may be considered later), family activity history (after PWA-5:
+human-readable request and registry events, never actor ids, raw
+metadata, security events or implementation details), Documents (not
+implemented; `document.*` permissions do not mean a module exists).
+
+## Internal-only data
+
+Never sent to the Family Portal:
+
+```text
+identifiers     numeric database ids; person_code (Family Portal
+                person_code = INTERNAL_ONLY, revisited only if a safe
+                public member identifier is needed); the declaration id;
+                paper_sequence_no
+lifecycle       created_by / updated_by and every *_by; deleted_at;
+                is_current; persons.is_active; ended memberships, end_reason
+Staff text      families / persons / memberships / residences /
+                declarations notes; person_health_records.details (free
+                text, may hold clinical notes); family_needs.description
+                and closure_reason; delivery notes
+Staff data      registration_source; residence source, latitude /
+                longitude (unless separately approved); need priority;
+                source_assessment_id; resolved_by
+targeting       nomination_source, targeting_criteria, beneficiary
+                statuses, approval / rejection / not-delivered decisions
+                and reasons, export_fields, beneficiary-list snapshots,
+                reversal internals
+assessments     ratings, results, notes, general_notes
+audit           family_activities actor ids and raw metadata; import
+                batches, rows and apply records
+security        passwords, remember tokens, sessions, login_key, HMAC
+                fingerprints, key versions, OTP data, security events,
+                revoked / stale trust history
+```
+
+## Sensitive values: masked by default, revealed on request
+
+The mask is **screen privacy**, not authorization to withhold a value from
+the person entitled to review it.
+
+- Ordinary payloads carry masked values only: National ID by the existing
+  `NationalIdMask` (last 4 visible), mobiles by the existing mobile mask
+  (`05` + last 3 visible).
+- Each value has its own Eye control («إظهار» / «إخفاء»), accessible and
+  RTL-correct. A reveal is temporary: never persisted (no
+  localStorage / sessionStorage), reset on navigation or reload, no
+  automatic clipboard copy.
+
+**Self reveal (PWA-3B.2).** `POST /api/v1/family/self/reveal`, body: the
+field only — `NATIONAL_ID`, `MOBILE` or `ALTERNATE_MOBILE`; response: only
+that value. No person id, `person_code`, family id / code or any other
+target is accepted. The owner is resolved exclusively from the
+authenticated Family context's Person. Behind `auth:sanctum` →
+`family.side` → `can:family-portal.access` → `family.context`, a dedicated
+throttle, CSRF under the stateful Sanctum session,
+`Cache-Control: no-store, private`. Each successful reveal records a
+security event carrying the field code, never the value; no Family
+Activity event. No password / OTP re-authentication in V1.
+
+**Member reveal (PWA-3B.4).** For ACTIVE household members the head may
+reveal National ID, mobile and alternate mobile when present — reviewing
+the household registry. Never through the self endpoint and never in
+ordinary list payloads. Its own boundary, designed in PWA-3B.4:
+`family.context`; the target must belong to the authenticated household
+through the canonical membership rules; Coordinator scope never widens
+access; no cross-family target; no raw numeric database id as the member
+reference (the safe reference is a PWA-3B.4 design issue, §33a FU-13); no
+caching; throttle; a security event without the value.
+
+## Display vocabulary
+
+| State | Arabic |
+|---|---|
+| Value absent (null) | «غير مسجّل» — e.g. birth_date null: «تاريخ الميلاد غير مسجّل» |
+| Explicit UNKNOWN enum | «غير معروف» |
+| Life status UNKNOWN | «الحالة غير مؤكدة» |
+| Declaration value not declared | «غير مُعلن» |
+| No current entity / record | a specific phrase: «لا يوجد إقرار مسجّل», «لم يُسجَّل عنوان السكن الحالي» |
+| Not applicable | the row is omitted — never "-" |
+| Zero | `0` — never «غير مسجّل» |
+| Person unavailable | «بيانات هذا الفرد غير متاحة حاليًا» |
+| DECEASED, death date null | «تاريخ الوفاة غير معروف» |
+
+## Relationship with Profile Review and Change Requests
+
+- Full Data Visibility and Family Profile Review (§9) are separate. The
+  review keeps FAMILY, HEAD, MEMBERS, RESIDENCE and its completeness rules
+  unchanged; showing more data adds nothing to completeness or to the
+  staleness fingerprint. The HEAD National ID may be shown masked with
+  reveal in the review, outside completeness and fingerprint. Health is
+  not a V1 review section.
+- Visibility never means direct editing. Correction paths (§14):
+  PERSON_CORRECTION, RESIDENCE_UPDATE, ADD_FAMILY_MEMBER, BIRTH_REPORT,
+  DEATH_REPORT, CONTACT_UPDATE (approved); HOUSEHOLD_DECLARATION_UPDATE,
+  HEALTH_RECORD_SUBMISSION, NEED_SUBMISSION, FAMILY_DATA_UPDATE (still
+  proposed, PFP-008).
 
 ---
 
@@ -1413,7 +1646,8 @@ PWA-1   Family identity and access — delivered as slices PWA-1A … PWA-1I
 PWA-2   Family authentication — its scope (activation, OTP, login, reset)
         is delivered inside PWA-1E … PWA-1G; no separate phase remains
 PWA-3   Family shell and read-only portal — delivered as PWA-3A
-        (household read views; DONE)
+        (household read views; DONE) and PWA-3B (Full Data Visibility,
+        §23a, slices 3B.1 … 3B.7)
 PWA-4   Family Profile Review (Staff Family Verification deferred) —
         delivered AFTER PWA-5 and the first PWA-6 request types
 PWA-5   Change Request engine and Staff review workspace
@@ -1425,8 +1659,10 @@ PWA-10  PWA installability; security, performance and accessibility
         hardening
 ```
 
-Delivery order differs from the numbers (approved 2026-10-04): PWA-3A →
-documentation and ADR consolidation → Change Request prerequisites → PWA-5
+Delivery order differs from the numbers (approved 2026-10-04; PWA-3B
+inserted 2026-10-05, docs/07 RM-ADR-048): PWA-3A →
+documentation and ADR consolidation → Change Request prerequisites →
+PWA-3B Full Data Visibility → PWA-5
 → first PWA-6 request types (FP-ADR-059) → PWA-4 Family Profile Review →
 later account / contact → PWA-7 health and need submissions → optional
 Staff Family Verification and PWA-8 card.
@@ -2368,6 +2604,17 @@ GET /api/v1/family/household/profile   family facts + the CURRENT residence
   Labels: «السكن الأصلي», «الحالة غير مؤكدة», «متوفى/متوفاة», «بيانات هذا
   الفرد غير متاحة حاليًا».
 
+*Superseded in part on 2026-10-05 by FP-ADR-062 (§23a); this record stays
+as the history of what PWA-3A delivered.* The PWA-3A exclusions of member
+National ID, mobile and marital status, of `address_text` and
+`residence_type`, of declared sons / daughters and declaration source,
+and of registration date no longer describe the target: PWA-3B shows them
+(sensitive values masked, full values only through reveal endpoints).
+The exclusions of `person_code`, notes, ids, coordinates, residence
+source / flags and status stay. The UI wording «تاريخ الميلاد غير معروف»
+for a null birth date is corrected to «تاريخ الميلاد غير مسجّل» (§23a
+vocabulary).
+
 ## Installable Family app implementation record — manifest, icon, service worker
 
 Implemented 2026-10-04 (FP-ADR-055). Frontend only; no backend change.
@@ -2528,6 +2775,7 @@ also annotated at its original location.
 | A-15 | docs/03 "Verified is not beneficiary": verification makes a family eligible to be considered by targeting and nomination; docs/11 §13 chain Complete → Verified → Eligible | No review or verification state is an eligibility gate | **Amended (FP-ADR-058).** Neither Account Verification, Family Profile Review nor Staff Family Verification makes a family eligible or ineligible; programmes keep their own criteria |
 | A-16 | docs/02 §20a / §75, docs/03 §55 / §55c, docs/04: Registered Household Size excludes DECEASED | registered_member_count counts every ACTIVE membership | **Amended (FP-ADR-056).** "Registered members" = active memberships; the living population is named "living members" (targeting, health summaries) |
 | A-17 | docs/11 §9–§11, docs/02 §45a, docs/03, docs/05: Profile Completion and Family Verification, VERIFIED after the family submits | Family Profile Review by the head, separate from Staff verification | **Amended (FP-ADR-057).** Profile Review (CONFIRMED, never VERIFIED) is distinct from Account Verification and Staff Family Verification |
+| A-18 | docs/06 §38 (Family self National ID "MASKED by default"; other members' mobile / National ID HIDDEN; Person Code FULL), §121 (adult member sensitive fields HIDDEN), §123 (health hidden), §124–§125 (needs / assistance pending); docs/11 FP-ADR-056 allow-list, §9 HEAD, §15, §23 | Full Data Visibility (§23a, 2026-10-05) | **Amended (FP-ADR-062).** For the Family Portal: own and members' National ID / mobiles masked with reveal through dedicated endpoints; structured health facts, recorded needs and received assistance visible; person_code INTERNAL_ONLY; internal Staff, audit, security and targeting data stay hidden |
 
 ---
 
@@ -2857,6 +3105,9 @@ soft-deleted state; "living members" names the targeting / health
 population. One row per active membership; a soft-deleted Person is a
 placeholder that keeps the membership relationship. The profile shows the
 current residence only.
+(Its explicit allow-list — the exclusions listed in the §30a PWA-3A
+record — is superseded in part by FP-ADR-062; the counting, placeholder,
+no-store and current-residence-only rules stay.)
 
 FP-ADR-057
 Family Profile Review (مراجعة ملف الأسرة) is separate from Account
@@ -2949,6 +3200,66 @@ D4  Staff may record the current household head's death. No successor is
 DEATH_REPORT (non-head, PWA-6) will APPLY through RecordPersonDeathAction
 server-side; HOUSEHOLD_DECLARATION_UPDATE stays proposed (PFP-008). Change
 Request APPLY never calls the Staff routes.
+
+FP-ADR-062
+Family Portal Full Data Visibility (§23a, PWA-3B — approved 2026-10-05).
+Principle: the portal replaces, as far as reasonable, a visit to a
+data-update center; the household head reviews the family-facing
+canonical registry data of themselves and their household. VIEW is not
+UPDATE: changes are Change Requests applied through Domain Actions.
+Personal data is not hidden merely for being personal; authorization,
+household isolation and family.context are the boundaries; internal Staff,
+audit, security, targeting, workflow and implementation data stay hidden.
+Decisions:
+- «بياناتي الشخصية» lives under «حسابي» (/family/account/me) and is also
+  linked from the head's own member card; «حسابي» is the account view.
+- The head sees their own full_name, national_id, mobile, alternate_mobile
+  (masked by default, each with its own Eye reveal), alternate-mobile
+  owner relation, gender, birth date / age, marital status, relationship
+  and membership start.
+- Self reveal: POST /api/v1/family/self/reveal, field NATIONAL_ID | MOBILE
+  | ALTERNATE_MOBILE only; owner from the Family context's Person; no
+  target input; no-store, private; throttle; CSRF; a security event with
+  the field code, never the value; no Family Activity event; no
+  re-authentication in V1. Masks: NationalIdMask (last 4), mobile mask
+  (05 + last 3). Reveal state never persisted, no clipboard copy.
+- ACTIVE household members: National ID, mobile and alternate mobile are
+  masked with reveal, through a separate member-reveal boundary designed
+  in PWA-3B.4 (family.context, canonical membership check, no Coordinator
+  widening, no cross-family target, no raw numeric id, no caching,
+  throttle, security event without the value). Never in list payloads.
+- Member detail: name, relationship, head status, gender, birth date, age,
+  marital status, life status, death date («تاريخ الوفاة غير معروف» when
+  null), membership start, masked identity / contact, health facts.
+  Deceased members stay visible. An in-page sheet; no route-addressed
+  member screen unless PWA-3B.4 needs one.
+- «أسرتي» is the full family record: family code, clan, branch group,
+  branch, head, registration date, paper form number; the CURRENT
+  declaration (size, sons, daughters, date, source — never arithmetic
+  against the registered members); the CURRENT residence including
+  address_text, residence_type and started_at.
+- PFP-006 resolved: structured health facts of household members (type,
+  disability type, condition_name, dates, active state), no adult / minor
+  distinction in V1; `details` internal.
+- Recorded needs (category, title, quantity, unit, status, created_at,
+  resolved_at, person) and actual non-reversed received assistance
+  (title, category, type, provider, delivered_at, item, quantity, unit,
+  unit_value, currency, receipt mode, recipient / delegate) are visible;
+  priority, description, closure reason, targeting, nomination, approval
+  and reversal internals are not.
+- Assessments stay internal; family activity history waits for PWA-5;
+  Documents are not implemented and are not part of PWA-3B.
+- Family Portal person_code = INTERNAL_ONLY (resolves the docs/06 §38
+  "FULL" vs §30a "never" conflict; revisited only if a safe public member
+  identifier is needed).
+- Profile Review sections and completeness are unchanged; the HEAD
+  National ID may be shown masked with reveal, outside completeness and
+  fingerprint; health is not a V1 review section.
+- Documenting visibility approves no proposed request type.
+Supersedes in part: FP-ADR-056 (its allow-list exclusions), the §9 HEAD
+"never its value" rule, the §15 health reading rules, the §23 "no Health /
+Needs / Assistance areas" note, docs/06 §38 / §121 / §123–§125 as they
+apply to the Family Portal (§31 A-18).
 ```
 
 ---
@@ -2988,9 +3299,11 @@ household head.
 DECIDED 2026-10-02: allowed, but only through an individual verification per
 Person; no automatic trust (FP-ADR-028).
 
-PFP-006  (PWA-7)
+PFP-006  — RESOLVED 2026-10-05 (FP-ADR-062)
 Exact health and disability visibility between adult family members, and
-for minors.
+for minors. Decided for V1: the household head reviews the structured
+health facts of all household members (no adult / minor distinction);
+free-text details stay internal.
 
 PFP-007  (Staff Family Verification)
 Approval of the verification invalidation decision table (§12). Applies to
@@ -3105,6 +3418,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-10 | **Resolved 2026-10-05 (FP-ADR-061).** Staff paths exist for both apply targets: `POST /api/v1/people/{person}/record-death` (`person.record-death`, verification method required, death date explicit, irreversible, head death allowed without succession) and `POST /api/v1/families/{family}/household-declarations` (`family.update`, Staff sources only, stale-write protected); Staff UI actions «تسجيل وفاة» and «تسجيل إقرار أسرة». No migration | Done; DEATH_REPORT (PWA-6) and HOUSEHOLD_DECLARATION_UPDATE (PFP-008) apply through the same actions server-side |
 | FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.view-history`, `family-membership.transfer`. (`person.record-death` is now read by `confirm-alive` and `record-death`.) | Reserved for their phases (docs/06) |
 | FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
+| FU-13 | Member reveal reference: `family_memberships` and `persons` have no public identifier the Family Portal may use (`person_code` is INTERNAL_ONLY, numeric ids are never exposed); the member-reveal boundary needs a safe target reference | PWA-3B.4 design; no migration decided yet |
 
 ---
 
@@ -3129,3 +3443,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.13 | 2026-10-04 | Approved | Documentation and ADR consolidation: §9 Family Profile Review (V1 sections, derived completeness and states, confirmation, dedicated fingerprint key, Change Request relationship) and §11 Staff Family Verification kept separate (FP-ADR-057); §10 registered members = active memberships, living members named (FP-ADR-056); §13 no automatic eligibility (FP-ADR-058); §14 first-release request direction, RESIDENCE_UPDATE = correction, UNKNOWN → ALIVE prerequisite (FP-ADR-059); §23 portal structure; §25 routes; §28 concepts; §30 delivery order; §30a PWA-3A record; §31 A-15 … A-17; PFP-007 / 017 / 018 clarified, PFP-023 / 024; §33a FU-02 answered, FU-07 … FU-12. Documentation only |
 | 1.14 | 2026-10-04 | Approved | FU-07 / PFP-024 resolved (FP-ADR-060): ConfirmPersonAliveAction (UNKNOWN → ALIVE only), Staff endpoint and action with a recorded verification method, UNKNOWN heads confirmed only by Staff; §14 PERSON_CORRECTION / CONFIRM_ALIVE apply target |
 | 1.15 | 2026-10-05 | Approved | FU-10 resolved (FP-ADR-061): Staff death recording (verification method, explicit death date, irreversible in V1, head death allowed without succession — FU-01 still open) and Staff household declarations (`family.update`, Staff sources, stale-write protection); §9 Staff declaration path is a Profile Review prerequisite; §14 apply targets; FU-11 updated. No migration |
+| 1.16 | 2026-10-05 | Approved | Full Data Visibility (FP-ADR-062): §23a principle, structure («حسابي» → «بياناتي الشخصية»), family-facing data per domain, internal-only data, self reveal (POST /api/v1/family/self/reveal) and member-reveal boundary (PWA-3B.4), display vocabulary, Profile Review and Change Request relationship; PFP-006 resolved; FP-ADR-056, §9 HEAD, §15, §23 and the §30a PWA-3A exclusions superseded in part (kept as history); §31 A-18; FU-13; PWA-3B in the phases. Documentation only |
