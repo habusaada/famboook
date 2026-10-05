@@ -26,7 +26,7 @@ class FamilyHouseholdController extends Controller
 
         return (new FamilyHouseholdResource($this->household->summary($context), $context->person))
             ->response()
-            ->header('Cache-Control', 'no-store');
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /** One row per active membership of the resolved Family (PWA-3A Step 3). */
@@ -37,7 +37,7 @@ class FamilyHouseholdController extends Controller
         return response()->json(['data' => [
             'family_code' => $context->family->family_code,
             'members' => FamilyHouseholdMemberResource::collection($this->household->members($context)),
-        ]])->header('Cache-Control', 'no-store');
+        ]])->header('Cache-Control', 'no-store, private');
     }
 
     /** The «أسرتي» profile: family facts and the current residence (PWA-3A Step 4). */
@@ -47,6 +47,6 @@ class FamilyHouseholdController extends Controller
 
         return (new FamilyHouseholdProfileResource($this->household->profile($context), $context->person))
             ->response()
-            ->header('Cache-Control', 'no-store');
+            ->header('Cache-Control', 'no-store, private');
     }
 }

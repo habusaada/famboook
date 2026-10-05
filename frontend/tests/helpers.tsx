@@ -55,7 +55,14 @@ export function familyMember(overrides: Partial<FamilyMember> = {}): FamilyMembe
     is_household_head: false,
     gender: "MALE",
     birth_date: "2010-01-01",
+    marital_status: "SINGLE",
     life_status: "ALIVE",
+    death_date: null,
+    national_id_masked: "*****4321",
+    mobile_masked: null,
+    alternate_mobile_masked: null,
+    alternate_mobile_owner_relation: null,
+    membership_started_at: "2010-01-01",
     ...overrides,
   };
 }
@@ -71,22 +78,35 @@ export function familyMembers(members?: FamilyMember[]): FamilyMembers {
   };
 }
 
-/** A synthetic, complete «أسرتي» profile; nothing here is real registry data. */
+/** A synthetic, complete «أسرتي» record; nothing here is real registry data. */
 export function familyProfile(
   family: Partial<FamilyProfile["family"]> = {},
-  residence: Partial<NonNullable<FamilyProfile["residence"]>> | null = {}
+  residence: Partial<NonNullable<FamilyProfile["residence"]>> | null = {},
+  declaration: Partial<NonNullable<FamilyProfile["declaration"]>> | null = {}
 ): FamilyProfile {
   return {
     family: {
       family_code: "FAM-000123",
       clan_name: "عائلة الاختبار",
+      branch_group_name: "مجموعة الاختبار",
       branch_name: "فرع الاختبار",
       head: { full_name: "سالم الاختبار" },
-      declared_household_size: 7,
-      declared_at: "2026-09-01",
+      registration_date: "2011-11-11",
+      paper_form_no: "PF-7788",
       registered_member_count: 2,
       ...family,
     },
+    declaration:
+      declaration === null
+        ? null
+        : {
+            declared_household_size: 7,
+            declared_living_sons: 3,
+            declared_living_daughters: 2,
+            declared_at: "2026-09-01",
+            source: "PAPER_FORM",
+            ...declaration,
+          },
     residence:
       residence === null
         ? null
@@ -94,7 +114,15 @@ export function familyProfile(
             original_residence_text: "بني سهيلا – خانيونس",
             displacement_status: "DISPLACED",
             displacement_location_text: "مواصي خانيونس",
-            current_address: { governorate: "خانيونس", city: "خانيونس", area: "المواصي", neighborhood: "حي الاختبار" },
+            residence_type: "خيمة",
+            started_at: "2024-01-02",
+            current_address: {
+              governorate: "خانيونس",
+              city: "خانيونس",
+              area: "المواصي",
+              neighborhood: "حي الاختبار",
+              address_text: "قرب مسجد الاختبار",
+            },
             ...residence,
           },
   };

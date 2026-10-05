@@ -8,7 +8,7 @@ import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_PROFILE_QUERY_KEY, type FamilyProfile } from "@/lib/api/family-household";
 import { browserStorageDump, familyGet, familyProfile, renderWithClient } from "./helpers";
 
-// PWA-3A Step 4: /family/household («أسرتي») on GET
+// PWA-3A Step 4, completed by PWA-3B.3: /family/household («أسرتي») on GET
 // /api/v1/family/household/profile. Synthetic data only.
 
 const router = { replace: vi.fn(), push: vi.fn() };
@@ -23,7 +23,7 @@ vi.mock("next/link", () => ({
 }));
 
 const PROFILE = "/api/v1/family/household/profile";
-const EMPTY_ADDRESS = { governorate: null, city: null, area: null, neighborhood: null };
+const EMPTY_ADDRESS = { governorate: null, city: null, area: null, neighborhood: null, address_text: null };
 
 function renderHousehold(profile: FamilyProfile | Error | (() => Promise<unknown>) = familyProfile()) {
   const get = vi.spyOn(apiClient, "get").mockImplementation(familyGet({ profile }));
@@ -36,7 +36,8 @@ function renderHousehold(profile: FamilyProfile | Error | (() => Promise<unknown
   return { get, ...result };
 }
 
-const info = () => screen.findByRole("region", { name: "معلومات الأسرة" });
+const info = () => screen.findByRole("region", { name: "بيانات الأسرة" });
+const declarationCard = () => screen.findByRole("region", { name: "الإقرار الأسري الحالي" });
 const residenceCard = () => screen.findByRole("region", { name: "السكن" });
 const field = (container: HTMLElement, name: string) => container.querySelector(`[data-field="${name}"] dd`) as HTMLElement | null;
 
@@ -58,61 +59,106 @@ describe("the page", () => {
     expect(paths.join(" ")).not.toMatch(/family_id|residence_id|declaration_id|person_id|\?/);
   });
 
-  it("has one h1 «أسرتي» with the family code (LTR) beside it, and three section headings", async () => {
+  it("has one h1 «أسرتي» with the family code (LTR) beside it, and four section headings", async () => {
     const { container } = renderHousehold();
     await info();
 
     expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["أسرتي"]);
     expect(container.querySelector("header [data-family-code]")).toHaveAttribute("dir", "ltr");
     expect(container.querySelector("header [data-family-code]")?.textContent).toBe("FAM-000123");
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["معلومات الأسرة", "السكن", "أفراد الأسرة"]);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "بيانات الأسرة",
+      "الإقرار الأسري الحالي",
+      "السكن",
+      "أفراد الأسرة",
+    ]);
   });
 });
 
-describe("معلومات الأسرة", () => {
-  it("shows the complete family facts", async () => {
-    renderHousehold(familyProfile({ declared_household_size: 7, declared_at: "2026-09-01", registered_member_count: 5 }));
+describe("بيانات الأسرة", () => {
+  it("shows the complete family record", async () => {
+    renderHousehold(familyProfile({ registered_member_count: 5 }));
     const card = await info();
 
     expect(field(card, "family_code")?.querySelector("[dir=ltr]")?.textContent).toBe("FAM-000123");
     expect(field(card, "clan")?.textContent).toBe("عائلة الاختبار");
+    expect(field(card, "branch_group")?.textContent).toBe("مجموعة الاختبار");
     expect(field(card, "branch")?.textContent).toBe("فرع الاختبار");
     expect(field(card, "head")?.textContent).toBe("سالم الاختبار");
     expect(field(card, "head")?.querySelector("bdi")).not.toBeNull();
-    expect(field(card, "declared_household_size")?.textContent).toBe("7");
-    expect(field(card, "declared_at")?.textContent).toBe("1 سبتمبر 2026");
+    expect(field(card, "registration_date")?.textContent).toBe("11 نوفمبر 2011");
+    expect(field(card, "paper_form_no")?.textContent).toBe("PF-7788");
     expect(field(card, "registered_member_count")?.textContent).toBe("5");
-    expect(within(card).getByText(SUMMARY_CAPTION)).toBeInTheDocument();
+    expect(Array.from(card.querySelectorAll("[data-field]")).map((el) => el.getAttribute("data-field"))).toEqual([
+      "family_code", "clan", "branch_group", "branch", "head", "registration_date", "paper_form_no", "registered_member_count",
+    ]);
   });
 
-  it("hides the branch and the declaration date when there are none", async () => {
-    renderHousehold(familyProfile({ branch_name: null, declared_at: null }));
+  it("omits the branch group, branch and paper form number when there are none, and says «غير مسجّل» for a missing date", async () => {
+    renderHousehold(familyProfile({ branch_group_name: null, branch_name: null, paper_form_no: null, registration_date: null }));
     const card = await info();
 
-    expect(card.querySelector('[data-field="branch"]')).toBeNull();
-    expect(card.querySelector('[data-field="declared_at"]')).toBeNull();
-    expect(within(card).queryByText("الفرع")).not.toBeInTheDocument();
-    expect(within(card).queryByText("تاريخ الإقرار")).not.toBeInTheDocument();
+    for (const name of ["branch_group", "branch", "paper_form_no"]) {
+      expect(card.querySelector(`[data-field="${name}"]`), name).toBeNull();
+    }
+    expect(field(card, "registration_date")?.textContent).toBe(NOT_RECORDED);
   });
 
-  it("says «غير مُعلن» for a null declared size, and keeps a declared zero", async () => {
-    renderHousehold(familyProfile({ declared_household_size: null }));
-    expect(field(await info(), "declared_household_size")?.textContent).toBe("غير مُعلن");
-  });
-
-  it("keeps a declared zero as 0", async () => {
-    renderHousehold(familyProfile({ declared_household_size: 0 }));
-    expect(field(await info(), "declared_household_size")?.textContent).toBe("0");
-  });
-
-  it("never shows registration, status, source, paper form or declared children", async () => {
+  it("never shows a status, a registration source or internal data", async () => {
     renderHousehold();
     const card = await info();
 
-    expect(card.textContent).not.toMatch(/تاريخ التسجيل|الحالة|المصدر|رقم الاستمارة|أبناء|بنات|ذكور|إناث/);
-    expect(Array.from(card.querySelectorAll("[data-field]")).map((el) => el.getAttribute("data-field"))).toEqual([
-      "family_code", "clan", "branch", "head", "declared_household_size", "declared_at", "registered_member_count",
-    ]);
+    expect(card.textContent).not.toMatch(/الحالة|مصدر التسجيل|ملاحظ|PER-|null|undefined/);
+  });
+});
+
+describe("الإقرار الأسري الحالي", () => {
+  it("shows the current declaration as declared, with its date and source", async () => {
+    renderHousehold();
+    const card = await declarationCard();
+
+    expect(field(card, "declared_household_size")?.textContent).toBe("7");
+    expect(field(card, "declared_living_sons")?.textContent).toBe("3");
+    expect(field(card, "declared_living_daughters")?.textContent).toBe("2");
+    expect(field(card, "declared_at")?.textContent).toBe("1 سبتمبر 2026");
+    expect(field(card, "declaration_source")?.textContent).toBe("استمارة ورقية");
+    expect(within(card).getByText(SUMMARY_CAPTION)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["IMPORT", "مستورد من السجل السابق"],
+    ["PAPER_FORM", "استمارة ورقية"],
+    ["MANUAL_ENTRY", "إدخال يدوي"],
+    ["VERIFIED_SOURCE", "مصدر موثّق"],
+  ] as const)("labels the source %s as «%s»", async (source, label) => {
+    renderHousehold(familyProfile({}, {}, { source }));
+    expect(field(await declarationCard(), "declaration_source")?.textContent).toBe(label);
+  });
+
+  it("says «غير مُعلن» for an undeclared value, keeps 0, and «غير مسجّل» for a missing date", async () => {
+    renderHousehold(familyProfile({}, {}, { declared_household_size: null, declared_living_sons: 0, declared_living_daughters: null, declared_at: null }));
+    const card = await declarationCard();
+
+    expect(field(card, "declared_household_size")?.textContent).toBe("غير مُعلن");
+    expect(field(card, "declared_living_sons")?.textContent).toBe("0");
+    expect(field(card, "declared_living_daughters")?.textContent).toBe("غير مُعلن");
+    expect(field(card, "declared_at")?.textContent).toBe(NOT_RECORDED);
+  });
+
+  it("says «لا يوجد إقرار مسجّل» when there is no current declaration — never zeros", async () => {
+    renderHousehold(familyProfile({}, {}, null));
+    const card = await declarationCard();
+
+    expect(within(card).getByText("لا يوجد إقرار مسجّل")).toBeInTheDocument();
+    expect(card.querySelector("[data-field]")).toBeNull();
+    expect(card.textContent).not.toContain("0");
+  });
+
+  it("never computes a difference with the registered members", async () => {
+    renderHousehold(familyProfile({ registered_member_count: 2 }, {}, { declared_household_size: 9 }));
+    await declarationCard();
+
+    expect(document.body.textContent).not.toMatch(/(^|\D)7(\D|$)|غير مسجلين|ناقص|مفقود|الفرق/);
   });
 });
 
@@ -127,8 +173,16 @@ describe("السكن", () => {
     expect(field(card, "displacement_location")?.textContent).toBe("مواصي خانيونس");
     expect(field(card, "current_address")?.textContent).toBe("حي الاختبار، المواصي، خانيونس، خانيونس");
     expect(field(card, "current_address")?.querySelectorAll("bdi")).toHaveLength(4);
+    expect(field(card, "address_text")?.textContent).toBe("قرب مسجد الاختبار");
+    expect(field(card, "residence_type")?.textContent).toBe("خيمة");
+    expect(field(card, "residence_started_at")?.textContent).toBe("2 يناير 2024");
     // The approved label, without the old "(قبل النزوح)".
-    expect(within(card).getByText("السكن الأصلي")).toBeInTheDocument();
+    expect(within(card).getAllByText("السكن الأصلي").length).toBeGreaterThan(0);
+    expect(within(card).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+      "السكن الأصلي",
+      "حالة النزوح",
+      "عنوان السكن الحالي",
+    ]);
     expect(card.textContent).not.toContain("قبل النزوح");
   });
 
@@ -148,7 +202,7 @@ describe("السكن", () => {
   it.each([
     ["DISPLACED", "نازحة", true],
     ["NOT_DISPLACED", "غير نازحة", false],
-    [null, "غير محدد", false],
+    [null, "غير مسجّل", false],
   ] as const)("labels %s as «%s», with the location row only for DISPLACED", async (status, label, hasLocation) => {
     renderHousehold(familyProfile({}, { displacement_status: status, displacement_location_text: status === "DISPLACED" ? "مواصي" : null }));
     const card = await residenceCard();
@@ -164,13 +218,25 @@ describe("السكن", () => {
   });
 
   it("shows only the populated parts of a partial address — no empty labels", async () => {
-    renderHousehold(familyProfile({}, { current_address: { governorate: "غزة", city: null, area: "  ", neighborhood: "الرمال" } }));
+    renderHousehold(
+      familyProfile({}, { current_address: { governorate: "غزة", city: null, area: "  ", neighborhood: "الرمال", address_text: null } })
+    );
     const card = await residenceCard();
 
     const address = field(card, "current_address") as HTMLElement;
     expect(address.textContent).toBe("الرمال، غزة");
     expect(address.querySelectorAll("[data-address-part]")).toHaveLength(2);
-    expect(card.textContent).not.toMatch(/المحافظة|المنطقة|الحي|null|undefined/);
+    expect(card.textContent).not.toMatch(/المحافظة|المنطقة|null|undefined/);
+    expect(card.querySelector('[data-field="address_text"]')).toBeNull();
+  });
+
+  it("omits the residence type and start date when they are not recorded, and never shows coordinates", async () => {
+    renderHousehold(familyProfile({}, { residence_type: null, started_at: null }));
+    const card = await residenceCard();
+
+    expect(card.querySelector('[data-field="residence_type"]')).toBeNull();
+    expect(card.querySelector('[data-field="residence_started_at"]')).toBeNull();
+    expect(card.textContent).not.toMatch(/latitude|longitude|إحداثيات|\d+\.\d{4,}/);
   });
 
   it("says «لم يُسجَّل عنوان السكن الحالي» for an empty address, as in an imported family", async () => {
@@ -285,13 +351,14 @@ describe("navigation and privacy", () => {
   it("renders no identifier, contact, coordinate or staff data, even if a response carried some", async () => {
     const profile = familyProfile();
     const leaky = {
-      family: { ...profile.family, id: 4242, national_id: "807766554", mobile: "0597766554", paper_form_no: "PAPER-7788", notes: "ملاحظة سرية" },
-      residence: { ...profile.residence, address_text: "عنوان تفصيلي سري", latitude: "31.5012345", longitude: "34.4612345", source: "IMPORT", residence_type: "نوع سري" },
+      family: { ...profile.family, id: 4242, national_id: "807766554", mobile: "0597766554", notes: "ملاحظة سرية", registration_source: "MANUAL_ENTRY" },
+      declaration: { ...profile.declaration, id: 5151, notes: "ملاحظة إقرار سرية", is_current: true, created_by: 6161 },
+      residence: { ...profile.residence, latitude: "31.5012345", longitude: "34.4612345", source: "VERIFIED_SOURCE", notes: "ملاحظة سكن سرية" },
     } as unknown as FamilyProfile;
     renderHousehold(leaky);
     await info();
 
-    for (const secret of ["4242", "807766554", "0597766554", "PAPER-7788", "ملاحظة سرية", "عنوان تفصيلي سري", "31.50", "34.46", "IMPORT", "نوع سري"]) {
+    for (const secret of ["4242", "5151", "6161", "807766554", "0597766554", "ملاحظة", "MANUAL_ENTRY", "31.50", "34.46", "VERIFIED_SOURCE", "مصدر موثّق"]) {
       expect(document.body.textContent).not.toContain(secret);
     }
   });

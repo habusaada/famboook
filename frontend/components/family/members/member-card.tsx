@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
-import { ChevronLeft, CircleQuestionMark, EyeOff, IdCard, Ribbon } from "lucide-react";
+import { ChevronLeft, CircleQuestionMark, EyeOff, IdCard, ListTree, Ribbon } from "lucide-react";
 import type { FamilyMember } from "@/lib/api/family-household";
 import { calculateAge, formatDateLong } from "@/lib/utils/date";
+import { NOT_RECORDED } from "@/lib/utils/family-portal-labels";
 import { relationshipLabel } from "@/lib/utils/relationship";
 
 export const UNAVAILABLE_MEMBER = "بيانات هذا الفرد غير متاحة حاليًا";
@@ -37,7 +40,7 @@ export function ageText(birthDate: string): string {
  * member has no current age; a member whose data is unavailable shows no
  * Person detail at all.
  */
-export function MemberCard({ member }: { member: FamilyMember }) {
+export function MemberCard({ member, onShowDetails }: { member: FamilyMember; onShowDetails?: () => void }) {
   const relationship = relationshipLabel(member.relationship, member.gender);
 
   if (!member.available) {
@@ -108,9 +111,28 @@ export function MemberCard({ member }: { member: FamilyMember }) {
             <span data-member-birth-date>{formatDateLong(member.birth_date)}</span>
           </>
         ) : (
-          <span data-member-birth-date>تاريخ الميلاد غير معروف</span>
+          // A null birth date is not recorded — never «غير معروف» (docs/11 §23a).
+          <span data-member-birth-date>تاريخ الميلاد {NOT_RECORDED}</span>
         )}
       </p>
+
+      {onShowDetails && (
+        // The registry details of this member open in an in-page sheet from
+        // the data already loaded — no member identifier or URL (PWA-3B.3).
+        <button
+          type="button"
+          onClick={onShowDetails}
+          aria-label={`تفاصيل ${member.full_name ?? ""}`.trim()}
+          className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+          data-member-details
+        >
+          <span className="flex items-center gap-2">
+            <ListTree className="size-4" aria-hidden />
+            تفاصيل الفرد
+          </span>
+          <ChevronLeft className="size-4" aria-hidden />
+        </button>
+      )}
 
       {member.is_household_head && (
         // The head's card is the signed-in user's own (V1 eligibility):

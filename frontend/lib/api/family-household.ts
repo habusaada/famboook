@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY, type FamilyUser } from "@/lib/api/family-auth";
 import type { DisplacementStatus, Gender } from "@/lib/types/api/family";
+import type { MaritalStatus } from "@/lib/utils/marital-status";
 
 // The signed-in household head's own household (PWA-3A). The server resolves
 // the Family from the session; nothing here sends a family, person or
@@ -26,9 +27,11 @@ export type FamilyHousehold = {
 export type FamilyMemberRelationship = { code: string; name: string };
 
 /**
- * One active membership. The relationship and the head flag belong to the
- * membership and are always present; the Person fields are null when the
- * Person's data is not available (available = false).
+ * One active membership (PWA-3A, completed by PWA-3B.3). The relationship,
+ * the head flag and the membership start belong to the membership and are
+ * always present; the Person fields are null when the Person's data is not
+ * available (available = false). The National ID and mobiles arrive MASKED
+ * only — a member reveal is PWA-3B.4, never this payload.
  */
 export type FamilyMember = {
   available: boolean;
@@ -37,7 +40,16 @@ export type FamilyMember = {
   is_household_head: boolean;
   gender: Gender | null;
   birth_date: string | null;
+  /** As stored; UNKNOWN is an explicit value, not a missing one. */
+  marital_status: MaritalStatus | null;
   life_status: "ALIVE" | "DECEASED" | "UNKNOWN" | null;
+  /** Only meaningful when DECEASED; null = date not recorded. */
+  death_date: string | null;
+  national_id_masked: string | null;
+  mobile_masked: string | null;
+  alternate_mobile_masked: string | null;
+  alternate_mobile_owner_relation: string | null;
+  membership_started_at: string | null;
 };
 
 /** One row per active membership, in the server's order (never re-sorted here). */
@@ -46,27 +58,50 @@ export type FamilyMembers = {
   members: FamilyMember[];
 };
 
+/** The source of a household declaration (as stored). */
+export type DeclarationSource = "PAPER_FORM" | "MANUAL_ENTRY" | "IMPORT" | "VERIFIED_SOURCE";
+
 /**
- * The «أسرتي» profile: the family facts and the CURRENT residence (null when
- * none is recorded). Values arrive as stored: null means not recorded, and a
- * null displacement_status means not collected — never "not displaced".
+ * The «أسرتي» record (PWA-3A Step 4, completed by PWA-3B.3): the family
+ * facts, the CURRENT declaration and the CURRENT residence (each null when
+ * none is recorded). Values arrive as stored: null means not recorded, 0 is
+ * a value, and a null displacement_status means not collected — never "not
+ * displaced".
  */
 export type FamilyProfile = {
   family: {
     family_code: string;
     clan_name: string | null;
+    /** null when the branch has no named group. */
+    branch_group_name: string | null;
     branch_name: string | null;
     head: { full_name: string };
-    declared_household_size: number | null;
-    declared_at: string | null;
+    registration_date: string | null;
+    paper_form_no: string | null;
     registered_member_count: number;
   };
+  /** Source-declared facts: never derived from, or compared with, the registered members. */
+  declaration: {
+    declared_household_size: number | null;
+    declared_living_sons: number | null;
+    declared_living_daughters: number | null;
+    declared_at: string | null;
+    source: DeclarationSource;
+  } | null;
   residence: {
     /** The family's residence before displacement — never the current address. */
     original_residence_text: string | null;
     displacement_status: DisplacementStatus | null;
     displacement_location_text: string | null;
-    current_address: { governorate: string | null; city: string | null; area: string | null; neighborhood: string | null };
+    residence_type: string | null;
+    started_at: string | null;
+    current_address: {
+      governorate: string | null;
+      city: string | null;
+      area: string | null;
+      neighborhood: string | null;
+      address_text: string | null;
+    };
   } | null;
 };
 

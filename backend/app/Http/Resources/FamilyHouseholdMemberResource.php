@@ -3,23 +3,32 @@
 namespace App\Http\Resources;
 
 use App\Models\FamilyMembership;
+use App\Support\MobileMask;
+use App\Support\NationalIdMask;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 
 /**
  * One household member for the Family Portal (GET
- * /api/v1/family/household/members, PWA-3A): one row per active membership,
- * an explicit allow-list built from HouseholdReadModel::members().
+ * /api/v1/family/household/members; PWA-3A, completed by PWA-3B.3, docs/11
+ * §23a): one row per active membership, an explicit allow-list built from
+ * HouseholdReadModel::members().
  *
- * The relationship and the household-head flag belong to the MEMBERSHIP and
- * are always returned. The Person fields are returned only while the Person
- * exists: for a soft-deleted Person the row stays (the membership is still
- * active and counted) with available=false and no Person data at all.
+ * The relationship, the household-head flag and the membership start belong
+ * to the MEMBERSHIP and are always returned. The Person fields are returned
+ * only while the Person exists: for a soft-deleted Person the row stays (the
+ * membership is still active and counted) with available=false and no
+ * Person data at all.
  *
- * Never person_code, a National ID (in any form), a mobile, marital status,
- * notes, paper_sequence_no, health, audit, account or auth data, or any
- * internal id.
+ * The National ID, mobile and alternate mobile are returned MASKED only
+ * (NationalIdMask, MobileMask); the full values are a separate member reveal
+ * (PWA-3B.4, docs/11 FU-13) and never part of this payload. Enums are
+ * returned as stored (UNKNOWN stays UNKNOWN); NULL stays NULL.
+ *
+ * Never person_code, any internal id (Person, membership, relationship
+ * type), paper_sequence_no, notes, is_active, health, audit, account or auth
+ * data.
  *
  * @mixin FamilyMembership
  */
@@ -29,20 +38,27 @@ class FamilyHouseholdMemberResource extends JsonResource
     public function toArray(Request $request): array
     {
         $available = $this->person_deleted_at === null;
+        $date = fn (?string $value): ?string => $value === null ? null : Carbon::parse($value)->toDateString();
+        $person = fn (mixed $value): mixed => $available ? $value : null;
 
         return [
             'available' => $available,
-            'full_name' => $available ? $this->person_full_name : null,
+            'full_name' => $person($this->person_full_name),
             'relationship' => $this->relationship_code === null ? null : [
                 'code' => $this->relationship_code,
                 'name' => $this->relationship_name,
             ],
             'is_household_head' => (bool) $this->is_household_head,
-            'gender' => $available ? $this->person_gender : null,
-            'birth_date' => $available && $this->person_birth_date !== null
-                ? Carbon::parse($this->person_birth_date)->toDateString()
-                : null,
-            'life_status' => $available ? $this->person_life_status : null,
+            'gender' => $person($this->person_gender),
+            'birth_date' => $person($date($this->person_birth_date)),
+            'marital_status' => $person($this->person_marital_status),
+            'life_status' => $person($this->person_life_status),
+            'death_date' => $person($date($this->person_death_date)),
+            'national_id_masked' => $person(NationalIdMask::mask($this->person_national_id)),
+            'mobile_masked' => $person(MobileMask::mask($this->person_mobile)),
+            'alternate_mobile_masked' => $person(MobileMask::mask($this->person_alternate_mobile)),
+            'alternate_mobile_owner_relation' => $person($this->person_alternate_mobile_owner_relation),
+            'membership_started_at' => $date($this->membership_started_at),
         ];
     }
 }

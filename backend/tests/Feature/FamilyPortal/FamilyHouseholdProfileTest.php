@@ -40,7 +40,7 @@ class FamilyHouseholdProfileTest extends TestCase
 
     private const DENIED = ['message' => EnsureFamilyContext::MESSAGE, 'code' => EnsureFamilyContext::CODE];
 
-    private const NO_ADDRESS = ['governorate' => null, 'city' => null, 'area' => null, 'neighborhood' => null];
+    private const NO_ADDRESS = ['governorate' => null, 'city' => null, 'area' => null, 'neighborhood' => null, 'address_text' => null];
 
     protected function setUp(): void
     {
@@ -73,17 +73,26 @@ class FamilyHouseholdProfileTest extends TestCase
 
     // -------------------------------------------------------------- contract
 
-    public function test_complete_family_and_residence_data_is_exactly_the_approved_allow_list(): void
+    public function test_complete_family_declaration_and_residence_data_is_exactly_the_approved_allow_list(): void
     {
         $head = $this->activatedHead();
         $clan = $this->clan();
-        $branch = $this->branch($clan);
-        $head['family']->forceFill(['clan_id' => $clan->id, 'branch_id' => $branch->id])->save();
+        $group = $this->group($clan);
+        $branch = $this->branch($clan, $group);
+        $head['family']->forceFill([
+            'clan_id' => $clan->id, 'branch_id' => $branch->id, 'registration_date' => '2011-11-11', 'paper_form_no' => 'PAPER-7788',
+            'notes' => 'ملاحظة سرية للأسرة',
+        ])->save();
         $this->addMembers($head['family'], 4);
-        FamilyHouseholdDeclaration::factory()->create(['family_id' => $head['family']->id, 'declared_household_size' => 7, 'declared_at' => '2026-09-01']);
+        FamilyHouseholdDeclaration::factory()->create([
+            'family_id' => $head['family']->id, 'declared_household_size' => 7, 'declared_living_sons' => 3, 'declared_living_daughters' => 0,
+            'declared_at' => '2026-09-01', 'source' => 'PAPER_FORM', 'notes' => 'ملاحظة إقرار سرية',
+        ]);
         $this->residence($head['family'], [
             'original_residence_text' => 'بني سهيلا – خانيونس', 'displacement_status' => 'DISPLACED', 'displacement_location_text' => 'مواصي خانيونس',
-            'governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'المواصي', 'neighborhood' => 'حي تجريبي',
+            'governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'المواصي', 'neighborhood' => 'حي تجريبي', 'address_text' => 'قرب المسجد',
+            'residence_type' => 'خيمة', 'started_at' => '2024-01-02', 'latitude' => '31.5012345', 'longitude' => '34.4612345',
+            'source' => 'MANUAL_ENTRY', 'notes' => 'ملاحظة سكن سرية',
         ]);
 
         $response = $this->fetch($head['user'])->assertOk();
@@ -92,51 +101,91 @@ class FamilyHouseholdProfileTest extends TestCase
             'family' => [
                 'family_code' => $head['family']->family_code,
                 'clan_name' => $clan->name,
+                'branch_group_name' => $group->name,
                 'branch_name' => $branch->name,
                 'head' => ['full_name' => $head['person']->full_name],
-                'declared_household_size' => 7,
-                'declared_at' => '2026-09-01',
+                'registration_date' => '2011-11-11',
+                'paper_form_no' => 'PAPER-7788',
                 'registered_member_count' => 5,
+            ],
+            'declaration' => [
+                'declared_household_size' => 7,
+                'declared_living_sons' => 3,
+                'declared_living_daughters' => 0,
+                'declared_at' => '2026-09-01',
+                'source' => 'PAPER_FORM',
             ],
             'residence' => [
                 'original_residence_text' => 'بني سهيلا – خانيونس',
                 'displacement_status' => 'DISPLACED',
                 'displacement_location_text' => 'مواصي خانيونس',
-                'current_address' => ['governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'المواصي', 'neighborhood' => 'حي تجريبي'],
+                'residence_type' => 'خيمة',
+                'started_at' => '2024-01-02',
+                'current_address' => [
+                    'governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'المواصي', 'neighborhood' => 'حي تجريبي', 'address_text' => 'قرب المسجد',
+                ],
             ],
         ]]);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_a_family_without_a_branch_declaration_or_residence_gets_nulls(): void
     {
         $head = $this->activatedHead();
+        $head['family']->forceFill(['registration_date' => null, 'paper_form_no' => null])->save();
 
         $this->fetch($head['user'])->assertOk()->assertExactJson(['data' => [
             'family' => [
                 'family_code' => $head['family']->family_code,
                 'clan_name' => $head['family']->clan->name,
+                'branch_group_name' => null,
                 'branch_name' => null,
                 'head' => ['full_name' => $head['person']->full_name],
-                'declared_household_size' => null,
-                'declared_at' => null,
+                'registration_date' => null,
+                'paper_form_no' => null,
                 'registered_member_count' => 1,
             ],
+            'declaration' => null,
             'residence' => null,
         ]]);
     }
 
-    public function test_a_declaration_with_a_null_size_or_date_keeps_them_null_and_ignores_older_declarations(): void
+    public function test_a_branch_without_a_group_has_no_group_name(): void
     {
         $head = $this->activatedHead();
-        FamilyHouseholdDeclaration::factory()->create(['family_id' => $head['family']->id, 'declared_household_size' => 11, 'declared_at' => '2020-01-01', 'is_current' => false]);
+        $clan = $this->clan();
+        $head['family']->forceFill(['clan_id' => $clan->id, 'branch_id' => $this->branch($clan)->id])->save();
+
+        $response = $this->fetch($head['user'])->assertOk();
+
+        $this->assertNull($response->json('data.family.branch_group_name'));
+        $this->assertNotNull($response->json('data.family.branch_name'));
+    }
+
+    public function test_only_the_current_declaration_is_returned_with_nulls_and_zeros_as_stored(): void
+    {
+        $head = $this->activatedHead();
+        $this->addMembers($head['family'], 2);
         FamilyHouseholdDeclaration::factory()->create([
-            'family_id' => $head['family']->id, 'declared_household_size' => null, 'declared_living_sons' => 2, 'declared_at' => null,
+            'family_id' => $head['family']->id, 'declared_household_size' => 11, 'declared_living_sons' => 9, 'declared_at' => '2020-01-01', 'is_current' => false,
+        ]);
+        FamilyHouseholdDeclaration::factory()->create([
+            'family_id' => $head['family']->id, 'declared_household_size' => null, 'declared_living_sons' => 0, 'declared_living_daughters' => null,
+            'declared_at' => null, 'source' => 'IMPORT',
         ]);
 
-        $this->fetch($head['user'])->assertOk()
-            ->assertJsonPath('data.family.declared_household_size', null)
-            ->assertJsonPath('data.family.declared_at', null);
+        $response = $this->fetch($head['user'])->assertOk();
+
+        $this->assertSame([
+            'declared_household_size' => null, 'declared_living_sons' => 0, 'declared_living_daughters' => null, 'declared_at' => null, 'source' => 'IMPORT',
+        ], $response->json('data.declaration'));
+        // No historical value, and nothing derived from the registered members (3).
+        $this->assertStringNotContainsString('2020-01-01', $response->getContent());
+        foreach ([':11', ':9', 'missing', 'difference', 'unregistered'] as $absent) {
+            $this->assertStringNotContainsString($absent, $response->getContent(), $absent);
+        }
+        $this->assertSame(3, $response->json('data.family.registered_member_count'));
     }
 
     public function test_the_registered_count_matches_the_dashboard_and_the_members_list(): void
@@ -171,6 +220,8 @@ class FamilyHouseholdProfileTest extends TestCase
             'original_residence_text' => 'بيت لاهيا',
             'displacement_status' => null,
             'displacement_location_text' => null,
+            'residence_type' => null,
+            'started_at' => '2026-10-01',
             'current_address' => self::NO_ADDRESS,
         ]);
     }
@@ -184,7 +235,9 @@ class FamilyHouseholdProfileTest extends TestCase
             'original_residence_text' => null,
             'displacement_status' => null,
             'displacement_location_text' => null,
-            'current_address' => ['governorate' => null, 'city' => 'غزة', 'area' => null, 'neighborhood' => 'الرمال'],
+            'residence_type' => null,
+            'started_at' => null,
+            'current_address' => ['governorate' => null, 'city' => 'غزة', 'area' => null, 'neighborhood' => 'الرمال', 'address_text' => null],
         ]);
     }
 
@@ -251,7 +304,7 @@ class FamilyHouseholdProfileTest extends TestCase
             $this->assertStringNotContainsString($foreign, $spoofed->getContent(), $foreign);
         }
         $this->assertNull($spoofed->json('data.residence'));
-        $this->assertNull($spoofed->json('data.family.declared_household_size'));
+        $this->assertNull($spoofed->json('data.declaration'));
     }
 
     public function test_a_dual_role_head_sees_only_their_own_household(): void
@@ -270,27 +323,23 @@ class FamilyHouseholdProfileTest extends TestCase
         $this->assertStringNotContainsString('مدينة أسرة ضمن النطاق', $response->getContent());
     }
 
-    public function test_no_sensitive_value_or_internal_id_appears(): void
+    public function test_no_sensitive_value_internal_field_or_history_appears(): void
     {
         $head = $this->activatedHead('123456789');
         $family = $head['family'];
-        $family->forceFill(['notes' => 'ملاحظة سرية للأسرة', 'paper_form_no' => 'PAPER-7788', 'registration_date' => '2011-11-11'])->save();
+        $family->forceFill(['notes' => 'ملاحظة سرية للأسرة', 'registration_source' => 'VERIFIED_SOURCE'])->save();
         $head['person']->forceFill(['mobile' => '0597766554', 'alternate_mobile' => '0568877665'])->save();
-        FamilyHouseholdDeclaration::factory()->create([
-            'family_id' => $family->id, 'declared_household_size' => 6, 'declared_living_sons' => 3, 'declared_living_daughters' => 2, 'notes' => 'ملاحظة إقرار سرية',
-        ]);
+        FamilyHouseholdDeclaration::factory()->create(['family_id' => $family->id, 'notes' => 'ملاحظة إقرار سرية', 'declared_at' => '2019-01-01', 'is_current' => false]);
+        FamilyHouseholdDeclaration::factory()->create(['family_id' => $family->id, 'notes' => 'ملاحظة إقرار حالي سرية', 'source' => 'PAPER_FORM']);
         $this->residence($family, [
-            'address_text' => 'عنوان تفصيلي سري', 'residence_type' => 'نوع سكن سري', 'latitude' => '31.5012345', 'longitude' => '34.4612345',
-            'started_at' => '2019-09-09', 'source' => 'MANUAL_ENTRY', 'notes' => 'ملاحظة سكن سرية', 'city' => 'غزة',
+            'address_text' => 'عنوان', 'latitude' => '31.5012345', 'longitude' => '34.4612345', 'source' => 'MANUAL_ENTRY', 'notes' => 'ملاحظة سكن سرية', 'city' => 'غزة',
         ]);
 
         $body = $this->fetch($head['user'])->assertOk()->getContent();
 
-        foreach (['123456789', '*****', '0597766554', '0568877665', 'ملاحظة', 'PAPER-7788', '2011-11-11', 'عنوان تفصيلي سري', 'نوع سكن سري',
-            '31.50', '34.46', '2019-09-09', 'MANUAL_ENTRY', 'IMPORT', $head['person']->person_code,
-            '"id"', 'family_id', 'person_id', 'clan_id', 'branch_id', 'address_text', 'residence_type', 'latitude', 'longitude',
-            'started_at', 'ended_at', 'is_current', 'source', 'notes', 'paper_form_no', 'registration', '"status"', 'sons', 'daughters',
-            'national_id', 'mobile', 'created', 'updated', 'deleted'] as $secret) {
+        foreach (['123456789', '*****', '0597766554', '0568877665', 'ملاحظة', '2019-01-01', '31.50', '34.46', 'MANUAL_ENTRY', 'VERIFIED_SOURCE',
+            $head['person']->person_code, '"id"', 'family_id', 'person_id', 'clan_id', 'branch_id', 'branch_group_id', 'latitude', 'longitude',
+            'ended_at', 'is_current', 'notes', 'registration_source', '"status"', 'national_id', 'mobile', 'created', 'updated', 'deleted'] as $secret) {
             $this->assertStringNotContainsString($secret, $body, $secret);
         }
     }

@@ -2102,6 +2102,8 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
              — DONE (POST /family/self/reveal; per-field Eye; security
              event without the value)
         3B.3 complete Family / declaration / residence / member read views
+             — DONE (profile and members extended; in-page member sheet;
+             masked member values only)
         3B.4 family-member identity/contact reveal
         3B.5 account view («حسابي»)
         3B.6 health read visibility
@@ -4970,6 +4972,7 @@ Date: 2026-09-24
 | 1.2.40 | 2026-10-05 | Approved | PWA-3B Family Portal Full Data Visibility inserted before PWA-5 with slices 3B.1 … 3B.7 (RM-ADR-048, docs/11 FP-ADR-062); PWA-3 table row and program status updated; documentation only |
 | 1.2.41 | 2026-10-05 | Approved | PWA-3B.1 done: «بياناتي الشخصية» read view (GET /api/v1/family/self, /family/account/me), masked National ID and mobiles only; no migration. PWA-3B.2 (reveal) next |
 | 1.2.42 | 2026-10-05 | Approved | PWA-3B.2 done: self sensitive-value reveal (POST /api/v1/family/self/reveal; one field per request; throttle 10 / minute and 60 / hour per user; SELF_SENSITIVE_REVEALED security event with the field code only; per-field Eye on «بياناتي الشخصية»); no migration. PWA-3B.3 next |
+| 1.2.43 | 2026-10-05 | Approved | PWA-3B.3 done: complete «أسرتي» (registration, branch group, current declaration, full current residence) and member registry details with masked identity / contact values in an in-page sheet; no new endpoint, no migration. PWA-3B.4 (member reveal, FU-13) next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.18
+**Version:** 1.19
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2834,6 +2834,53 @@ POST /api/v1/family/self/reveal
   «طلبات إظهار كثيرة. حاول مجددًا بعد قليل.»); 401 / 403 go to the usual
   access flow. No clipboard, no browser storage, no attribute.
 
+## PWA-3B.3 implementation record — complete family, declaration, residence and member read views
+
+Implemented 2026-10-05 (FP-ADR-062, §23a). Read-only; no migration; no
+new endpoint. The member reveal stays PWA-3B.4 (§33a FU-13).
+
+```text
+GET /api/v1/family/household/profile   «أسرتي»: family · declaration · residence
+GET /api/v1/family/household/members   one row per ACTIVE membership
+GET /api/v1/family/household           the dashboard summary (unchanged shape)
+  all three: family.context; Cache-Control: no-store, private
+```
+
+- **Family** (`data.family`): `family_code`, `clan_name`,
+  `branch_group_name` (NULL when the branch has no named group),
+  `branch_name`, `head.full_name`, `registration_date`, `paper_form_no`,
+  `registered_member_count` (ACTIVE memberships — unchanged semantics).
+- **Declaration** (`data.declaration`, NULL when there is no current
+  declaration): `declared_household_size`, `declared_living_sons`,
+  `declared_living_daughters`, `declared_at`, `source`. The current row
+  only; values as stored (NULL «غير مُعلن», 0 is 0); nothing derived from,
+  or compared with, the registered members. The former
+  `data.family.declared_household_size` / `declared_at` of the profile moved
+  here; the dashboard summary keeps its own two fields.
+- **Residence** (`data.residence`, NULL when none): adds `residence_type`,
+  `started_at` and `current_address.address_text` to the PWA-3A fields.
+  Never coordinates, source, notes or lifecycle flags; no history.
+- **Members**: each row adds `marital_status`, `death_date`,
+  `national_id_masked`, `mobile_masked`, `alternate_mobile_masked`,
+  `alternate_mobile_owner_relation` and `membership_started_at` (a
+  membership fact, kept on a placeholder row). Sensitive values MASKED only
+  (`NationalIdMask`, `MobileMask`); never `person_code`, ids,
+  `paper_sequence_no`, notes or audit data. A soft-deleted Person stays a
+  placeholder with every Person field NULL. Deceased ACTIVE members stay.
+  All selects are explicit; the query count stays constant (tested).
+- **Frontend.** «أسرتي»: بيانات الأسرة · الإقرار الأسري الحالي (or «لا يوجد
+  إقرار مسجّل») · السكن (السكن الأصلي · حالة النزوح · عنوان السكن الحالي) ·
+  أفراد الأسرة. Declaration sources use the approved family-facing labels
+  (`lib/utils/family-portal-labels.ts`); a null displacement status is now
+  «غير مسجّل». «أفراد الأسرة»: each available member's card opens an
+  in-page detail sheet («تفاصيل الفرد») fed by the list — no identifier,
+  URL or extra request — with البيانات الأساسية · بيانات الهوية والاتصال ·
+  بيانات العضوية; masked values only, no reveal control; DECEASED shows the
+  death date or «تاريخ الوفاة غير معروف». No details for an unavailable
+  member. The head keeps «بياناتي الشخصية» (self reveal stays there only).
+- **Vocabulary fix done:** a null birth date reads «تاريخ الميلاد غير
+  مسجّل» (no longer «غير معروف»).
+
 ---
 
 # 31. Amendment Register
@@ -3531,3 +3578,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.16 | 2026-10-05 | Approved | Full Data Visibility (FP-ADR-062): §23a principle, structure («حسابي» → «بياناتي الشخصية»), family-facing data per domain, internal-only data, self reveal (POST /api/v1/family/self/reveal) and member-reveal boundary (PWA-3B.4), display vocabulary, Profile Review and Change Request relationship; PFP-006 resolved; FP-ADR-056, §9 HEAD, §15, §23 and the §30a PWA-3A exclusions superseded in part (kept as history); §31 A-18; FU-13; PWA-3B in the phases. Documentation only |
 | 1.17 | 2026-10-05 | Approved | PWA-3B.1 implementation record in §30a: GET /api/v1/family/self (SELF only, masked National ID and mobiles, no-store, private), shared MobileMask, «بياناتي الشخصية» at /family/account/me reached from the head's own member card; no reveal, no migration |
 | 1.18 | 2026-10-05 | Approved | PWA-3B.2 implementation record in §30a: POST /api/v1/family/self/reveal (SELF only, one field, strict field mapping, prohibited targets, per-user throttle, no-store, private), SELF_SENSITIVE_REVEALED security event with the field code only (null reveals recorded too), per-field Eye on «بياناتي الشخصية» with transient component state only; no migration |
+| 1.19 | 2026-10-05 | Approved | PWA-3B.3 implementation record in §30a: complete «أسرتي» (family registration, branch group, current declaration with sons / daughters / source, full current residence), member rows with marital status, death date, masked National ID and mobiles and membership start, in-page member detail sheet; null birth date wording fixed; no member reveal, no migration |

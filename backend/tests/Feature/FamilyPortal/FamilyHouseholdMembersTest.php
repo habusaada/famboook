@@ -40,7 +40,17 @@ class FamilyHouseholdMembersTest extends TestCase
 
     private const URI = '/api/v1/family/household/members';
 
-    private const ROW_KEYS = ['available', 'full_name', 'relationship', 'is_household_head', 'gender', 'birth_date', 'life_status'];
+    private const ROW_KEYS = [
+        'available', 'full_name', 'relationship', 'is_household_head', 'gender', 'birth_date', 'marital_status', 'life_status',
+        'death_date', 'national_id_masked', 'mobile_masked', 'alternate_mobile_masked', 'alternate_mobile_owner_relation',
+        'membership_started_at',
+    ];
+
+    /** The Person part of a placeholder row: all NULL. */
+    private const NO_PERSON = [
+        'full_name' => null, 'gender' => null, 'birth_date' => null, 'marital_status' => null, 'life_status' => null, 'death_date' => null,
+        'national_id_masked' => null, 'mobile_masked' => null, 'alternate_mobile_masked' => null, 'alternate_mobile_owner_relation' => null,
+    ];
 
     private const DENIED = ['message' => EnsureFamilyContext::MESSAGE, 'code' => EnsureFamilyContext::CODE];
 
@@ -95,8 +105,13 @@ class FamilyHouseholdMembersTest extends TestCase
 
     public function test_each_active_membership_is_one_row_with_exactly_the_approved_fields(): void
     {
-        $head = $this->householdHead();
-        $this->member($head['family'], 'زوجة تجريبية', 'SPOUSE', ['gender' => 'FEMALE', 'birth_date' => '1975-03-04']);
+        $head = $this->householdHead('123456789', person: [
+            'marital_status' => 'MARRIED', 'mobile' => '0591234567', 'alternate_mobile' => '0567654321', 'alternate_mobile_owner_relation' => 'أخ',
+        ]);
+        $head['membership']->forceFill(['started_at' => '2001-03-04'])->save();
+        $this->member($head['family'], 'زوجة تجريبية', 'SPOUSE', [
+            'gender' => 'FEMALE', 'birth_date' => '1975-03-04', 'marital_status' => 'UNKNOWN', 'national_id' => '807766554', 'mobile' => null,
+        ], ['started_at' => null]);
 
         $response = $this->fetch($head['user'])->assertOk();
 
@@ -105,15 +120,39 @@ class FamilyHouseholdMembersTest extends TestCase
             'members' => [
                 [
                     'available' => true, 'full_name' => 'رب الأسرة التجريبي', 'relationship' => ['code' => 'HEAD', 'name' => 'رب الأسرة'],
-                    'is_household_head' => true, 'gender' => 'MALE', 'birth_date' => '1970-01-01', 'life_status' => 'ALIVE',
+                    'is_household_head' => true, 'gender' => 'MALE', 'birth_date' => '1970-01-01', 'marital_status' => 'MARRIED',
+                    'life_status' => 'ALIVE', 'death_date' => null, 'national_id_masked' => '*****6789', 'mobile_masked' => '05*****567',
+                    'alternate_mobile_masked' => '05*****321', 'alternate_mobile_owner_relation' => 'أخ', 'membership_started_at' => '2001-03-04',
                 ],
                 [
                     'available' => true, 'full_name' => 'زوجة تجريبية', 'relationship' => ['code' => 'SPOUSE', 'name' => 'زوج/زوجة'],
-                    'is_household_head' => false, 'gender' => 'FEMALE', 'birth_date' => '1975-03-04', 'life_status' => 'ALIVE',
+                    'is_household_head' => false, 'gender' => 'FEMALE', 'birth_date' => '1975-03-04', 'marital_status' => 'UNKNOWN',
+                    'life_status' => 'ALIVE', 'death_date' => null, 'national_id_masked' => '*****6554', 'mobile_masked' => null,
+                    'alternate_mobile_masked' => null, 'alternate_mobile_owner_relation' => null, 'membership_started_at' => null,
                 ],
             ],
         ]]);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+        // Masked only: no full National ID or mobile, the head's included.
+        foreach (['123456789', '807766554', '0591234567', '0567654321'] as $full) {
+            $this->assertStringNotContainsString($full, $response->getContent(), $full);
+        }
+    }
+
+    public function test_a_deceased_active_member_stays_visible_with_or_without_a_death_date(): void
+    {
+        $head = $this->householdHead();
+        $this->member($head['family'], 'ابن متوفى بتاريخ', 'SON', ['life_status' => LifeStatus::DECEASED->value, 'birth_date' => '2000-01-01', 'death_date' => '2024-11-20']);
+        $this->member($head['family'], 'ابن متوفى بلا تاريخ', 'SON', ['life_status' => LifeStatus::DECEASED->value, 'birth_date' => '2001-01-01', 'death_date' => null]);
+
+        $response = $this->fetch($head['user'])->assertOk();
+        $rows = collect($response->json('data.members'))->keyBy('full_name');
+
+        $this->assertSame(['DECEASED', '2024-11-20'], [$rows['ابن متوفى بتاريخ']['life_status'], $rows['ابن متوفى بتاريخ']['death_date']]);
+        $this->assertSame(['DECEASED', null], [$rows['ابن متوفى بلا تاريخ']['life_status'], $rows['ابن متوفى بلا تاريخ']['death_date']]);
+        // Both still counted as registered members.
+        $this->assertSame(3, $this->fetch($head['user'], '/api/v1/family/household')->json('data.registered_member_count'));
     }
 
     public function test_every_life_status_and_an_inactive_person_keep_an_available_row(): void
@@ -148,24 +187,26 @@ class FamilyHouseholdMembersTest extends TestCase
         $head = $this->householdHead();
         $deleted = $this->member($head['family'], 'شخص محذوف سري', 'DAUGHTER', [
             'gender' => 'FEMALE', 'birth_date' => '1999-09-09', 'life_status' => LifeStatus::DECEASED->value,
-        ]);
+            'national_id' => '807766554', 'mobile' => '0591122334', 'marital_status' => 'WIDOWED',
+        ], ['started_at' => null]);
         $deleted->person->delete();
-        $unrelated = $this->member($head['family'], 'محذوف بلا علاقة', null);
+        $unrelated = $this->member($head['family'], 'محذوف بلا علاقة', null, [], ['started_at' => null]);
         $unrelated->person->delete();
 
         $response = $this->fetch($head['user'])->assertOk();
         $rows = $response->json('data.members');
 
         $this->assertCount(3, $rows);
-        $this->assertSame([
-            'available' => false, 'full_name' => null, 'relationship' => ['code' => 'DAUGHTER', 'name' => 'ابنة'],
-            'is_household_head' => false, 'gender' => null, 'birth_date' => null, 'life_status' => null,
+        $this->assertEquals([
+            'available' => false, 'relationship' => ['code' => 'DAUGHTER', 'name' => 'ابنة'], 'is_household_head' => false,
+            'membership_started_at' => null, ...self::NO_PERSON,
         ], $rows[1]);
-        $this->assertSame([
-            'available' => false, 'full_name' => null, 'relationship' => null,
-            'is_household_head' => false, 'gender' => null, 'birth_date' => null, 'life_status' => null,
+        $this->assertSame(self::ROW_KEYS, array_keys($rows[1]));
+        $this->assertEquals([
+            'available' => false, 'relationship' => null, 'is_household_head' => false, 'membership_started_at' => null, ...self::NO_PERSON,
         ], $rows[2]);
-        foreach (['شخص محذوف سري', 'محذوف بلا علاقة', '1999-09-09', 'DECEASED'] as $secret) {
+        // Not even the placeholder Person's masks (the head's own row is masked legitimately).
+        foreach (['شخص محذوف سري', 'محذوف بلا علاقة', '1999-09-09', 'DECEASED', 'WIDOWED', '*****6554', '05*****334'] as $secret) {
             $this->assertStringNotContainsString($secret, $response->getContent(), $secret);
         }
     }
@@ -292,20 +333,21 @@ class FamilyHouseholdMembersTest extends TestCase
         $this->assertStringNotContainsString($assigned->family_code, $response->getContent());
     }
 
-    public function test_no_sensitive_value_or_internal_id_appears(): void
+    public function test_no_full_sensitive_value_or_internal_field_appears(): void
     {
         $head = $this->householdHead('123456789');
-        $head['person']->forceFill(['mobile' => '0597766554', 'alternate_mobile' => '0568877665', 'notes' => 'ملاحظة سرية للرب', 'marital_status' => 'MARRIED'])->save();
+        $head['person']->forceFill(['mobile' => '0597766554', 'alternate_mobile' => '0568877665', 'notes' => 'ملاحظة سرية للرب'])->save();
         $member = $this->member($head['family'], 'زوجة', 'SPOUSE', [
-            'national_id' => '807766554', 'mobile' => '0591122334', 'notes' => 'ملاحظة سرية للزوجة', 'marital_status' => 'WIDOWED',
+            'national_id' => '807766554', 'mobile' => '0591122334', 'alternate_mobile' => '0563344556', 'notes' => 'ملاحظة سرية للزوجة',
         ], ['paper_sequence_no' => 4321, 'notes' => 'ملاحظة عضوية سرية']);
         PersonHealthRecord::factory()->create(['person_id' => $member->person_id, 'condition_name' => 'حالة صحية سرية', 'details' => 'تفاصيل صحية سرية']);
 
         $body = $this->fetch($head['user'])->assertOk()->getContent();
 
-        foreach (['123456789', '807766554', '*****', '0597766554', '0568877665', '0591122334', 'ملاحظة', 'MARRIED', 'WIDOWED', '4321',
-            'حالة صحية', $head['person']->person_code, $member->person->person_code, 'person_code', 'national_id', 'mobile', 'notes',
-            'marital', 'paper_sequence', '"id"', 'person_id', 'family_id', 'relationship_type_id', 'deleted_at', 'created', 'updated'] as $secret) {
+        foreach (['123456789', '807766554', '0597766554', '0568877665', '0591122334', '0563344556', 'ملاحظة', '4321',
+            'حالة صحية', $head['person']->person_code, $member->person->person_code, 'person_code', 'notes', 'paper_sequence', 'is_active',
+            '"id"', 'person_id', 'family_id', 'membership_id', 'relationship_type_id', 'deleted_at', 'created', 'updated', '"national_id"',
+            '"mobile"', '"alternate_mobile"', 'health'] as $secret) {
             $this->assertStringNotContainsString($secret, $body, $secret);
         }
     }

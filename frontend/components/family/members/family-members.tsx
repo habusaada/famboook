@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowRight, RotateCw, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MemberCard } from "@/components/family/members/member-card";
-import { isAccessFailure, useFamilyMembersQuery } from "@/lib/api/family-household";
+import { MemberDetailSheet } from "@/components/family/members/member-detail-sheet";
+import { type FamilyMember, isAccessFailure, useFamilyMembersQuery } from "@/lib/api/family-household";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 
@@ -51,6 +53,9 @@ function MembersError({ onRetry, retrying }: { onRetry: () => void; retrying: bo
 export function FamilyMembers() {
   const query = useFamilyMembersQuery();
   const data = query.data;
+  // The member whose registry details are open (PWA-3B.3): taken from the
+  // loaded list itself — no identifier, no URL, no extra request.
+  const [selected, setSelected] = useState<FamilyMember | null>(null);
 
   return (
     <div className="flex flex-col gap-5">
@@ -99,7 +104,12 @@ export function FamilyMembers() {
               <ul className="flex flex-col gap-3" aria-label="أفراد الأسرة">
                 {/* Server order, never re-sorted; rows carry no identifier. */}
                 {data.members.map((member, index) => (
-                  <MemberCard key={index} member={member} />
+                  <MemberCard
+                    key={index}
+                    member={member}
+                    // An unavailable Person has no details to show.
+                    onShowDetails={member.available ? () => setSelected(member) : undefined}
+                  />
                 ))}
               </ul>
             )}
@@ -110,6 +120,8 @@ export function FamilyMembers() {
           <MembersSkeleton />
         )}
       </div>
+
+      <MemberDetailSheet member={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

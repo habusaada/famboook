@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
 import { type FamilyProfile, isAccessFailure, useFamilyProfileQuery } from "@/lib/api/family-household";
 import { formatDateLong } from "@/lib/utils/date";
-import { displacementStatusLabel } from "@/lib/utils/displacement";
+import { NO_DECLARATION, NOT_DECLARED, declarationSourceLabels, familyDisplacementLabel } from "@/lib/utils/family-portal-labels";
 
 export const NOT_RECORDED = "غير مسجّل";
 export const NO_RESIDENCE = "لا توجد بيانات سكن مسجّلة";
@@ -25,11 +25,24 @@ function Row({ label, children, field }: { label: string; children: React.ReactN
   );
 }
 
+function Missing({ children = NOT_RECORDED }: { children?: string }) {
+  return <span className="font-normal text-subtle-foreground">{children}</span>;
+}
+
+/** Text as recorded, or «غير مسجّل» for a missing or blank value. */
+function Text({ value }: { value: string | null }) {
+  return value?.trim() ? <bdi>{value}</bdi> : <Missing />;
+}
+
+function DateValue({ value }: { value: string | null }) {
+  return value ? <span className="tabular-nums">{formatDateLong(value)}</span> : <Missing />;
+}
+
 function FamilyInfo({ family }: { family: FamilyProfile["family"] }) {
   return (
     <section className={card} aria-labelledby="household-info-title" data-household-info>
       <h2 id="household-info-title" className="text-base font-semibold text-foreground">
-        معلومات الأسرة
+        بيانات الأسرة
       </h2>
       <dl className="mt-1 divide-y divide-stroke-subtle">
         <Row label="رمز الأسرة" field="family_code">
@@ -38,8 +51,13 @@ function FamilyInfo({ family }: { family: FamilyProfile["family"] }) {
           </span>
         </Row>
         <Row label="العائلة" field="clan">
-          {family.clan_name ? <bdi>{family.clan_name}</bdi> : NOT_RECORDED}
+          <Text value={family.clan_name} />
         </Row>
+        {family.branch_group_name && (
+          <Row label="مجموعة الفروع" field="branch_group">
+            <bdi>{family.branch_group_name}</bdi>
+          </Row>
+        )}
         {family.branch_name && (
           <Row label="الفرع" field="branch">
             <bdi>{family.branch_name}</bdi>
@@ -48,25 +66,67 @@ function FamilyInfo({ family }: { family: FamilyProfile["family"] }) {
         <Row label="رب الأسرة" field="head">
           <bdi>{family.head.full_name}</bdi>
         </Row>
-        <Row label="عدد أفراد الأسرة حسب الإقرار" field="declared_household_size">
-          {family.declared_household_size === null ? (
-            <span className="text-subtle-foreground">غير مُعلن</span>
-          ) : (
-            <span className="tabular-nums">{family.declared_household_size}</span>
-          )}
+        <Row label="تاريخ التسجيل" field="registration_date">
+          <DateValue value={family.registration_date} />
         </Row>
-        {family.declared_at && (
-          <Row label="تاريخ الإقرار" field="declared_at">
-            <span className="tabular-nums">{formatDateLong(family.declared_at)}</span>
+        {family.paper_form_no?.trim() && (
+          <Row label="رقم الاستمارة الورقية" field="paper_form_no">
+            <bdi dir="ltr" className="tabular-nums">
+              {family.paper_form_no}
+            </bdi>
           </Row>
         )}
         <Row label="الأفراد المسجّلون بالتفصيل" field="registered_member_count">
           <span className="tabular-nums">{family.registered_member_count}</span>
         </Row>
       </dl>
-      <p className="mt-2 text-xs leading-relaxed text-subtle-foreground" data-count-caption>
-        {SUMMARY_CAPTION}
-      </p>
+    </section>
+  );
+}
+
+/** A declared count: 0 is a value; null was not declared by the source. */
+function Declared({ value }: { value: number | null }) {
+  return value === null ? <Missing>{NOT_DECLARED}</Missing> : <span className="tabular-nums">{value}</span>;
+}
+
+/**
+ * The CURRENT household declaration: source-declared facts, shown as stated.
+ * Nothing here is derived from, or compared with, the registered members.
+ */
+function Declaration({ declaration }: { declaration: FamilyProfile["declaration"] }) {
+  return (
+    <section className={card} aria-labelledby="household-declaration-title" data-household-declaration>
+      <h2 id="household-declaration-title" className="text-base font-semibold text-foreground">
+        الإقرار الأسري الحالي
+      </h2>
+      {declaration === null ? (
+        <p className="mt-3 text-sm text-muted-foreground" data-no-declaration>
+          {NO_DECLARATION}
+        </p>
+      ) : (
+        <>
+          <dl className="mt-1 divide-y divide-stroke-subtle">
+            <Row label="عدد أفراد الأسرة حسب الإقرار" field="declared_household_size">
+              <Declared value={declaration.declared_household_size} />
+            </Row>
+            <Row label="الأبناء الذكور" field="declared_living_sons">
+              <Declared value={declaration.declared_living_sons} />
+            </Row>
+            <Row label="البنات" field="declared_living_daughters">
+              <Declared value={declaration.declared_living_daughters} />
+            </Row>
+            <Row label="تاريخ الإقرار" field="declared_at">
+              <DateValue value={declaration.declared_at} />
+            </Row>
+            <Row label="مصدر الإقرار" field="declaration_source">
+              {declarationSourceLabels[declaration.source]}
+            </Row>
+          </dl>
+          <p className="mt-2 text-xs leading-relaxed text-subtle-foreground" data-count-caption>
+            {SUMMARY_CAPTION}
+          </p>
+        </>
+      )}
     </section>
   );
 }
@@ -78,8 +138,17 @@ function currentAddressParts(address: NonNullable<FamilyProfile["residence"]>["c
   );
 }
 
+function SubHeading({ id, children }: { id: string; children: string }) {
+  return (
+    <h3 id={id} className="mt-4 text-sm font-semibold text-foreground first:mt-2">
+      {children}
+    </h3>
+  );
+}
+
 function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
   const parts = residence ? currentAddressParts(residence.current_address) : [];
+  const hasAddress = parts.length > 0 || Boolean(residence?.current_address.address_text?.trim());
 
   return (
     <section className={card} aria-labelledby="household-residence-title" data-household-residence>
@@ -91,31 +160,63 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
           {NO_RESIDENCE}
         </p>
       ) : (
-        <dl className="mt-1 divide-y divide-stroke-subtle">
-          <Row label="السكن الأصلي" field="original_residence">
-            {residence.original_residence_text?.trim() ? <bdi>{residence.original_residence_text}</bdi> : NOT_RECORDED}
-          </Row>
-          <Row label="حالة النزوح" field="displacement_status">
-            {displacementStatusLabel(residence.displacement_status)}
-          </Row>
-          {residence.displacement_status === "DISPLACED" && (
-            <Row label="مكان النزوح الحالي" field="displacement_location">
-              {residence.displacement_location_text?.trim() ? <bdi>{residence.displacement_location_text}</bdi> : NOT_RECORDED}
+        <>
+          <SubHeading id="residence-original-title">السكن الأصلي</SubHeading>
+          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-original-title">
+            <Row label="السكن الأصلي" field="original_residence">
+              <Text value={residence.original_residence_text} />
             </Row>
-          )}
-          <Row label="العنوان الحالي" field="current_address">
-            {parts.length === 0 ? (
-              <span className="font-normal text-muted-foreground">{NO_CURRENT_ADDRESS}</span>
-            ) : (
-              parts.map((part, i) => (
-                <span key={i} data-address-part>
-                  {i > 0 && "، "}
-                  <bdi>{part}</bdi>
-                </span>
-              ))
+          </dl>
+
+          <SubHeading id="residence-displacement-title">حالة النزوح</SubHeading>
+          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-displacement-title">
+            <Row label="حالة النزوح" field="displacement_status">
+              {residence.displacement_status === null ? <Missing /> : familyDisplacementLabel(residence.displacement_status)}
+            </Row>
+            {residence.displacement_status === "DISPLACED" && (
+              <Row label="مكان النزوح الحالي" field="displacement_location">
+                <Text value={residence.displacement_location_text} />
+              </Row>
             )}
-          </Row>
-        </dl>
+          </dl>
+
+          <SubHeading id="residence-current-title">عنوان السكن الحالي</SubHeading>
+          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-current-title">
+            {hasAddress ? (
+              <>
+                {parts.length > 0 && (
+                  <Row label="العنوان الحالي" field="current_address">
+                    {parts.map((part, i) => (
+                      <span key={i} data-address-part>
+                        {i > 0 && "، "}
+                        <bdi>{part}</bdi>
+                      </span>
+                    ))}
+                  </Row>
+                )}
+                {residence.current_address.address_text?.trim() && (
+                  <Row label="تفاصيل العنوان" field="address_text">
+                    <bdi>{residence.current_address.address_text}</bdi>
+                  </Row>
+                )}
+              </>
+            ) : (
+              <Row label="العنوان الحالي" field="current_address">
+                <span className="font-normal text-muted-foreground">{NO_CURRENT_ADDRESS}</span>
+              </Row>
+            )}
+            {residence.residence_type?.trim() && (
+              <Row label="نوع السكن" field="residence_type">
+                <bdi>{residence.residence_type}</bdi>
+              </Row>
+            )}
+            {residence.started_at && (
+              <Row label="تاريخ بدء السكن" field="residence_started_at">
+                <span className="tabular-nums">{formatDateLong(residence.started_at)}</span>
+              </Row>
+            )}
+          </dl>
+        </>
       )}
     </section>
   );
@@ -207,6 +308,7 @@ export function FamilyHousehold() {
         {data ? (
           <div className="flex flex-col gap-4">
             <FamilyInfo family={data.family} />
+            <Declaration declaration={data.declaration} />
             <Residence residence={data.residence} />
             <MembersEntry count={data.family.registered_member_count} />
           </div>

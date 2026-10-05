@@ -156,12 +156,12 @@ describe("the members list", () => {
     expect(ageText(bornYearsAgo(years))).toBe(text);
   });
 
-  it("manufactures no date when the birth date is not known", async () => {
+  it("manufactures no date when the birth date is not recorded — «غير مسجّل», never «غير معروف»", async () => {
     renderMembers([HEAD, familyMember({ birth_date: null })]);
 
     const [, member] = await rows();
     expect(member.querySelector("[data-member-age]")).toBeNull();
-    expect(member.querySelector("[data-member-birth-date]")?.textContent).toBe("تاريخ الميلاد غير معروف");
+    expect(member.querySelector("[data-member-birth-date]")?.textContent).toBe("تاريخ الميلاد غير مسجّل");
     expect(member.querySelector("[data-member-dates]")?.textContent).not.toMatch(/\d/);
   });
 

@@ -34,14 +34,16 @@ final class HouseholdReadModel
      * The «أسرتي» profile (PWA-3A Step 4): the summary's Family plus its
      * CURRENT residence only (is_current; at most one per Family). There is
      * no residence history to read: residence corrections are made in place.
-     * Only the family-facing residence columns are selected.
+     * Only the family-facing residence columns are selected (PWA-3B.3 adds
+     * address_text, residence_type and started_at — never coordinates,
+     * source, notes or lifecycle flags).
      */
     public function profile(FamilyAccessResult $context): Family
     {
         return $this->family($context)
             ->with(['currentResidence' => fn ($r) => $r->select([
                 'id', 'family_id', 'original_residence_text', 'displacement_status', 'displacement_location_text',
-                'governorate', 'city', 'area', 'neighborhood',
+                'governorate', 'city', 'area', 'neighborhood', 'address_text', 'residence_type', 'started_at',
             ])])
             ->firstOrFail();
     }
@@ -72,10 +74,18 @@ final class HouseholdReadModel
             ->select([
                 'family_memberships.id',
                 'family_memberships.is_household_head',
+                'family_memberships.started_at as membership_started_at',
                 'persons.full_name as person_full_name',
                 'persons.gender as person_gender',
                 'persons.birth_date as person_birth_date',
+                'persons.marital_status as person_marital_status',
                 'persons.life_status as person_life_status',
+                'persons.death_date as person_death_date',
+                // Masked by FamilyHouseholdMemberResource; never returned in full.
+                'persons.national_id as person_national_id',
+                'persons.mobile as person_mobile',
+                'persons.alternate_mobile as person_alternate_mobile',
+                'persons.alternate_mobile_owner_relation as person_alternate_mobile_owner_relation',
                 'persons.deleted_at as person_deleted_at',
                 'relationship_types.code as relationship_code',
                 'relationship_types.name as relationship_name',
@@ -126,17 +136,25 @@ final class HouseholdReadModel
             ->firstOrFail();
     }
 
-    /** The resolved Family with its lineage names, current declaration and registered count. */
+    /**
+     * The resolved Family with its lineage names (branch group included),
+     * registration date and paper form number, current declaration and
+     * registered count. Never notes, status, registration source or ids out.
+     */
     private function family(FamilyAccessResult $context): Builder
     {
         return Family::query()
             ->whereKey($context->family->getKey())
-            ->select(['families.id', 'families.family_code', 'families.clan_id', 'families.branch_id'])
+            ->select([
+                'families.id', 'families.family_code', 'families.clan_id', 'families.branch_id',
+                'families.registration_date', 'families.paper_form_no',
+            ])
             ->addSelect(['registered_member_count' => $this->activeMemberships($context)->selectRaw('count(*)')])
             ->with([
                 'clan:id,name',
-                'branch:id,name',
-                'currentHouseholdDeclaration:id,family_id,declared_household_size,declared_at',
+                'branch:id,name,branch_group_id',
+                'branch.group:id,name',
+                'currentHouseholdDeclaration:id,family_id,declared_household_size,declared_living_sons,declared_living_daughters,declared_at,source',
             ]);
     }
 
