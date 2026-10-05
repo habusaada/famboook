@@ -118,5 +118,16 @@ class AppServiceProvider extends ServiceProvider
         )
             ->by('family-login|ip|'.hash('sha256', (string) $request->ip()))
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
+        // Self sensitive-value reveal (docs/11 §23a, PWA-3B.2): per signed-in
+        // user — the route is authenticated — per minute and per hour.
+        RateLimiter::for('family-self-reveal', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('family_auth.self_reveal.limits.user_hour'))
+                : Limit::perMinute((int) config('family_auth.self_reveal.limits.user_minute')))
+                ->by("family-self-reveal|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
+            ['minute', 'hour'],
+        ));
     }
 }

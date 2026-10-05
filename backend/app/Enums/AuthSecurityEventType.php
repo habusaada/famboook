@@ -37,4 +37,7 @@ enum AuthSecurityEventType: string
     // The COORDINATOR role itself (PWA-1H); the scopes are recorded above.
     case COORDINATOR_ROLE_GRANTED = 'COORDINATOR_ROLE_GRANTED';
     case COORDINATOR_ROLE_REVOKED = 'COORDINATOR_ROLE_REVOKED';
+    // The household head revealed one of their OWN sensitive values
+    // (PWA-3B.2); metadata: the field code only, never the value.
+    case SELF_SENSITIVE_REVEALED = 'SELF_SENSITIVE_REVEALED';
 }

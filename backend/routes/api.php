@@ -95,6 +95,12 @@ Route::prefix('family')->group(function () {
             // «بياناتي الشخصية» (PWA-3B.1): SELF only, masked sensitive
             // values; the full values are a separate reveal (PWA-3B.2).
             Route::get('/self', [FamilySelfController::class, 'show']);
+
+            // Self sensitive-value reveal (PWA-3B.2): one OWN field per
+            // request (field code only, no target), throttled per user,
+            // no-store, recorded as a security event without the value.
+            Route::post('/self/reveal', [FamilySelfController::class, 'reveal'])
+                ->middleware('throttle:family-self-reveal');
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from

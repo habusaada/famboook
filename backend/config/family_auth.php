@@ -228,4 +228,23 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Self sensitive-value reveal (docs/11 §23a, PWA-3B.2)
+    |--------------------------------------------------------------------------
+    |
+    | POST /api/v1/family/self/reveal returns one of the signed-in head's own
+    | full values (National ID, mobile, alternate mobile). Ceilings per
+    | authenticated user: enough to show the three fields a few times, too
+    | few for automated extraction.
+    |
+    */
+
+    'self_reveal' => [
+        'limits' => [
+            'user_minute' => (int) env('FAMILY_SELF_REVEAL_LIMIT_USER_MINUTE', 10),
+            'user_hour' => (int) env('FAMILY_SELF_REVEAL_LIMIT_USER_HOUR', 60),
+        ],
+    ],
+
 ];

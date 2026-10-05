@@ -4,9 +4,10 @@ import Link from "next/link";
 import { AlertCircle, ArrowRight, Info, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SensitiveValue } from "@/components/family/account/sensitive-value";
 import { ageText } from "@/components/family/members/member-card";
 import { isAccessFailure } from "@/lib/api/family-household";
-import { type FamilySelf, useFamilySelfQuery } from "@/lib/api/family-self";
+import { type FamilySelf, type SelfRevealField, useFamilySelfQuery } from "@/lib/api/family-self";
 import { formatDateLong } from "@/lib/utils/date";
 import { maritalStatusLabels } from "@/lib/utils/marital-status";
 import { relationshipLabel } from "@/lib/utils/relationship";
@@ -32,17 +33,13 @@ function Row({ label, children, field }: { label: string; children: React.ReactN
 }
 
 /**
- * A masked value exactly as the server sent it. PWA-3B.1 has no reveal: the
- * full value is never in this page (PWA-3B.2 adds a separate reveal).
+ * A sensitive value: the server's mask with its own Eye control (PWA-3B.2),
+ * or «غير مسجّل» — and then no control — when nothing is recorded.
  */
-function Masked({ value }: { value: string | null }) {
-  if (value === null) return <Missing />;
+function Sensitive({ field, masked }: { field: SelfRevealField; masked: string | null }) {
+  if (masked === null) return <Missing />;
 
-  return (
-    <bdi dir="ltr" className="font-mono tracking-wide tabular-nums" data-masked>
-      {value}
-    </bdi>
-  );
+  return <SensitiveValue field={field} masked={masked} />;
 }
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -66,7 +63,7 @@ function MyDataSections({ self }: { self: FamilySelf }) {
           <bdi>{self.full_name}</bdi>
         </Row>
         <Row label="رقم الهوية" field="national_id">
-          <Masked value={self.national_id_masked} />
+          <Sensitive field="NATIONAL_ID" masked={self.national_id_masked} />
         </Row>
         <Row label="الجنس" field="gender">
           {self.gender ? genderLabels[self.gender] : <Missing />}
@@ -87,10 +84,10 @@ function MyDataSections({ self }: { self: FamilySelf }) {
 
       <Section id="contact" title="بيانات الاتصال">
         <Row label="رقم الجوال" field="mobile">
-          <Masked value={self.mobile_masked} />
+          <Sensitive field="MOBILE" masked={self.mobile_masked} />
         </Row>
         <Row label="الجوال البديل" field="alternate_mobile">
-          <Masked value={self.alternate_mobile_masked} />
+          <Sensitive field="ALTERNATE_MOBILE" masked={self.alternate_mobile_masked} />
         </Row>
         {self.alternate_mobile_masked !== null && (
           // Describes the alternate number; not applicable without one.
@@ -120,7 +117,7 @@ function MyDataSections({ self }: { self: FamilySelf }) {
 
       <p className="flex items-start gap-2 px-1 text-[13px] leading-relaxed text-muted-foreground" data-my-data-note>
         <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-        هذه هي البيانات المسجّلة حاليًا في سجل الأسرة. تُعرض أرقام الهوية والجوال مخفية جزئيًا لحماية خصوصيتك على الشاشة.
+        هذه هي البيانات المسجّلة حاليًا في سجل الأسرة. تُعرض أرقام الهوية والجوال مخفية جزئيًا لحماية خصوصيتك على الشاشة؛ اضغط زر الإظهار لعرض الرقم كاملًا مؤقتًا.
       </p>
     </div>
   );
@@ -163,9 +160,10 @@ function MyDataError({ onRetry, retrying }: { onRetry: () => void; retrying: boo
 }
 
 /**
- * بياناتي الشخصية (PWA-3B.1, docs/11 §23a): the signed-in household head's
- * own registry data, read-only. Sensitive values are shown masked exactly as
- * received; there is no reveal and no edit in this slice. A 401 or 403 is
+ * بياناتي الشخصية (PWA-3B.1 / 3B.2, docs/11 §23a): the signed-in household
+ * head's own registry data, read-only. Sensitive values are shown masked as
+ * received, each with its own temporary reveal (SensitiveValue); there is no
+ * edit. A 401 or 403 is
  * handled by the session/access flow (the gate and the shell), any other
  * failure inline.
  */

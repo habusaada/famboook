@@ -32,6 +32,24 @@ export type FamilySelf = {
 
 export const FAMILY_SELF_QUERY_KEY = ["family", "self"] as const;
 
+/** The own sensitive values the self reveal may return (PWA-3B.2). */
+export type SelfRevealField = "NATIONAL_ID" | "MOBILE" | "ALTERNATE_MOBILE";
+
+/**
+ * POST /api/v1/family/self/reveal — ONE own full value. Deliberately a plain
+ * request, not a query or a mutation: the value must never enter the query
+ * or mutation cache. The caller keeps it in transient component state only
+ * and drops it on hide and on unmount. Only the field code is sent.
+ */
+export async function revealSelfValue(field: SelfRevealField): Promise<string | null> {
+  const response = await apiClient.post<{ data: { field: SelfRevealField; value: string | null } }>(
+    "/api/v1/family/self/reveal",
+    { field }
+  );
+
+  return response.data.value;
+}
+
 /** GET /api/v1/family/self. */
 export function useFamilySelfQuery() {
   const query = useQuery({

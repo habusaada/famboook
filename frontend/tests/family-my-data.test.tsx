@@ -82,19 +82,25 @@ describe("sensitive values", () => {
     expect(field("alternate_mobile")).toHaveTextContent("05*****321");
   });
 
-  it("has no full value anywhere, no reveal control and nothing in browser storage", async () => {
+  it("has no full value before a reveal, only the reveal controls, and nothing in browser storage", async () => {
+    const post = vi.spyOn(apiClient, "post");
     const { container } = renderMyData();
     await screen.findByRole("heading", { name: "البيانات الأساسية" });
 
     for (const full of FULL_VALUES) {
       expect(container.innerHTML).not.toContain(full);
     }
-    // The screen itself (the shell's navigation is not part of it).
+    // The screen itself (the shell's navigation is not part of it): only the
+    // three reveal controls, all unpressed; nothing is requested on load.
     const page = container.querySelector("[data-my-data]") as HTMLElement;
-    expect(within(page).queryByRole("button")).not.toBeInTheDocument();
-    expect(page.querySelector("[aria-pressed]")).toBeNull();
-    expect(screen.queryByRole("button", { name: /إظهار|إخفاء|show|hide/i })).not.toBeInTheDocument();
-    // PWA-3B.1 is read-only: no edit or request link either.
+    expect(within(page).getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "إظهار رقم الهوية",
+      "إظهار رقم الجوال",
+      "إظهار الجوال البديل",
+    ]);
+    expect(page.querySelectorAll('[aria-pressed="true"]')).toHaveLength(0);
+    expect(post).not.toHaveBeenCalled();
+    // Read-only: no edit or request link either.
     expect(within(page).queryByRole("link")).not.toBeInTheDocument();
     expect(browserStorageDump()).not.toMatch(/\*{5}|سالم/);
   });

@@ -3994,6 +3994,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-054
+PWA-3B.2 self sensitive-value reveal (2026-10-05) adds **no migration**: the new `auth_security_events.event_type` `SELF_SENSITIVE_REVEALED` already satisfies `chk_auth_security_event_codes` (code format only), and the new metadata key `field` (a field code) is enforced by the model's allow-list. The revealed value is never stored.
+
 ### DB-ADR-053
 FU-10 (2026-10-05) adds **no migration**. Household declarations gain an optimistic stale-state check under the existing `families` row lock (expected current declaration, `HOUSEHOLD_DECLARATION_CHANGED`); `uq_family_current_household_declaration` stays the final guard. The Staff stale-write reference is the declaration's internal id, returned only by the Staff Family profile (the table has no public identifier; adding one would need a migration and is not required). Death recording keeps its `persons` row lock; no `RegistrationSource` value is added.
 
@@ -4274,6 +4277,7 @@ Date: 2026-09-24
 | 1.2.33 | 2026-10-04 | Approved | First self-activation: migration allowing `SELF_OTP` in the trust CHECKs (DB-ADR-051); pending row promoted on a correct code |
 | 1.2.34 | 2026-10-04 | Approved | Documentation consolidation: no schema change (DB-ADR-052); Registered Members / Living Members wording; `family_profile_confirmations` concept and Staff Family Verification deferred in the phase-concept table |
 | 1.2.35 | 2026-10-05 | Approved | FU-10: no schema change (DB-ADR-053); §25a stale-state check for household declarations; §69 death transaction as implemented (head review and access re-evaluation passive) |
+| 1.2.36 | 2026-10-05 | Approved | PWA-3B.2: no schema change (DB-ADR-054); `SELF_SENSITIVE_REVEALED` event type and `field` metadata key within the existing constraints |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

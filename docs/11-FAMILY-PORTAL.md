@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.17
+**Version:** 1.18
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2787,6 +2787,53 @@ GET /api/v1/family/self   auth:sanctum → family.side →
 - The member list's null birth-date wording («تاريخ الميلاد غير معروف»)
   is corrected with the member detail work of PWA-3B.3.
 
+## PWA-3B.2 implementation record — self sensitive-value reveal
+
+Implemented 2026-10-05 (FP-ADR-062, §23a, docs/06 AUTH-ADR-078). No
+migration. The member reveal stays PWA-3B.4 (§33a FU-13).
+
+```text
+POST /api/v1/family/self/reveal
+  auth:sanctum → family.side → can:family-portal.access → family.context
+  → throttle:family-self-reveal; no route parameter
+  body      {"field": "NATIONAL_ID" | "MOBILE" | "ALTERNATE_MOBILE"}
+  response  {"data": {"field": "…", "value": "…" | null}}
+            Cache-Control: no-store, private
+```
+
+- **SELF only.** The value is read from the Family context's Person
+  (`SelfSensitiveReveal`); the persons column comes from the fixed
+  `SelfRevealField` mapping (NATIONAL_ID → `national_id`, MOBILE →
+  `mobile`, ALTERNATE_MOBILE → `alternate_mobile`), never from the input.
+  `FamilySelfRevealRequest` refuses (422) an unknown field and any
+  `person_id`, `person_code`, `family_id`, `family_code`, `user_id`,
+  `membership_id`, `national_id`, `mobile`, `alternate_mobile`, `value` or
+  `target`, in the body or the query string. Coordinator scope never
+  changes the Person. Only the requested value is returned; a value that is
+  not recorded is `null`, never fabricated.
+- **Throttle** `family-self-reveal`, per authenticated user:
+  `family_auth.self_reveal.limits.user_minute` (default 10) and
+  `user_hour` (default 60); 429 `TOO_MANY_REQUESTS` with `no-store`.
+- **Security event.** Every authorized reveal — also one whose value is
+  null — records one `SELF_SENSITIVE_REVEALED` (outcome SUCCESS; person,
+  user, actor, link) with `metadata.field` = the field code, BEFORE the
+  value is returned. Never the value. `field` is an allow-listed
+  `auth_security_events` metadata key. No Family Activity event. Refused
+  requests (validation, boundary, throttle) record nothing.
+- **Unchanged:** `GET /family/self` stays masked only; `/family/me` and
+  the household endpoints carry no sensitive value.
+- **Frontend.** «بياناتي الشخصية» gives each recorded sensitive value its
+  own Eye control («إظهار / إخفاء رقم الهوية · رقم الجوال · الجوال
+  البديل», `aria-pressed`); none for a value that is not recorded. A show
+  POSTs only that field code through a plain request — not a query or
+  mutation — and keeps the full value in that field's component state
+  only, as `<bdi dir="ltr">` text. Hide discards it at once; showing again
+  asks again; leaving the screen discards it; a late answer after hide or
+  unmount is dropped. Busy state is per field and repeated clicks are
+  ignored; a failure keeps the mask and shows a field-level message (429:
+  «طلبات إظهار كثيرة. حاول مجددًا بعد قليل.»); 401 / 403 go to the usual
+  access flow. No clipboard, no browser storage, no attribute.
+
 ---
 
 # 31. Amendment Register
@@ -3483,3 +3530,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.15 | 2026-10-05 | Approved | FU-10 resolved (FP-ADR-061): Staff death recording (verification method, explicit death date, irreversible in V1, head death allowed without succession — FU-01 still open) and Staff household declarations (`family.update`, Staff sources, stale-write protection); §9 Staff declaration path is a Profile Review prerequisite; §14 apply targets; FU-11 updated. No migration |
 | 1.16 | 2026-10-05 | Approved | Full Data Visibility (FP-ADR-062): §23a principle, structure («حسابي» → «بياناتي الشخصية»), family-facing data per domain, internal-only data, self reveal (POST /api/v1/family/self/reveal) and member-reveal boundary (PWA-3B.4), display vocabulary, Profile Review and Change Request relationship; PFP-006 resolved; FP-ADR-056, §9 HEAD, §15, §23 and the §30a PWA-3A exclusions superseded in part (kept as history); §31 A-18; FU-13; PWA-3B in the phases. Documentation only |
 | 1.17 | 2026-10-05 | Approved | PWA-3B.1 implementation record in §30a: GET /api/v1/family/self (SELF only, masked National ID and mobiles, no-store, private), shared MobileMask, «بياناتي الشخصية» at /family/account/me reached from the head's own member card; no reveal, no migration |
+| 1.18 | 2026-10-05 | Approved | PWA-3B.2 implementation record in §30a: POST /api/v1/family/self/reveal (SELF only, one field, strict field mapping, prohibited targets, per-user throttle, no-store, private), SELF_SENSITIVE_REVEALED security event with the field code only (null reveals recorded too), per-field Eye on «بياناتي الشخصية» with transient component state only; no migration |

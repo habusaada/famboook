@@ -42,6 +42,8 @@ class AuthSecurityEvent extends Model
         // SMS delivery failure class and reason (codes only).
         'delivery_outcome',
         'delivery_reason',
+        // Which own sensitive value was revealed (SelfRevealField code).
+        'field',
     ];
 
     /** Largest counter a metadata value may hold (far below any identifier). */
