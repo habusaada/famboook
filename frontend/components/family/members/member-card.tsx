@@ -1,4 +1,5 @@
-import { CircleQuestionMark, EyeOff, Ribbon } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, CircleQuestionMark, EyeOff, IdCard, Ribbon } from "lucide-react";
 import type { FamilyMember } from "@/lib/api/family-household";
 import { calculateAge, formatDateLong } from "@/lib/utils/date";
 import { relationshipLabel } from "@/lib/utils/relationship";
@@ -110,6 +111,22 @@ export function MemberCard({ member }: { member: FamilyMember }) {
           <span data-member-birth-date>تاريخ الميلاد غير معروف</span>
         )}
       </p>
+
+      {member.is_household_head && (
+        // The head's card is the signed-in user's own (V1 eligibility):
+        // the way to «بياناتي الشخصية». No other card links anywhere.
+        <Link
+          href="/family/account/me"
+          className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
+          data-my-data-link
+        >
+          <span className="flex items-center gap-2">
+            <IdCard className="size-4" aria-hidden />
+            بياناتي الشخصية
+          </span>
+          <ChevronLeft className="size-4" aria-hidden />
+        </Link>
+      )}
     </li>
   );
 }

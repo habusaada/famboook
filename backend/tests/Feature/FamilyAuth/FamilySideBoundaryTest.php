@@ -208,12 +208,12 @@ class FamilySideBoundaryTest extends TestCase
                 $this->assertContains('auth:sanctum', $middleware, $route->uri());
                 $this->assertContains('family.side', $middleware, $route->uri());
             }
-            // Family data (PWA-3A): the permission, then the resolved context.
-            if (in_array($route->uri(), ['api/v1/family/household', 'api/v1/family/household/members', 'api/v1/family/household/profile'], true)) {
+            // Family data (PWA-3A, PWA-3B.1): the permission, then the resolved context.
+            if (in_array($route->uri(), ['api/v1/family/household', 'api/v1/family/household/members', 'api/v1/family/household/profile', 'api/v1/family/self'], true)) {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context'], $middleware);
             }
             $checked++;
         }
-        $this->assertSame(18, $checked);
+        $this->assertSame(19, $checked);
     }
 }

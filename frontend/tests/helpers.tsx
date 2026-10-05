@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { FamilyUser } from "@/lib/api/family-auth";
 import type { FamilyHousehold, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
+import type { FamilySelf } from "@/lib/api/family-self";
 
 /** Renders inside a fresh, non-retrying query client. */
 export function renderWithClient(ui: ReactElement) {
@@ -99,6 +100,24 @@ export function familyProfile(
   };
 }
 
+/** A synthetic «بياناتي الشخصية» payload, masked as the server sends it. */
+export function familySelf(overrides: Partial<FamilySelf> = {}): FamilySelf {
+  return {
+    full_name: "سالم أحمد الاختبار",
+    national_id_masked: "*****6789",
+    gender: "MALE",
+    birth_date: "1980-01-15",
+    marital_status: "MARRIED",
+    mobile_masked: "05*****567",
+    alternate_mobile_masked: "05*****321",
+    alternate_mobile_owner_relation: "أخ",
+    relationship: { code: "HEAD", name: "رب الأسرة" },
+    is_household_head: true,
+    membership_started_at: "2001-03-04",
+    ...overrides,
+  };
+}
+
 type Answer = unknown | Error | (() => Promise<unknown>);
 
 /**
@@ -112,7 +131,8 @@ export function familyGet({
   household = familyHousehold(),
   members = familyMembers(),
   profile = familyProfile(),
-}: { user?: FamilyUser | Error; household?: Answer; members?: Answer; profile?: Answer } = {}) {
+  self = familySelf(),
+}: { user?: FamilyUser | Error; household?: Answer; members?: Answer; profile?: Answer; self?: Answer } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
     if (value instanceof Error) throw value;
@@ -129,6 +149,9 @@ export function familyGet({
     }
     if (path === "/api/v1/family/household/profile") {
       return typeof profile === "function" || profile instanceof Error ? answer(profile) : { data: profile };
+    }
+    if (path === "/api/v1/family/self") {
+      return typeof self === "function" || self instanceof Error ? answer(self) : { data: self };
     }
     throw new Error(`Unexpected GET ${path}`);
   };

@@ -82,7 +82,7 @@ export const FAMILY_PROFILE_QUERY_KEY = ["family", "household", "profile"] as co
  * only ever take access away locally; the next /me answer from the server
  * stays authoritative. Other failures are left to the page.
  */
-function useFamilyAccessFailure(error: unknown) {
+export function useFamilyAccessFailure(error: unknown) {
   const queryClient = useQueryClient();
   const status = error instanceof ApiError ? error.status : null;
 

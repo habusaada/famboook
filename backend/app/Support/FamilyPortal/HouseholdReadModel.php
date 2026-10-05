@@ -95,6 +95,37 @@ final class HouseholdReadModel
             ->get();
     }
 
+    /**
+     * «بياناتي الشخصية» (PWA-3B.1): the signed-in household head's OWN Person
+     * and membership — the membership the resolver put in the context, never
+     * one chosen by the client. Only the columns the self view needs are
+     * read; the sensitive ones leave this class only through
+     * FamilySelfResource, masked.
+     */
+    public function self(FamilyAccessResult $context): FamilyMembership
+    {
+        return FamilyMembership::query()
+            ->whereKey($context->membership->getKey())
+            ->where('family_memberships.person_id', $context->person->getKey())
+            ->join('persons', 'persons.id', '=', 'family_memberships.person_id')
+            ->leftJoin('relationship_types', 'relationship_types.id', '=', 'family_memberships.relationship_type_id')
+            ->select([
+                'family_memberships.is_household_head',
+                'family_memberships.started_at as membership_started_at',
+                'persons.full_name as person_full_name',
+                'persons.national_id as person_national_id',
+                'persons.gender as person_gender',
+                'persons.birth_date as person_birth_date',
+                'persons.marital_status as person_marital_status',
+                'persons.mobile as person_mobile',
+                'persons.alternate_mobile as person_alternate_mobile',
+                'persons.alternate_mobile_owner_relation as person_alternate_mobile_owner_relation',
+                'relationship_types.code as relationship_code',
+                'relationship_types.name as relationship_name',
+            ])
+            ->firstOrFail();
+    }
+
     /** The resolved Family with its lineage names, current declaration and registered count. */
     private function family(FamilyAccessResult $context): Builder
     {

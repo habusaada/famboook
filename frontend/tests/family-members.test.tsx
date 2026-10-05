@@ -331,3 +331,28 @@ describe("navigation and privacy", () => {
     }
   });
 });
+
+describe("the way to «بياناتي الشخصية» (PWA-3B.1)", () => {
+  it("is offered on the head's own card only", async () => {
+    renderMembers([
+      HEAD,
+      familyMember({ full_name: "زوجة الاختبار", relationship: { code: "SPOUSE", name: "زوج/زوجة" }, gender: "FEMALE" }),
+      familyMember({ full_name: "ابن الاختبار" }),
+    ]);
+    const [head, ...others] = await rows();
+
+    const link = within(head).getByRole("link", { name: "بياناتي الشخصية" });
+    expect(link).toHaveAttribute("href", "/family/account/me");
+    for (const row of others) {
+      expect(within(row).queryByRole("link")).not.toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("link", { name: "بياناتي الشخصية" })).toHaveLength(1);
+  });
+
+  it("is never offered on an unavailable member's placeholder", async () => {
+    renderMembers([HEAD, familyMember({ available: false, full_name: null, gender: null, birth_date: null, life_status: null })]);
+    const [, placeholder] = await rows();
+
+    expect(within(placeholder).queryByRole("link")).not.toBeInTheDocument();
+  });
+});

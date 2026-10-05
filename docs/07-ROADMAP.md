@@ -2096,7 +2096,8 @@ Change Request prerequisites                      NEXT
         request view permission (FU-04)
 PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
         RM-ADR-048) — read-only, before PWA-5:
-        3B.1 My Data read view («حسابي» → «بياناتي الشخصية»)
+        3B.1 My Data read view («حسابي» → «بياناتي الشخصية») — DONE
+             (GET /family/self, /family/account/me; masked only)
         3B.2 self sensitive-value reveal (National ID, mobile, alternate)
         3B.3 complete Family / declaration / residence / member read views
         3B.4 family-member identity/contact reveal
@@ -4965,6 +4966,7 @@ Date: 2026-09-24
 | 1.2.38 | 2026-10-04 | Approved | Change Request prerequisite FU-07 / PFP-024 done: ConfirmPersonAliveAction with a Staff endpoint and action (docs/11 FP-ADR-060) |
 | 1.2.39 | 2026-10-05 | Approved | Change Request prerequisite FU-10 done: Staff death recording (verification method, irreversible, head death without succession) and Staff household declarations (stale-write protected); no migration (docs/11 FP-ADR-061) |
 | 1.2.40 | 2026-10-05 | Approved | PWA-3B Family Portal Full Data Visibility inserted before PWA-5 with slices 3B.1 … 3B.7 (RM-ADR-048, docs/11 FP-ADR-062); PWA-3 table row and program status updated; documentation only |
+| 1.2.41 | 2026-10-05 | Approved | PWA-3B.1 done: «بياناتي الشخصية» read view (GET /api/v1/family/self, /family/account/me), masked National ID and mobiles only; no migration. PWA-3B.2 (reveal) next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

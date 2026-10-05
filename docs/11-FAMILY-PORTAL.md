@@ -2,7 +2,7 @@
 ## Family Portal / Family PWA — Program Specification
 
 **Document:** `11-FAMILY-PORTAL.md`
-**Version:** 1.16
+**Version:** 1.17
 **Date:** 2026-10-05
 **Status:** APPROVED — PWA-0 baseline and PWA-1B identity/access design. Implemented so far: the PWA-1C foundation, the PWA-1D identity domain behaviour, the PWA-1E mobile trust and OTP foundation, PWA-1F activation with the first Family Portal screens, PWA-1G Family login and password reset and PWA-1H coordinator scope and Coordinator Space (§30a); TweetsMS SMS delivery and the PWA-1I security hardening (§30a); the PWA-3A household read views (§30a); activation, login and password reset are each disabled by default, and SMS sends nothing until the server is configured
 
@@ -2749,6 +2749,44 @@ unexpired, unsuperseded code establishes it.
   already TRUSTED mobile); login; Staff grant and revoke (a Staff grant can
   never use SELF_OTP); account sides.
 
+## PWA-3B.1 implementation record — «بياناتي الشخصية» read view
+
+Implemented 2026-10-05 (FP-ADR-062, §23a). Read-only; no migration; no
+reveal (PWA-3B.2), no edit, no request path.
+
+```text
+GET /api/v1/family/self   auth:sanctum → family.side →
+                          can:family-portal.access → family.context;
+                          no route parameter; Cache-Control: no-store, private
+```
+
+- **SELF only.** The Person and membership are the ones the resolver put
+  in the Family context (`HouseholdReadModel::self`); query strings or any
+  other input are ignored. Coordinator scope never changes the Person.
+- **Allow-list** (`FamilySelfResource`): `full_name`,
+  `national_id_masked`, `gender`, `birth_date`, `marital_status` (as
+  stored: UNKNOWN stays UNKNOWN), `mobile_masked`,
+  `alternate_mobile_masked`, `alternate_mobile_owner_relation`,
+  `relationship` (`code`, `name`), `is_household_head`,
+  `membership_started_at`. NULL stays NULL; the age is derived by the
+  client. Never the full National ID or mobiles, `person_code`, ids, notes,
+  `is_active`, life status internals, audit, account, trust or auth data.
+- **Masks.** National ID: `NationalIdMask` (`*****` + last 4). Mobiles:
+  the shared `App\Support\MobileMask` — a valid mobile (FamilyMobile) is
+  `05*****` + last 3 (the activation confirmation now uses the same
+  helper); a stored value that is not a valid mobile gets no invented `05`
+  prefix: `*****` + at most its last 3 characters, never more than half.
+- **Frontend:** `/family/account/me` — البيانات الأساسية · بيانات الاتصال ·
+  بيانات العضوية, masked values as received, no Eye control; the §23a
+  vocabulary (null «غير مسجّل», marital UNKNOWN «غير معروف»; the age row
+  and the alternate-mobile owner row are omitted when not applicable).
+  Reached from the head's own member card («بياناتي الشخصية» on
+  `/family/members`); the full «حسابي» screen stays PWA-3B.5, so the bottom
+  navigation entry stays «قريبًا». Query cache only (cleared on logout);
+  the service worker never touches API responses.
+- The member list's null birth-date wording («تاريخ الميلاد غير معروف»)
+  is corrected with the member detail work of PWA-3B.3.
+
 ---
 
 # 31. Amendment Register
@@ -3444,3 +3482,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.14 | 2026-10-04 | Approved | FU-07 / PFP-024 resolved (FP-ADR-060): ConfirmPersonAliveAction (UNKNOWN → ALIVE only), Staff endpoint and action with a recorded verification method, UNKNOWN heads confirmed only by Staff; §14 PERSON_CORRECTION / CONFIRM_ALIVE apply target |
 | 1.15 | 2026-10-05 | Approved | FU-10 resolved (FP-ADR-061): Staff death recording (verification method, explicit death date, irreversible in V1, head death allowed without succession — FU-01 still open) and Staff household declarations (`family.update`, Staff sources, stale-write protection); §9 Staff declaration path is a Profile Review prerequisite; §14 apply targets; FU-11 updated. No migration |
 | 1.16 | 2026-10-05 | Approved | Full Data Visibility (FP-ADR-062): §23a principle, structure («حسابي» → «بياناتي الشخصية»), family-facing data per domain, internal-only data, self reveal (POST /api/v1/family/self/reveal) and member-reveal boundary (PWA-3B.4), display vocabulary, Profile Review and Change Request relationship; PFP-006 resolved; FP-ADR-056, §9 HEAD, §15, §23 and the §30a PWA-3A exclusions superseded in part (kept as history); §31 A-18; FU-13; PWA-3B in the phases. Documentation only |
+| 1.17 | 2026-10-05 | Approved | PWA-3B.1 implementation record in §30a: GET /api/v1/family/self (SELF only, masked National ID and mobiles, no-store, private), shared MobileMask, «بياناتي الشخصية» at /family/account/me reached from the head's own member card; no reveal, no migration |

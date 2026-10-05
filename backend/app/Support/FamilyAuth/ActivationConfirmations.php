@@ -2,6 +2,7 @@
 
 namespace App\Support\FamilyAuth;
 
+use App\Support\MobileMask;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -54,10 +55,10 @@ final class ActivationConfirmations
         return $state;
     }
 
-    /** The displayable mask of a real number: 05*****NNN. */
+    /** The displayable mask of a real (normalized) number: 05*****NNN. */
     public static function mask(#[\SensitiveParameter] string $mobile): string
     {
-        return '05*****'.substr($mobile, -3);
+        return MobileMask::normalized($mobile);
     }
 
     private static function key(string $uuid): string

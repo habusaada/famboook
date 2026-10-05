@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
+use App\Http\Controllers\Api\V1\Family\FamilySelfController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
@@ -90,6 +91,10 @@ Route::prefix('family')->group(function () {
             Route::get('/household', [FamilyHouseholdController::class, 'show']);
             Route::get('/household/members', [FamilyHouseholdController::class, 'members']);
             Route::get('/household/profile', [FamilyHouseholdController::class, 'profile']);
+
+            // «بياناتي الشخصية» (PWA-3B.1): SELF only, masked sensitive
+            // values; the full values are a separate reveal (PWA-3B.2).
+            Route::get('/self', [FamilySelfController::class, 'show']);
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
