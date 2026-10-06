@@ -333,7 +333,7 @@ describe("loading, errors and access", () => {
 });
 
 describe("navigation and privacy", () => {
-  it("makes أسرتي the current entry on /family/household, linked there; the rest stays disabled", async () => {
+  it("makes أسرتي the current entry on /family/household, linked there; حسابي is a link; the rest stays disabled", async () => {
     renderHousehold();
     await info();
 
@@ -342,8 +342,11 @@ describe("navigation and privacy", () => {
     expect(household).toHaveAttribute("href", "/family/household");
     expect(household).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getAllByRole("link")).toHaveLength(2);
-    for (const label of ["طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
+    expect(within(nav).getAllByRole("link")).toHaveLength(3);
+    const account = within(nav).getByRole("link", { name: "حسابي" });
+    expect(account).toHaveAttribute("href", "/family/account");
+    expect(account).not.toHaveAttribute("aria-current");
+    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
       expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
     }
   });

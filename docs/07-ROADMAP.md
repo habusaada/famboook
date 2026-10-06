@@ -2113,7 +2113,8 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
              reset still disabled — enablement per docs/08 §16a checklist
         FU-15 Staff mobile trust UI — DONE (Person profile card
              «توثيق رقم الجوال» on the PWA-1E API; RM-ADR-049)
-        3B.5 account view («حسابي»)
+        3B.5 account view («حسابي») — DONE (GET /family/account,
+             /family/account; FP-ADR-067; RM-ADR-050)
         3B.6 health read visibility
         3B.7 needs and received-assistance visibility
 PWA-5   Change Request engine + Staff review workspace
@@ -2122,6 +2123,8 @@ PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         DEATH_REPORT (non-head); «طلباتي»
 PWA-4   Family Profile Review (/family/verification; docs/11 FP-ADR-057)
 later   contact update (CONTACT_UPDATE); the «حسابي» view itself is PWA-3B.5
+later   authenticated change password (docs/11 FU-16), a Family Auth phase
+        separate from Account Recovery (FU-14)
 PWA-7   health and need submissions (PFP-008, PFP-009; health visibility
         decided for PWA-3B.6 — docs/11 FP-ADR-062)
 later   optional Staff Family Verification (PFP-017) / PWA-8 card
@@ -4727,6 +4730,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-050
+PWA-3B.5 — Family account view «حسابي» is done (2026-10-06, docs/11 FP-ADR-067, docs/06 AUTH-ADR-082): one self-scoped read endpoint (`GET /api/v1/family/account`) and the `/family/account` page, now the destination of «حسابي». No migration, no role or permission change; FU-14 and FU-15 unchanged. Account Recovery stays on the login screen; Authenticated Change Password is recorded as a separate future Family Auth item (docs/11 FU-16). PWA-3B.6 follows.
+
 ### RM-ADR-049
 FU-15 — Staff Mobile Trust Management UI (2026-10-06) is delivered without a slice letter, after FU-14: the Staff Person profile card «توثيق رقم الجوال» shows the backend state, the masked current mobile and the trust history, and grants / revokes through the existing PWA-1E endpoints and Domain Actions (docs/06 AUTH-ADR-081, docs/11 FP-ADR-066). It satisfies the RM-ADR-044 prerequisite "the Staff mobile-trust UI before any cohort beyond a test household". No migration, no backend behavior change, no permission or role change; password reset, activation, login and SMS are unchanged.
 
@@ -4988,6 +4994,7 @@ Date: 2026-09-24
 | 1.2.45 | 2026-10-05 | Approved | PWA-3B.4 done: household-member sensitive reveal by member_ref inside the family context (generic 404, head's own values on the self path only, dedicated per-user throttle, security event without the value); no migration (docs/11 FP-ADR-064). PWA-3B.5 next |
 | 1.2.46 | 2026-10-06 | Approved | FU-14 password reset Production readiness implemented: the PWA-1G / PWA-1I reset kept unchanged (automatic sign-in, head eligibility, no masked mobile); runtime Family Auth capabilities endpoint and fail-closed forgot-password entry; self-OTP journey, coordinator, Staff boundary, changed-mobile and registry coverage; no migration (docs/11 FP-ADR-065). `FAMILY_PASSWORD_RESET_ENABLED` stays false until the docs/08 §16a enablement checklist is completed |
 | 1.2.47 | 2026-10-06 | Approved | FU-15 done: Staff Mobile Trust Management UI on the Person profile (state, masked current mobile, history, grant with the three Staff methods, revoke with a reason code; REVOKED never revived, grant = new row); satisfies the RM-ADR-044 Staff mobile-trust UI prerequisite; no migration, no backend behavior change (RM-ADR-049) |
+| 1.2.48 | 2026-10-06 | Approved | PWA-3B.5 done: «حسابي» account view (activation date, access types, current mobile trust owner summary, Coordinator section from the coordinator context, «بياناتي الشخصية» entry, logout) on `GET /api/v1/family/account`; «حسابي» enabled in the navigation; authenticated change password recorded as a future item (docs/11 FU-16); no migration (RM-ADR-050). PWA-3B.6 next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

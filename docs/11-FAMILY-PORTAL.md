@@ -1247,7 +1247,10 @@ ACCOUNT       (PWA-3B.5) account active state, activation date, login
               mobile trust summary, roles and capabilities, Coordinator
               capability, scope summary and entry, entry to «بياناتي
               الشخصية», logout. Coordinator scope never mixes with
-              household registry data.
+              household registry data. Account Recovery (FU-14, the
+              public password reset) belongs to the login experience and
+              is not an account setting; authenticated password change is
+              a separate future item (FU-16). As implemented: FP-ADR-067.
 ```
 
 Not in PWA-3B: assessments (INTERNAL_ONLY; a neutral "last assessment
@@ -2782,7 +2785,8 @@ GET /api/v1/family/self   auth:sanctum → family.side →
   and the alternate-mobile owner row are omitted when not applicable).
   Reached from the head's own member card («بياناتي الشخصية» on
   `/family/members`); the full «حسابي» screen stays PWA-3B.5, so the bottom
-  navigation entry stays «قريبًا». Query cache only (cleared on logout);
+  navigation entry stays «قريبًا» (until PWA-3B.5: «حسابي» is now a link to
+  `/family/account`, current on `/family/account/me` too). Query cache only (cleared on logout);
   the service worker never touches API responses.
 - The member list's null birth-date wording («تاريخ الميلاد غير معروف»)
   is corrected with the member detail work of PWA-3B.3.
@@ -2997,6 +3001,64 @@ a Staff-revoked SELF_OTP trust stays revoked; a change between verify and
 complete stops it; persons, families and family_memberships rows are
 byte-identical and no Family Activity is written. Frontend: login link and
 forgot-password route, loading / false / error / no connection / true.
+
+## PWA-3B.5 implementation record — «حسابي» account view
+
+Implemented 2026-10-06 (FP-ADR-067). No migration; no role, permission,
+activation, login, password reset (FU-14), Staff mobile trust (FU-15) or
+SMS change.
+
+- **Backend:** `GET /api/v1/family/account` (`FamilyAccountController`,
+  `FamilyAccountResource`) behind `auth:sanctum`, `family.side`,
+  `can:family-portal.access`, `family.context`; no parameter, nothing read
+  from the request; `Cache-Control: no-store, private`; no write and no
+  security event. Allow-list: `activated_at` (the current User-Person
+  Link's `activated_at`, ISO 8601 or null) and `mobile` `{state, masked}` —
+  `state` from `CurrentTrustedMobile` (TRUSTED, STALE, REVOKED,
+  UNVERIFIED, NO_MOBILE, UNAVAILABLE), `masked` from the Family
+  `MobileMask` (the value «بياناتي الشخصية» shows). `/family/me` is
+  unchanged. UNAVAILABLE cannot normally reach the page: without a usable
+  Family Auth key `family.context` already refuses the identity.
+- **Reachable states:** a deactivated account is 401
+  (`EnsureUserIsActive`); a Staff or mixed account is 403 (`family.side`);
+  without a Family context the shell shows its neutral notice instead of
+  the page. «الحساب مفعّل» is therefore the only account state the page
+  can show; no suspended / inactive state is invented.
+- **Frontend `/family/account`:** «حسابي» — the signed-in name, «الحساب
+  مفعّل», «تاريخ التفعيل» (null «غير مسجّل»), «رمز الأسرة»; «نوع الدخول»
+  («رب الأسرة», plus «صلاحية التنسيق» for COORDINATOR — never a role or
+  permission string); «توثيق رقم الجوال» (owner labels TRUSTED «موثّق»,
+  STALE «يحتاج إعادة توثيق», REVOKED «غير موثّق حاليًا», UNVERIFIED «غير
+  موثّق», NO_MOBILE «لا يوجد رقم جوال صالح», UNAVAILABLE «تعذّر عرض حالة
+  التوثيق حاليًا»; the masked number; that the verified number receives
+  verification codes, including account recovery; «يُرجى مراجعة إدارة
+  السجل» where the registry must act; no history, reason, verifier,
+  control, reveal or edit); «مساحة التنسيق» for COORDINATOR only — the
+  effective scopes (`scopeLabel`) and family count from `GET
+  /family/coordinator/context` and «فتح مساحة التنسيق» when
+  `coordinator_space` is true, otherwise «لا يوجد نطاق تنسيق فعّال
+  حاليًا» with no entry; the «بياناتي الشخصية» entry (`/family/account/me`);
+  «تسجيل الخروج».
+- **Password:** no «نسيت / إعادة تعيين كلمة المرور» action and no link to
+  `/family/forgot-password` from «حسابي»; Account Recovery stays on the
+  login screen, unchanged. No disabled or placeholder «تغيير كلمة المرور»
+  control: authenticated change password is FU-16.
+- **Logout:** one shared `useFamilySignOut` for the header and «حسابي» —
+  `POST /api/v1/family/auth/logout`, the query cache cleared, `/family/me`
+  set to null, `/family/login`. Behavior unchanged.
+- **Navigation:** «حسابي» is a link to `/family/account`, current on
+  `/family/account` and `/family/account/*`; «طلباتي» and «+» stay
+  disabled. Shell and width unchanged.
+- **Tests:** backend `FamilyAccountTest` (allow-list, cache headers, mask
+  parity with /family/self, every state including REVOKED then a new Staff
+  grant, no internals, no write, no target, coordinator payload without
+  scope, family.side, lost context, deactivated account); the
+  `FamilySideBoundaryTest` route inventory. Frontend
+  `family-account.test.tsx` (header, null wording, access words, owner
+  labels, no «ملغى», no history or controls, no reset link or password
+  control, coordinator open / closed / 403, logout, navigation, leak and
+  storage checks); the navigation assertions of the gate, home, household
+  and members tests.
 
 ---
 
@@ -3611,6 +3673,26 @@ Staff Mobile Trust Management UI (FU-15 — approved 2026-10-06).
   itself deactivate the account or end sessions;
 - no migration, no backend behavior change; FU-14 password reset,
   activation, login and SMS are unchanged.
+
+FP-ADR-067
+Family account view «حسابي» (PWA-3B.5 — approved 2026-10-06).
+- /family/account is the ACCOUNT view, not a registry view: who is signed
+  in, «الحساب مفعّل», the activation date, the Family code, the access
+  types in words, the current mobile trust summary, the Coordinator
+  section (COORDINATOR only), the «بياناتي الشخصية» entry and logout;
+- GET /api/v1/family/account: self only through family.context, no target,
+  no-store, private; only activated_at and mobile {state, masked}. The
+  state is the server's CURRENT state; the Family sees no trust history,
+  verifier, revoker or reason, and REVOKED reads «غير موثّق حاليًا» (the
+  Staff word «ملغى» stays Staff-side). No self-trust, reveal or edit;
+- /family/me keeps its minimal contract; the Coordinator scope comes only
+  from /family/coordinator/context;
+- Account Recovery (FU-14) and Authenticated Change Password are separate
+  product / security flows. «حسابي» does not offer the Forgot Password
+  flow as an account setting and has no disabled or placeholder password
+  control; Authenticated Change Password is FU-16;
+- logout is the existing Family logout; no migration, no role or
+  permission change; FU-14 and FU-15 unchanged.
 ```
 
 ---
@@ -3772,6 +3854,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-13 | **Resolved 2026-10-05 (FP-ADR-063).** The Family Portal member reference is `member_ref`: the full keyed HMAC-SHA256 (64 lowercase hex characters) of a FAMILY MEMBERSHIP (`FingerprintContext::MEMBER_REF`, Family Auth key and versions), resolved only among the ACTIVE memberships of the `family.context` Family. Never an id, never stored, never authorization. No migration | Done; the member reveal (PWA-3B.4) and member-specific Change Requests use it |
 | FU-14 | **Implemented 2026-10-06 (FP-ADR-065); enablement pending.** Password reset Production readiness: the PWA-1G / PWA-1I reset is kept unchanged (automatic sign-in, head eligibility, no masked mobile, no trust created); runtime `GET /api/v1/family/auth/capabilities` and a fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; realistic coverage (self-OTP account journey, coordinator, Staff boundary, changed / revoked mobile, no registry mutation). No migration | `FAMILY_PASSWORD_RESET_ENABLED=true` only through the docs/08 §16a enablement checklist, as its own decision |
 | FU-15 | **Resolved 2026-10-06 (FP-ADR-066).** Staff Mobile Trust Management UI: the Staff Person profile card «توثيق رقم الجوال» (state, masked current mobile, trust history; grant with IN_PERSON / STAFF_CALLBACK / AUTHORIZED_RECORD_REVIEW, revoke with a reason code) on the existing PWA-1E API and Domain Actions. REVOKED never revived; a grant is a new row for the current `Person.mobile`; SELF_OTP never a Staff method; revoke does not deactivate the account or end sessions. Staff-side only — no Family Portal change. No migration | Done |
+| FU-16 | **Authenticated Change Password** (recorded 2026-10-06, FP-ADR-067). There is no authenticated Family password-change endpoint; Account Recovery (FU-14) is a login-side flow and is not offered from «حسابي». The future phase must define: current-password verification; new-password validation; throttling; the session revocation policy and whether the completing browser stays signed in; security event / audit semantics; CSRF / session behavior | A future Family Auth phase, its own decision |
 
 ---
 
@@ -3804,3 +3887,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.21 | 2026-10-05 | Approved | PWA-3B.4 (FP-ADR-064): household-member sensitive reveal — POST /api/v1/family/household/members/{memberRef}/reveal resolved only inside the family.context Family, one generic 404 HOUSEHOLD_MEMBER_UNAVAILABLE, head's own values on the self path only, HOUSEHOLD_MEMBER_SENSITIVE_REVEALED event (target Person, field only), per-user family-member-reveal throttle 20 / minute and 120 / hour; implementation record in §30a; no migration |
 | 1.22 | 2026-10-06 | Approved | FU-14 password reset Production readiness (FP-ADR-065): public runtime `GET /api/v1/family/auth/capabilities` (three global booleans, outside the gates, no-store, private); fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; FP-ADR-045 automatic sign-in, head eligibility, no masked mobile and no trust creation explicitly preserved; realistic reset coverage; §33a FU-14; implementation record in §30a. No migration; password reset still disabled |
 | 1.23 | 2026-10-06 | Approved | FU-15 Staff Mobile Trust Management UI (FP-ADR-066): Staff Person profile card on the existing PWA-1E API — backend state (six states incl. UNAVAILABLE), masked current mobile only, history, grant with the three Staff methods (never SELF_OTP, never a number, always a new row), revoke with a reason code; REVOKED never revived; trust and login lifecycles separate; §33a FU-15. Staff-side only, no Family Portal change, no migration |
+| 1.24 | 2026-10-06 | Approved | PWA-3B.5 «حسابي» (FP-ADR-067): GET /api/v1/family/account (self only, no-store, private; activation date and current mobile trust state with the Family mask); /family/account with identity, access types, owner mobile trust labels (REVOKED «غير موثّق حاليًا»), Coordinator section from the coordinator context, «بياناتي الشخصية» entry and logout; «حسابي» in the navigation; Account Recovery not an account setting; §33a FU-16 Authenticated Change Password; implementation record in §30a. No migration |

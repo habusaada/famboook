@@ -1,3 +1,4 @@
+import type { FamilyMobileTrustState } from "@/lib/api/family-account";
 import type { DeclarationSource } from "@/lib/api/family-household";
 import type { DisplacementStatus, Gender } from "@/lib/types/api/family";
 
@@ -34,4 +35,18 @@ export const declarationSourceLabels: Record<DeclarationSource, string> = {
   PAPER_FORM: "استمارة ورقية",
   MANUAL_ENTRY: "إدخال يدوي",
   VERIFIED_SOURCE: "مصدر موثّق",
+};
+
+/**
+ * The owner's view of their CURRENT mobile trust (PWA-3B.5). REVOKED is
+ * «غير موثّق حاليًا»: the Staff lifecycle word «ملغى», the reason and the
+ * history stay internal.
+ */
+export const mobileTrustOwnerLabels: Record<FamilyMobileTrustState, string> = {
+  TRUSTED: "موثّق",
+  STALE: "يحتاج إعادة توثيق",
+  REVOKED: "غير موثّق حاليًا",
+  UNVERIFIED: "غير موثّق",
+  NO_MOBILE: "لا يوجد رقم جوال صالح",
+  UNAVAILABLE: "تعذّر عرض حالة التوثيق حاليًا",
 };

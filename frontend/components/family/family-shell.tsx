@@ -1,29 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { ArrowRight, Loader2, LogOut, Network, ShieldAlert } from "lucide-react";
 import { FamilyBottomNav } from "@/components/family/bottom-nav";
 import { FamilyBrand } from "@/components/family/family-brand";
 import { useFamilyUser } from "@/components/family/family-context";
-import { FAMILY_ME_QUERY_KEY, familyLogout } from "@/lib/api/family-auth";
+import { useFamilySignOut } from "@/components/family/use-family-sign-out";
 
 function LogoutButton() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [pending, setPending] = useState(false);
-
-  async function signOut() {
-    setPending(true);
-    // Even if the server call fails the local session state is dropped;
-    // the next API call would be refused anyway.
-    await familyLogout().catch(() => undefined);
-    queryClient.clear();
-    queryClient.setQueryData(FAMILY_ME_QUERY_KEY, null);
-    router.replace("/family/login");
-  }
+  const { signOut, pending } = useFamilySignOut();
 
   return (
     <button

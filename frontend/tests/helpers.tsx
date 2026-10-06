@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
 import { apiClient } from "@/lib/api/client";
+import type { CoordinatorContext } from "@/lib/api/coordinator";
+import type { FamilyAccount } from "@/lib/api/family-account";
 import type { FamilyAuthCapabilities, FamilyUser } from "@/lib/api/family-auth";
 import type { FamilyHousehold, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
 import type { FamilySelf } from "@/lib/api/family-self";
@@ -184,13 +186,32 @@ export function familySelf(overrides: Partial<FamilySelf> = {}): FamilySelf {
   };
 }
 
+/** Synthetic «حسابي» account facts (PWA-3B.5); nothing here is real data. */
+export function familyAccount(overrides: Partial<FamilyAccount> = {}): FamilyAccount {
+  return {
+    activated_at: "2026-10-01T09:00:00+03:00",
+    mobile: { state: "TRUSTED", masked: "05*****567" },
+    ...overrides,
+  };
+}
+
+/** A synthetic coordinator context: one clan scope. */
+export function coordinatorContext(overrides: Partial<CoordinatorContext> = {}): CoordinatorContext {
+  return {
+    scopes: [{ type: "CLAN", code: "TEST_CLAN", name: "عشيرة الاختبار", clan_name: "عشيرة الاختبار" }],
+    family_count: 12,
+    ...overrides,
+  };
+}
+
 type Answer = unknown | Error | (() => Promise<unknown>);
 
 /**
  * apiClient.get by path for the Family Portal: /me answers with the user,
  * /household with the summary, /household/members with the members,
- * /household/profile with the «أسرتي» profile (or an error to throw, or a
- * function for a custom promise). Any other path fails the test loudly.
+ * /household/profile with the «أسرتي» profile, /self, /account and
+ * /coordinator/context likewise (or an error to throw, or a function for a
+ * custom promise). Any other path fails the test loudly.
  */
 export function familyGet({
   user = familyUser(),
@@ -198,7 +219,17 @@ export function familyGet({
   members = familyMembers(),
   profile = familyProfile(),
   self = familySelf(),
-}: { user?: FamilyUser | Error; household?: Answer; members?: Answer; profile?: Answer; self?: Answer } = {}) {
+  account = familyAccount(),
+  coordinator = coordinatorContext(),
+}: {
+  user?: FamilyUser | Error;
+  household?: Answer;
+  members?: Answer;
+  profile?: Answer;
+  self?: Answer;
+  account?: Answer;
+  coordinator?: Answer;
+} = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
     if (value instanceof Error) throw value;
@@ -218,6 +249,12 @@ export function familyGet({
     }
     if (path === "/api/v1/family/self") {
       return typeof self === "function" || self instanceof Error ? answer(self) : { data: self };
+    }
+    if (path === "/api/v1/family/account") {
+      return typeof account === "function" || account instanceof Error ? answer(account) : { data: account };
+    }
+    if (path === "/api/v1/family/coordinator/context") {
+      return typeof coordinator === "function" || coordinator instanceof Error ? answer(coordinator) : { data: coordinator };
     }
     throw new Error(`Unexpected GET ${path}`);
   };

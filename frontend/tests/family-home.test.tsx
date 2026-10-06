@@ -193,16 +193,16 @@ describe("Coordinator Space and the quick actions", () => {
     expect(within(section).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("keeps the bottom navigation: الرئيسية (current) and أسرتي are links, the rest disabled", async () => {
+  it("keeps the bottom navigation: الرئيسية (current), أسرتي and حسابي are links, the rest disabled", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderHome();
     await summary();
 
     const nav = screen.getByRole("navigation", { name: "التنقل الرئيسي" });
-    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية", "أسرتي"]);
+    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية", "أسرتي", "حسابي"]);
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).toHaveAttribute("aria-current", "page");
-    for (const label of ["طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
+    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
       expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
     }
   });

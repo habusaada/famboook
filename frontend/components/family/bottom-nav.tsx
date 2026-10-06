@@ -5,16 +5,16 @@ import { usePathname } from "next/navigation";
 import { FileText, House, Plus, UserRound, UsersRound, type LucideIcon } from "lucide-react";
 
 // The approved Family Portal navigation (docs/11 §23). Only the pages that
-// exist are links — الرئيسية (/family) and أسرتي (/family/household, current
-// on its members page /family/members too); every other entry, and the
-// central action, is visible but disabled: no link, no route, no placeholder
-// workflow behind it. The current entry follows the pathname.
+// exist are links — الرئيسية (/family), أسرتي (/family/household, current
+// on its members page /family/members too) and حسابي (/family/account,
+// current on «بياناتي الشخصية» /family/account/me too); every other entry,
+// and the central action, is visible but disabled: no link, no route, no
+// placeholder workflow behind it. The current entry follows the pathname.
 
 type Entry = { label: string; icon: LucideIcon };
 
-const LATER: Record<"requests" | "account", Entry> = {
+const LATER: Record<"requests", Entry> = {
   requests: { label: "طلباتي", icon: FileText },
-  account: { label: "حسابي", icon: UserRound },
 };
 
 function NavLink({ href, label, icon: Icon, current }: Entry & { href: string; current: boolean }) {
@@ -79,7 +79,7 @@ export function FamilyBottomNav() {
           </button>
         </li>
         <Disabled {...LATER.requests} />
-        <Disabled {...LATER.account} />
+        <NavLink href="/family/account" label="حسابي" icon={UserRound} current={within("/family/account")} />
       </ul>
     </nav>
   );

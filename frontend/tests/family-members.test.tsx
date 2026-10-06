@@ -294,7 +294,7 @@ describe("loading, empty, errors and access", () => {
 });
 
 describe("navigation and privacy", () => {
-  it("marks أسرتي as the current page and keeps the rest disabled", async () => {
+  it("marks أسرتي as the current page, links حسابي and keeps the rest disabled", async () => {
     renderMembers();
     await list();
 
@@ -303,8 +303,11 @@ describe("navigation and privacy", () => {
     expect(members).toHaveAttribute("href", "/family/household");
     expect(members).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getAllByRole("link")).toHaveLength(2);
-    for (const label of ["طلباتي", "حسابي", "إجراء جديد (قريبًا)"]) {
+    expect(within(nav).getAllByRole("link")).toHaveLength(3);
+    const account = within(nav).getByRole("link", { name: "حسابي" });
+    expect(account).toHaveAttribute("href", "/family/account");
+    expect(account).not.toHaveAttribute("aria-current");
+    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
       expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
     }
   });
