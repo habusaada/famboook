@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Family;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFamilyContext;
+use App\Http\Resources\FamilyHouseholdHealthResource;
 use App\Http\Resources\FamilyHouseholdMemberResource;
 use App\Http\Resources\FamilyHouseholdProfileResource;
 use App\Http\Resources\FamilyHouseholdResource;
@@ -38,6 +39,19 @@ class FamilyHouseholdController extends Controller
             'family_code' => $context->family->family_code,
             'members' => FamilyHouseholdMemberResource::collection($this->household->members($context)),
         ]])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The registered health facts of the household's members (PWA-3B.6),
+     * grouped by member_ref. Read-only; no security event.
+     */
+    public function health(Request $request): JsonResponse
+    {
+        $context = EnsureFamilyContext::context($request);
+
+        return (new FamilyHouseholdHealthResource($this->household->health($context)))
+            ->response()
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /** The «أسرتي» profile: family facts and the current residence (PWA-3A Step 4). */

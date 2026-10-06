@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api/client";
 import type { CoordinatorContext } from "@/lib/api/coordinator";
 import type { FamilyAccount } from "@/lib/api/family-account";
 import type { FamilyAuthCapabilities, FamilyUser } from "@/lib/api/family-auth";
-import type { FamilyHousehold, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
+import type { FamilyHousehold, FamilyHouseholdHealth, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
 import type { FamilySelf } from "@/lib/api/family-self";
 
 /** Renders inside a fresh, non-retrying query client. */
@@ -204,13 +204,18 @@ export function coordinatorContext(overrides: Partial<CoordinatorContext> = {}):
   };
 }
 
+/** Synthetic household health (PWA-3B.6); by default nothing is registered. */
+export function familyHealth(members: FamilyHouseholdHealth["members"] = []): FamilyHouseholdHealth {
+  return { members };
+}
+
 type Answer = unknown | Error | (() => Promise<unknown>);
 
 /**
  * apiClient.get by path for the Family Portal: /me answers with the user,
  * /household with the summary, /household/members with the members,
- * /household/profile with the «أسرتي» profile, /self, /account and
- * /coordinator/context likewise (or an error to throw, or a function for a
+ * /household/profile with the «أسرتي» profile, /household/health, /self,
+ * /account and /coordinator/context likewise (or an error to throw, or a function for a
  * custom promise). Any other path fails the test loudly.
  */
 export function familyGet({
@@ -221,6 +226,7 @@ export function familyGet({
   self = familySelf(),
   account = familyAccount(),
   coordinator = coordinatorContext(),
+  health = familyHealth(),
 }: {
   user?: FamilyUser | Error;
   household?: Answer;
@@ -229,6 +235,7 @@ export function familyGet({
   self?: Answer;
   account?: Answer;
   coordinator?: Answer;
+  health?: Answer;
 } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
@@ -246,6 +253,9 @@ export function familyGet({
     }
     if (path === "/api/v1/family/household/profile") {
       return typeof profile === "function" || profile instanceof Error ? answer(profile) : { data: profile };
+    }
+    if (path === "/api/v1/family/household/health") {
+      return typeof health === "function" || health instanceof Error ? answer(health) : { data: health };
     }
     if (path === "/api/v1/family/self") {
       return typeof self === "function" || self instanceof Error ? answer(self) : { data: self };

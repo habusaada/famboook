@@ -5,9 +5,15 @@ import { AlertCircle, ChevronLeft, RotateCw, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
-import { type FamilyProfile, isAccessFailure, useFamilyProfileQuery } from "@/lib/api/family-household";
+import { type FamilyProfile, isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyProfileQuery } from "@/lib/api/family-household";
 import { formatDateLong } from "@/lib/utils/date";
-import { NO_DECLARATION, NOT_DECLARED, declarationSourceLabels, familyDisplacementLabel } from "@/lib/utils/family-portal-labels";
+import {
+  HEALTH_REGISTERED,
+  NO_DECLARATION,
+  NOT_DECLARED,
+  declarationSourceLabels,
+  familyDisplacementLabel,
+} from "@/lib/utils/family-portal-labels";
 
 export const NOT_RECORDED = "غير مسجّل";
 export const NO_RESIDENCE = "لا توجد بيانات سكن مسجّلة";
@@ -222,6 +228,25 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
   );
 }
 
+/**
+ * How many members have registered health data (PWA-3B.6): members with at
+ * least one record of any status in the household health response. Shown
+ * only when there are some — and silent while loading or on a failure: the
+ * line states that data exists, never a health status, and «0» could be
+ * read as one.
+ */
+function HealthLine() {
+  const health = useFamilyHouseholdHealthQuery();
+  const count = health.data?.members.length ?? 0;
+  if (count === 0) return null;
+
+  return (
+    <p className="mt-1 text-sm text-muted-foreground" data-household-health>
+      {HEALTH_REGISTERED} لـ <span className="tabular-nums">{count}</span> من الأفراد
+    </p>
+  );
+}
+
 function MembersEntry({ count }: { count: number }) {
   return (
     <section className={card} aria-labelledby="household-members-title" data-household-members>
@@ -231,6 +256,7 @@ function MembersEntry({ count }: { count: number }) {
       <p className="mt-1 text-sm text-muted-foreground" data-members-count>
         أفراد الأسرة المسجلون (<span className="tabular-nums">{count}</span>)
       </p>
+      <HealthLine />
       <Link
         href="/family/members"
         className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"

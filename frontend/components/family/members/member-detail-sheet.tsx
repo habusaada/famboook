@@ -5,6 +5,7 @@ import { ChevronLeft, IdCard, X } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SensitiveValue } from "@/components/family/account/sensitive-value";
 import { ageText } from "@/components/family/members/member-card";
+import { MemberHealth } from "@/components/family/members/member-health";
 import type { FamilyMember } from "@/lib/api/family-household";
 import { revealMemberValue } from "@/lib/api/family-member-reveal";
 import type { SelfRevealField } from "@/lib/api/family-self";
@@ -164,6 +165,9 @@ function Details({ member }: { member: FamilyMember }) {
             </Row>
           )}
         </Group>
+
+        {/* Health (PWA-3B.6): this member's records only, by member_ref. */}
+        <MemberHealth memberRef={member.member_ref} />
 
         <Group id="identity" title="بيانات الهوية والاتصال">
           <Row label="رقم الهوية" field="national_id">

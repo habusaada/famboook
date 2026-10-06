@@ -1232,7 +1232,11 @@ HEALTH        (PWA-3B.6, PFP-006 resolved) structured facts of household
               (DISABILITY, CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING),
               disability type, condition_name, started_at, ended_at,
               active / ended. No infant or milk fields are invented;
-              formula and diapers are needs.
+              formula and diapers are needs. As implemented (FP-ADR-068):
+              read-only; the household endpoint takes no client
+              identifier; active = ended_at IS NULL; closed records stay
+              as history; no record means "nothing registered", never
+              "healthy"; details and Staff metadata stay hidden.
 
 NEEDS         (PWA-3B.7) recorded family needs: category, title, quantity,
               unit, status, created_at, resolved_at, related person name.
@@ -3060,6 +3064,59 @@ SMS change.
   storage checks); the navigation assertions of the gate, home, household
   and members tests.
 
+## PWA-3B.6 implementation record — household health read visibility
+
+Implemented 2026-10-06 (FP-ADR-068). No migration; no role, permission,
+authentication, SMS, FU-14, FU-15 or PWA-3B.5 change; no Staff health
+change.
+
+- **Canonical model (unchanged):** `person_health_records` (DISABILITY,
+  CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING; DISABILITY →
+  `disability_types`, CHRONIC_DISEASE → `condition_name`) is the only
+  health source; no flags on persons or families, no import or assessment
+  representation. A record is active while `ended_at` IS NULL; closed
+  records are history. There are no negative ("none") records.
+- **Backend:** `GET /api/v1/family/household/health`
+  (`FamilyHouseholdController@health`, `HouseholdReadModel::health`,
+  `FamilyHouseholdHealthResource`) behind `auth:sanctum`, `family.side`,
+  `can:family-portal.access`, `family.context`; no parameter; `no-store,
+  private`; no write, activity or security event. `{data: {members:
+  [{member_ref, records: [{type, disability_type: {code, name} | null,
+  condition_name, started_at, ended_at, is_active}]}]}}` — only members
+  with at least one record. Population: the resolved Family's ACTIVE
+  memberships — the head included, DECEASED members included, soft-deleted
+  Persons and ended memberships excluded; health is Person-based, so a
+  member's earlier records stay theirs. Order: active first; DISABILITY,
+  CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING; started_at newest first,
+  unknown last; then the internal id (never serialized). A deactivated
+  disability type is still named. The Staff `HealthRecordResource` is not
+  reused.
+- **Member sheet:** «الحالة الصحية» after «البيانات الأساسية», read only by
+  the member's `member_ref` from the household query (`["family",
+  "household", "health"]`, staleTime 0, query cache only). Sub-groups as
+  applicable: «الإعاقة» («إعاقة {type}»), «الأمراض المزمنة» (the registered
+  name), «الحمل والرضاعة» («حمل» / «رضاعة»); per record «حالية» /
+  «منتهية», «تاريخ البداية» (or «غير مسجّل»), «تاريخ الانتهاء» for ended
+  records only; the note «هذه هي البيانات الصحية المسجّلة حاليًا في سجل
+  الأسرة.»; no record: «لا توجد بيانات صحية مسجّلة لهذا الفرد.» — never
+  «سليم», «لا توجد أمراض» or «لا توجد إعاقة». Its own skeleton and error
+  («تعذّر تحميل البيانات الصحية» with retry): the member's other data stays.
+  No edit, add, close, delete, reveal or request control.
+- **Discovery:** the member card shows the neutral chip «بيانات صحية مسجّلة»
+  when the member has records of any status, nothing otherwise; «أسرتي»
+  shows «بيانات صحية مسجّلة لـ N من الأفراد» inside the members card (which
+  links to the list) when N > 0, nothing while loading, on a failure or for
+  0. The Staff `FamilyHealthSummary` is not used.
+- **Tests:** backend `FamilyHouseholdHealthTest` (head and members,
+  another household, coordinator scope, account sides, guest, lost context,
+  `family-portal.access`, deceased included, soft-deleted and ended
+  excluded, several disabilities and chronic diseases, pregnancy and
+  breastfeeding, closed history, null start, deactivated type, order, empty
+  household, allow-list, no details / ids / uuid / person_code / Staff
+  fields, no writes or events, cache headers, route without parameters);
+  the `FamilySideBoundaryTest` inventory. Frontend `family-health.test.tsx`
+  and the member-detail groups / requests assertions.
+
 ---
 
 # 31. Amendment Register
@@ -3693,6 +3750,24 @@ Family account view «حسابي» (PWA-3B.5 — approved 2026-10-06).
   control; Authenticated Change Password is FU-16;
 - logout is the existing Family logout; no migration, no role or
   permission change; FU-14 and FU-15 unchanged.
+
+FP-ADR-068
+Household health read visibility (PWA-3B.6 — approved 2026-10-06).
+- read-only visibility of the canonical person_health_records of the
+  household's ACTIVE members (head and deceased members included,
+  soft-deleted Persons and ended memberships excluded): type, disability
+  type, condition_name, started_at, ended_at, active state;
+- one household endpoint, GET /api/v1/family/household/health, that takes
+  no client identifier; records grouped by the opaque member_ref and read
+  by it in the member sheet; coordinator scope never grants it;
+- health is Person-based; active = ended_at IS NULL; closed records stay
+  visible as history; no record is "nothing registered", never "healthy";
+- details, ids, uuids, person_code and all Staff / audit / assessment /
+  targeting metadata stay hidden; no security event for this read;
+- discovery by a neutral member-card chip and a «أسرتي» count of members
+  with registered data — never a health status, never Staff indicators;
+- no edit or request control: corrections remain PWA-5 (Change Request
+  engine); health submissions remain PWA-7.
 ```
 
 ---
@@ -3888,3 +3963,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.22 | 2026-10-06 | Approved | FU-14 password reset Production readiness (FP-ADR-065): public runtime `GET /api/v1/family/auth/capabilities` (three global booleans, outside the gates, no-store, private); fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; FP-ADR-045 automatic sign-in, head eligibility, no masked mobile and no trust creation explicitly preserved; realistic reset coverage; §33a FU-14; implementation record in §30a. No migration; password reset still disabled |
 | 1.23 | 2026-10-06 | Approved | FU-15 Staff Mobile Trust Management UI (FP-ADR-066): Staff Person profile card on the existing PWA-1E API — backend state (six states incl. UNAVAILABLE), masked current mobile only, history, grant with the three Staff methods (never SELF_OTP, never a number, always a new row), revoke with a reason code; REVOKED never revived; trust and login lifecycles separate; §33a FU-15. Staff-side only, no Family Portal change, no migration |
 | 1.24 | 2026-10-06 | Approved | PWA-3B.5 «حسابي» (FP-ADR-067): GET /api/v1/family/account (self only, no-store, private; activation date and current mobile trust state with the Family mask); /family/account with identity, access types, owner mobile trust labels (REVOKED «غير موثّق حاليًا»), Coordinator section from the coordinator context, «بياناتي الشخصية» entry and logout; «حسابي» in the navigation; Account Recovery not an account setting; §33a FU-16 Authenticated Change Password; implementation record in §30a. No migration |
+| 1.25 | 2026-10-06 | Approved | PWA-3B.6 household health read visibility (FP-ADR-068): GET /api/v1/family/household/health (no client identifier, active memberships, allow-listed facts by member_ref, no-store, private); «الحالة الصحية» in the member sheet, member-card chip, «أسرتي» count line; empty data never means healthy; history visible; details and Staff metadata hidden; §23a HEALTH as implemented; implementation record in §30a. No migration |

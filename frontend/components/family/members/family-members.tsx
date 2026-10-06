@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MemberCard } from "@/components/family/members/member-card";
 import { MemberDetailSheet } from "@/components/family/members/member-detail-sheet";
-import { isAccessFailure, useFamilyMembersQuery } from "@/lib/api/family-household";
+import { isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyMembersQuery } from "@/lib/api/family-household";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 
@@ -58,6 +58,10 @@ export function FamilyMembers() {
   // extra request. If the list no longer has it, the sheet simply closes.
   const [selectedRef, setSelectedRef] = useState<string | null>(null);
   const selected = data?.members.find((member) => member.member_ref === selectedRef) ?? null;
+  // Which members have registered health data (PWA-3B.6), by member_ref; the
+  // chip waits for the health query and simply does not show if it fails.
+  const health = useFamilyHouseholdHealthQuery();
+  const withHealth = new Set(health.data?.members.map((member) => member.member_ref) ?? []);
 
   return (
     <div className="flex flex-col gap-5">
@@ -111,6 +115,7 @@ export function FamilyMembers() {
                     member={member}
                     // An unavailable Person has no details to show.
                     onShowDetails={member.available ? () => setSelectedRef(member.member_ref) : undefined}
+                    hasHealth={withHealth.has(member.member_ref)}
                   />
                 ))}
               </ul>

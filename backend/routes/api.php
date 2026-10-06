@@ -100,6 +100,11 @@ Route::prefix('family')->group(function () {
             Route::get('/household/members', [FamilyHouseholdController::class, 'members']);
             Route::get('/household/profile', [FamilyHouseholdController::class, 'profile']);
 
+            // Household health (PWA-3B.6): the registered health facts of the
+            // ACTIVE members of this Family, grouped by member_ref. No
+            // parameter — nothing in the request chooses a member or Person.
+            Route::get('/household/health', [FamilyHouseholdController::class, 'health']);
+
             // Household-member sensitive-value reveal (PWA-3B.4): one field of
             // ANOTHER member, named by the opaque member_ref (FU-13) and
             // resolved only inside this Family — never route-model bound; any

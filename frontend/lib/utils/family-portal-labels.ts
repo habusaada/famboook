@@ -1,5 +1,5 @@
 import type { FamilyMobileTrustState } from "@/lib/api/family-account";
-import type { DeclarationSource } from "@/lib/api/family-household";
+import type { DeclarationSource, HealthRecordType } from "@/lib/api/family-household";
 import type { DisplacementStatus, Gender } from "@/lib/types/api/family";
 
 // The Family Portal display vocabulary (docs/11 §23a). A missing value is
@@ -50,3 +50,21 @@ export const mobileTrustOwnerLabels: Record<FamilyMobileTrustState, string> = {
   NO_MOBILE: "لا يوجد رقم جوال صالح",
   UNAVAILABLE: "تعذّر عرض حالة التوثيق حاليًا",
 };
+
+// Household health (PWA-3B.6). No record is "nothing registered" — never a
+// statement that the person is healthy or has no condition.
+export const NO_HEALTH_RECORDS = "لا توجد بيانات صحية مسجّلة لهذا الفرد.";
+export const HEALTH_REGISTERED = "بيانات صحية مسجّلة";
+export const HEALTH_NOTE = "هذه هي البيانات الصحية المسجّلة حاليًا في سجل الأسرة.";
+
+export const healthTypeLabels: Record<HealthRecordType, string> = {
+  DISABILITY: "إعاقة",
+  CHRONIC_DISEASE: "مرض مزمن",
+  PREGNANCY: "حمل",
+  BREASTFEEDING: "رضاعة",
+};
+
+/** A record's status: the domain rule is ended_at (is_active). */
+export function healthStatusLabel(isActive: boolean): string {
+  return isActive ? "حالية" : "منتهية";
+}

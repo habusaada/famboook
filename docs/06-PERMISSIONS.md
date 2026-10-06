@@ -1005,6 +1005,19 @@ GET  /api/v1/family/me
   public password reset, PWA-1G / FU-14) is a login-side flow and is not
   exposed as an account setting; there is no authenticated password change
   (a future Family Auth item, docs/11 FU-16).
+- **`GET /family/household/health`** (PWA-3B.6, AUTH-ADR-083, §123): behind
+  `auth:sanctum`, `family.side`, `can:family-portal.access` and
+  `family.context`; no route parameter and no Person, member or Family
+  identifier is read from the request. It returns the `person_health_records`
+  of the Persons behind the resolved Family's ACTIVE memberships (the head
+  included, deceased members included, soft-deleted Persons and ended
+  memberships excluded), grouped by the opaque `member_ref`, with only
+  `type`, `disability_type` {code, name}, `condition_name`, `started_at`,
+  `ended_at` and `is_active`. Never `details`, ids, uuids, person_code,
+  disability-type internals, created_by / updated_by, timestamps, Staff
+  summary / abilities, assessment, targeting, activity or audit data.
+  `Cache-Control: no-store, private`; a pure read, no security event.
+  Coordinator scope never grants or widens it.
 - **Activation gate.** `family.activation` runs first on the four
   activation routes: while `family_auth.activation_enabled` is false they
   answer 503 `ACTIVATION_UNAVAILABLE` with no lookup, event or SMS.
@@ -3728,6 +3741,12 @@ ended_at, active state — with no adult / minor distinction.
 COORDINATOR still sees no health, disability, pregnancy or breastfeeding
 details.
 
+**As implemented 2026-10-06 (PWA-3B.6, AUTH-ADR-083).** `GET
+/api/v1/family/household/health` (§22b): the household's own records only,
+read-only, no client identifier, `details` and every Staff / internal
+field hidden, historical (closed) records shown as history. No new
+permission: `family-portal.access` + `family.context`.
+
 ---
 
 # 124. Needs Portal Visibility
@@ -4289,6 +4308,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-083
+Family household health (2026-10-06, PWA-3B.6, docs/11 FP-ADR-068): no permission or role added or seeded. `GET /api/v1/family/household/health` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no parameter and no client identifier, and answers `no-store, private` with the registered health facts (type, disability type code and name, condition_name, started_at, ended_at, is_active) of the resolved Family's ACTIVE members — head and deceased members included, soft-deleted Persons and ended memberships excluded — grouped by `member_ref`. Health is Person-based; closed records stay visible as history; `details` and all Staff / internal metadata stay hidden; no security event for this ordinary read. Coordinator scope never grants Family health access. Corrections remain the Change Request engine (PWA-5).
+
 ### AUTH-ADR-082
 Family account view (2026-10-06, PWA-3B.5, docs/11 FP-ADR-067): no permission or role added or seeded. `GET /api/v1/family/account` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no target and answers `no-store, private` with the activation date and the CURRENT mobile trust state and Family-masked mobile of the signed-in head only — never trust history, internals, ids or permissions. `/family/me` keeps its minimal contract. The Coordinator scope shown on «حسابي» comes only from `GET /family/coordinator/context`. Account Recovery (FU-14) and an authenticated password change are separate flows: the reset is not offered from «حسابي», and authenticated change password is a future Family Auth item with its own decisions.
 
@@ -4705,6 +4727,7 @@ Date: 2026-09-24
 | 1.2.44 | 2026-10-06 | Approved | FU-14 (AUTH-ADR-080): §22b public `GET /api/v1/family/auth/capabilities` — three global gate booleans, outside the gates, no account data; password reset authorization unchanged. No permission seeded |
 | 1.2.45 | 2026-10-06 | Approved | FU-15 (AUTH-ADR-081): §22b Staff Mobile Trust UI on the Person profile — card, grant and revoke gated by `person-mobile-trust.view` / `.grant` / `.revoke`; `UNAVAILABLE` state documented; REVOKED never revived, grant = new row for the current mobile, SELF_OTP never a Staff method, revoke ≠ account or session end. No permission, role or mapping change |
 | 1.2.46 | 2026-10-06 | Approved | PWA-3B.5 (AUTH-ADR-082): §22b `GET /api/v1/family/account` — self only, `family.context`, `no-store, private`, activation date and current mobile trust state with the Family mask; `/family/me` unchanged; Account Recovery not an account setting; authenticated change password a future item. No permission seeded |
+| 1.2.47 | 2026-10-06 | Approved | PWA-3B.6 (AUTH-ADR-083): §22b `GET /api/v1/family/household/health` — self household only, no client identifier, active memberships, allow-listed health facts grouped by `member_ref`, `no-store, private`, no security event; §123 as implemented (`details` hidden, history visible). No permission seeded |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

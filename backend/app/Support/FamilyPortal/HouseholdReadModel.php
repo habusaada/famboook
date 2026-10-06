@@ -160,6 +160,52 @@ final class HouseholdReadModel
             ]);
     }
 
+    /**
+     * Household health (PWA-3B.6, docs/11 §23a): every person_health_records
+     * row of the Persons behind the resolved Family's ACTIVE memberships —
+     * the household head included, a DECEASED member included (history), a
+     * soft-deleted Person excluded (unavailable, as in the member list).
+     * Health is Person-based: a member's earlier records stay theirs. Active
+     * and closed (ended_at set) records alike. One query; one row per record.
+     *
+     * Order: membership id (grouping only); then active first; DISABILITY,
+     * CHRONIC_DISEASE, PREGNANCY, BREASTFEEDING; started_at newest first,
+     * unknown last; the record id. None of the ids is exposed.
+     *
+     * @return Collection<int, FamilyMembership>
+     */
+    public function health(FamilyAccessResult $context): Collection
+    {
+        return $this->activeMemberships($context)
+            ->join('persons', 'persons.id', '=', 'family_memberships.person_id')
+            ->whereNull('persons.deleted_at')
+            ->join('person_health_records', 'person_health_records.person_id', '=', 'persons.id')
+            ->leftJoin('disability_types', 'disability_types.id', '=', 'person_health_records.disability_type_id')
+            ->select([
+                // For grouping and the opaque member_ref (FU-13); never returned.
+                'family_memberships.id',
+                'family_memberships.family_id',
+                'person_health_records.type as health_type',
+                'disability_types.code as disability_type_code',
+                'disability_types.name as disability_type_name',
+                'person_health_records.condition_name as health_condition_name',
+                'person_health_records.started_at as health_started_at',
+                'person_health_records.ended_at as health_ended_at',
+            ])
+            ->orderBy('family_memberships.id')
+            ->orderByRaw('person_health_records.ended_at IS NOT NULL')
+            ->orderByRaw("CASE person_health_records.type
+                WHEN 'DISABILITY' THEN 1
+                WHEN 'CHRONIC_DISEASE' THEN 2
+                WHEN 'PREGNANCY' THEN 3
+                WHEN 'BREASTFEEDING' THEN 4
+                ELSE 5 END")
+            ->orderByRaw('person_health_records.started_at IS NULL')
+            ->orderByDesc('person_health_records.started_at')
+            ->orderBy('person_health_records.id')
+            ->get();
+    }
+
     /** The authoritative population: the resolved Family's ACTIVE memberships. */
     private function activeMemberships(FamilyAccessResult $context): Builder
     {

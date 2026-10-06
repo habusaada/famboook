@@ -2115,7 +2115,8 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
              «توثيق رقم الجوال» on the PWA-1E API; RM-ADR-049)
         3B.5 account view («حسابي») — DONE (GET /family/account,
              /family/account; FP-ADR-067; RM-ADR-050)
-        3B.6 health read visibility
+        3B.6 health read visibility — DONE (GET /family/household/health;
+             member sheet «الحالة الصحية»; FP-ADR-068; RM-ADR-051)
         3B.7 needs and received-assistance visibility
 PWA-5   Change Request engine + Staff review workspace
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
@@ -4730,6 +4731,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-051
+PWA-3B.6 — household health read visibility is done (2026-10-06, docs/11 FP-ADR-068, docs/06 AUTH-ADR-083): one self-scoped household read (`GET /api/v1/family/household/health`) over the canonical `person_health_records`, the member sheet's «الحالة الصحية», a neutral member-card chip and a «أسرتي» count. Read-only; no migration, no role or permission change. Corrections remain PWA-5; health submissions PWA-7. PWA-3B.7 follows.
+
 ### RM-ADR-050
 PWA-3B.5 — Family account view «حسابي» is done (2026-10-06, docs/11 FP-ADR-067, docs/06 AUTH-ADR-082): one self-scoped read endpoint (`GET /api/v1/family/account`) and the `/family/account` page, now the destination of «حسابي». No migration, no role or permission change; FU-14 and FU-15 unchanged. Account Recovery stays on the login screen; Authenticated Change Password is recorded as a separate future Family Auth item (docs/11 FU-16). PWA-3B.6 follows.
 
@@ -4995,6 +4999,7 @@ Date: 2026-09-24
 | 1.2.46 | 2026-10-06 | Approved | FU-14 password reset Production readiness implemented: the PWA-1G / PWA-1I reset kept unchanged (automatic sign-in, head eligibility, no masked mobile); runtime Family Auth capabilities endpoint and fail-closed forgot-password entry; self-OTP journey, coordinator, Staff boundary, changed-mobile and registry coverage; no migration (docs/11 FP-ADR-065). `FAMILY_PASSWORD_RESET_ENABLED` stays false until the docs/08 §16a enablement checklist is completed |
 | 1.2.47 | 2026-10-06 | Approved | FU-15 done: Staff Mobile Trust Management UI on the Person profile (state, masked current mobile, history, grant with the three Staff methods, revoke with a reason code; REVOKED never revived, grant = new row); satisfies the RM-ADR-044 Staff mobile-trust UI prerequisite; no migration, no backend behavior change (RM-ADR-049) |
 | 1.2.48 | 2026-10-06 | Approved | PWA-3B.5 done: «حسابي» account view (activation date, access types, current mobile trust owner summary, Coordinator section from the coordinator context, «بياناتي الشخصية» entry, logout) on `GET /api/v1/family/account`; «حسابي» enabled in the navigation; authenticated change password recorded as a future item (docs/11 FU-16); no migration (RM-ADR-050). PWA-3B.6 next |
+| 1.2.49 | 2026-10-06 | Approved | PWA-3B.6 done: household health read visibility (allow-listed health facts of the active members by member_ref, history visible, details hidden, no client identifier); member sheet section, card chip and «أسرتي» count; no migration (RM-ADR-051). PWA-3B.7 next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

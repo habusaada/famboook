@@ -78,10 +78,11 @@ describe("opening the details", () => {
     const sheet = await openDetails("زوجة الاختبار");
 
     expect(within(sheet).getByRole("heading", { name: "زوجة الاختبار" })).toBeInTheDocument();
-    // Only the session check and the list itself are ever requested (a
-    // routine refetch of either is fine): no member-specific request.
+    // Only the session check, the list and the household health (PWA-3B.6,
+    // household-level) are ever requested (a routine refetch of any is
+    // fine): no member-specific request.
     const paths = new Set(get.mock.calls.map(([path]) => String(path)));
-    expect([...paths].sort()).toEqual(["/api/v1/family/household/members", "/api/v1/family/me"]);
+    expect([...paths].sort()).toEqual(["/api/v1/family/household/health", "/api/v1/family/household/members", "/api/v1/family/me"]);
   });
 
   it("offers no details for an unavailable member", async () => {
@@ -111,12 +112,13 @@ describe("opening the details", () => {
 });
 
 describe("the details", () => {
-  it("show the approved registry fields in three groups", async () => {
+  it("show the approved registry fields in their groups, health after the basic data", async () => {
     renderMembers([HEAD, SPOUSE]);
     const sheet = await openDetails("سالم الاختبار");
 
     expect(within(sheet).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "البيانات الأساسية",
+      "الحالة الصحية",
       "بيانات الهوية والاتصال",
       "بيانات العضوية",
     ]);

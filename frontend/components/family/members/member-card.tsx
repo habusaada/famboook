@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, CircleQuestionMark, EyeOff, IdCard, ListTree, Ribbon } from "lucide-react";
+import { ChevronLeft, CircleQuestionMark, EyeOff, HeartPulse, IdCard, ListTree, Ribbon } from "lucide-react";
 import type { FamilyMember } from "@/lib/api/family-household";
 import { calculateAge, formatDateLong } from "@/lib/utils/date";
-import { NOT_RECORDED } from "@/lib/utils/family-portal-labels";
+import { HEALTH_REGISTERED, NOT_RECORDED } from "@/lib/utils/family-portal-labels";
 import { relationshipLabel } from "@/lib/utils/relationship";
 
 export const UNAVAILABLE_MEMBER = "بيانات هذا الفرد غير متاحة حاليًا";
@@ -38,9 +38,18 @@ export function ageText(birthDate: string): string {
  * One household member. The relationship and the head marker come from the
  * membership; the Person's details only when they are available. A deceased
  * member has no current age; a member whose data is unavailable shows no
- * Person detail at all.
+ * Person detail at all. hasHealth (PWA-3B.6) adds the neutral «بيانات صحية
+ * مسجّلة» chip: records of any status exist — never a health status.
  */
-export function MemberCard({ member, onShowDetails }: { member: FamilyMember; onShowDetails?: () => void }) {
+export function MemberCard({
+  member,
+  onShowDetails,
+  hasHealth = false,
+}: {
+  member: FamilyMember;
+  onShowDetails?: () => void;
+  hasHealth?: boolean;
+}) {
   const relationship = relationshipLabel(member.relationship, member.gender);
 
   if (!member.available) {
@@ -91,6 +100,11 @@ export function MemberCard({ member, onShowDetails }: { member: FamilyMember; on
         {member.life_status === "UNKNOWN" && (
           <Status icon={CircleQuestionMark} kind="unknown">
             الحالة غير مؤكدة
+          </Status>
+        )}
+        {hasHealth && (
+          <Status icon={HeartPulse} kind="health">
+            {HEALTH_REGISTERED}
           </Status>
         )}
       </div>
