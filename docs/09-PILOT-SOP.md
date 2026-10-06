@@ -1,6 +1,6 @@
 # Famboook — Pilot Standard Operating Procedure
 
-**Document:** `09-PILOT-SOP.md` · **Version:** 1.0 · **Date:** 2026-09-27  
+**Document:** `09-PILOT-SOP.md` · **Version:** 1.1 · **Date:** 2026-10-06  
 For every Staff member entering or correcting real Pilot data.
 
 ## Before entry
@@ -29,6 +29,24 @@ For every Staff member entering or correcting real Pilot data.
   correcting a National ID.
 - There is no delete and no merge. Do not work around this (for example by
   renaming a record to reuse it). Report doubtful cases to an ADMINISTRATOR.
+
+## Mobile trust (ADMINISTRATOR / SUPER_ADMIN)
+
+On the Person page, card «توثيق رقم الجوال» (FU-15):
+
+- **Grant** only after you have actually verified that the person's
+  **currently registered** mobile belongs to them — in person, by your own
+  call-back, or by reviewing an authorized record. Choose that method and
+  confirm. You never type a number; if the registered number is wrong or
+  missing, correct the person's mobile first.
+- **Revoke** when the number is lost, is not the person's, was verified in
+  error, or for an administrative reason. Revoking blocks password recovery
+  by that number; it does **not** close the family's account or log them
+  out.
+- A revoked or outdated trust is never "restored". To trust the number
+  again, verify it again and grant: a new record is created and the old one
+  stays in the history.
+- Every grant and revoke is recorded in your name.
 
 ## Security
 

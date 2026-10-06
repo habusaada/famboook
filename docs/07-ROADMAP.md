@@ -2111,6 +2111,8 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
              (runtime GET /family/auth/capabilities, fail-closed
              forgot-password entry, realistic reset coverage; FP-ADR-065);
              reset still disabled — enablement per docs/08 §16a checklist
+        FU-15 Staff mobile trust UI — DONE (Person profile card
+             «توثيق رقم الجوال» on the PWA-1E API; RM-ADR-049)
         3B.5 account view («حسابي»)
         3B.6 health read visibility
         3B.7 needs and received-assistance visibility
@@ -4725,6 +4727,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-049
+FU-15 — Staff Mobile Trust Management UI (2026-10-06) is delivered without a slice letter, after FU-14: the Staff Person profile card «توثيق رقم الجوال» shows the backend state, the masked current mobile and the trust history, and grants / revokes through the existing PWA-1E endpoints and Domain Actions (docs/06 AUTH-ADR-081, docs/11 FP-ADR-066). It satisfies the RM-ADR-044 prerequisite "the Staff mobile-trust UI before any cohort beyond a test household". No migration, no backend behavior change, no permission or role change; password reset, activation, login and SMS are unchanged.
+
 ### RM-ADR-048
 PWA-3B — Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062) is inserted before PWA-5, in slices 3B.1 My Data, 3B.2 self reveal, 3B.3 complete family / declaration / residence / member views, 3B.4 member identity/contact reveal, 3B.5 account view, 3B.6 health visibility, 3B.7 needs and received assistance. The head sees the canonical value before any correction request; PWA-3B is read-only, approves no proposed request type and adds no Documents phase. Completed historical phases are not renumbered.
 
@@ -4982,6 +4987,7 @@ Date: 2026-09-24
 | 1.2.44 | 2026-10-05 | Approved | FU-13 done: opaque household-member reference `member_ref` (full keyed HMAC-SHA256 of the membership, family-context-only resolution; docs/11 FP-ADR-063); no migration. PWA-3B.4 next |
 | 1.2.45 | 2026-10-05 | Approved | PWA-3B.4 done: household-member sensitive reveal by member_ref inside the family context (generic 404, head's own values on the self path only, dedicated per-user throttle, security event without the value); no migration (docs/11 FP-ADR-064). PWA-3B.5 next |
 | 1.2.46 | 2026-10-06 | Approved | FU-14 password reset Production readiness implemented: the PWA-1G / PWA-1I reset kept unchanged (automatic sign-in, head eligibility, no masked mobile); runtime Family Auth capabilities endpoint and fail-closed forgot-password entry; self-OTP journey, coordinator, Staff boundary, changed-mobile and registry coverage; no migration (docs/11 FP-ADR-065). `FAMILY_PASSWORD_RESET_ENABLED` stays false until the docs/08 §16a enablement checklist is completed |
+| 1.2.47 | 2026-10-06 | Approved | FU-15 done: Staff Mobile Trust Management UI on the Person profile (state, masked current mobile, history, grant with the three Staff methods, revoke with a reason code; REVOKED never revived, grant = new row); satisfies the RM-ADR-044 Staff mobile-trust UI prerequisite; no migration, no backend behavior change (RM-ADR-049) |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

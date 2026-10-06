@@ -1416,6 +1416,35 @@ STALE / REVOKED ──a new grant of the current number──▶ a NEW TRUSTED r
 - `PENDING_VERIFICATION` and assistance are not used yet: the coordinator
   path above arrives with PWA-1H.
 
+Staff operation (FU-15, WF-ADR-047). An authorized Staff user opens the
+Person profile → «توثيق رقم الجوال»:
+
+```text
+1. read the current state, the masked current mobile and the history
+2. state UNVERIFIED / STALE / REVOKED → «توثيق رقم الجوال»:
+   verify ownership first (in person, Staff callback or authorized record
+   review), choose that method, confirm the attestation → a NEW TRUSTED row
+   for the current registered mobile
+3. state TRUSTED → «إلغاء التوثيق»: choose the reason code, confirm →
+   TRUSTED → REVOKED, the row stays in history
+4. NO_MOBILE → correct the Person's mobile through the normal Person
+   update first, then grant
+```
+
+- REVOKED and STALE rows are history and are never revived: the UI has no
+  "restore" or "re-trust" action for a row, and the API has none.
+- A grant always creates a NEW TRUSTED row for the Person's CURRENT
+  registered mobile (`Person.mobile`). Staff never type or send a number;
+  the card shows only the backend mask (`mobile_masked`), offers no reveal
+  and no mobile editing.
+- `SELF_OTP` is not a Staff method: it is shown in history (first
+  self-activation) but never offered by the grant.
+- The Family login (account, password, sessions) and mobile trust have
+  separate lifecycles. Revoking trust stops the number being used for OTP
+  security flows such as password recovery; it does not by itself
+  deactivate the Family account, end the User-Person Link or end
+  authenticated sessions.
+
 ## Activation as implemented (PWA-1F)
 
 ```text
@@ -3139,6 +3168,9 @@ PWA-1G implemented Family login and password reset. Login resolves the account t
 ### WF-ADR-045
 PWA-1H implemented coordinator administration as four Staff Domain Actions — grant role, revoke role, assign scope, revoke scope — on the existing assignment table. The role and the assignments are separate layers; an assignment never grants the role, and removing the role revokes every active assignment in the same transaction. Coordinator Space is decided per request by one resolver over the current hierarchy.
 
+### WF-ADR-047
+Staff mobile trust operation (FU-15): Staff grant and revoke a Person's mobile trust from the Person profile card «توثيق رقم الجوال» through the existing PWA-1E endpoints and Domain Actions. A grant always trusts the current registered mobile as a NEW row and records the operator's verification method (never SELF_OTP); a revoke needs a reason code and leaves the row as history. REVOKED and STALE rows are never revived. Family login and mobile trust keep separate lifecycles: revoking trust does not by itself deactivate the account or end sessions.
+
 ### WF-ADR-046
 Family Profile Review is a family workflow separate from Account Verification and Staff Family Verification: section review, confirm or request a change; derived states driven by completeness, confirmations and Change Request status (APPROVED ≠ APPLIED); confirmations never change canonical data (docs/11 FP-ADR-057). First-release request types: RESIDENCE_UPDATE (current residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION, non-head DEATH_REPORT (docs/11 FP-ADR-059).
 ```
@@ -3409,3 +3441,4 @@ Date: 2026-09-24
 | 1.2.12 | 2026-10-03 | Approved | PWA-1G: §53b login decision path and password reset as implemented — purpose-bound references, completion transaction, session revocation (WF-ADR-044) |
 | 1.2.13 | 2026-10-03 | Approved | PWA-1H: §53b coordinator administration workflow (grant, assign, revoke scope, revoke role) and Coordinator Space opening per request (WF-ADR-045) |
 | 1.2.14 | 2026-10-04 | Approved | Documentation consolidation: §53a Profile Completion / Family Verification lifecycle replaced by the Family Profile Review workflow and the deferred Staff Family Verification lifecycle (WF-ADR-046; docs/11 FP-ADR-057, FP-ADR-059) |
+| 1.2.15 | 2026-10-06 | Approved | FU-15: §53b Staff mobile trust operation from the Person profile (grant = new row for the current mobile, revoke with a reason, history never revived, login and trust lifecycles separate) (WF-ADR-047) |

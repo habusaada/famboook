@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Code, DetailItem, DetailList, SectionHeader } from "@/components/shared/page-layout";
 import { ConfirmAliveDialog } from "@/components/people/confirm-alive-dialog";
 import { CorrectNationalIdDialog } from "@/components/people/correct-national-id-dialog";
+import { MobileTrustCard } from "@/components/people/mobile-trust-card";
 import { RecordDeathDialog } from "@/components/people/record-death-dialog";
 import { PersonIdentityHeader, genderLabel, lifeStatusLabels } from "@/components/people/person-identity-header";
 import { usePerson } from "@/lib/api/people";
@@ -228,7 +229,8 @@ function NationalIdSection({ person }: { person: PersonDetail }) {
 /**
  * Person 360° (existing data only): identity, current family, personal and
  * contact data, and — for authorized users — the masked National ID with
- * its controlled correction. The Person API exposes no health, activity or
+ * its controlled correction and the mobile trust card (FU-15, masked number
+ * only). The Person API exposes no health, activity or
  * membership history, so none is shown here.
  */
 export function PersonProfileView({ personCode }: { personCode: string }) {
@@ -301,6 +303,7 @@ export function PersonProfileView({ personCode }: { personCode: string }) {
         <div className="flex flex-col gap-4 xl:col-span-5">
           <ContactInformation person={person} />
           <NationalIdSection person={person} />
+          <MobileTrustCard personCode={person.person_code} />
         </div>
       </div>
     </div>

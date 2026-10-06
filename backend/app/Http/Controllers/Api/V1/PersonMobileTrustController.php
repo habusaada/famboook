@@ -20,7 +20,8 @@ use Illuminate\Http\JsonResponse;
  * Staff API for a Person's mobile trust (docs/06 §22b): view the state,
  * grant the current mobile, revoke the trusted one. Staff-side only (the
  * `staff.side` boundary) and permission-gated per route; the Domain Actions
- * re-check both. No family-side or coordinator endpoint, and no UI.
+ * re-check both. No family-side or coordinator endpoint; the Staff UI is
+ * the Person profile card «توثيق رقم الجوال» (FU-15).
  *
  * The trust state itself is never decided here: it comes from
  * CurrentTrustedMobile.

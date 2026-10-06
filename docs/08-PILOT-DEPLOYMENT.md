@@ -445,9 +445,13 @@ Family Portal activation may be enabled in Production.
   password reset deletes the account's session rows — this relies on
   `SESSION_DRIVER=database`; with any other driver the remaining sessions
   are still refused on their next request by the password-hash check.
-- **Operational prerequisite.** There is still no Staff screen for
-  granting mobile trust — only the API (docs/06 §22b). Nobody can activate
-  or reset without a TRUSTED mobile.
+- **Operational prerequisite.** Staff manage mobile trust from the Person
+  profile card «توثيق رقم الجوال» (FU-15, docs/06 §22b; SUPER_ADMIN and
+  ADMINISTRATOR through `person-mobile-trust.*`). Nobody can reset without
+  a TRUSTED current mobile; a REVOKED trust is never revived — a new grant
+  of the current registered mobile creates a new trust. FU-15 needs no
+  migration and no environment change; frontend and backend deploy
+  together as usual.
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -907,6 +911,7 @@ Never do this once real data has been entered.
 | 1.1.13 | 2026-10-04 | Approved | §16a: installable Family app (FP-ADR-055) — new public files, cache header of the worker, post-deploy checks, rollback of a service worker |
 | 1.1.14 | 2026-10-04 | Approved | Session cookies: the Family 419 incident recorded as a stale / duplicate-cookie incident; production-like CSRF write smoke test required before the first new Family Portal write endpoint (docs/11 FU-08) |
 | 1.1.15 | 2026-10-06 | Approved | §16a: FU-14 password reset enablement checklist (flag stays false through deployment, CSRF write smoke, `SESSION_DRIVER=database`, measured response floor, TweetsMS check without secrets, `config:cache` after the flag change, capabilities and link verified, test-household reset with prior-session revocation, coordinator preservation, security events) and rollback. Nothing enabled |
+| 1.1.16 | 2026-10-06 | Approved | §16a: FU-15 — the Staff mobile trust screen exists (Person profile «توثيق رقم الجوال»); the "API only" operational prerequisite is closed. No migration, no environment change |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

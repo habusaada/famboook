@@ -754,7 +754,8 @@ Approved 2026-10-02 (AUTH-ADR-063). Architecture: `11-FAMILY-PORTAL.md`
 sides, the role checks and the Staff API boundary below (AUTH-ADR-065);
 `user-person-link.manage` is checked by the link lifecycle actions. PWA-1E
 implemented the mobile trust Staff API, which reads
-`person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067).
+`person-mobile-trust.view`, `.grant` and `.revoke` (AUTH-ADR-067); FU-15
+added its Staff UI on the Person profile (AUTH-ADR-081).
 PWA-1F implemented the Family API boundary and the activation endpoints
 below (AUTH-ADR-068). PWA-1G added the Family login and password reset
 routes (AUTH-ADR-069). PWA-1H implemented coordinator administration and
@@ -902,12 +903,50 @@ POST /api/v1/people/{person}/mobile-trust/revoke   person-mobile-trust.revoke
 - Revoke accepts only `reason` (`REPORTED_LOST`, `NOT_OWNER`,
   `VERIFICATION_ERROR`, `ADMINISTRATIVE`).
 - The response is the derived state (`NO_MOBILE`, `UNVERIFIED`, `TRUSTED`,
-  `STALE`, `REVOKED`), a mask of the current number and the history with
+  `STALE`, `REVOKED`, or `UNAVAILABLE` when the fingerprint key is
+  unusable), a mask of the current number and the history with
   status, method, times and display names. Never the fingerprint, its key
   version, internal ids or anything about OTP challenges.
-- There is no family-side endpoint, no coordinator endpoint and no UI.
+- There is no family-side endpoint and no coordinator endpoint. The Staff
+  UI is the Person profile card described below (FU-15).
   `person-mobile-trust.assist` stays unused, and withheld from COORDINATOR,
   until PWA-1H.
+
+### Staff Mobile Trust UI (FU-15)
+
+The card «توثيق رقم الجوال» on the Staff Person profile is the only UI for
+these routes. It is presentation only; the routes and the Domain Actions
+remain the authority.
+
+```text
+card and its GET     person-mobile-trust.view
+«توثيق رقم الجوال»   person-mobile-trust.grant   state UNVERIFIED, STALE or REVOKED
+                                                 (NO_MOBILE: shown disabled)
+«إلغاء التوثيق»      person-mobile-trust.revoke  state TRUSTED
+UNAVAILABLE          no action
+```
+
+- Visibility follows the permissions, never a role name; today they are
+  held by SUPER_ADMIN and ADMINISTRATOR only. No role or mapping changed.
+- The state shown is the backend `state`; the frontend never derives it.
+  Person eligibility (deleted, inactive, not ALIVE) is not re-checked in
+  the frontend: the API's `PERSON_NOT_ELIGIBLE` is shown as returned.
+- Refusals (`PERSON_NOT_ELIGIBLE`, `NO_VALID_MOBILE`, `ALREADY_TRUSTED`,
+  `NOT_TRUSTED`, 403, 404, validation) are shown inline; after a refusal the
+  authoritative state is refetched.
+- REVOKED and STALE rows are history and are never revived: the UI has no
+  "restore" or "re-trust" action for a row, and the API has none.
+- A grant always creates a NEW TRUSTED row for the Person's CURRENT
+  registered mobile (`Person.mobile`). Staff never type or send a number;
+  the card shows only the backend mask (`mobile_masked`), offers no reveal
+  and no mobile editing.
+- `SELF_OTP` is not a Staff method: it is shown in history (first
+  self-activation) but never offered by the grant.
+- The Family login (account, password, sessions) and mobile trust have
+  separate lifecycles. Revoking trust stops the number being used for OTP
+  security flows such as password recovery; it does not by itself
+  deactivate the Family account, end the User-Person Link or end
+  authenticated sessions.
 
 ## Family API boundary and activation (PWA-1F)
 
@@ -4238,6 +4277,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-081
+Staff Mobile Trust UI (2026-10-06, FU-15, docs/11 FP-ADR-066): no permission, role, route or migration added; no mapping changed. The Staff Person profile card «توثيق رقم الجوال» consumes the three PWA-1E routes: the card needs `person-mobile-trust.view`, the grant `person-mobile-trust.grant`, the revoke `person-mobile-trust.revoke` — checked as permissions, never as roles, and UX only. Grant sends only `verification_method` (the three Staff methods; never `SELF_OTP`, never a number) and creates a new TRUSTED row for the current `Person.mobile`; REVOKED and STALE rows are never revived. Revoke requires a `MobileTrustRevokeReason` code and does not deactivate the account or end sessions. Only `mobile_masked` is displayed; no fingerprint, key version or full number reaches the frontend.
+
 ### AUTH-ADR-080
 Family Auth capabilities (2026-10-06, FU-14, docs/11 FP-ADR-065): no permission or role added or seeded. `GET /api/v1/family/auth/capabilities` is public and unauthenticated, outside `family.activation`, `family.login` and `family.password-reset`, and exposes only the three global gate values as booleans (`no-store, private`) — never an account, a throttle, SMS / provider or environment setting. It is presentation input only: the gate middleware remains authoritative. Password reset authorization is unchanged (full Family context including household head, TRUSTED current mobile, FAMILY_USER with or without COORDINATOR, never Staff or mixed accounts).
 
@@ -4646,6 +4688,7 @@ Date: 2026-09-24
 | 1.2.42 | 2026-10-05 | Approved | Family Portal Full Data Visibility (AUTH-ADR-078, docs/11 FP-ADR-062): §22b reveal boundary; §38 Family Portal amendment (masked with reveal, person_code hidden, structured health visible); §121–§122 resolved for the Family Portal; §123 health, §124 needs and §125 received assistance decided. No permission seeded |
 | 1.2.43 | 2026-10-05 | Approved | AUTH-ADR-079: household-member sensitive reveal boundary (family.context-only resolution, generic 404, self values on the self path, dedicated per-user throttle, security event). No permission seeded |
 | 1.2.44 | 2026-10-06 | Approved | FU-14 (AUTH-ADR-080): §22b public `GET /api/v1/family/auth/capabilities` — three global gate booleans, outside the gates, no account data; password reset authorization unchanged. No permission seeded |
+| 1.2.45 | 2026-10-06 | Approved | FU-15 (AUTH-ADR-081): §22b Staff Mobile Trust UI on the Person profile — card, grant and revoke gated by `person-mobile-trust.view` / `.grant` / `.revoke`; `UNAVAILABLE` state documented; REVOKED never revived, grant = new row for the current mobile, SELF_OTP never a Staff method, revoke ≠ account or session end. No permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

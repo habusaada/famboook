@@ -3588,6 +3588,29 @@ approved 2026-10-06).
 - password reset is otherwise unchanged: automatic sign-in after a reset
   (FP-ADR-045), the full Family context including household head, no
   masked mobile at any step, no trust created or revived by a reset.
+
+FP-ADR-066
+Staff Mobile Trust Management UI (FU-15 — approved 2026-10-06).
+- Staff-side only: the card «توثيق رقم الجوال» on the Staff Person profile,
+  on GET / POST /api/v1/people/{person}/mobile-trust and POST …/revoke
+  (person-mobile-trust.view / .grant / .revoke, checked as permissions);
+  nothing in the Family Portal;
+- the state is the backend's (TRUSTED, STALE, REVOKED, UNVERIFIED,
+  NO_MOBILE, UNAVAILABLE), never derived in the frontend; only
+  mobile_masked is displayed — no reveal, no mobile editing, no
+  fingerprint or key version;
+- grant: one of IN_PERSON, STAFF_CALLBACK, AUTHORIZED_RECORD_REVIEW with an
+  operator attestation; never SELF_OTP (history-readable only), never a
+  number; always a NEW TRUSTED row for the Person's CURRENT registered
+  mobile; offered for UNVERIFIED, STALE and REVOKED, shown disabled for
+  NO_MOBILE, absent for TRUSTED and UNAVAILABLE;
+- revoke: TRUSTED only, with a MobileTrustRevokeReason code; the row stays
+  as history; REVOKED and STALE rows are never revived;
+- Family login and mobile trust have separate lifecycles: revoking trust
+  ends its use for OTP flows such as password recovery, and does not by
+  itself deactivate the account or end sessions;
+- no migration, no backend behavior change; FU-14 password reset,
+  activation, login and SMS are unchanged.
 ```
 
 ---
@@ -3748,6 +3771,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
 | FU-13 | **Resolved 2026-10-05 (FP-ADR-063).** The Family Portal member reference is `member_ref`: the full keyed HMAC-SHA256 (64 lowercase hex characters) of a FAMILY MEMBERSHIP (`FingerprintContext::MEMBER_REF`, Family Auth key and versions), resolved only among the ACTIVE memberships of the `family.context` Family. Never an id, never stored, never authorization. No migration | Done; the member reveal (PWA-3B.4) and member-specific Change Requests use it |
 | FU-14 | **Implemented 2026-10-06 (FP-ADR-065); enablement pending.** Password reset Production readiness: the PWA-1G / PWA-1I reset is kept unchanged (automatic sign-in, head eligibility, no masked mobile, no trust created); runtime `GET /api/v1/family/auth/capabilities` and a fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; realistic coverage (self-OTP account journey, coordinator, Staff boundary, changed / revoked mobile, no registry mutation). No migration | `FAMILY_PASSWORD_RESET_ENABLED=true` only through the docs/08 §16a enablement checklist, as its own decision |
+| FU-15 | **Resolved 2026-10-06 (FP-ADR-066).** Staff Mobile Trust Management UI: the Staff Person profile card «توثيق رقم الجوال» (state, masked current mobile, trust history; grant with IN_PERSON / STAFF_CALLBACK / AUTHORIZED_RECORD_REVIEW, revoke with a reason code) on the existing PWA-1E API and Domain Actions. REVOKED never revived; a grant is a new row for the current `Person.mobile`; SELF_OTP never a Staff method; revoke does not deactivate the account or end sessions. Staff-side only — no Family Portal change. No migration | Done |
 
 ---
 
@@ -3779,3 +3803,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.20 | 2026-10-05 | Approved | FU-13 resolved (FP-ADR-063): `member_ref`, the full 64-hex keyed HMAC-SHA256 of a family membership (MEMBER_REF domain separation, Family Auth key and versions), resolved only among the ACTIVE memberships of the family.context Family; never an id, never stored, never authorization; Change Requests store the internal membership id; implementation record in §30a; no migration |
 | 1.21 | 2026-10-05 | Approved | PWA-3B.4 (FP-ADR-064): household-member sensitive reveal — POST /api/v1/family/household/members/{memberRef}/reveal resolved only inside the family.context Family, one generic 404 HOUSEHOLD_MEMBER_UNAVAILABLE, head's own values on the self path only, HOUSEHOLD_MEMBER_SENSITIVE_REVEALED event (target Person, field only), per-user family-member-reveal throttle 20 / minute and 120 / hour; implementation record in §30a; no migration |
 | 1.22 | 2026-10-06 | Approved | FU-14 password reset Production readiness (FP-ADR-065): public runtime `GET /api/v1/family/auth/capabilities` (three global booleans, outside the gates, no-store, private); fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; FP-ADR-045 automatic sign-in, head eligibility, no masked mobile and no trust creation explicitly preserved; realistic reset coverage; §33a FU-14; implementation record in §30a. No migration; password reset still disabled |
+| 1.23 | 2026-10-06 | Approved | FU-15 Staff Mobile Trust Management UI (FP-ADR-066): Staff Person profile card on the existing PWA-1E API — backend state (six states incl. UNAVAILABLE), masked current mobile only, history, grant with the three Staff methods (never SELF_OTP, never a number, always a new row), revoke with a reason code; REVOKED never revived; trust and login lifecycles separate; §33a FU-15. Staff-side only, no Family Portal change, no migration |
