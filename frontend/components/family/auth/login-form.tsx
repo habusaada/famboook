@@ -19,7 +19,7 @@ import {
 } from "@/components/family/auth/auth-parts";
 import { PasswordField } from "@/components/family/auth/password-field";
 import { useFamilySignIn } from "@/components/family/auth/use-family-sign-in";
-import { familyLogin, readFamilyAuthError } from "@/lib/api/family-auth";
+import { familyLogin, readFamilyAuthError, usePasswordResetAvailability } from "@/lib/api/family-auth";
 import { type LoginInput, type LoginValues, loginSchema } from "@/lib/schemas/family-auth";
 import { cn } from "@/lib/utils";
 import { InstallFamboook } from "@/components/family/pwa/install-famboook";
@@ -33,9 +33,14 @@ import { InstallFamboook } from "@/components/family/pwa/install-famboook";
  * one code, and this form shows one sentence for it: nothing here can tell
  * whether a National ID has an account. The page does not ask who is signed
  * in; a successful login replaces whatever session the browser had.
+ *
+ * "نسيت كلمة المرور؟" appears only once the server reports password reset
+ * open (FU-14): hidden while that is loading and after any failure. Login
+ * itself never depends on that request.
  */
 export function FamilyLoginForm() {
   const signIn = useFamilySignIn();
+  const resetAvailable = usePasswordResetAvailability() === "available";
   const [error, setError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   // Presentation only: reveals the typed password locally.
@@ -126,9 +131,11 @@ export function FamilyLoginForm() {
               <Label htmlFor="family-login-password" className="text-sm font-medium">
                 كلمة المرور
               </Label>
-              <Link href="/family/forgot-password" className={cn(textLinkClass, "text-[13px]")}>
-                نسيت كلمة المرور؟
-              </Link>
+              {resetAvailable && (
+                <Link href="/family/forgot-password" className={cn(textLinkClass, "text-[13px]")}>
+                  نسيت كلمة المرور؟
+                </Link>
+              )}
             </div>
             <PasswordField
               id="family-login-password"

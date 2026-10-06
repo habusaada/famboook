@@ -448,6 +448,57 @@ Family Portal activation may be enabled in Production.
 - **Operational prerequisite.** There is still no Staff screen for
   granting mobile trust — only the API (docs/06 §22b). Nobody can activate
   or reset without a TRUSTED mobile.
+- **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
+  FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
+  in the server `.env` through the deployment, and the login page shows
+  «نسيت كلمة المرور؟» only once the server reports reset open
+  (`GET /api/v1/family/auth/capabilities`). Enabling it is one explicit
+  decision, after every item below, in this order:
+  1. after the FU-14 deployment, with the flag still `false`:
+     `GET https://api.famboook.com/api/v1/family/auth/capabilities`
+     answers `password_reset: false` with `Cache-Control: no-store,
+     private`, the login page shows no «نسيت كلمة المرور؟», and
+     `/family/forgot-password` shows the unavailable notice;
+  2. Production CSRF write smoke (docs/11 FU-08): from a normal browser
+     profile with no stale cookies, a Family login (a write through
+     `/sanctum/csrf-cookie`) succeeds without 419. No Sanctum / CORS change
+     without a reproduced defect;
+  3. `SESSION_DRIVER=database` in the server `.env` (the reset deletes the
+     account's `sessions` rows; with any other driver only the
+     password-hash check ends old sessions);
+  4. the response floor: confirm the Production
+     `FAMILY_ACTIVATION_MIN_RESPONSE_MS` was measured against the real
+     provider (gate item 8). Reset shares it; do not guess or change it as
+     part of enabling reset;
+  5. TweetsMS operational: `php artisan famboook:sms-check` ends with
+     `Configuration: OK` (YES/NO only — never copy key or sender values
+     into notes or tickets), and activation SMS are arriving;
+  6. `php artisan famboook:family-auth-check` ends with "no warnings";
+  7. set `FAMILY_PASSWORD_RESET_ENABLED=true`, then
+     `php artisan config:cache` (the flag is read from the cached
+     configuration; without the refresh nothing changes);
+  8. capabilities now answer `password_reset: true`; after a page reload
+     the login page shows «نسيت كلمة المرور؟» — only now;
+  9. test household (synthetic or the operator's own, already activated,
+     TRUSTED mobile): sign in on a second device or browser, then on the
+     first run the full reset (National ID → code by SMS → new password).
+     The completing browser lands in `/family`; the old password is
+     refused; the new one signs in; the second device's session is gone
+     on its next request;
+  10. where a Coordinator test account exists: after its reset it is still
+      FAMILY_USER + COORDINATOR with the same scopes, and Coordinator Space
+      opens;
+  11. check `auth_security_events` for the test: `PASSWORD_RESET_REQUESTED`
+      SUCCESS, `OTP_*` with purpose `PASSWORD_RESET`,
+      `PASSWORD_RESET_COMPLETED` SUCCESS, `SESSIONS_REVOKED` — and no
+      National ID, mobile, code or password anywhere in them or in the
+      logs.
+- **Password reset rollback.** Set `FAMILY_PASSWORD_RESET_ENABLED=false`,
+  then `php artisan config:cache`. The four reset routes answer 503 at
+  once, capabilities answer `password_reset: false` and the link
+  disappears on the next page load. No migration and no data change;
+  open reset challenges simply expire. Login and activation are not
+  affected.
 - **Coordinators (PWA-1H).** Deploying PWA-1H adds one permission,
   `coordinator-family.view-summary`, granted to COORDINATOR: run the
   RolePermissionSeeder and `famboook:verify-permissions` as usual (§7). No
@@ -855,6 +906,7 @@ Never do this once real data has been entered.
 | 1.1.12 | 2026-10-04 | Approved | §16a: first-activation refusal (FP-ADR-054) deployment notes — no migration, frontend and backend together, what pilot staff see |
 | 1.1.13 | 2026-10-04 | Approved | §16a: installable Family app (FP-ADR-055) — new public files, cache header of the worker, post-deploy checks, rollback of a service worker |
 | 1.1.14 | 2026-10-04 | Approved | Session cookies: the Family 419 incident recorded as a stale / duplicate-cookie incident; production-like CSRF write smoke test required before the first new Family Portal write endpoint (docs/11 FU-08) |
+| 1.1.15 | 2026-10-06 | Approved | §16a: FU-14 password reset enablement checklist (flag stays false through deployment, CSRF write smoke, `SESSION_DRIVER=database`, measured response floor, TweetsMS check without secrets, `config:cache` after the flag change, capabilities and link verified, test-household reset with prior-session revocation, coordinator preservation, security events) and rollback. Nothing enabled |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

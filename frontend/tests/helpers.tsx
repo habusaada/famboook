@@ -1,7 +1,9 @@
 import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import type { FamilyUser } from "@/lib/api/family-auth";
+import { vi } from "vitest";
+import { apiClient } from "@/lib/api/client";
+import type { FamilyAuthCapabilities, FamilyUser } from "@/lib/api/family-auth";
 import type { FamilyHousehold, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
 import type { FamilySelf } from "@/lib/api/family-self";
 
@@ -10,6 +12,26 @@ export function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
   return { client, ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>) };
+}
+
+export const CAPABILITIES_PATH = "/api/v1/family/auth/capabilities";
+
+/** The three global Family Auth capabilities (FU-14); all open unless overridden. */
+export function familyAuthCapabilities(overrides: Partial<FamilyAuthCapabilities> = {}): FamilyAuthCapabilities {
+  return { activation: true, login: true, password_reset: true, ...overrides };
+}
+
+/**
+ * Answers GET /api/v1/family/auth/capabilities: the capabilities, an error
+ * to reject with, or "pending" (never settles). Any other GET fails the test.
+ */
+export function mockFamilyAuthCapabilities(reply: FamilyAuthCapabilities | Error | "pending") {
+  return vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
+    if (path !== CAPABILITIES_PATH) throw new Error(`Unexpected GET: ${path}`);
+    if (reply === "pending") return new Promise<never>(() => {});
+    if (reply instanceof Error) throw reply;
+    return { data: reply } as never;
+  });
 }
 
 /** A synthetic family-side user; nothing here is real registry data. */

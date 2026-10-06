@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { FamilyAuthCard, textLinkClass } from "@/components/family/auth/auth-parts";
+import { FamilyAuthCard, StepHeading, textLinkClass } from "@/components/family/auth/auth-parts";
 import { NationalIdStep } from "@/components/family/auth/national-id-step";
 import { OtpStep } from "@/components/family/auth/otp-step";
 import { PasswordStep } from "@/components/family/auth/password-step";
@@ -15,6 +15,7 @@ import {
   completePasswordReset,
   resendPasswordReset,
   startPasswordReset,
+  usePasswordResetAvailability,
   verifyPasswordReset,
 } from "@/lib/api/family-auth";
 
@@ -28,6 +29,54 @@ type State =
 const STEP_NUMBER = { IDENTIFIER: 1, OTP: 2, NEW_PASSWORD: 3 } as const;
 
 /**
+ * /family/forgot-password can be opened directly (typed, bookmarked), so the
+ * route asks the server itself whether password reset is open (FU-14,
+ * FP-ADR-065) and FAILS CLOSED: while that is loading nothing of the form is
+ * shown, and when it is off or the answer is unavailable one plain notice
+ * leads back to the login — without saying why. Only an explicit `true`
+ * renders the reset flow, unchanged.
+ */
+export function PasswordResetFlow() {
+  const availability = usePasswordResetAvailability();
+  // Once shown, the flow stays mounted: signing in at the end clears the
+  // query cache, and a running flow must not be torn down by that (or by a
+  // later failed refetch). Every step is still gated by the server.
+  const [opened, setOpened] = useState(false);
+  if (availability === "available" && !opened) setOpened(true);
+
+  if (opened || availability === "available") return <PasswordResetSteps />;
+
+  if (availability === "loading") {
+    return (
+      <FamilyAuthCard step="LOADING">
+        <div className="flex justify-center py-8" role="status">
+          <Loader2 className="size-6 animate-spin text-brand-700" aria-label="جارٍ التحميل" />
+        </div>
+      </FamilyAuthCard>
+    );
+  }
+
+  return (
+    <FamilyAuthCard
+      step="UNAVAILABLE"
+      below={
+        <p>
+          <Link href="/family/login" className={textLinkClass}>
+            العودة إلى تسجيل الدخول
+          </Link>
+        </p>
+      }
+    >
+      <section aria-labelledby="family-reset-unavailable-title">
+        <StepHeading id="family-reset-unavailable-title" title="استعادة كلمة المرور">
+          استعادة كلمة المرور غير متاحة حاليًا. يمكنك تسجيل الدخول أو مراجعة الإدارة.
+        </StepHeading>
+      </section>
+    </FamilyAuthCard>
+  );
+}
+
+/**
  * Forgotten password (docs/11 §30a): National ID → code to the trusted
  * mobile → new password, on one route, built from the same steps as
  * activation. The whole state — including the opaque challenge reference —
@@ -35,7 +84,7 @@ const STEP_NUMBER = { IDENTIFIER: 1, OTP: 2, NEW_PASSWORD: 3 } as const;
  * sessionStorage or a cookie, so a refresh simply starts over. A successful
  * reset signs in directly; there is no extra login step.
  */
-export function PasswordResetFlow() {
+function PasswordResetSteps() {
   const signIn = useFamilySignIn();
   const [state, setState] = useState<State>({ step: "IDENTIFIER", notice: null });
 

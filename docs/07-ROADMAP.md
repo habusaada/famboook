@@ -2107,6 +2107,10 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
         FU-13 safe member reference (member_ref) — DONE (FP-ADR-063)
         3B.4 family-member identity/contact reveal — DONE (POST
              /family/household/members/{memberRef}/reveal; FP-ADR-064)
+        FU-14 password reset Production readiness — IMPLEMENTED
+             (runtime GET /family/auth/capabilities, fail-closed
+             forgot-password entry, realistic reset coverage; FP-ADR-065);
+             reset still disabled — enablement per docs/08 §16a checklist
         3B.5 account view («حسابي»)
         3B.6 health read visibility
         3B.7 needs and received-assistance visibility
@@ -4977,6 +4981,7 @@ Date: 2026-09-24
 | 1.2.43 | 2026-10-05 | Approved | PWA-3B.3 done: complete «أسرتي» (registration, branch group, current declaration, full current residence) and member registry details with masked identity / contact values in an in-page sheet; no new endpoint, no migration. PWA-3B.4 (member reveal, FU-13) next |
 | 1.2.44 | 2026-10-05 | Approved | FU-13 done: opaque household-member reference `member_ref` (full keyed HMAC-SHA256 of the membership, family-context-only resolution; docs/11 FP-ADR-063); no migration. PWA-3B.4 next |
 | 1.2.45 | 2026-10-05 | Approved | PWA-3B.4 done: household-member sensitive reveal by member_ref inside the family context (generic 404, head's own values on the self path only, dedicated per-user throttle, security event without the value); no migration (docs/11 FP-ADR-064). PWA-3B.5 next |
+| 1.2.46 | 2026-10-06 | Approved | FU-14 password reset Production readiness implemented: the PWA-1G / PWA-1I reset kept unchanged (automatic sign-in, head eligibility, no masked mobile); runtime Family Auth capabilities endpoint and fail-closed forgot-password entry; self-OTP journey, coordinator, Staff boundary, changed-mobile and registry coverage; no migration (docs/11 FP-ADR-065). `FAMILY_PASSWORD_RESET_ENABLED` stays false until the docs/08 §16a enablement checklist is completed |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

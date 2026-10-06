@@ -202,6 +202,11 @@ class FamilySideBoundaryTest extends TestCase
                 // The gate, then a throttle: never an open public route.
                 $this->assertContains($gates[$route->uri()], $middleware, $route->uri());
                 $this->assertNotEmpty(array_filter($middleware, fn ($m) => str_starts_with((string) $m, 'throttle:family-')), $route->uri());
+            } elseif ($route->uri() === 'api/v1/family/auth/capabilities') {
+                // FU-14 (FP-ADR-065): the one public read with no gate —
+                // three global booleans, no input, no account. Nothing else.
+                $this->assertSame(['api'], $middleware);
+                $this->assertSame(['GET', 'HEAD'], $route->methods());
             } elseif ($route->uri() === 'api/v1/family/auth/logout') {
                 $this->assertContains('auth:sanctum', $middleware);
             } else {
@@ -222,6 +227,6 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        $this->assertSame(21, $checked);
+        $this->assertSame(22, $checked);
     }
 }

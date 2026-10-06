@@ -1007,6 +1007,20 @@ POST /api/v1/family/auth/password/reset/complete    family.password-reset
 - An authenticated "change my password" endpoint does not exist; it belongs
   to the future account module.
 
+### Family Auth capabilities (FU-14)
+
+```text
+PUBLIC, no gate, no authentication
+GET /api/v1/family/auth/capabilities               (none)
+```
+
+- Answers `{"data": {"activation", "login", "password_reset"}}`: the three
+  gate values above as booleans, `Cache-Control: no-store, private`. No
+  input, no account lookup, nothing user-specific, no throttle, SMS,
+  provider or environment detail. It authorizes nothing: the gates stay
+  the authority, and the Family Portal uses the answer only to hide entry
+  points that are closed (fail closed, docs/11 FP-ADR-065).
+
 ## Coordinator Space and administration (PWA-1H)
 
 ```text
@@ -4224,6 +4238,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-080
+Family Auth capabilities (2026-10-06, FU-14, docs/11 FP-ADR-065): no permission or role added or seeded. `GET /api/v1/family/auth/capabilities` is public and unauthenticated, outside `family.activation`, `family.login` and `family.password-reset`, and exposes only the three global gate values as booleans (`no-store, private`) — never an account, a throttle, SMS / provider or environment setting. It is presentation input only: the gate middleware remains authoritative. Password reset authorization is unchanged (full Family context including household head, TRUSTED current mobile, FAMILY_USER with or without COORDINATOR, never Staff or mixed accounts).
+
 ### AUTH-ADR-079
 Household-member sensitive reveal (2026-10-05, PWA-3B.4, docs/11 FP-ADR-064): no permission or role added or seeded. `POST /api/v1/family/household/members/{memberRef}/reveal` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access`, `family.context` and its own per-user `throttle:family-member-reveal` (20 / minute, 120 / hour). The member is resolved only among the ACTIVE memberships of the resolved Family (FU-13 `member_ref`, never authorization); the head's own membership and every unavailable target answer one generic 404 `HOUSEHOLD_MEMBER_UNAVAILABLE`; the head's own values stay on the self reveal. Each authorized reveal records `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` (target Person, metadata the field code only). Coordinator scope never widens it.
 
@@ -4628,6 +4645,7 @@ Date: 2026-09-24
 | 1.2.41 | 2026-10-05 | Approved | FU-10 (AUTH-ADR-077): §96 Staff death recording with `person.record-death` and a required verification method; §43 `family.update` also authorizes a new household declaration. No permission seeded |
 | 1.2.42 | 2026-10-05 | Approved | Family Portal Full Data Visibility (AUTH-ADR-078, docs/11 FP-ADR-062): §22b reveal boundary; §38 Family Portal amendment (masked with reveal, person_code hidden, structured health visible); §121–§122 resolved for the Family Portal; §123 health, §124 needs and §125 received assistance decided. No permission seeded |
 | 1.2.43 | 2026-10-05 | Approved | AUTH-ADR-079: household-member sensitive reveal boundary (family.context-only resolution, generic 404, self values on the self path, dedicated per-user throttle, security event). No permission seeded |
+| 1.2.44 | 2026-10-06 | Approved | FU-14 (AUTH-ADR-080): §22b public `GET /api/v1/family/auth/capabilities` — three global gate booleans, outside the gates, no account data; password reset authorization unchanged. No permission seeded |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

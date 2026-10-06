@@ -2930,6 +2930,74 @@ POST /api/v1/family/household/members/{memberRef}/reveal
   close, switch or unmount are dropped. Plain request only — never the
   query or mutation cache, storage, a URL, an attribute or the clipboard.
 
+## FU-14 implementation record — password reset Production readiness
+
+Implemented 2026-10-06. No migration. Password reset itself is the PWA-1G /
+PWA-1I implementation above and is **not changed**: the four routes, the
+`PASSWORD_RESET` purpose, decoys, the response floor, the TRUSTED current
+mobile, the server-side grant (`verified_at` / `grant_expires_at`, 600 s,
+consumed once), the password policy, session revocation, security events,
+limiters and SMS ceilings. `FAMILY_PASSWORD_RESET_ENABLED` stays `false`;
+enabling it is a separate decision (docs/08 §16a checklist).
+
+**Decisions preserved (confirmed for FU-14).**
+
+- A successful reset ends every earlier session and signs the completing
+  browser in on a new session, which continues to `/family` (FP-ADR-045).
+  There is no return-to-login step.
+- Reset requires the same Family context as login, household head
+  included. An account that lost headship gets the ordinary decoy; there
+  is no self-service reset for it.
+- The reset never returns or shows a masked mobile: every well-formed
+  National ID gets the same start answer.
+- Reset never creates, confirms, revives or overrides a mobile trust. A
+  changed, STALE, revoked or missing current mobile means a decoy until
+  Staff establish trust (an operational process; no Staff screen yet).
+- No `tokens()->delete()`: no Personal Access Token is ever issued, and
+  `FamilySessions::revoke` is unchanged.
+
+**Backend.**
+
+- `GET /api/v1/family/auth/capabilities`
+  (`FamilyAuthCapabilitiesController`, route `family.auth.capabilities`):
+  public, no authentication, outside the three Family Auth gates, no
+  input, no account lookup, no database read. `200 {"data": {"activation",
+  "login", "password_reset"}}` — each exactly what the matching gate
+  middleware reads (`=== true`), `Cache-Control: no-store, private`. No
+  throttle, SMS, provider, environment or account information. Records no
+  event.
+
+**Frontend.**
+
+- `useFamilyAuthCapabilitiesQuery()` / `usePasswordResetAvailability()` in
+  `lib/api/family-auth.ts`: runtime, not `NEXT_PUBLIC_*`; no refetch on
+  focus; a surface is open only on an explicit server `true`.
+- `/family/login`: «نسيت كلمة المرور؟» appears only when
+  `password_reset === true` — hidden while loading and after any failure.
+  Login and the activation link never depend on the request.
+- `/family/forgot-password`: loading shows the restrained spinner and no
+  form; off, error or no connection show one notice («استعادة كلمة المرور
+  غير متاحة حاليًا. يمكنك تسجيل الدخول أو مراجعة الإدارة.») with «العودة
+  إلى تسجيل الدخول», never a reason. `true` renders the unchanged flow,
+  which then stays mounted (the cache cleared at sign-in does not tear it
+  down); the server still gates every step.
+
+**Tests.** `FamilyAuthCapabilitiesTest` (every flag combination, strict
+`true`, no-store / private, no authentication, outside the gates, no
+input, fields only). `FamilyPasswordResetJourneyTest`, on accounts made by
+the real first self-activation (TRUSTED, SELF_OTP): activation → logout →
+reset → old password refused, new password accepted, completing browser
+signed in, other sessions ended; FAMILY_USER + COORDINATOR keeps both
+roles, its scope assignments and Coordinator Space; a Staff account beside
+a matching Person, and a Staff-only account tied to the matching identity,
+get decoys (no SMS, no Staff password change, no role, link, identity or
+trust created); a Staff mobile change makes the trust STALE and reset a
+decoy, changing back revives nothing and sends nothing to the old number;
+a Staff-revoked SELF_OTP trust stays revoked; a change between verify and
+complete stops it; persons, families and family_memberships rows are
+byte-identical and no Family Activity is written. Frontend: login link and
+forgot-password route, loading / false / error / no connection / true.
+
 ---
 
 # 31. Amendment Register
@@ -3497,6 +3565,29 @@ alternate mobile of ANOTHER member of their household:
   self reveal; 429 TOO_MANY_REQUESTS, no-store;
 - no adult / minor rule in V1; no re-authentication; no migration; the
   masked GET payloads are unchanged.
+
+FP-ADR-065
+Runtime Family Auth capabilities and fail-closed entry points (FU-14 —
+approved 2026-10-06).
+- GET /api/v1/family/auth/capabilities: public, unauthenticated, outside
+  the activation, login and password reset gates; no input, no account
+  lookup; 200 {"data": {"activation", "login", "password_reset"}}, each the
+  strict `true` its gate reads; Cache-Control: no-store, private. Only
+  these three global booleans — never throttle, SMS / provider, security
+  or environment settings, never anything about an account;
+- the Family Portal reads them at RUNTIME (never NEXT_PUBLIC build flags),
+  so a flag change needs a config refresh on the server only;
+- fail closed: an entry point to a surface ("نسيت كلمة المرور؟", the
+  /family/forgot-password form) appears only on an explicit `true`; while
+  loading, after an error, without a connection or on `false` it is not
+  offered, and the route shows a plain unavailable notice with the way
+  back to the login, never a reason. Login itself never depends on the
+  capabilities request;
+- presentation only: the gates remain the authority, and a closed surface
+  still answers 503;
+- password reset is otherwise unchanged: automatic sign-in after a reset
+  (FP-ADR-045), the full Family context including household head, no
+  masked mobile at any step, no trust created or revived by a reset.
 ```
 
 ---
@@ -3656,6 +3747,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-11 | Seeded permissions not read by any code: `change-request.*`, `document.*`, `residence.change`, `family.archive` / `.restore` / `.change-household-head` / `.view-history`, `person.archive` / `.view-history`, `family-membership.transfer`. (`person.record-death` is now read by `confirm-alive` and `record-death`.) | Reserved for their phases (docs/06) |
 | FU-12 | Seven legacy PostgreSQL test-fixture failures beyond the three recorded in docs/07 (hard-coded reference ids, a check constraint) | Test cleanup; not a Family Portal defect |
 | FU-13 | **Resolved 2026-10-05 (FP-ADR-063).** The Family Portal member reference is `member_ref`: the full keyed HMAC-SHA256 (64 lowercase hex characters) of a FAMILY MEMBERSHIP (`FingerprintContext::MEMBER_REF`, Family Auth key and versions), resolved only among the ACTIVE memberships of the `family.context` Family. Never an id, never stored, never authorization. No migration | Done; the member reveal (PWA-3B.4) and member-specific Change Requests use it |
+| FU-14 | **Implemented 2026-10-06 (FP-ADR-065); enablement pending.** Password reset Production readiness: the PWA-1G / PWA-1I reset is kept unchanged (automatic sign-in, head eligibility, no masked mobile, no trust created); runtime `GET /api/v1/family/auth/capabilities` and a fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; realistic coverage (self-OTP account journey, coordinator, Staff boundary, changed / revoked mobile, no registry mutation). No migration | `FAMILY_PASSWORD_RESET_ENABLED=true` only through the docs/08 §16a enablement checklist, as its own decision |
 
 ---
 
@@ -3686,3 +3778,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.19 | 2026-10-05 | Approved | PWA-3B.3 implementation record in §30a: complete «أسرتي» (family registration, branch group, current declaration with sons / daughters / source, full current residence), member rows with marital status, death date, masked National ID and mobiles and membership start, in-page member detail sheet; null birth date wording fixed; no member reveal, no migration |
 | 1.20 | 2026-10-05 | Approved | FU-13 resolved (FP-ADR-063): `member_ref`, the full 64-hex keyed HMAC-SHA256 of a family membership (MEMBER_REF domain separation, Family Auth key and versions), resolved only among the ACTIVE memberships of the family.context Family; never an id, never stored, never authorization; Change Requests store the internal membership id; implementation record in §30a; no migration |
 | 1.21 | 2026-10-05 | Approved | PWA-3B.4 (FP-ADR-064): household-member sensitive reveal — POST /api/v1/family/household/members/{memberRef}/reveal resolved only inside the family.context Family, one generic 404 HOUSEHOLD_MEMBER_UNAVAILABLE, head's own values on the self path only, HOUSEHOLD_MEMBER_SENSITIVE_REVEALED event (target Person, field only), per-user family-member-reveal throttle 20 / minute and 120 / hour; implementation record in §30a; no migration |
+| 1.22 | 2026-10-06 | Approved | FU-14 password reset Production readiness (FP-ADR-065): public runtime `GET /api/v1/family/auth/capabilities` (three global booleans, outside the gates, no-store, private); fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; FP-ADR-045 automatic sign-in, head eligibility, no masked mobile and no trust creation explicitly preserved; realistic reset coverage; §33a FU-14; implementation record in §30a. No migration; password reset still disabled |

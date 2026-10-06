@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PasswordResetFlow } from "@/components/family/auth/password-reset-flow";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
-import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
+import {
+  CAPABILITIES_PATH,
+  browserStorageDump,
+  familyAuthCapabilities,
+  familyUser,
+  mockFamilyAuthCapabilities,
+  renderWithClient,
+} from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -42,10 +49,12 @@ function api(replies: Record<string, Reply>) {
 const refusal = (status: number, code: string, extra: object = {}) => new ApiError(status, { message: "…", code, ...extra });
 
 const idField = () => screen.getByLabelText("رقم الهوية");
+/** The reset form, once the server has said password reset is open. */
+const opened = () => screen.findByLabelText("رقم الهوية");
 const otpField = () => screen.getByLabelText(/رمز التحقق المكوّن من/);
 
 async function toOtpStep(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(idField(), NATIONAL_ID);
+  await user.type(await opened(), NATIONAL_ID);
   await user.click(screen.getByRole("button", { name: "متابعة" }));
   await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
 }
@@ -67,13 +76,15 @@ beforeEach(() => {
   router.replace.mockReset();
   window.localStorage.clear();
   window.sessionStorage.clear();
+  // Password reset is open unless a test says otherwise (FU-14).
+  mockFamilyAuthCapabilities(familyAuthCapabilities());
 });
 
 describe("step 1 — the identifier", () => {
-  it("renders the approved copy and a way back to the login", () => {
+  it("renders the approved copy and a way back to the login", async () => {
     renderWithClient(<PasswordResetFlow />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "استعادة كلمة المرور" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "استعادة كلمة المرور" })).toBeInTheDocument();
     expect(idField()).toHaveAttribute("inputmode", "numeric");
     expect(idField()).toHaveAttribute("dir", "ltr");
     expect(screen.getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
@@ -85,7 +96,7 @@ describe("step 1 — the identifier", () => {
     const user = userEvent.setup();
     renderWithClient(<PasswordResetFlow />);
 
-    await user.type(idField(), "١٢٣٤٥٦٧٨٩");
+    await user.type(await opened(), "١٢٣٤٥٦٧٨٩");
     await user.click(screen.getByRole("button", { name: "متابعة" }));
 
     await screen.findByRole("heading", { name: "أدخل رمز التحقق" });
@@ -98,7 +109,7 @@ describe("step 1 — the identifier", () => {
     const user = userEvent.setup();
     renderWithClient(<PasswordResetFlow />);
 
-    await user.type(idField(), "12345");
+    await user.type(await opened(), "12345");
     await user.click(screen.getByRole("button", { name: "متابعة" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("رقم الهوية يجب أن يتكون من 9 أرقام.");
@@ -113,7 +124,7 @@ describe("step 1 — the identifier", () => {
     const user = userEvent.setup();
     renderWithClient(<PasswordResetFlow />);
 
-    await user.type(idField(), NATIONAL_ID);
+    await user.type(await opened(), NATIONAL_ID);
     await user.click(screen.getByRole("button", { name: "متابعة" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(message);
@@ -368,7 +379,69 @@ describe("browser state", () => {
     first.unmount();
     renderWithClient(<PasswordResetFlow />);
 
+    expect(await opened()).toHaveValue("");
     expect(screen.getByRole("heading", { name: "استعادة كلمة المرور" })).toBeInTheDocument();
-    expect(idField()).toHaveValue("");
+  });
+});
+
+describe("availability (FU-14): the route asks the server and fails closed", () => {
+  const unavailable = "استعادة كلمة المرور غير متاحة حاليًا. يمكنك تسجيل الدخول أو مراجعة الإدارة.";
+
+  it("shows only a loading state, never the form, while capabilities load", () => {
+    mockFamilyAuthCapabilities("pending");
+    const post = api({});
+    const { container } = renderWithClient(<PasswordResetFlow />);
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByLabelText("رقم الهوية")).not.toBeInTheDocument();
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelector("[data-auth-step]")).toHaveAttribute("data-auth-step", "LOADING");
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["password_reset=false", familyAuthCapabilities({ password_reset: false })],
+    ["a failed request", new ApiError(500, null)],
+    ["no connection", new TypeError("Failed to fetch")],
+  ])("shows the unavailable notice for %s, with no form and no reason", async (_, reply) => {
+    mockFamilyAuthCapabilities(reply);
+    const post = api({});
+    const { container } = renderWithClient(<PasswordResetFlow />);
+
+    expect(await screen.findByText(unavailable)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "استعادة كلمة المرور" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("رقم الهوية")).not.toBeInTheDocument();
+    expect(container.querySelector("form")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/معطّل|disabled|flag|503|SMS/i);
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("offers the way back to the login when unavailable", async () => {
+    mockFamilyAuthCapabilities(familyAuthCapabilities({ password_reset: false }));
+    renderWithClient(<PasswordResetFlow />);
+
+    expect(await screen.findByRole("link", { name: "العودة إلى تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
+  });
+
+  it("renders the existing flow unchanged when password_reset=true", async () => {
+    const get = mockFamilyAuthCapabilities(familyAuthCapabilities({ activation: false, login: false, password_reset: true }));
+    renderWithClient(<PasswordResetFlow />);
+
+    expect(await opened()).toHaveValue("");
+    expect(screen.getByText("الخطوة 1 من 3")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
+    expect(get).toHaveBeenCalledWith(CAPABILITIES_PATH);
+  });
+
+  it("keeps a running flow on screen when the capabilities cache is cleared", async () => {
+    api({ "/start": START });
+    const user = userEvent.setup();
+    const { client } = renderWithClient(<PasswordResetFlow />);
+    await toOtpStep(user);
+
+    mockFamilyAuthCapabilities(new ApiError(500, null));
+    await act(async () => client.clear());
+
+    expect(screen.getByRole("heading", { name: "أدخل رمز التحقق" })).toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
+use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -46,6 +47,11 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 // `family.side` only says the account is family-side; it authorizes no family
 // data — family-data routes will resolve the Family context explicitly.
 Route::prefix('family')->group(function () {
+    // Family Auth capabilities (FU-14, FP-ADR-065): public, read-only and
+    // OUTSIDE every Family Auth gate — the three global gates as booleans,
+    // nothing user-specific, so the portal hides what is closed.
+    Route::get('/auth/capabilities', FamilyAuthCapabilitiesController::class)->name('family.auth.capabilities');
+
     // Activation (docs/11 §30a): public and generic. The gate runs first —
     // while it is off nothing is looked up, recorded or sent. National IDs,
     // codes and passwords travel in the body, never in a URL.

@@ -4,8 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActivationFlow } from "@/components/family/activation/activation-flow";
 import { FamilyLoginForm } from "@/components/family/auth/login-form";
 import { ApiError, apiClient } from "@/lib/api/client";
-import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
-import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
+import { FAMILY_AUTH_CAPABILITIES_QUERY_KEY, FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
+import {
+  CAPABILITIES_PATH,
+  browserStorageDump,
+  familyAuthCapabilities,
+  familyUser,
+  mockFamilyAuthCapabilities,
+  renderWithClient,
+} from "./helpers";
 
 const router = { replace: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -36,11 +43,15 @@ beforeEach(() => {
   router.replace.mockReset();
   window.localStorage.clear();
   window.sessionStorage.clear();
+  // As in Production today: login open, password reset closed (FU-14).
+  mockFamilyAuthCapabilities(familyAuthCapabilities({ password_reset: false }));
 });
+
+const forgotLink = () => screen.queryByRole("link", { name: "نسيت كلمة المرور؟" });
 
 describe("/family/login", () => {
   it("renders the approved form without asking the API who is signed in", () => {
-    const get = vi.spyOn(apiClient, "get");
+    const get = mockFamilyAuthCapabilities(familyAuthCapabilities());
     renderWithClient(<FamilyLoginForm />);
 
     expect(screen.getByRole("heading", { level: 1, name: "تسجيل الدخول" })).toBeInTheDocument();
@@ -49,7 +60,8 @@ describe("/family/login", () => {
     expect(idField()).toHaveAttribute("dir", "ltr");
     expect(passwordField()).toHaveAttribute("type", "password");
     expect(passwordField()).toHaveAttribute("autocomplete", "current-password");
-    expect(get).not.toHaveBeenCalled();
+    // Only the global capabilities are read — never /family/me.
+    expect(get.mock.calls.map(([path]) => path)).toEqual([CAPABILITIES_PATH]);
   });
 
   it("shows the official logo above the portal name and the card", () => {
@@ -60,10 +72,11 @@ describe("/family/login", () => {
     expect(container.querySelector("[data-family-brand] svg")).toBeNull();
   });
 
-  it("links to the password reset and to activation", () => {
+  it("links to the password reset and to activation", async () => {
+    mockFamilyAuthCapabilities(familyAuthCapabilities());
     renderWithClient(<FamilyLoginForm />);
 
-    expect(screen.getByRole("link", { name: "نسيت كلمة المرور؟" })).toHaveAttribute("href", "/family/forgot-password");
+    expect(await screen.findByRole("link", { name: "نسيت كلمة المرور؟" })).toHaveAttribute("href", "/family/forgot-password");
     expect(screen.getByText(/ليس لديك حساب؟/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "تفعيل الحساب" })).toHaveAttribute("href", "/family/activate");
   });
@@ -239,6 +252,70 @@ describe("/family/login", () => {
     expect(stored).not.toContain(NATIONAL_ID);
     expect(stored).not.toContain(PASSWORD);
     expect(window.location.href).toBe(href);
+  });
+});
+
+describe("/family/login — the forgot-password link fails closed (FU-14)", () => {
+  async function settled(client: ReturnType<typeof renderWithClient>["client"], status: "success" | "error") {
+    await waitFor(() => expect(client.getQueryState(FAMILY_AUTH_CAPABILITIES_QUERY_KEY)?.status).toBe(status));
+  }
+
+  it("is hidden while the capabilities load", () => {
+    mockFamilyAuthCapabilities("pending");
+    renderWithClient(<FamilyLoginForm />);
+
+    expect(forgotLink()).not.toBeInTheDocument();
+    expect(idField()).toBeEnabled();
+    expect(submit()).toBeEnabled();
+  });
+
+  it.each([
+    ["a server error", new ApiError(500, null)],
+    ["no connection", new TypeError("Failed to fetch")],
+  ])("is hidden after %s", async (_, error) => {
+    mockFamilyAuthCapabilities(error);
+    const { client } = renderWithClient(<FamilyLoginForm />);
+
+    await settled(client, "error");
+    expect(forgotLink()).not.toBeInTheDocument();
+  });
+
+  it("is hidden when password_reset=false", async () => {
+    mockFamilyAuthCapabilities(familyAuthCapabilities({ password_reset: false }));
+    const { client } = renderWithClient(<FamilyLoginForm />);
+
+    await settled(client, "success");
+    expect(forgotLink()).not.toBeInTheDocument();
+  });
+
+  it("is shown when password_reset=true", async () => {
+    mockFamilyAuthCapabilities(familyAuthCapabilities({ password_reset: true }));
+    renderWithClient(<FamilyLoginForm />);
+
+    expect(await screen.findByRole("link", { name: "نسيت كلمة المرور؟" })).toHaveAttribute("href", "/family/forgot-password");
+  });
+
+  it("keeps the activation link whatever the capabilities say", async () => {
+    mockFamilyAuthCapabilities(new ApiError(500, null));
+    const { client } = renderWithClient(<FamilyLoginForm />);
+
+    await settled(client, "error");
+    expect(screen.getByRole("link", { name: "تفعيل الحساب" })).toHaveAttribute("href", "/family/activate");
+  });
+
+  it("still signs in when the capabilities request fails", async () => {
+    mockFamilyAuthCapabilities(new ApiError(500, null));
+    const account = familyUser();
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ user: account });
+    const user = userEvent.setup();
+    const { client } = renderWithClient(<FamilyLoginForm />);
+    await settled(client, "error");
+
+    await signIn(user);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/family"));
+    expect(post).toHaveBeenCalledWith(LOGIN, { national_id: NATIONAL_ID, password: PASSWORD });
+    expect(client.getQueryData(FAMILY_ME_QUERY_KEY)).toEqual(account);
   });
 });
 

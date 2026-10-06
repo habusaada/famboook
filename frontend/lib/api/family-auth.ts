@@ -46,6 +46,44 @@ export function useFamilyMeQuery() {
   });
 }
 
+/**
+ * Which Family authentication surfaces the server has open right now
+ * (FU-14, docs/11 FP-ADR-065): three global booleans, read at RUNTIME so a
+ * flag change on the server needs no frontend build. Nothing user-specific.
+ */
+export type FamilyAuthCapabilities = {
+  activation: boolean;
+  login: boolean;
+  password_reset: boolean;
+};
+
+export const FAMILY_AUTH_CAPABILITIES_QUERY_KEY = ["family", "auth", "capabilities"] as const;
+
+/**
+ * The one capabilities query. Consumers FAIL CLOSED: a surface counts as
+ * open only once the server has answered exactly `true` — never while
+ * loading, never after an error. Not refetched on focus, so a flow already
+ * on screen is not pulled away by a background request.
+ */
+export function useFamilyAuthCapabilitiesQuery() {
+  return useQuery({
+    queryKey: FAMILY_AUTH_CAPABILITIES_QUERY_KEY,
+    queryFn: async (): Promise<FamilyAuthCapabilities> =>
+      (await apiClient.get<{ data: FamilyAuthCapabilities }>("/api/v1/family/auth/capabilities")).data,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+/** Password reset is offered only on an explicit server `true`. */
+export function usePasswordResetAvailability(): "loading" | "available" | "unavailable" {
+  const capabilities = useFamilyAuthCapabilitiesQuery();
+  if (capabilities.data?.password_reset === true) return "available";
+
+  return capabilities.isPending ? "loading" : "unavailable";
+}
+
 export async function familyLogout(): Promise<void> {
   await apiClient.post("/api/v1/family/auth/logout", {});
 }
