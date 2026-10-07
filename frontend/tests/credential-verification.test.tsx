@@ -108,6 +108,9 @@ describe("the public verification page", () => {
 
     expect(screen.queryAllByRole("link")).toHaveLength(0);
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    // No PDF, download or print control on the public page (PWA-8.3).
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(document.body).not.toHaveTextContent(/PDF|تنزيل|طباعة/);
     expect(browserStorageDump()).not.toContain(TOKEN);
     expect(browserStorageDump()).not.toContain("FC-7K4P");
     expect("/verify/x".startsWith(FAMILY_SW_SCOPE)).toBe(false);

@@ -158,6 +158,12 @@ class AppServiceProvider extends ServiceProvider
             ['minute', 'hour'],
         ));
 
+        // «بطاقة الأسرة الرقمية» PDF (PWA-8.3): per signed-in user — rendering
+        // a PDF costs more than the JSON card.
+        RateLimiter::for('family-card-pdf', fn (Request $request) => Limit::perMinute((int) config('credentials.pdf.limits.user_minute'))
+            ->by("family-card-pdf|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
         // «بطاقة الأسرة الرقمية» ensure (PWA-8.2): per signed-in user.
         RateLimiter::for('family-card', fn (Request $request) => Limit::perMinute((int) config('credentials.family_card_limits.user_minute'))
             ->by("family-card|user|{$request->user()?->getAuthIdentifier()}")

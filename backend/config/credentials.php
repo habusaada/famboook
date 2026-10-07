@@ -21,4 +21,13 @@ return [
     'family_card_limits' => [
         'user_minute' => (int) env('FAMILY_CARD_LIMIT_USER_MINUTE', 10),
     ],
+
+    // The card PDF (PWA-8.3): mPDF's temp / font-metric cache only — never a
+    // PDF, QR or token — and GET /api/v1/family/card/pdf per signed-in user.
+    'pdf' => [
+        'temp_dir' => env('FAMILY_CARD_PDF_TEMP_DIR', storage_path('framework/cache/mpdf')),
+        'limits' => [
+            'user_minute' => (int) env('FAMILY_CARD_PDF_LIMIT_USER_MINUTE', 5),
+        ],
+    ],
 ];

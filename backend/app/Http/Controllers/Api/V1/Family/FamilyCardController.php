@@ -6,8 +6,7 @@ use App\Actions\IssueFamilyCredentialAction;
 use App\Enums\CredentialIssueChannel;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFamilyContext;
-use App\Support\Credentials\CredentialTokens;
-use App\Support\Credentials\QrCodes;
+use App\Support\Credentials\FamilyCardView;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,9 +17,10 @@ use Illuminate\Http\Request;
  * returns it. Idempotent; never a write on GET. The Family is the one the
  * family.context boundary resolved; nothing in the request chooses another.
  *
- * This is the ONLY PWA-8.2 path that decrypts the stored token, to rebuild
- * the owner's QR. When it cannot be decrypted the card is still returned,
- * without a QR (qr_available false).
+ * The owner's QR is rebuilt through FamilyCardView (shared with the PDF,
+ * PWA-8.3), which reveals the stored token via CredentialTokens::reveal().
+ * When it cannot be decrypted the card is still returned here, without a QR
+ * (qr_available false).
  */
 class FamilyCardController extends Controller
 {
@@ -28,22 +28,9 @@ class FamilyCardController extends Controller
     {
         $context = EnsureFamilyContext::context($request);
         $credential = $issue->handle($context->family, CredentialIssueChannel::FAMILY_PORTAL, null, returnExisting: true);
-        $family = $context->family->loadMissing(['clan', 'branch']);
 
-        $token = CredentialTokens::reveal($credential);
-        $url = $token === null ? null : config('credentials.verify_base_url').$token;
-
-        return response()->json(['data' => [
-            'credential_number' => $credential->credential_number,
-            'family_code' => $family->family_code,
-            'issued_at' => $credential->issued_at->toDateString(),
-            'clan' => $family->clan?->name,
-            'branch' => $family->branch?->name,
-            // The owner's own card: the current head's full registered name.
-            'head_name' => $context->person->full_name,
-            'verification_url' => $url,
-            'qr' => $url === null ? null : QrCodes::svgDataUri($url),
-            'qr_available' => $url !== null,
-        ]])->header('Cache-Control', 'no-store, private');
+        // The shared owner view (also behind the PDF); the PWA-8.2 contract.
+        return response()->json(['data' => FamilyCardView::forOwner($context, $credential)->toArray()])
+            ->header('Cache-Control', 'no-store, private');
     }
 }

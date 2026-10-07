@@ -105,6 +105,16 @@ export const apiClient = {
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  // A binary GET (e.g. a PDF): the body as a Blob, never JSON-parsed. A
+  // failure still throws an ApiError with the JSON error payload.
+  getBlob: async (path: string, accept: string): Promise<Blob> => {
+    const response = await send(path, { headers: { Accept: accept } });
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") ?? "";
+      throw new ApiError(response.status, contentType.includes("application/json") ? await response.json() : null);
+    }
+    return response.blob();
+  },
   // Multipart POST (file uploads); same CSRF/session handling.
   upload: <T>(path: string, form: FormData) =>
     request<T>(path, { method: "POST", body: form }),

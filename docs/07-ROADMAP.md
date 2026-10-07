@@ -2124,7 +2124,8 @@ PWA-3B  Family Portal Full Data Visibility (docs/11 §23a, FP-ADR-062;
 PWA-8   Digital Family Card — PULLED FORWARD (RM-ADR-053; phase number
         unchanged): 8.1 credential architecture — DONE; 8.2 credential
         core, public /verify, /family/card, Staff panel — DONE
-        (FP-ADR-070); 8.3 PDF (mPDF) — next; 8.4 Staff open-record and
+        (FP-ADR-070); 8.3 PDF (mPDF) — DONE (FP-ADR-071); 8.4 Staff
+        PDF / reprint, open-record and
         card-number search — deferred
 PWA-5   Change Request engine + Staff review workspace
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
@@ -4739,6 +4740,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-054
+PWA-8.3 — Digital Family Card PDF is done (2026-10-07, docs/11 FP-ADR-071, docs/06 AUTH-ADR-086): the printable card of the existing ACTIVE Family credential for the household head (GET /api/v1/family/card/pdf, mPDF ^8.3 with bundled IBM Plex Sans Arabic). Presentation / export only — no new credential or lifecycle, no migration, no permission change. PWA-8 numbering unchanged. PWA-8.4 (Staff PDF / reprint, open-record, card-number search) stays deferred and needs its own decision; a wallet-size layout stays optional.
+
 ### RM-ADR-053
 PWA-8 — Digital Family Card is pulled forward (2026-10-07) and executed before PWA-4, PWA-5, PWA-6 and PWA-7; phase numbers are unchanged, only the execution order changes. Sub-phases: 8.1 architecture inspection, 8.2 credential core with public verification, the Family Portal card and Staff management (done; docs/11 FP-ADR-070, docs/06 AUTH-ADR-085, docs/04 DB-ADR-057), 8.3 server PDF with mPDF, 8.4 Staff open-record / credential resolve (deferred, optional). The card's subject is the Family (supersedes FP-ADR-017 in part).
 
@@ -5016,6 +5020,7 @@ Date: 2026-09-24
 | 1.2.49 | 2026-10-06 | Approved | PWA-3B.6 done: household health read visibility (allow-listed health facts of the active members by member_ref, history visible, details hidden, no client identifier); member sheet section, card chip and «أسرتي» count; no migration (RM-ADR-051). PWA-3B.7 next |
 | 1.2.50 | 2026-10-07 | Approved | PWA-3B.7 done: needs (every status, FULFILLED ≠ delivery) and received assistance (non-reversed INTERNAL deliveries with the full package) read visibility on two self-scoped endpoints and `/family/household/support`; no migration, no pagination in V1 (RM-ADR-052). PWA-3B complete after verification |
 | 1.2.51 | 2026-10-07 | Approved | PWA-8 pulled forward (phase numbers unchanged); PWA-8.2 done: Family-subject Digital Family Card, `digital_credentials`, public verification, /family/card, Staff panel, permissions seeded; one additive migration (RM-ADR-053). PWA-8.3 (PDF) next |
+| 1.2.52 | 2026-10-07 | Approved | PWA-8.3 done: Digital Family Card PDF for the household head (existing ACTIVE credential only, mPDF ^8.3, bundled IBM Plex Sans Arabic, in memory); no migration (RM-ADR-054). PWA-8.4 deferred |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

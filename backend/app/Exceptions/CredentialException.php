@@ -21,11 +21,20 @@ class CredentialException extends RuntimeException
 
     public const ISSUANCE_DISABLED = 'ISSUANCE_DISABLED';
 
+    // The owner's card PDF (PWA-8.3): no ACTIVE card — the PDF never issues one.
+    public const CARD_NOT_ISSUED = 'CARD_NOT_ISSUED';
+
+    // The owner's card PDF (PWA-8.3): the stored token cannot be decrypted, so
+    // no QR — a card without its QR is never printed.
+    public const CARD_QR_UNAVAILABLE = 'CARD_QR_UNAVAILABLE';
+
     private const MESSAGES = [
         self::FAMILY_NOT_ACTIVE => 'لا يمكن إصدار بطاقة لأسرة غير نشطة.',
         self::CARD_ALREADY_ACTIVE => 'لهذه الأسرة بطاقة رقمية سارية.',
         self::NO_ACTIVE_CARD => 'لا توجد بطاقة رقمية سارية لهذه الأسرة.',
         self::ISSUANCE_DISABLED => 'إصدار بطاقات الأسرة الرقمية غير متاح حاليًا.',
+        self::CARD_NOT_ISSUED => 'لا توجد بطاقة رقمية سارية لأسرتك. افتح صفحة البطاقة أولًا.',
+        self::CARD_QR_UNAVAILABLE => 'تعذّر إنشاء رمز التحقق لبطاقة أسرتك حاليًا. يُرجى مراجعة إدارة السجل.',
     ];
 
     public function __construct(public readonly string $reason)
@@ -35,7 +44,11 @@ class CredentialException extends RuntimeException
 
     public function render(Request $request): JsonResponse
     {
-        $status = $this->reason === self::ISSUANCE_DISABLED ? 503 : 409;
+        $status = match ($this->reason) {
+            self::ISSUANCE_DISABLED => 503,
+            self::CARD_NOT_ISSUED => 404,
+            default => 409,
+        };
 
         return response()
             ->json(['message' => $this->getMessage(), 'code' => $this->reason], $status)

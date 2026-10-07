@@ -479,6 +479,33 @@ Family Portal activation may be enabled in Production.
      `migrate:rollback --step=1`. After cards exist, never drop the table
      (printed QRs would stop verifying): forward-fix; the issuance switch
      stops new cards while verification continues.
+- **Digital Family Card PDF (PWA-8.3, docs/11 FP-ADR-071).**
+  1. Before deploying, on the server: `php -m` must list `gd`, `mbstring`,
+     `xml` and `zlib` (mPDF requires gd and mbstring; xml for SVG — the
+     logo — and zlib for compression). Install the missing `php8.3-*`
+     packages first.
+  2. `deploy-backend.sh` as usual: `composer install --no-dev` adds
+     `mpdf/mpdf` ^8.3 (and `setasign/fpdi`, `paragonie/random_compat`, the
+     `mpdf/psr-*` shims); **no migration**; then `optimize`. Then the
+     frontend.
+  3. mPDF writes ONLY its temp / font-metric cache to
+     `storage/framework/cache/mpdf` (`FAMILY_CARD_PDF_TEMP_DIR`), created
+     on first use — `storage/` must stay writable by www-data (§ storage
+     permissions). PDFs are generated in memory and never stored; the
+     directory holds no PDF, QR or token and may be deleted at any time.
+  4. The fonts ship in the repository
+     (`backend/resources/fonts/ibm-plex-sans-arabic/`, OFL); nothing to
+     install. The first PDF builds the font cache (slower once).
+  5. Optional: `FAMILY_CARD_PDF_LIMIT_USER_MINUTE` (default 5).
+  6. Manual Arabic check on Production: download as a test household head
+     on Android Chrome, iOS Safari (and the installed PWA) and desktop;
+     open in a PDF viewer; Arabic shaped and right-to-left, `FC-…` /
+     `FAM-…` left-to-right in place, the date «16 أكتوبر 2026» style, long
+     names wrap, the logo renders; print on A4 in colour and greyscale; the
+     QR scans and shows «بطاقة صالحة»; after a Staff reissue the old PDF's
+     QR fails. `storage/logs` contains no token.
+  7. Rollback: code only (no migration); the mPDF cache directory can be
+     removed.
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -940,6 +967,7 @@ Never do this once real data has been entered.
 | 1.1.15 | 2026-10-06 | Approved | §16a: FU-14 password reset enablement checklist (flag stays false through deployment, CSRF write smoke, `SESSION_DRIVER=database`, measured response floor, TweetsMS check without secrets, `config:cache` after the flag change, capabilities and link verified, test-household reset with prior-session revocation, coordinator preservation, security events) and rollback. Nothing enabled |
 | 1.1.16 | 2026-10-06 | Approved | §16a: FU-15 — the Staff mobile trust screen exists (Person profile «توثيق رقم الجوال»); the "API only" operational prerequisite is closed. No migration, no environment change |
 | 1.1.17 | 2026-10-07 | Approved | §16a: PWA-8.2 Digital Family Card — deployment order (backend migration and seeding first), environment switches and limits, APP_KEY / APP_PREVIOUS_KEYS, smoke test, optional nginx `/verify/` access-log hardening, rollback / forward-fix |
+| 1.1.18 | 2026-10-07 | Approved | §16a: PWA-8.3 Digital Family Card PDF — `php -m` gd / mbstring / xml / zlib, composer adds mPDF (no migration), mPDF temp / font cache under storage/framework/cache/mpdf, bundled fonts, manual Arabic and print check, rollback |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

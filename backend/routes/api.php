@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyAccountController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardController;
+use App\Http\Controllers\Api\V1\Family\FamilyCardPdfController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -147,6 +148,11 @@ Route::prefix('family')->group(function () {
             // POST — never a write on GET.
             Route::post('/card', [FamilyCardController::class, 'ensure'])
                 ->middleware('throttle:family-card');
+
+            // The card as a PDF (PWA-8.3): the EXISTING ACTIVE card only — a GET
+            // with no side effects, never an issuance. In memory, no-store.
+            Route::get('/card/pdf', [FamilyCardPdfController::class, 'show'])
+                ->middleware('throttle:family-card-pdf');
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from

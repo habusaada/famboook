@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyCard } from "@/components/family/card/family-card";
@@ -116,16 +116,109 @@ describe("«بطاقة الأسرة الرقمية»", () => {
     expect(screen.queryByRole("button", { name: "إعادة المحاولة" })).not.toBeInTheDocument();
   });
 
-  it("offers no print, PDF, copy or reissue control and stores nothing", async () => {
+  it("offers no print, copy or reissue control besides the PDF download, and stores nothing", async () => {
     renderCard();
     await screen.findByText("FC-7K4P-9XMQ-2R");
 
     const face = document.querySelector("[data-family-card]") as HTMLElement;
     expect(within(face).queryAllByRole("button")).toHaveLength(0);
-    for (const text of [/طباعة/, /PDF/, /تنزيل/, /نسخ/, /إعادة إصدار/]) {
+    for (const text of [/طباعة/, /نسخ/, /إعادة إصدار/]) {
       expect(screen.queryByText(text)).not.toBeInTheDocument();
     }
+    // Inside the page itself (the shell keeps its own logout / navigation).
+    const page = document.querySelector("main") as HTMLElement;
+    expect(within(page).getAllByRole("button").map((b) => b.textContent)).toEqual(["تنزيل البطاقة PDF"]);
     expect(browserStorageDump()).not.toMatch(/FC-7K4P|verify|svg/i);
+  });
+});
+
+describe("«تنزيل البطاقة PDF»", () => {
+  const PDF = "/api/v1/family/card/pdf";
+
+  function stubDownload() {
+    const create = vi.fn(() => "blob:famboook-test");
+    const revoke = vi.fn();
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    return { create, revoke, click };
+  }
+
+  it("is offered only when the card has a QR", async () => {
+    renderCard(card({ qr: null, qr_available: false, verification_url: null }));
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+
+    expect(screen.queryByRole("button", { name: /تنزيل البطاقة PDF/ })).not.toBeInTheDocument();
+  });
+
+  it("downloads the PDF with one GET — no POST, no issuance — and revokes the temporary URL", async () => {
+    const { post } = renderCard();
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+    const getBlob = vi.spyOn(apiClient, "getBlob").mockResolvedValue(new Blob(["%PDF-1.4"], { type: "application/pdf" }));
+    const { create, revoke, click } = stubDownload();
+
+    await userEvent.click(screen.getByRole("button", { name: "تنزيل البطاقة PDF" }));
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    const anchor = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(getBlob).toHaveBeenCalledWith(PDF, "application/pdf");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(anchor.download).toBe("famboook-family-card-FC-7K4P-9XMQ-2R.pdf");
+    expect(anchor.href).toBe("blob:famboook-test");
+    expect(document.querySelector('a[download]')).toBeNull();
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:famboook-test"), { timeout: 2500 });
+    expect(browserStorageDump()).not.toMatch(/PDF|blob:/);
+  });
+
+  it("disables the button and shows a busy state while the file is prepared", async () => {
+    renderCard();
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+    let resolve: (blob: Blob) => void = () => {};
+    vi.spyOn(apiClient, "getBlob").mockReturnValue(new Promise<Blob>((r) => (resolve = r)));
+    stubDownload();
+
+    await userEvent.click(screen.getByRole("button", { name: "تنزيل البطاقة PDF" }));
+
+    const busy = await screen.findByRole("button", { name: /جارٍ تجهيز الملف/ });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    resolve(new Blob(["%PDF"]));
+    expect(await screen.findByRole("button", { name: "تنزيل البطاقة PDF" })).toBeEnabled();
+  });
+
+  it("shows an inline failure and keeps the card", async () => {
+    renderCard();
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+    vi.spyOn(apiClient, "getBlob").mockRejectedValue(new ApiError(500, { message: "x" }));
+    stubDownload();
+
+    await userEvent.click(screen.getByRole("button", { name: "تنزيل البطاقة PDF" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("تعذّر تنزيل البطاقة. حاول مرة أخرى.");
+    expect(screen.getByText("FC-7K4P-9XMQ-2R")).toBeInTheDocument();
+  });
+
+  it("reloads the card after a 404 CARD_NOT_ISSUED and explains it", async () => {
+    const { post } = renderCard();
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+    vi.spyOn(apiClient, "getBlob").mockRejectedValue(new ApiError(404, { message: "x", code: "CARD_NOT_ISSUED" }));
+    stubDownload();
+
+    await userEvent.click(screen.getByRole("button", { name: "تنزيل البطاقة PDF" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("تغيّرت حالة البطاقة");
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
+  });
+
+  it("explains a 409 CARD_QR_UNAVAILABLE", async () => {
+    renderCard();
+    await screen.findByText("FC-7K4P-9XMQ-2R");
+    vi.spyOn(apiClient, "getBlob").mockRejectedValue(new ApiError(409, { message: "x", code: "CARD_QR_UNAVAILABLE" }));
+    stubDownload();
+
+    await userEvent.click(screen.getByRole("button", { name: "تنزيل البطاقة PDF" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("تعذّر إنشاء رمز التحقق حاليًا");
   });
 });
 
