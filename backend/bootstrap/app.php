@@ -70,5 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'beneficiary_national_id',
             'delegate_national_id',
             'code',
+            // Digital Family Card verification token (PWA-8.2).
+            'token',
         ]);
     })->create();

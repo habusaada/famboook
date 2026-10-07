@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CredentialStatus;
 use App\Enums\FamilyStatus;
 use App\Enums\RegistrationSource;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -89,6 +90,18 @@ class Family extends Model
     public function currentHouseholdDeclaration(): HasOne
     {
         return $this->hasOne(FamilyHouseholdDeclaration::class)->where('is_current', true);
+    }
+
+    /** Digital Family Card history (docs/11 FP-ADR-070); append-only. */
+    public function digitalCredentials(): HasMany
+    {
+        return $this->hasMany(DigitalCredential::class);
+    }
+
+    /** The ACTIVE Digital Family Card, if any (at most one). */
+    public function activeDigitalCredential(): HasOne
+    {
+        return $this->hasOne(DigitalCredential::class)->where('status', CredentialStatus::ACTIVE->value);
     }
 
     public function householdHeadMembership(): HasOne

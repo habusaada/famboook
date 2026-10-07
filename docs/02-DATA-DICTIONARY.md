@@ -2247,6 +2247,10 @@ revoked), an issue date and an issue / revoke / reissue history. The
 public holder ID never reuses `family_code`, `person_code`, a database id
 or the National ID.
 
+**Amended 2026-10-07 (docs/11 FP-ADR-070, §31 A-19).** Now the **Digital Family
+Card**: a credential whose subject is the Family (the current head is shown
+live), physically `digital_credentials` (§45c).
+
 ### Announcement and recipient
 
 A manual message with a sender, a sender context (Administration or
@@ -2409,6 +2413,40 @@ As implemented (PWA-1H):
   or its Persons.
 
 ---
+
+# 45c. Digital Credentials (PWA-8.2)
+
+Implemented 2026-10-07 (docs/11 FP-ADR-070). Generic infrastructure; PWA-8
+implements the FAMILY subject (the Digital Family Card) only.
+
+```text
+digital_credentials
+id                  internal only
+subject_type        FAMILY (only value in PWA-8)
+family_id           the Family (FK, restrict); required for FAMILY
+credential_number   public card number FC-XXXX-XXXX-XX; random Crockford
+                    base32; unique; immutable; not a secret
+token_hash          SHA-256 of the opaque QR token; unique; the lookup key
+token_encrypted     Laravel Crypt of the token, only to re-show the owner's QR
+token_version       token / hash scheme, 1
+status              ACTIVE | REVOKED
+issued_at, issued_by          issued_by NULL = system (Family Portal)
+revoked_at, revoked_by, revoke_reason   REISSUED | ADMINISTRATIVE | COMPROMISED
+```
+
+- The card's subject is the **Family**: a household-head change never
+  revokes, rotates, reissues or renumbers it; the current head is shown live.
+- Three distinct things: `family_code` (registry identifier, not a secret),
+  the card number `FC-XXXX-XXXX-XX` (random, immutable for the row) and the
+  opaque QR token (256-bit, never derived, stored only as a SHA-256 lookup
+  hash plus a Crypt-sealed copy decrypted only for the owner's QR).
+- Lifecycle ACTIVE → REVOKED only; reissue = revoke (REISSUED) + a NEW row
+  with a new number and token; no token-only rotation; rows never deleted.
+- Verification needs an ACTIVE credential of an ACTIVE, not deleted Family,
+  read live: an INACTIVE / ARCHIVED / deleted Family fails without the
+  credential changing, and verifies again once ACTIVE unless revoked.
+- A digital verification credential inside Famboook — never an official
+  identity document; a QR proves the card, not the presenter.
 
 # 46. Change Request Type
 
@@ -4169,6 +4207,7 @@ Date: 2026-09-24
 | 1.2.31 | 2026-10-03 | Approved | PWA-1H: §45b coordinator assignment lifecycle (effective = not revoked and target active, no expiry, revoke reasons) and the Coordinator family summary projection; no data-model change |
 | 1.2.32 | 2026-10-04 | Approved | Documentation consolidation: §20a Registered Members (active memberships, any life status) and Living Members replace Registered Household Size; §75 wording; §45a Family Profile Review and Staff Family Verification separated (DD-ADR-033; docs/11 FP-ADR-056, FP-ADR-057) |
 | 1.2.33 | 2026-10-05 | Approved | FU-10: §10 death writes scoped — `RecordPersonDeathAction` changes an EXISTING Person to DECEASED; import creation may create DECEASED; no path back to ALIVE. §20a stale-write refusal and Staff declaration sources. No data-model change |
+| 1.2.34 | 2026-10-07 | Approved | PWA-8.2: §45a Digital Household Head Card amended to the Family-subject Digital Family Card; new §45c `digital_credentials` (docs/11 FP-ADR-070) |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

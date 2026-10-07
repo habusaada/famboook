@@ -7,6 +7,7 @@ use App\Enums\FamilyAuthError;
 use App\Exceptions\FamilyAuthException;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
+use App\Models\DigitalCredential;
 use App\Models\Family;
 use App\Models\FamilyNeed;
 use App\Models\FamilyResidence;
@@ -70,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
             'assessment' => Assessment::class,
             'need' => FamilyNeed::class,
             'assistance_nominee' => AssistanceBeneficiary::class,
+            'digital_credential' => DigitalCredential::class,
         ]);
 
         // Staff login (AUTH-ADR-057): a per-IP ceiling on every attempt, in
@@ -141,5 +143,24 @@ class AppServiceProvider extends ServiceProvider
                 ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
             ['minute', 'hour'],
         ));
+
+        // Public Digital Family Card verification (docs/11 §19, FP-ADR-070):
+        // per client IP — the browser posts directly to the API, so this is the
+        // real client — per minute and per hour. Generic 429, no-store.
+        RateLimiter::for('credential-verify', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('credentials.verify_limits.ip_hour'))
+                : Limit::perMinute((int) config('credentials.verify_limits.ip_minute')))
+                ->by("credential-verify|ip|{$request->ip()}|{$window}")
+                ->response(fn () => response()
+                    ->json(['message' => 'تعذّر التحقق الآن. يُرجى المحاولة لاحقًا.', 'code' => 'TOO_MANY_REQUESTS'], 429)
+                    ->header('Cache-Control', 'no-store, private')),
+            ['minute', 'hour'],
+        ));
+
+        // «بطاقة الأسرة الرقمية» ensure (PWA-8.2): per signed-in user.
+        RateLimiter::for('family-card', fn (Request $request) => Limit::perMinute((int) config('credentials.family_card_limits.user_minute'))
+            ->by("family-card|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
     }
 }

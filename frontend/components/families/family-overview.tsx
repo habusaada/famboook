@@ -4,6 +4,7 @@ import { ChevronLeft, ClipboardCheck, HeartHandshake, HeartPulse, Home, MapPin, 
 import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-context";
 import { EditPersonDialog } from "@/components/people/edit-person-dialog";
+import { FamilyCardPanel } from "@/components/families/family-card-panel";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
 import type { FamilySnapshot } from "@/components/families/family-snapshot";
 import { AppCard } from "@/components/shared/app-card";
@@ -404,6 +405,9 @@ export function FamilyOverview({
           )}
         </AppCard>
       </div>
+
+      {/* Digital Family Card (PWA-8.2): family-card.view only. */}
+      <FamilyCardPanel familyCode={family.family_code} />
 
       {/* Residence & displacement */}
       <AppCard>

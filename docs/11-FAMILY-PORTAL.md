@@ -931,6 +931,18 @@ PWA-5.
 
 The card belongs to the eligible household-head identity and context.
 
+**Amended 2026-10-07 (FP-ADR-070, §31 A-19).** Superseded in part: the card is
+now the **Digital Family Card** («بطاقة الأسرة الرقمية») and its subject is
+the **Family**, not the household-head identity. The statements above and
+below that the card belongs to the head's identity, that it is valid only
+while the holder remains the eligible head and that loss of eligibility
+invalidates it, and the "FH-…" holder-ID example, no longer apply. Still
+valid: minimal official content (the head's name is the CURRENT head,
+resolved live), the "never on the card" list, an opaque public number that
+never reuses a family / person code, database id or National ID — now the
+card number `FC-XXXX-XXXX-XX` — and issue, active, revoke, reissue with
+every transition audited. Implementation: §30a PWA-8.2 record.
+
 ## Content (minimal, official)
 
 ```text
@@ -996,6 +1008,16 @@ QR → Public Verification Page → live card status
   unknown, malformed and revoked credentials are indistinguishable from
   one another to an enumerating client where that does not harm a
   legitimate verifier (detail: PWA-8).
+
+**As implemented 2026-10-07 (PWA-8.2, FP-ADR-070).** `/verify/{opaque-token}` is a
+public page outside `/family` (no gate, outside the service worker scope,
+no-store, noindex, no-referrer). The browser posts the token in the body of
+`POST /api/v1/credentials/verify` — never in an API URL — so the per-IP
+limiter sees the real client. One generic failure «تعذّر التحقق من هذه
+البطاقة.» for malformed, unknown, revoked and inactive / archived / deleted
+Family alike. Public fields (PFP-010): validity, card number, family_code,
+issue date, Clan, Branch and the current head shortened to first + last
+word (omitted without a current head). Staff open-record: PWA-8.4.
 
 ---
 
@@ -1085,7 +1107,8 @@ Approved order:
 2. Family summary
 3. Profile Completion / Verification status
 4. Quick services
-5. Digital Household Head Card / QR
+5. Digital Household Head Card / QR — implemented as «بطاقة الأسرة الرقمية»
+   (/family/card, FP-ADR-070)
 6. Requests requiring attention
 7. Recent requests
 8. Recent notifications
@@ -3186,6 +3209,54 @@ or assistance change.
   actions), the `FamilySideBoundaryTest` inventory; frontend
   `family-support.test.tsx` and the «أسرتي» heading list.
 
+## PWA-8.2 implementation record — Digital Family Card
+
+Implemented 2026-10-07 (FP-ADR-070). One additive migration
+(`digital_credentials`); no Person credential, no assistance, Family Auth,
+OTP or SMS change; no PDF (PWA-8.3); no Staff open-record or card-number
+search (PWA-8.4).
+
+- The card's subject is the **Family**: a household-head change never
+  revokes, rotates, reissues or renumbers it; the current head is shown live.
+- Three distinct things: `family_code` (registry identifier, not a secret),
+  the card number `FC-XXXX-XXXX-XX` (random, immutable for the row) and the
+  opaque QR token (256-bit, never derived, stored only as a SHA-256 lookup
+  hash plus a Crypt-sealed copy decrypted only for the owner's QR).
+- Lifecycle ACTIVE → REVOKED only; reissue = revoke (REISSUED) + a NEW row
+  with a new number and token; no token-only rotation; rows never deleted.
+- Verification needs an ACTIVE credential of an ACTIVE, not deleted Family,
+  read live: an INACTIVE / ARCHIVED / deleted Family fails without the
+  credential changing, and verifies again once ACTIVE unless revoked.
+- A digital verification credential inside Famboook — never an official
+  identity document; a QR proves the card, not the presenter.
+- **Schema:** `digital_credentials` — subject_type, family_id (FK,
+  restrict), credential_number (unique), token_hash (char 64, unique),
+  token_encrypted, token_version, status, issued_at / issued_by (NULL =
+  system), revoked_at / revoked_by / revoke_reason; one ACTIVE per Family
+  (partial unique index); PostgreSQL CHECKs for subject, status, revocation,
+  number and hash formats. Model guard: only ACTIVE → REVOKED once; never
+  deleted.
+- **Actions:** `IssueFamilyCredentialAction` (families row lock, ACTIVE
+  Family, returnExisting for lazy issuance), `RevokeFamilyCredentialAction`
+  (ADMINISTRATIVE / COMPROMISED only), `ReissueFamilyCredentialAction`
+  (revoke REISSUED + new); activity FAMILY_CARD_ISSUED (issue_channel),
+  FAMILY_CARD_REVOKED (revoke_reason), FAMILY_CARD_REISSUED — controlled
+  codes only, never a token or number; visible with family-card.view.
+- **API:** public `POST /api/v1/credentials/verify` (throttle per IP 30 /
+  minute, 300 / hour; generic 404 / 429; no-store); `POST
+  /api/v1/family/card` (family.context, idempotent ensure, QR as an SVG data
+  URI — chillerlan/php-qrcode — no-store, private; the only decrypting
+  path); Staff `GET|POST /api/v1/families/{family}/card`, `…/revoke`,
+  `…/reissue` (family-card.view / issue / revoke / reissue; never a token or
+  QR).
+- **Frontend:** `/verify/[token]` (public; headers no-store, noindex,
+  no-referrer), `/family/card` and its home entry, the Staff overview panel
+  «بطاقة الأسرة الرقمية».
+- **Tests:** backend `DigitalCredentialTest`, `PublicCredentialVerifyTest`,
+  `FamilyCardTest`, `StaffFamilyCardTest`, the route inventories and the
+  permission seeder counts; frontend `credential-verification`,
+  `family-card` and `family-card-panel` tests.
+
 ---
 
 # 31. Amendment Register
@@ -3213,6 +3284,7 @@ also annotated at its original location.
 | A-16 | docs/02 §20a / §75, docs/03 §55 / §55c, docs/04: Registered Household Size excludes DECEASED | registered_member_count counts every ACTIVE membership | **Amended (FP-ADR-056).** "Registered members" = active memberships; the living population is named "living members" (targeting, health summaries) |
 | A-17 | docs/11 §9–§11, docs/02 §45a, docs/03, docs/05: Profile Completion and Family Verification, VERIFIED after the family submits | Family Profile Review by the head, separate from Staff verification | **Amended (FP-ADR-057).** Profile Review (CONFIRMED, never VERIFIED) is distinct from Account Verification and Staff Family Verification |
 | A-18 | docs/06 §38 (Family self National ID "MASKED by default"; other members' mobile / National ID HIDDEN; Person Code FULL), §121 (adult member sensitive fields HIDDEN), §123 (health hidden), §124–§125 (needs / assistance pending); docs/11 FP-ADR-056 allow-list, §9 HEAD, §15, §23 | Full Data Visibility (§23a, 2026-10-05) | **Amended (FP-ADR-062).** For the Family Portal: own and members' National ID / mobiles masked with reveal through dedicated endpoints; structured health facts, recorded needs and received assistance visible; person_code INTERNAL_ONLY; internal Staff, audit, security and targeting data stay hidden |
+| A-19 | docs/11 §18, FP-ADR-017, docs/02 §45a, docs/03 «Card and QR», docs/05 §53a: the **Digital Household Head Card** belongs to the eligible household-head identity; loss of head eligibility invalidates it; ISSUED / REISSUED states; "FH-…" holder ID | (2026-10-07, FP-ADR-070) The **Digital Family Card**: subject = the Family; the current head is shown live; a head change changes nothing; ACTIVE → REVOKED with REISSUED as a reason; card number FC-XXXX-XXXX-XX | **Superseded in part.** Minimal content, opaque non-derived public number, live-status QR, possession ≠ identity, enumeration protection and audited lifecycle are unchanged |
 
 ---
 
@@ -3291,6 +3363,9 @@ canonical health and needs domains.
 FP-ADR-017
 The Digital Household Head Card carries minimal data, an opaque public
 holder ID and a QR resolving to live status.
+*Superseded in part on 2026-10-07 by FP-ADR-070 (the card subject — the Family,
+not the household head — and its validity); this record stays as
+history. Minimal data, an opaque public number and a live-status QR remain.*
 
 FP-ADR-018
 In-app notification records are the source of truth; announcements are
@@ -3859,6 +3934,29 @@ Needs and received assistance read visibility (PWA-3B.7 — approved
   no edit or request control — corrections remain PWA-5;
 - with PWA-3B.7 verified, PWA-3B (Family Portal Full Data Visibility) is
   complete.
+
+FP-ADR-070
+Digital Family Card — a Family-subject digital credential (PWA-8,
+pulled forward; PWA-8.2 approved 2026-10-07). Supersedes in part FP-ADR-017 and
+§18 (§31 A-19).
+- the subject is the Family; the current eligible head is its
+  representative, resolved live; a head change never revokes, rotates,
+  reissues or renumbers the card; Family Portal access keeps its own
+  head-eligibility rules, independently of the card;
+- generic `digital_credentials` infrastructure with explicit relational
+  integrity (subject FAMILY, family_id foreign key, no polymorphic subject,
+  no person_id yet); a future Person credential is additive and never
+  requires reissuing Family QRs;
+- family_code ≠ card number (FC-XXXX-XXXX-XX, random Crockford, immutable)
+  ≠ QR token (32 random bytes, base64url, SHA-256 lookup hash, Crypt-sealed
+  copy for the owner's QR only; never logged, never in activity or API URLs);
+- issuance: lazily for the eligible head on first /family/card (system
+  process) and by Staff; ACTIVE Family only; a switch
+  (credentials.family_card_issuance_enabled) blocks new credentials only;
+- one public route /verify/{token}, a browser POST of the token, a
+  type-specific allow-listed presenter, one generic failure;
+- a digital verification credential inside Famboook — «وسيلة تحقق رقمية
+  ضمن نظام Famboook» — never an official identity document.
 ```
 
 ---
@@ -3917,7 +4015,9 @@ PFP-009  (PWA-7)
 Need category refinement for formula and diapers.
 
 PFP-010  (PWA-8)
-Exact public QR verification fields.
+Exact public QR verification fields. **Resolved 2026-10-07 (FP-ADR-070):**
+validity, card number, family_code, issue date, Clan, Branch, current head
+as first + last word.
 
 PFP-011  (PWA-8)
 PDF generation library.
@@ -3953,7 +4053,9 @@ and who approves it, and whether the two must differ. Profile Review
 PFP-018  (PWA-8)
 Card issuance: automatic on verification or on request; who may revoke and
 reissue. "Verification" here means Staff Family Verification, never
-Profile Review CONFIRMED.
+Profile Review CONFIRMED. **Resolved 2026-10-07 (FP-ADR-070):** lazy automatic
+issuance on the eligible head's first /family/card plus Staff issue;
+revoke and reissue by Staff holding family-card.revoke / .reissue.
 
 PFP-019  (PWA-9)
 Queue and worker infrastructure for announcement fan-out and SMS.
@@ -4056,3 +4158,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.24 | 2026-10-06 | Approved | PWA-3B.5 «حسابي» (FP-ADR-067): GET /api/v1/family/account (self only, no-store, private; activation date and current mobile trust state with the Family mask); /family/account with identity, access types, owner mobile trust labels (REVOKED «غير موثّق حاليًا»), Coordinator section from the coordinator context, «بياناتي الشخصية» entry and logout; «حسابي» in the navigation; Account Recovery not an account setting; §33a FU-16 Authenticated Change Password; implementation record in §30a. No migration |
 | 1.25 | 2026-10-06 | Approved | PWA-3B.6 household health read visibility (FP-ADR-068): GET /api/v1/family/household/health (no client identifier, active memberships, allow-listed facts by member_ref, no-store, private); «الحالة الصحية» in the member sheet, member-card chip, «أسرتي» count line; empty data never means healthy; history visible; details and Staff metadata hidden; §23a HEALTH as implemented; implementation record in §30a. No migration |
 | 1.26 | 2026-10-07 | Approved | PWA-3B.7 needs and received assistance read visibility (FP-ADR-069): GET /api/v1/family/household/needs and /assistance (no client identifier, allow-lists, no-store, private); /family/household/support from «أسرتي» with independent sections; FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family; empty means nothing registered; §23a NEEDS / ASSISTANCE as implemented; implementation record in §30a. No migration |
+| 1.27 | 2026-10-07 | Approved | PWA-8.2 Digital Family Card (FP-ADR-070, supersedes FP-ADR-017 in part; §31 A-19): Family-subject credential, `digital_credentials`, FC- card number ≠ family_code ≠ QR token, lazy + Staff issuance, revoke / reissue, public /verify/{token} with browser POST and one generic failure, /family/card, Staff panel; §18 and §19 annotated; PFP-010 and PFP-018 resolved; implementation record in §30a. PDF (PFP-011) is PWA-8.3 |

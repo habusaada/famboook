@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\CredentialIssueChannel;
+use App\Enums\CredentialRevokeReason;
 use App\Enums\FamilyActivityType;
 use App\Enums\LifeStatusVerificationMethod;
 use App\Models\FamilyActivity;
@@ -47,6 +49,8 @@ class FamilyActivityLog
     public const EVENT_CODE_METADATA = [
         'PERSON_ALIVE_CONFIRMED' => ['verification_method' => LifeStatusVerificationMethod::class],
         'PERSON_DEATH_RECORDED' => ['verification_method' => LifeStatusVerificationMethod::class],
+        'FAMILY_CARD_ISSUED' => ['issue_channel' => CredentialIssueChannel::class],
+        'FAMILY_CARD_REVOKED' => ['revoke_reason' => CredentialRevokeReason::class],
     ];
 
     /**

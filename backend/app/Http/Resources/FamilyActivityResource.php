@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\AssistanceBeneficiary;
+use App\Models\DigitalCredential;
 use App\Models\FamilyNeed;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
@@ -33,6 +34,9 @@ class FamilyActivityResource extends JsonResource
                 'title' => match (true) {
                     $this->subject instanceof FamilyNeed => $this->subject->title,
                     $this->subject instanceof AssistanceBeneficiary => $this->subject->assistance?->title,
+                    // The public card number (never the token); these events
+                    // are visible only with family-card.view.
+                    $this->subject instanceof DigitalCredential => $this->subject->credential_number,
                     default => null,
                 },
             ],

@@ -30,6 +30,9 @@ class FamilyActivityVisibility
         if (! $user->can('assistance.view')) {
             $hidden = [...$hidden, ...FamilyActivityType::assistanceCases()];
         }
+        if (! $user->can('family-card.view')) {
+            $hidden = [...$hidden, ...FamilyActivityType::familyCardCases()];
+        }
 
         return $activities->when(
             $hidden !== [],

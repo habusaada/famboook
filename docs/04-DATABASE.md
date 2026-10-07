@@ -2154,7 +2154,7 @@ documents                §44–§46
 | Family Profile Review — completeness and states | Derived on read; never stored | PWA-4 |
 | Family Profile Review — confirmations | `family_profile_confirmations` (concept): id, uuid, family_id, section (FAMILY / HEAD / MEMBERS / RESIDENCE), confirmed_by_user_id, confirmed_by_person_id, confirmed_at, fingerprint, fingerprint_version, key_version, optional acknowledgement codes; append-only; no registry copy | PWA-4 |
 | Staff Family Verification | State, version, verifier, timestamps, history | Deferred (PFP-017) |
-| Card credential and issuance | Opaque public holder ID, verification credential, status, history | PWA-8 |
+| Card credential and issuance | Opaque public holder ID, verification credential, status, history — **implemented as `digital_credentials` (§55c, DB-ADR-057)** | PWA-8 |
 | Announcement | Sender, sender context, audience definition, content | PWA-9 |
 | Notification recipient / read state | Per-recipient row with read state | PWA-9 |
 | Authentication / security audit | Append-only events | PWA-2 |
@@ -2375,6 +2375,40 @@ purgeable after 90 days. `user_person_links` and `person_mobile_trusts`
 history is never purged by OTP cleanup.
 
 ---
+
+# 55c. Digital Credentials (PWA-8.2)
+
+Implemented 2026-10-07 (migration `2026_10_16_090000_create_digital_credentials_table`,
+docs/11 FP-ADR-070). Additive; no backfill.
+
+```text
+digital_credentials
+id                bigint PK
+subject_type      string(20)        CHECK = 'FAMILY' (PWA-8)
+family_id         FK families       restrict on delete; nullable column,
+                                    required by CHECK for FAMILY
+credential_number string(15) UNIQUE CHECK ^FC-[Crockford]{4}-{4}-{2}$
+token_hash        char(64) UNIQUE   CHECK lowercase hex
+token_encrypted   text              Laravel Crypt (APP_KEY)
+token_version     smallint          default 1, CHECK >= 1
+status            string(20)        CHECK ACTIVE | REVOKED
+issued_at         timestamp
+issued_by         FK users NULL     null on delete; NULL = system
+revoked_at        timestamp NULL
+revoked_by        FK users NULL     null on delete
+revoke_reason     string(30) NULL   CHECK REISSUED | ADMINISTRATIVE | COMPROMISED;
+                                    set ⇔ status REVOKED
+timestamps
+uq_digital_credentials_active_family  UNIQUE (family_id)
+                  WHERE status = 'ACTIVE' AND subject_type = 'FAMILY'
+index (family_id, status)
+```
+
+CHECK constraints are PostgreSQL-only (repository convention); the model
+guard (ACTIVE → REVOKED once, never deleted, number / token / subject
+immutable) and the Domain Actions carry the same rules on SQLite. A future
+subject is additive (a nullable FK, an extended CHECK, its own partial
+index) and never touches existing rows.
 
 # 56. Notifications
 
@@ -3994,6 +4028,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-057
+PWA-8.2 Digital Family Card (2026-10-07) adds one additive table, `digital_credentials` (§55c): generic subject infrastructure with explicit relational integrity — `subject_type` plus a typed `family_id` foreign key (restrict), no polymorphic subject and no `person_id` until a Person credential is approved. The QR token is never stored in plaintext: a unique SHA-256 `token_hash` (a 256-bit random token needs no key) and a Crypt-sealed copy for the owner's QR. One ACTIVE credential per Family by a partial unique index; append-only history (ACTIVE → REVOKED once; reissue is a new row). No backfill.
+
 ### DB-ADR-056
 PWA-3B.4 household-member sensitive reveal (2026-10-05) adds **no migration**: the new `auth_security_events.event_type` `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` (35 characters) fits `string(40)` and `chk_auth_security_event_codes`; the target Person is the existing `person_id`; the metadata key `field` is already allow-listed. The revealed value is never stored.
 
@@ -4286,6 +4323,7 @@ Date: 2026-09-24
 | 1.2.36 | 2026-10-05 | Approved | PWA-3B.2: no schema change (DB-ADR-054); `SELF_SENSITIVE_REVEALED` event type and `field` metadata key within the existing constraints |
 | 1.2.37 | 2026-10-05 | Approved | FU-13: no schema change (DB-ADR-055); `member_ref` is computed, never stored |
 | 1.2.38 | 2026-10-05 | Approved | PWA-3B.4: no schema change (DB-ADR-056); `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` within the existing constraints |
+| 1.2.39 | 2026-10-07 | Approved | PWA-8.2: §55c `digital_credentials` (DB-ADR-057) — Family-subject credential, unique card number and token hash, Crypt-sealed token, one ACTIVE per Family, append-only; §55a row marked implemented |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

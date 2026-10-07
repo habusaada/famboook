@@ -276,6 +276,14 @@ class RolePermissionSeeder extends Seeder
         'coordinator-scope.view',
         'coordinator-scope.manage',
 
+        // §22b Digital Family Card (PWA-8.2, docs/11 FP-ADR-070). Staff
+        // management only; the Family Portal card uses family-side
+        // authorization. family-card.open-record stays unseeded (PWA-8.4).
+        'family-card.view',
+        'family-card.issue',
+        'family-card.revoke',
+        'family-card.reissue',
+
         // §22b PWA-1H: Coordinator Space family SUMMARIES inside the scope
         // (approved 2026-10-03, AUTH-ADR-070). Summary projection only.
         'coordinator-family.view-summary',
@@ -303,6 +311,11 @@ class RolePermissionSeeder extends Seeder
             'person-mobile-trust.assist',
             'person-mobile-trust.grant',
             'person-mobile-trust.revoke',
+            // Digital Family Card (docs/06 §22b, docs/11 FP-ADR-070, PWA-8.2).
+            'family-card.view',
+            'family-card.issue',
+            'family-card.revoke',
+            'family-card.reissue',
             'user-person-link.view',
             'user-person-link.manage',
             'coordinator-scope.view',
@@ -427,6 +440,11 @@ class RolePermissionSeeder extends Seeder
             'person-mobile-trust.assist',
             'person-mobile-trust.grant',
             'person-mobile-trust.revoke',
+            // Digital Family Card (docs/06 §22b, docs/11 FP-ADR-070, PWA-8.2).
+            'family-card.view',
+            'family-card.issue',
+            'family-card.revoke',
+            'family-card.reissue',
             'user-person-link.view',
             'user-person-link.manage',
             'coordinator-scope.view',
@@ -520,6 +538,8 @@ class RolePermissionSeeder extends Seeder
             'role.assign',
         ],
         'DATA_ENTRY' => [
+            // Digital Family Card: view only (PWA-8.2).
+            'family-card.view',
             // Create Family ✓
             'family.create',
             // Create Person ✓
@@ -597,6 +617,8 @@ class RolePermissionSeeder extends Seeder
             'report.view',
         ],
         'SOCIAL_WORKER' => [
+            // Digital Family Card: view only (PWA-8.2).
+            'family-card.view',
             // View Family: Scope (grant + Data Scope constraint)
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)

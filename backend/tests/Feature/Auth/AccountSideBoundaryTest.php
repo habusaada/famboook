@@ -246,8 +246,9 @@ class AccountSideBoundaryTest extends TestCase
                 $this->assertContains('staff.side', $middleware, $route->uri());
                 $checked++;
             } else {
-                // Public routes only: the health check and the Staff login.
-                $this->assertContains($route->uri(), ['api/v1/health', 'api/v1/auth/login'], $route->uri());
+                // Public routes only: the health check, the Staff login and the
+                // public Digital Family Card verification (PWA-8.2, FP-ADR-070).
+                $this->assertContains($route->uri(), ['api/v1/health', 'api/v1/auth/login', 'api/v1/credentials/verify'], $route->uri());
             }
         }
         $this->assertGreaterThan(80, $checked);

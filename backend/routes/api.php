@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyAccountController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
+use App\Http\Controllers\Api\V1\Family\FamilyCardController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -21,6 +22,7 @@ use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
 use App\Http\Controllers\Api\V1\FamilyAssistanceController;
 use App\Http\Controllers\Api\V1\FamilyController;
+use App\Http\Controllers\Api\V1\FamilyCredentialController;
 use App\Http\Controllers\Api\V1\FamilyHouseholdDeclarationController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\Api\V1\NeedController;
 use App\Http\Controllers\Api\V1\PersonController;
 use App\Http\Controllers\Api\V1\PersonCoordinatorController;
 use App\Http\Controllers\Api\V1\PersonMobileTrustController;
+use App\Http\Controllers\Api\V1\PublicCredentialController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
@@ -43,6 +46,13 @@ Route::get('/health', function () {
 
 // Staff authentication on the Sanctum session (docs/06 §59c, AUTH-ADR-057).
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// Public Digital Family Card verification (docs/11 §19, FP-ADR-070): no
+// authentication, outside every group. The token travels in the BODY — never
+// in an API URL — and is posted by the browser from /verify/{token}, so the
+// per-IP limiter sees the real client. One generic failure, no-store.
+Route::post('/credentials/verify', [PublicCredentialController::class, 'verify'])
+    ->middleware('throttle:credential-verify');
 
 // The Family Portal API (docs/06 §22b, PWA-1F), OUTSIDE the Staff group.
 // `family.side` only says the account is family-side; it authorizes no family
@@ -131,6 +141,12 @@ Route::prefix('family')->group(function () {
             // «حسابي» (PWA-3B.5): SELF only — the activation date and the
             // current mobile trust state with the masked mobile; no-store.
             Route::get('/account', [FamilyAccountController::class, 'show']);
+
+            // «بطاقة الأسرة الرقمية» (PWA-8.2): ensures the Family's ACTIVE
+            // card (lazy, idempotent issuance) and returns it with its QR.
+            // POST — never a write on GET.
+            Route::post('/card', [FamilyCardController::class, 'ensure'])
+                ->middleware('throttle:family-card');
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
@@ -221,6 +237,21 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     // required. A household head stays head: no successor (FU-01).
     Route::post('/people/{person}/record-death', [PersonController::class, 'recordDeath'])
         ->middleware('can:person.record-death');
+
+    // Digital Family Card (docs/06 §22b, docs/11 FP-ADR-070, PWA-8.2):
+    // Staff-side only, one permission per operation, Domain Actions only. No
+    // token or QR is ever returned here.
+    Route::get('/families/{family}/card', [FamilyCredentialController::class, 'show'])
+        ->middleware('can:family-card.view');
+
+    Route::post('/families/{family}/card', [FamilyCredentialController::class, 'issue'])
+        ->middleware('can:family-card.issue');
+
+    Route::post('/families/{family}/card/revoke', [FamilyCredentialController::class, 'revoke'])
+        ->middleware('can:family-card.revoke');
+
+    Route::post('/families/{family}/card/reissue', [FamilyCredentialController::class, 'reissue'])
+        ->middleware('can:family-card.reissue');
 
     // Mobile trust (docs/06 §22b, PWA-1E): Staff-side only. The mobile number
     // is never an input — the Person's stored mobile is what gets trusted.

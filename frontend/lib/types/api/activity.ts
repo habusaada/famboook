@@ -38,7 +38,10 @@ export type FamilyActivityType =
   | "ASSISTANCE_DELIVERED"
   | "ASSISTANCE_NOT_DELIVERED"
   | "ASSISTANCE_DELIVERY_REVERSED"
-  | "ASSISTANCE_BENEFICIARY_LISTED";
+  | "ASSISTANCE_BENEFICIARY_LISTED"
+  | "FAMILY_CARD_ISSUED"
+  | "FAMILY_CARD_REVOKED"
+  | "FAMILY_CARD_REISSUED";
 
 export interface FamilyActivity {
   // Public UUID (the database id is never exposed).

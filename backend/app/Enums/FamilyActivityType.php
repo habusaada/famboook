@@ -48,6 +48,17 @@ enum FamilyActivityType: string
     case ASSISTANCE_NOT_DELIVERED = 'ASSISTANCE_NOT_DELIVERED';
     case ASSISTANCE_DELIVERY_REVERSED = 'ASSISTANCE_DELIVERY_REVERSED';
     case ASSISTANCE_BENEFICIARY_LISTED = 'ASSISTANCE_BENEFICIARY_LISTED';
+    // Digital Family Card (docs/11 FP-ADR-070, PWA-8.2). Metadata: controlled
+    // codes only — never a token or card number.
+    case FAMILY_CARD_ISSUED = 'FAMILY_CARD_ISSUED';
+    case FAMILY_CARD_REVOKED = 'FAMILY_CARD_REVOKED';
+    case FAMILY_CARD_REISSUED = 'FAMILY_CARD_REISSUED';
+
+    /** @return list<self> */
+    public static function familyCardCases(): array
+    {
+        return [self::FAMILY_CARD_ISSUED, self::FAMILY_CARD_REVOKED, self::FAMILY_CARD_REISSUED];
+    }
 
     /** @return list<self> */
     public static function healthCases(): array

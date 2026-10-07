@@ -1307,6 +1307,30 @@ ISSUED → ACTIVE → REVOKED
 Loss of household-head eligibility invalidates the card. Public
 verification always reads live status.
 
+**Amended 2026-10-07 (docs/11 FP-ADR-070, WF-ADR-048, §31 A-19).** The Digital
+Family Card's subject is the Family; the lifecycle above is superseded:
+
+```text
+(none) ──issue (Family Portal lazy, or Staff)──▶ ACTIVE
+ACTIVE ──Staff revoke (ADMINISTRATIVE | COMPROMISED)──▶ REVOKED
+ACTIVE ──Staff reissue──▶ REVOKED (REISSUED) + a NEW ACTIVE credential
+REVOKED ──never──▶ ACTIVE
+```
+
+- The card's subject is the **Family**: a household-head change never
+  revokes, rotates, reissues or renumbers it; the current head is shown live.
+- Three distinct things: `family_code` (registry identifier, not a secret),
+  the card number `FC-XXXX-XXXX-XX` (random, immutable for the row) and the
+  opaque QR token (256-bit, never derived, stored only as a SHA-256 lookup
+  hash plus a Crypt-sealed copy decrypted only for the owner's QR).
+- Lifecycle ACTIVE → REVOKED only; reissue = revoke (REISSUED) + a NEW row
+  with a new number and token; no token-only rotation; rows never deleted.
+- Verification needs an ACTIVE credential of an ACTIVE, not deleted Family,
+  read live: an INACTIVE / ARCHIVED / deleted Family fails without the
+  credential changing, and verifies again once ACTIVE unless revoked.
+- A digital verification credential inside Famboook — never an official
+  identity document; a QR proves the card, not the presenter.
+
 ## Announcements
 
 ```text
@@ -3168,6 +3192,9 @@ PWA-1G implemented Family login and password reset. Login resolves the account t
 ### WF-ADR-045
 PWA-1H implemented coordinator administration as four Staff Domain Actions — grant role, revoke role, assign scope, revoke scope — on the existing assignment table. The role and the assignments are separate layers; an assignment never grants the role, and removing the role revokes every active assignment in the same transaction. Coordinator Space is decided per request by one resolver over the current hierarchy.
 
+### WF-ADR-048
+Digital Family Card lifecycle (PWA-8.2, 2026-10-07): a Family-subject credential issued lazily on the eligible head's first /family/card or by Staff, revoked by Staff for ADMINISTRATIVE or COMPROMISED, reissued by Staff as revoke (REISSUED) plus a new credential with a new number and token. A household-head change changes nothing; public verification reads the credential and the Family's ACTIVE status live. The issuance switch blocks new credentials only (issue, reissue), never verification or revocation.
+
 ### WF-ADR-047
 Staff mobile trust operation (FU-15): Staff grant and revoke a Person's mobile trust from the Person profile card «توثيق رقم الجوال» through the existing PWA-1E endpoints and Domain Actions. A grant always trusts the current registered mobile as a NEW row and records the operator's verification method (never SELF_OTP); a revoke needs a reason code and leaves the row as history. REVOKED and STALE rows are never revived. Family login and mobile trust keep separate lifecycles: revoking trust does not by itself deactivate the account or end sessions.
 
@@ -3442,3 +3469,4 @@ Date: 2026-09-24
 | 1.2.13 | 2026-10-03 | Approved | PWA-1H: §53b coordinator administration workflow (grant, assign, revoke scope, revoke role) and Coordinator Space opening per request (WF-ADR-045) |
 | 1.2.14 | 2026-10-04 | Approved | Documentation consolidation: §53a Profile Completion / Family Verification lifecycle replaced by the Family Profile Review workflow and the deferred Staff Family Verification lifecycle (WF-ADR-046; docs/11 FP-ADR-057, FP-ADR-059) |
 | 1.2.15 | 2026-10-06 | Approved | FU-15: §53b Staff mobile trust operation from the Person profile (grant = new row for the current mobile, revoke with a reason, history never revived, login and trust lifecycles separate) (WF-ADR-047) |
+| 1.2.16 | 2026-10-07 | Approved | PWA-8.2: §53a Digital Family Card lifecycle amended (Family subject; ACTIVE → REVOKED; reissue = new credential; head change changes nothing) (WF-ADR-048) |

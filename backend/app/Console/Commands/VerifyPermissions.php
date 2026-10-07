@@ -40,14 +40,15 @@ class VerifyPermissions extends Command
     public const CRITICAL = [
         'DATA_ENTRY' => [
             'has' => ['family-membership.update'],
-            'lacks' => ['family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic'],
+            'lacks' => ['family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic',
+                'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
         ],
         'ADMINISTRATOR' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant', 'family-card.reissue'],
             'lacks' => ['person.national-id.view'],
         ],
         'SUPER_ADMIN' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant', 'family-card.reissue'],
             // import.apply is gated: see the explicit check in handle().
             'lacks' => ['person.national-id.view'],
         ],
@@ -56,11 +57,13 @@ class VerifyPermissions extends Command
         // hold assist before coordinator scope authorization exists (PWA-1H).
         'REVIEWER' => [
             'has' => [],
-            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist'],
+            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist',
+                'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
-            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary'],
+            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
+                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
         ],
         // A Coordinator is family-side and scope-bound (PWA-1H): summaries in
         // its scope and nothing of the Staff API, review, export or trust.
@@ -69,7 +72,8 @@ class VerifyPermissions extends Command
             'lacks' => ['person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
-                'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access'],
+                'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
+                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
         ],
     ];
 

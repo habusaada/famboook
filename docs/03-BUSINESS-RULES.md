@@ -2378,6 +2378,22 @@ still requires service criteria, nomination, review and approval (§47).
 - A QR proves access to the QR, not the identity of the presenter.
 - A downloaded PDF is outside system control; only its QR can be revoked.
 
+**Amended 2026-10-07 (docs/11 FP-ADR-070, §31 A-19).** The card is the **Digital
+Family Card**: its subject is the Family, not the household head.
+- The card's subject is the **Family**: a household-head change never
+  revokes, rotates, reissues or renumbers it; the current head is shown live.
+- Three distinct things: `family_code` (registry identifier, not a secret),
+  the card number `FC-XXXX-XXXX-XX` (random, immutable for the row) and the
+  opaque QR token (256-bit, never derived, stored only as a SHA-256 lookup
+  hash plus a Crypt-sealed copy decrypted only for the owner's QR).
+- Lifecycle ACTIVE → REVOKED only; reissue = revoke (REISSUED) + a NEW row
+  with a new number and token; no token-only rotation; rows never deleted.
+- Verification needs an ACTIVE credential of an ACTIVE, not deleted Family,
+  read live: an INACTIVE / ARCHIVED / deleted Family fails without the
+  credential changing, and verifies again once ACTIVE unless revoked.
+- A digital verification credential inside Famboook — never an official
+  identity document; a QR proves the card, not the presenter.
+
 ## Notifications and announcements
 
 - In-app records are the source of truth; Web Push and SMS are channels.
@@ -4979,6 +4995,7 @@ Date: 2026-09-24
 | 1.2.47 | 2026-10-04 | Approved | Documentation consolidation: "Verified is not beneficiary" replaced by No automatic eligibility; Profile Completion / Family Verification section replaced by Family Profile Review and Staff Family Verification; §55 / §55c Registered Members and Living Members (BD-051, BD-052; docs/11 FP-ADR-056 … FP-ADR-058) |
 | 1.2.48 | 2026-10-04 | Approved | §30: RecordPersonDeathAction is the only path that changes an EXISTING Person to DECEASED (import creation may create UNKNOWN / DECEASED); UNKNOWN → ALIVE through ConfirmPersonAliveAction only; §97a PERSON_ALIVE_CONFIRMED (docs/11 FP-ADR-060) |
 | 1.2.49 | 2026-10-05 | Approved | FU-10 (docs/11 FP-ADR-061): §30 Staff death recording with an explicit death date and a required verification method, `PERSON_ALREADY_DECEASED`, death irreversible in V1, head death allowed without succession, the import is not a caller (also §96a); §31 DEATH_REPORT direction; §55c stale-write protection and Staff declaration endpoint (`family.update`, Staff sources only); §97a PERSON_DEATH_RECORDED metadata |
+| 1.2.50 | 2026-10-07 | Approved | PWA-8.2 (docs/11 FP-ADR-070): «Card and QR» amended — Family-subject Digital Family Card, head change changes nothing, three distinct identifiers, ACTIVE → REVOKED with reissue as a new credential, live Family validity |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

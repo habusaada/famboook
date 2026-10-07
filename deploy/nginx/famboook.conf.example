@@ -33,6 +33,18 @@ server {
 
     client_max_body_size 1m;
 
+    # OPTIONAL hardening (docs/08 §16a, PWA-8.2): the public Digital Family
+    # Card page carries its opaque token in the URL path; do not write it to
+    # the access log. Uncomment, run `nginx -t`, then reload.
+    # location ^~ /verify/ {
+    #     access_log off;
+    #     proxy_pass http://127.0.0.1:3000;
+    #     proxy_http_version 1.1;
+    #     proxy_set_header Host $host;
+    #     proxy_set_header X-Forwarded-Proto https;
+    #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # }
+
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;

@@ -452,6 +452,33 @@ Family Portal activation may be enabled in Production.
   of the current registered mobile creates a new trust. FU-15 needs no
   migration and no environment change; frontend and backend deploy
   together as usual.
+- **Digital Family Card (PWA-8.2, docs/11 FP-ADR-070).**
+  1. Backend first (`deploy-backend.sh`): `composer install` (adds the
+     explicit `chillerlan/php-qrcode` ^5 requirement, already present in
+     the lock), `migrate --force` — ONE additive table,
+     `digital_credentials`, no backfill — then `RolePermissionSeeder`
+     (four `family-card.*` permissions) and `famboook:verify-permissions`.
+     Then the frontend. The new routes are unused until the frontend ships.
+  2. Environment (optional): `FAMILY_CARD_ISSUANCE_ENABLED` (default true —
+     the switch blocks NEW credentials only, never verification or
+     revocation); `CREDENTIAL_VERIFY_BASE_URL` (default
+     `FRONTEND_URL` + `/verify/`); `CREDENTIAL_VERIFY_LIMIT_IP_MINUTE` /
+     `_HOUR` (30 / 300); `FAMILY_CARD_LIMIT_USER_MINUTE` (10).
+  3. `APP_KEY` seals the stored QR tokens: keep it stable; on any rotation
+     set `APP_PREVIOUS_KEYS`, or existing cards show without a QR until
+     reissued (verification of printed QRs is unaffected — it uses the hash).
+  4. Smoke test: a test head opens `/family/card` (a card is issued once);
+     scanning its QR on another device shows «بطاقة صالحة»; a Staff revoke
+     makes it fail generically; a reissue gives a new number and QR and the
+     old QR fails; `storage/logs` contains no token.
+  5. Optional nginx hardening: do not access-log `/verify/` on
+     `famboook.com` (the URL path carries the token) — the commented
+     `location ^~ /verify/` block in `deploy/nginx/famboook.conf.example`;
+     `nginx -t` before reloading. The API logs no token (it is in the body).
+  6. Rollback: before any card exists, roll the code back and
+     `migrate:rollback --step=1`. After cards exist, never drop the table
+     (printed QRs would stop verifying): forward-fix; the issuance switch
+     stops new cards while verification continues.
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -912,6 +939,7 @@ Never do this once real data has been entered.
 | 1.1.14 | 2026-10-04 | Approved | Session cookies: the Family 419 incident recorded as a stale / duplicate-cookie incident; production-like CSRF write smoke test required before the first new Family Portal write endpoint (docs/11 FU-08) |
 | 1.1.15 | 2026-10-06 | Approved | §16a: FU-14 password reset enablement checklist (flag stays false through deployment, CSRF write smoke, `SESSION_DRIVER=database`, measured response floor, TweetsMS check without secrets, `config:cache` after the flag change, capabilities and link verified, test-household reset with prior-session revocation, coordinator preservation, security events) and rollback. Nothing enabled |
 | 1.1.16 | 2026-10-06 | Approved | §16a: FU-15 — the Staff mobile trust screen exists (Person profile «توثيق رقم الجوال»); the "API only" operational prerequisite is closed. No migration, no environment change |
+| 1.1.17 | 2026-10-07 | Approved | §16a: PWA-8.2 Digital Family Card — deployment order (backend migration and seeding first), environment switches and limits, APP_KEY / APP_PREVIOUS_KEYS, smoke test, optional nginx `/verify/` access-log hardening, rollback / forward-fix |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

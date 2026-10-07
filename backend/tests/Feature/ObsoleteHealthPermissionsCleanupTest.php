@@ -53,7 +53,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
     {
         $this->createObsoleteRows();
         $rolesBefore = $this->roleAssignments();
-        $this->assertSame(140 + 8, Permission::count());
+        $this->assertSame(144 + 8, Permission::count());
 
         $this->migration->up();
 
@@ -69,14 +69,15 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
         $this->migration->up();
 
         $canonical = $this->canonicalCatalog();
-        // 140 = 119 + activity-log.view (AUTH-ADR-049)
+        // 144 = 119 + activity-log.view (AUTH-ADR-049)
         //       + assistance.open/nominate (AUTH-ADR-052)
         //       + assistance.approve/deliver/complete/export/export-sensitive (AUTH-ADR-053)
         //       + clan.view/manage (AUTH-ADR-054)
         //       + the ten PWA-1 identity and access permissions (AUTH-ADR-063)
-        //       + coordinator-family.view-summary (AUTH-ADR-070).
-        $this->assertCount(140, $canonical);
-        $this->assertSame(140, Permission::count());
+        //       + coordinator-family.view-summary (AUTH-ADR-070)
+        //       + family-card.view/issue/revoke/reissue (AUTH-ADR-085).
+        $this->assertCount(144, $canonical);
+        $this->assertSame(144, Permission::count());
         $this->assertEqualsCanonicalizing($canonical, Permission::pluck('name')->all());
     }
 
@@ -88,7 +89,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
         $this->migration->up();
         $this->migration->up();
 
-        $this->assertSame(140, Permission::count());
+        $this->assertSame(144, Permission::count());
     }
 
     public function test_refuses_when_an_obsolete_permission_is_assigned_to_a_role(): void
@@ -101,7 +102,7 @@ class ObsoleteHealthPermissionsCleanupTest extends TestCase
             $this->fail('Expected the cleanup to refuse.');
         } catch (\RuntimeException) {
             // Nothing was deleted.
-            $this->assertSame(140 + 8, Permission::count());
+            $this->assertSame(144 + 8, Permission::count());
         }
     }
 

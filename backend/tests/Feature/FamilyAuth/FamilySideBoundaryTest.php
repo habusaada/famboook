@@ -222,12 +222,16 @@ class FamilySideBoundaryTest extends TestCase
             if ($route->uri() === 'api/v1/family/self/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-self-reveal'], $middleware);
             }
+            // Digital Family Card (PWA-8.2): the same boundary plus its own throttle.
+            if ($route->uri() === 'api/v1/family/card') {
+                $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-card'], $middleware);
+            }
             // Household-member reveal (PWA-3B.4): the same boundary plus its own throttle.
             if ($route->uri() === 'api/v1/family/household/members/{memberRef}/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-member-reveal'], $middleware);
             }
             $checked++;
         }
-        $this->assertSame(26, $checked);
+        $this->assertSame(27, $checked);
     }
 }

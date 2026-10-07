@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, Network } from "lucide-react";
+import { ChevronLeft, IdCard, Network } from "lucide-react";
 import { useFamilyUser } from "@/components/family/family-context";
 import {
   FamilyIdentityCard,
@@ -49,6 +49,22 @@ export function FamilyHome() {
           <HouseholdSkeleton />
         )}
       </div>
+
+      {/* «بطاقة الأسرة الرقمية» (PWA-8.2): the household's card and QR. */}
+      <Link
+        href="/family/card"
+        className="flex items-center gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+        data-family-card-entry
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
+          <IdCard className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-foreground">بطاقة الأسرة الرقمية</span>
+          <span className="mt-0.5 block text-[13px] text-muted-foreground">عرض بطاقة أسرتك ورمز التحقق</span>
+        </span>
+        <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      </Link>
 
       {user.coordinator_space && (
         // Shown only when the server says Coordinator Space is open; the space

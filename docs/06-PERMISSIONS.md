@@ -722,11 +722,11 @@ finalized separately and moved to §22b.
 | `announcement.create` | Administration; COORDINATOR (scope-bound) | PWA-9 |
 | `announcement.send` | Administration; COORDINATOR (scope-bound) | PWA-9 |
 | `announcement.send-all` (all eligible family users) | Administration only | PWA-9 |
-| `family-card.view` | Authorized Staff | PWA-8 |
-| `family-card.issue` | Authorized Staff / system process | PWA-8 |
-| `family-card.revoke` | Authorized Staff | PWA-8 |
-| `family-card.reissue` | Authorized Staff | PWA-8 |
-| `family-card.open-record` (open the internal record from a QR) | Authorized Staff | PWA-8 |
+| `family-card.view` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER | PWA-8 |
+| `family-card.issue` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR (the Family Portal lazy issuance is a system process) | PWA-8 |
+| `family-card.revoke` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR | PWA-8 |
+| `family-card.reissue` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR | PWA-8 |
+| `family-card.open-record` (open the internal record from a QR) | Authorized Staff — **not seeded; PWA-8.4** | PWA-8 |
 
 Existing permissions reused: `user.link-person`,
 `user.verify-person-link`, `user.activate`, `user.suspend` (§54, §100) and
@@ -1030,6 +1030,19 @@ GET  /api/v1/family/me
   `assistance_deliveries` with `reversed_at IS NULL` of INTERNAL Assistances
   whose beneficiary belongs to the context Family, with the full package
   (docs/03 §47e). Family-specific allow-lists; no pagination in V1.
+- **Digital Family Card** (PWA-8.2, AUTH-ADR-085, docs/11 FP-ADR-070):
+  - `POST /api/v1/credentials/verify` — public, outside every group,
+    `throttle:credential-verify` (per IP); the token in the body only; one
+    generic 404 for every non-verifiable credential; no-store; no write.
+  - `POST /api/v1/family/card` — `auth:sanctum`, `family.side`,
+    `can:family-portal.access`, `family.context`, `throttle:family-card`;
+    ensures (lazily issues) and returns the household's card with its QR.
+    Family-side authorization only; no `family-card.*` permission.
+  - `GET|POST /api/v1/families/{family}/card`, `POST …/card/revoke`,
+    `POST …/card/reissue` — Staff (`staff.side`), each with its own
+    `family-card.view / issue / revoke / reissue`; never a token or QR.
+  - FAMILY_USER and COORDINATOR hold no `family-card.*`; the verifier
+    checks it. `family-card.open-record` stays unseeded (PWA-8.4).
 - **Activation gate.** `family.activation` runs first on the four
   activation routes: while `family_auth.activation_enabled` is false they
   answer 503 `ACTIVATION_UNAVAILABLE` with no lookup, event or SMS.
@@ -4330,6 +4343,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-085
+Digital Family Card authorization (2026-10-07, PWA-8.2, docs/11 FP-ADR-070): seeded `family-card.view` (SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER) and `family-card.issue / .revoke / .reissue` (SUPER_ADMIN, ADMINISTRATOR); never FAMILY_USER or COORDINATOR. The Family Portal card is reached through family-side authorization (`family.context`), not a Staff permission. One public verification route, `POST /api/v1/credentials/verify`, outside authentication, rate limited per client IP, with the token in the body only and one generic failure. `family-card.open-record` stays unseeded until PWA-8.4.
+
 ### AUTH-ADR-084
 Family needs and received assistance (2026-10-07, PWA-3B.7, docs/11 FP-ADR-069): no permission or role added or seeded. `GET /api/v1/family/household/needs` and `GET /api/v1/family/household/assistance` are two separate reads behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`; they take no parameter and no client Family / Person identifier, answer `no-store, private`, write nothing and record no security event; coordinator scope never widens them. Needs and assistance are independent domains: a FULFILLED need is never proof of a delivery. Only an `assistance_deliveries` row with `reversed_at IS NULL` of an INTERNAL Assistance is a receipt; targeting, nominations and approvals stay internal. History stays with the recorded Family; former or deceased Persons keep their names, soft-deleted Persons are unavailable. Family-specific allow-lists; no pagination in V1. Corrections remain PWA-5.
 
@@ -4754,6 +4770,7 @@ Date: 2026-09-24
 | 1.2.46 | 2026-10-06 | Approved | PWA-3B.5 (AUTH-ADR-082): §22b `GET /api/v1/family/account` — self only, `family.context`, `no-store, private`, activation date and current mobile trust state with the Family mask; `/family/me` unchanged; Account Recovery not an account setting; authenticated change password a future item. No permission seeded |
 | 1.2.47 | 2026-10-06 | Approved | PWA-3B.6 (AUTH-ADR-083): §22b `GET /api/v1/family/household/health` — self household only, no client identifier, active memberships, allow-listed health facts grouped by `member_ref`, `no-store, private`, no security event; §123 as implemented (`details` hidden, history visible). No permission seeded |
 | 1.2.48 | 2026-10-07 | Approved | PWA-3B.7 (AUTH-ADR-084): §22b `GET /api/v1/family/household/needs` and `/assistance` — self household only, no client identifier, allow-lists, `no-store, private`, no security event; §124–§125 as implemented (FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family). No permission seeded |
+| 1.2.49 | 2026-10-07 | Approved | PWA-8.2 (AUTH-ADR-085): `family-card.view / issue / revoke / reissue` seeded with the approved mapping; §22b public `POST /api/v1/credentials/verify`, `POST /api/v1/family/card` and the Staff card routes; open-record deferred to PWA-8.4 |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

@@ -10,6 +10,22 @@ export default function config(phase: string): NextConfig {
   }
 
   return {
+    // Public Digital Family Card verification (docs/11 §19, FP-ADR-070): the
+    // URL carries the opaque token, so the page is never cached, indexed or
+    // sent as a referrer.
+    async headers() {
+      return [
+        {
+          source: "/verify/:path*",
+          headers: [
+            { key: "Cache-Control", value: "no-store" },
+            { key: "X-Robots-Tag", value: "noindex, nofollow" },
+            { key: "Referrer-Policy", value: "no-referrer" },
+          ],
+        },
+      ];
+    },
+
     async rewrites() {
       if (phase === PHASE_DEVELOPMENT_SERVER) return [];
 

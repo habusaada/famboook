@@ -68,6 +68,9 @@ export const familyActivityPresentation: Record<
   ASSISTANCE_NOT_DELIVERED: { label: "تم تسجيل عدم تسليم مساعدة", icon: PackageX },
   ASSISTANCE_DELIVERY_REVERSED: { label: "تم عكس تسليم مساعدة", icon: Undo2 },
   ASSISTANCE_BENEFICIARY_LISTED: { label: "تم إصدار المستفيد في كشف لجهة خارجية", icon: FileSpreadsheet },
+  FAMILY_CARD_ISSUED: { label: "تم إصدار بطاقة الأسرة الرقمية", icon: IdCard },
+  FAMILY_CARD_REVOKED: { label: "تم إلغاء بطاقة الأسرة الرقمية", icon: CircleX },
+  FAMILY_CARD_REISSUED: { label: "تمت إعادة إصدار بطاقة الأسرة الرقمية", icon: IdCard },
 };
 
 export function formatActivityTime(iso: string): string {
