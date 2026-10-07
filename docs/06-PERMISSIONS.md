@@ -2142,6 +2142,26 @@ change-request.apply
 change-request.view-internal-notes
 ```
 
+**Amended 2026-10-07 (PWA-5a, AUTH-ADR-087).** Seeded grants:
+
+```text
+SUPER_ADMIN, ADMINISTRATOR, REVIEWER
+  change-request.view, .review, .return, .approve, .reject, .apply,
+  .view-internal-notes
+FAMILY_USER
+  change-request.create, .update-own-draft, .submit, .resubmit,
+  .cancel (new)
+DATA_ENTRY, SOCIAL_WORKER, REPORTS_VIEWER, COORDINATOR
+  none
+```
+
+FAMILY_USER holds no `change-request.view`: the family's "scoped view
+access" is the Family boundary — `family-portal.access`, `family.context`
+and Family ownership — with Family-subject visibility (the current eligible
+head sees the Family's whole request history, docs/11 FU-04 resolved).
+`change-request.view` is Staff-only. COORDINATOR receives none
+(coordinator-submitted requests are deferred).
+
 ---
 
 # 54. User Administration Permissions
@@ -4347,6 +4367,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-087
+Change Request permissions (2026-10-07, PWA-5a, docs/11 FP-ADR-072): `change-request.cancel` is added and granted to FAMILY_USER only. SUPER_ADMIN, ADMINISTRATOR and REVIEWER additionally receive `change-request.view`, `.return`, `.reject` and `.view-internal-notes` (seeded but previously granted to nobody, so a reviewer could approve but not reject or return). DATA_ENTRY, SOCIAL_WORKER, REPORTS_VIEWER and COORDINATOR hold no change-request permission; no role is added or changed. `change-request.view` stays Staff-side: family reads use `family-portal.access` + `family.context` + Family ownership (FU-04). No route uses these permissions yet (PWA-5c / 5e). `famboook:verify-permissions` checks the reviewer set, and that FAMILY_USER and COORDINATOR hold no review power.
+
 ### AUTH-ADR-086
 Digital Family Card PDF (2026-10-07, PWA-8.3, docs/11 FP-ADR-071): no permission or role added. `GET /api/v1/family/card/pdf` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access`, `family.context` and `throttle:family-card-pdf` (per user), reads no parameter and resolves only the context Family's ACTIVE credential — a GET with no side effect, never an issuance. The owner path may reveal the token for the QR through the existing `CredentialTokens::reveal()`; the Staff boundary is unchanged (no token, QR or verification URL to Staff), and a Staff PDF / reprint needs its own decision (PWA-8.4).
 
@@ -4551,6 +4574,8 @@ This is a baseline, not a substitute for explicit permissions.
 | Approve Change Request | Permission | Permission | — | Permission | Policy | — | — |
 | Apply Change Request | Permission | Permission | — | Permission | Policy | — | — |
 | Submit Change Request | — | — | — | — | — | — | ✓ |
+| View / Return / Reject Change Request, internal notes (PWA-5a) | ✓ | ✓ | — | ✓ | — | — | — |
+| Cancel own open Change Request (PWA-5a) | — | — | — | — | — | — | ✓ |
 | View Audit | ✓ | Permission | — | Limited | — | — | — |
 | View Family Activity Log | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
 | View Executive Dashboard | Permission | Permission | — | — | Policy | ✓ | — |
@@ -4779,6 +4804,7 @@ Date: 2026-09-24
 | 1.2.48 | 2026-10-07 | Approved | PWA-3B.7 (AUTH-ADR-084): §22b `GET /api/v1/family/household/needs` and `/assistance` — self household only, no client identifier, allow-lists, `no-store, private`, no security event; §124–§125 as implemented (FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family). No permission seeded |
 | 1.2.49 | 2026-10-07 | Approved | PWA-8.2 (AUTH-ADR-085): `family-card.view / issue / revoke / reissue` seeded with the approved mapping; §22b public `POST /api/v1/credentials/verify`, `POST /api/v1/family/card` and the Staff card routes; open-record deferred to PWA-8.4 |
 | 1.2.50 | 2026-10-07 | Approved | PWA-8.3 (AUTH-ADR-086): §22b `GET /api/v1/family/card/pdf` — owner only through the Family boundary, no permission, no issuance, no-store; Staff PDF deferred to PWA-8.4 |
+| 1.2.51 | 2026-10-07 | Approved | PWA-5a (AUTH-ADR-087): `change-request.cancel` added (FAMILY_USER); view / return / reject / view-internal-notes granted to SUPER_ADMIN, ADMINISTRATOR, REVIEWER; FU-04 resolved through the Family boundary; no route yet |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

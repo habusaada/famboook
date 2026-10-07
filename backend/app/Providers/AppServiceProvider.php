@@ -7,6 +7,7 @@ use App\Enums\FamilyAuthError;
 use App\Exceptions\FamilyAuthException;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
+use App\Models\ChangeRequest;
 use App\Models\DigitalCredential;
 use App\Models\Family;
 use App\Models\FamilyNeed;
@@ -72,6 +73,8 @@ class AppServiceProvider extends ServiceProvider
             'need' => FamilyNeed::class,
             'assistance_nominee' => AssistanceBeneficiary::class,
             'digital_credential' => DigitalCredential::class,
+            // workflow_events.workflowable_type (PWA-5a, docs/04 §33).
+            'change_request' => ChangeRequest::class,
         ]);
 
         // Staff login (AUTH-ADR-057): a per-IP ceiling on every attempt, in

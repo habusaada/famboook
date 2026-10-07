@@ -1274,6 +1274,17 @@ created_at TIMESTAMP NOT NULL
 
 Workflow events are append-only.
 
+**Implemented 2026-10-07 (PWA-5a, DB-ADR-058).** `workflow_events` exists as
+above with `comment` split into `public_message` (family-visible) and
+`internal_note` (Staff-only), plus `actor_side` (FAMILY / STAFF / SYSTEM) and
+`reason_code` (a code, never free text); `actor_user_id` restricts deletion;
+no `updated_at`. Only the morph alias `change_request` is allowed. On
+PostgreSQL the trigger `trg_workflow_events_append_only` (function
+`famboook_workflow_events_append_only()`) rejects every UPDATE and DELETE;
+INSERT stays allowed. TRUNCATE, a table-owner operation no application path
+issues, is not trigger-blocked (the PostgreSQL test harness truncates with
+CASCADE).
+
 ---
 
 # 34. Workflow Indexes
@@ -1341,6 +1352,11 @@ created_at
 updated_at
 ```
 
+**Superseded 2026-10-07 (PWA-5a, DB-ADR-058, owner decision AE-1).** No
+`change_request_types` table is created: request types are a code registry
+(the `ChangeRequestType` enum, a checked `change_requests.type` varchar);
+behaviour, risk and evidence rules live with each type's handler in code.
+
 ---
 
 # 37. Change Requests
@@ -1395,6 +1411,19 @@ applied_at TIMESTAMP NULL
 created_at
 updated_at
 ```
+
+**Implemented 2026-10-07 (PWA-5a, DB-ADR-058)** with these differences:
+`uuid` (public identifier) beside `request_code` (CRQ-000001, from the
+PostgreSQL sequence `change_request_code_seq`); `type` varchar instead of
+`change_request_type_id`; `payload_version`; `target_membership_id`
+(docs/11 FP-ADR-063); `base_fingerprint` + `base_key_version` (stale-write
+protection); `submitted_by_person_id`; `client_reference` (unique per
+submitting user); `rejection_reason_code` (controlled) beside the
+family-visible `rejection_reason`; `cancelled_by` / `cancelled_at`;
+`apply_failure_count` / `last_apply_failed_at`. Not created: `risk_level`
+(derived from the type), `notes` and `review_notes` (on `workflow_events`).
+PostgreSQL CHECKs keep each status consistent with its actor / timestamp
+columns. Actor foreign keys restrict deletion.
 
 ---
 
@@ -4028,6 +4057,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-058
+PWA-5a Change Request foundation (2026-10-07) adds two additive tables, `change_requests` and `workflow_events` (§33, §37 as implemented), and no backfill. The type is a checked varchar (no `change_request_types`, AE-1); `uuid` is the public key and `request_code` a sequence-generated human reference; the sequence is OWNED BY the column so it goes with the table. PostgreSQL CHECKs enforce: allowed status / type / reason codes, DRAFT ⇔ no `submitted_at`, review / approval / rejection / apply / cancellation actor-and-time pairs per status, APPROVED → REJECTED only as NO_LONGER_APPLICABLE after a recorded failed apply, the base-fingerprint pair (64 lowercase hex, key version ≥ 1), the apply-failure pair and an object `submitted_data`. `workflow_events` is append-only by trigger (every UPDATE and DELETE refused) as well as in the model. Both `down()` methods refuse while rows exist; after Production use the rollback is a code rollback that keeps the tables. `submitted_data` is not application-encrypted (AE-8): authorization, masking in presentation and no payload logging protect it.
+
 ### DB-ADR-057
 PWA-8.2 Digital Family Card (2026-10-07) adds one additive table, `digital_credentials` (§55c): generic subject infrastructure with explicit relational integrity — `subject_type` plus a typed `family_id` foreign key (restrict), no polymorphic subject and no `person_id` until a Person credential is approved. The QR token is never stored in plaintext: a unique SHA-256 `token_hash` (a 256-bit random token needs no key) and a Crypt-sealed copy for the owner's QR. One ACTIVE credential per Family by a partial unique index; append-only history (ACTIVE → REVOKED once; reissue is a new row). No backfill.
 
@@ -4324,6 +4356,7 @@ Date: 2026-09-24
 | 1.2.37 | 2026-10-05 | Approved | FU-13: no schema change (DB-ADR-055); `member_ref` is computed, never stored |
 | 1.2.38 | 2026-10-05 | Approved | PWA-3B.4: no schema change (DB-ADR-056); `HOUSEHOLD_MEMBER_SENSITIVE_REVEALED` within the existing constraints |
 | 1.2.39 | 2026-10-07 | Approved | PWA-8.2: §55c `digital_credentials` (DB-ADR-057) — Family-subject credential, unique card number and token hash, Crypt-sealed token, one ACTIVE per Family, append-only; §55a row marked implemented |
+| 1.2.40 | 2026-10-07 | Approved | PWA-5a: `change_requests` and `workflow_events` implemented (§33, §37 annotated; §36 type table superseded by the code registry) with PostgreSQL CHECKs, the CRQ code sequence and the append-only trigger; safe down() (DB-ADR-058) |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

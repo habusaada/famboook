@@ -506,6 +506,21 @@ Family Portal activation may be enabled in Production.
      QR fails. `storage/logs` contains no token.
   7. Rollback: code only (no migration); the mPDF cache directory can be
      removed.
+- **Change Request foundation (PWA-5a, docs/05 WF-ADR-049, docs/04
+  DB-ADR-058).** When deployed:
+  1. `deploy-backend.sh` as usual — two additive migrations
+     (`change_requests`, `workflow_events`; on PostgreSQL also the sequence
+     `change_request_code_seq`, the CHECK constraints and the append-only
+     trigger and function); no backfill; no new package and no `.env` key
+     (the family submission switch arrives with PWA-5e);
+  2. the seeder grants the new change-request permissions; run
+     `php artisan famboook:verify-permissions` and expect no problem;
+  3. nothing is reachable: no route, no UI, no request type;
+  4. before the deploy, run the PostgreSQL suite (§16a) — the CHECK and
+     trigger tests run only there;
+  5. rollback: CODE only. Both migrations' `down()` refuse while a request
+     or event exists; never drop or truncate request history (the trigger
+     refuses UPDATE and DELETE on `workflow_events`).
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -968,6 +983,7 @@ Never do this once real data has been entered.
 | 1.1.16 | 2026-10-06 | Approved | §16a: FU-15 — the Staff mobile trust screen exists (Person profile «توثيق رقم الجوال»); the "API only" operational prerequisite is closed. No migration, no environment change |
 | 1.1.17 | 2026-10-07 | Approved | §16a: PWA-8.2 Digital Family Card — deployment order (backend migration and seeding first), environment switches and limits, APP_KEY / APP_PREVIOUS_KEYS, smoke test, optional nginx `/verify/` access-log hardening, rollback / forward-fix |
 | 1.1.18 | 2026-10-07 | Approved | §16a: PWA-8.3 Digital Family Card PDF — `php -m` gd / mbstring / xml / zlib, composer adds mPDF (no migration), mPDF temp / font cache under storage/framework/cache/mpdf, bundled fonts, manual Arabic and print check, rollback |
+| 1.1.19 | 2026-10-07 | Approved | §16a: PWA-5a Change Request foundation — two additive migrations (PostgreSQL CHECKs, code sequence, append-only trigger), permission seeding and verify-permissions, PostgreSQL suite before the deploy, code-only rollback; no `.env` change |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

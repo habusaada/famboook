@@ -2155,6 +2155,20 @@ Queue Retry
 Duplicate HTTP Request
 ```
 
+**Amended 2026-10-07 (PWA-5a; docs/05 WF-ADR-049).**
+
+- A requester may cancel an own request until it is approved (SUBMITTED,
+  UNDER_REVIEW, RETURNED_FOR_CLARIFICATION, RESUBMITTED); never after.
+- Resubmission adds a text response only; the proposed data never change
+  after submission (§72) — wrong data means rejection and a new request.
+- A request whose base data changed is not approved or applied over the
+  newer data: the canonical values it was based on are fingerprinted at
+  submission and compared at approve and apply (PWA-5b).
+- An APPROVED request that can no longer be applied (its preconditions fail)
+  may be rejected only as NO_LONGER_APPLICABLE, after the refused apply.
+- Rejection records a controlled reason code; the family-visible message is
+  separate free text; internal notes stay Staff-only (§76).
+
 ---
 
 # 82. Add Family Member Request
@@ -4996,6 +5010,7 @@ Date: 2026-09-24
 | 1.2.48 | 2026-10-04 | Approved | §30: RecordPersonDeathAction is the only path that changes an EXISTING Person to DECEASED (import creation may create UNKNOWN / DECEASED); UNKNOWN → ALIVE through ConfirmPersonAliveAction only; §97a PERSON_ALIVE_CONFIRMED (docs/11 FP-ADR-060) |
 | 1.2.49 | 2026-10-05 | Approved | FU-10 (docs/11 FP-ADR-061): §30 Staff death recording with an explicit death date and a required verification method, `PERSON_ALREADY_DECEASED`, death irreversible in V1, head death allowed without succession, the import is not a caller (also §96a); §31 DEATH_REPORT direction; §55c stale-write protection and Staff declaration endpoint (`family.update`, Staff sources only); §97a PERSON_DEATH_RECORDED metadata |
 | 1.2.50 | 2026-10-07 | Approved | PWA-8.2 (docs/11 FP-ADR-070): «Card and QR» amended — Family-subject Digital Family Card, head change changes nothing, three distinct identifiers, ACTIVE → REVOKED with reissue as a new credential, live Family validity |
+| 1.2.51 | 2026-10-07 | Approved | PWA-5a: §67–§81 Change Request notes — cancellation until approval, text-only resubmission, base-data conflict refusal at approve and apply, NO_LONGER_APPLICABLE after a refused apply, rejection reason codes (docs/05 WF-ADR-049) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

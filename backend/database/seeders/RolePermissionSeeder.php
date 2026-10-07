@@ -193,6 +193,8 @@ class RolePermissionSeeder extends Seeder
         'change-request.reject',
         'change-request.apply',
         'change-request.view-internal-notes',
+        // PWA-5a (AUTH-ADR-087): the requester withdraws an open request.
+        'change-request.cancel',
 
         // §54 User Administration Permissions
         'user.view',
@@ -382,6 +384,12 @@ class RolePermissionSeeder extends Seeder
             'change-request.approve',
             // Apply Change Request: Permission
             'change-request.apply',
+            // PWA-5a (AUTH-ADR-087): the Staff review workspace needs the
+            // queue, return and reject alongside review / approve / apply.
+            'change-request.view',
+            'change-request.return',
+            'change-request.reject',
+            'change-request.view-internal-notes',
             // View Audit ✓
             'audit.view',
             // View Executive Dashboard: Permission
@@ -509,6 +517,12 @@ class RolePermissionSeeder extends Seeder
             'change-request.approve',
             // Apply Change Request: Permission
             'change-request.apply',
+            // PWA-5a (AUTH-ADR-087): the Staff review workspace needs the
+            // queue, return and reject alongside review / approve / apply.
+            'change-request.view',
+            'change-request.return',
+            'change-request.reject',
+            'change-request.view-internal-notes',
             // View Audit: Permission
             'audit.view',
             // View Executive Dashboard: Permission
@@ -597,6 +611,12 @@ class RolePermissionSeeder extends Seeder
             'change-request.approve',
             // Apply Change Request: Permission
             'change-request.apply',
+            // PWA-5a (AUTH-ADR-087): the Staff review workspace needs the
+            // queue, return and reject alongside review / approve / apply.
+            'change-request.view',
+            'change-request.return',
+            'change-request.reject',
+            'change-request.view-internal-notes',
             // View Family: Scope (grant + Data Scope constraint)
             'family.view',
             // View Person: Scope (grant + Data Scope constraint)
@@ -675,6 +695,10 @@ class RolePermissionSeeder extends Seeder
             'change-request.update-own-draft',
             'change-request.submit',
             'change-request.resubmit',
+            // PWA-5a (AUTH-ADR-087): cancel an own open request (never after
+            // APPROVED). No change-request.view: Family reads use the
+            // family.context boundary and ownership instead (FU-04).
+            'change-request.cancel',
             // §22b Family Portal, family context (PWA-1).
             'family-portal.access',
         ],

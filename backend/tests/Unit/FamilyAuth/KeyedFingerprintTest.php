@@ -52,9 +52,10 @@ class KeyedFingerprintTest extends TestCase
             FingerprintContext::cases(),
         );
 
-        // LOGIN_ID, MOBILE, OTP_CODE and MEMBER_REF (FU-13).
-        $this->assertCount(4, FingerprintContext::cases());
-        $this->assertCount(4, array_unique($values));
+        // LOGIN_ID, MOBILE, OTP_CODE, MEMBER_REF (FU-13) and
+        // CHANGE_REQUEST_BASE (PWA-5a).
+        $this->assertCount(5, FingerprintContext::cases());
+        $this->assertCount(5, array_unique($values));
     }
 
     public function test_it_is_independent_of_app_key_and_of_the_import_fingerprint(): void

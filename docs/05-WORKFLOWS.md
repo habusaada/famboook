@@ -1662,6 +1662,29 @@ UNDER_REVIEW
                     APPLIED
 ```
 
+**Amended 2026-10-07 (WF-ADR-049, PWA-5a).** Implemented foundation:
+
+```text
+(new) → SUBMITTED                     V1 creates no DRAFT; DRAFT → SUBMITTED kept
+SUBMITTED / UNDER_REVIEW /
+RETURNED_FOR_CLARIFICATION /
+RESUBMITTED → CANCELLED               the requester withdraws (never from APPROVED)
+APPROVED → REJECTED                   only as NO_LONGER_APPLICABLE, after an
+                                      apply attempt was refused
+APPROVED → APPROVED (APPLY_FAILED)    a refused / failed apply records an event,
+                                      not a transition
+```
+
+- One authoritative transition table (`ChangeRequestTransitions`) names, for
+  every transition, its workflow event, the acting side (FAMILY / STAFF) and
+  the permission; terminal states (APPLIED, REJECTED, CANCELLED) have none.
+- Resubmission adds a family-visible text response only; `submitted_data` is
+  immutable after submission (wrong data → rejection + a new request).
+- `workflow_events` is append-only in the model AND in PostgreSQL (a trigger
+  refuses every UPDATE and DELETE). Family-visible text
+  (`public_message`) and Staff-only notes (`internal_note`) are separate.
+- The transition Domain Actions, conflict refusal and APPLY are PWA-5b.
+
 ---
 
 # 55. Change Request DRAFT
@@ -3200,6 +3223,9 @@ Staff mobile trust operation (FU-15): Staff grant and revoke a Person's mobile t
 
 ### WF-ADR-046
 Family Profile Review is a family workflow separate from Account Verification and Staff Family Verification: section review, confirm or request a change; derived states driven by completeness, confirmations and Change Request status (APPROVED ≠ APPLIED); confirmations never change canonical data (docs/11 FP-ADR-057). First-release request types: RESIDENCE_UPDATE (current residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION, non-head DEATH_REPORT (docs/11 FP-ADR-059).
+
+### WF-ADR-049
+Change Request lifecycle as implemented by PWA-5a (2026-10-07; §54 amended): CANCELLED is added — the family requester may cancel from SUBMITTED, UNDER_REVIEW, RETURNED_FOR_CLARIFICATION or RESUBMITTED, never from APPROVED or a terminal state. APPROVED → REJECTED is allowed only as NO_LONGER_APPLICABLE after an apply attempt was refused (a database CHECK requires the approval and a recorded failed apply). DRAFT stays a valid state but no V1 flow creates one: a request is created directly as SUBMITTED. Resubmission carries a text response only; the proposal is immutable after submission. A refused or failed apply leaves the request APPROVED and records an APPLY_FAILED event. One transition table is authoritative; workflow events are append-only in the model and by a PostgreSQL trigger (owner decision AE-18, strengthened from model-only). No generic maker-checker rule beyond the family / Staff separation in V1.
 ```
 
 ---
@@ -3470,3 +3496,4 @@ Date: 2026-09-24
 | 1.2.14 | 2026-10-04 | Approved | Documentation consolidation: §53a Profile Completion / Family Verification lifecycle replaced by the Family Profile Review workflow and the deferred Staff Family Verification lifecycle (WF-ADR-046; docs/11 FP-ADR-057, FP-ADR-059) |
 | 1.2.15 | 2026-10-06 | Approved | FU-15: §53b Staff mobile trust operation from the Person profile (grant = new row for the current mobile, revoke with a reason, history never revived, login and trust lifecycles separate) (WF-ADR-047) |
 | 1.2.16 | 2026-10-07 | Approved | PWA-8.2: §53a Digital Family Card lifecycle amended (Family subject; ACTIVE → REVOKED; reissue = new credential; head change changes nothing) (WF-ADR-048) |
+| 1.2.17 | 2026-10-07 | Approved | PWA-5a: §54 lifecycle amended — CANCELLED (requester, until approval), APPROVED → REJECTED only as NO_LONGER_APPLICABLE after a refused apply, no V1 DRAFT, text-only resubmission, APPLY_FAILED event, one transition table, append-only workflow events enforced by PostgreSQL (WF-ADR-049) |

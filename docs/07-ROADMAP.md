@@ -2127,7 +2127,13 @@ PWA-8   Digital Family Card — PULLED FORWARD (RM-ADR-053; phase number
         (FP-ADR-070); 8.3 PDF (mPDF) — DONE (FP-ADR-071); 8.4 Staff
         PDF / reprint, open-record and
         card-number search — deferred
-PWA-5   Change Request engine + Staff review workspace
+PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
+        5a foundation — schema, enums, transitions, workflow events,
+           permissions — DONE (no route, UI or request type)
+        5b Domain Actions, handler contract, conflict detection, APPLY
+        5c Staff API · 5d Staff review workspace
+        5e Family API (submission switch, default off) · 5f Family views
+        then PWA-6.1 RESIDENCE_UPDATE enables «+» and «طلباتي»
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
         DEATH_REPORT (non-head); «طلباتي»
@@ -4740,6 +4746,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-055
+PWA-5 — Change Request engine (2026-10-07): the approved order is kept (PWA-5 → first PWA-6 types → PWA-4; PWA-4 is NOT pulled forward). PWA-5 is delivered in slices: 5a foundation (schema, enums, transition table, workflow event recorder, permissions — no route, no UI, no request type) — DONE; 5b Domain Actions, type-handler contract, conflict detection and APPLY; 5c Staff API and 5d Staff review workspace; 5e Family API (with `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`, default off) and 5f Family request views, built but not linked; then PWA-6.1 RESIDENCE_UPDATE end to end, which first enables «+», «طلباتي» and the quick actions.
+
 ### RM-ADR-054
 PWA-8.3 — Digital Family Card PDF is done (2026-10-07, docs/11 FP-ADR-071, docs/06 AUTH-ADR-086): the printable card of the existing ACTIVE Family credential for the household head (GET /api/v1/family/card/pdf, mPDF ^8.3 with bundled IBM Plex Sans Arabic). Presentation / export only — no new credential or lifecycle, no migration, no permission change. PWA-8 numbering unchanged. PWA-8.4 (Staff PDF / reprint, open-record, card-number search) stays deferred and needs its own decision; a wallet-size layout stays optional.
 
@@ -5021,6 +5030,7 @@ Date: 2026-09-24
 | 1.2.50 | 2026-10-07 | Approved | PWA-3B.7 done: needs (every status, FULFILLED ≠ delivery) and received assistance (non-reversed INTERNAL deliveries with the full package) read visibility on two self-scoped endpoints and `/family/household/support`; no migration, no pagination in V1 (RM-ADR-052). PWA-3B complete after verification |
 | 1.2.51 | 2026-10-07 | Approved | PWA-8 pulled forward (phase numbers unchanged); PWA-8.2 done: Family-subject Digital Family Card, `digital_credentials`, public verification, /family/card, Staff panel, permissions seeded; one additive migration (RM-ADR-053). PWA-8.3 (PDF) next |
 | 1.2.52 | 2026-10-07 | Approved | PWA-8.3 done: Digital Family Card PDF for the household head (existing ACTIVE credential only, mPDF ^8.3, bundled IBM Plex Sans Arabic, in memory); no migration (RM-ADR-054). PWA-8.4 deferred |
+| 1.2.53 | 2026-10-07 | Approved | PWA-5 slicing (RM-ADR-055); PWA-5a done: Change Request foundation — tables, CHECKs, append-only workflow events, transition table, recorder, permissions; no route, UI or request type; PWA-4 stays after PWA-6 |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

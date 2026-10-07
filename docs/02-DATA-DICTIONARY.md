@@ -2766,6 +2766,22 @@ RecordPersonDeathAction
 
 The Change Request itself must not contain arbitrary database mutation logic.
 
+**Implemented 2026-10-07 (PWA-5a, DD-ADR-034).** `change_requests` also holds
+`uuid` (the public identifier), `type` (a code of the approved base list —
+the PFP-008 proposals are not codes), `payload_version`,
+`target_membership_id`, `base_fingerprint` / `base_key_version` (never
+returned), `submitted_by_person_id`, `client_reference`,
+`rejection_reason_code` (INSUFFICIENT_INFORMATION, CANNOT_VERIFY,
+DATA_ALREADY_CORRECT, DUPLICATE_REQUEST, DATA_CHANGED, NO_LONGER_APPLICABLE,
+OTHER), `cancelled_by` / `cancelled_at` and `apply_failure_count` /
+`last_apply_failed_at`; `rejection_reason` is the family-visible message.
+Status adds **CANCELLED** (the requester withdrew the request before
+approval). `workflow_events` records each transition: from / to status,
+event type (SUBMITTED, REVIEW_STARTED, RETURNED, RESUBMITTED, APPROVED,
+REJECTED, APPLIED, APPLY_FAILED, CANCELLED), actor and actor side,
+reason code, family-visible `public_message`, Staff-only `internal_note`,
+allow-listed metadata codes; never payload copies.
+
 ---
 
 # 58. Change Request Supporting Documents
@@ -3973,6 +3989,10 @@ Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIE
 
 Registered Members (`registered_member_count`) are ACTIVE memberships whatever the Person's life status, activity or soft-deleted state; Living Members (not DECEASED, not soft-deleted) is the targeting and health-summary population; "Registered Household Size" is superseded (§20a, §75). Family Profile Review (derived completeness and states, stored confirmations with a keyed fingerprint, no registry copy) is distinct from Staff Family Verification (§45a; docs/11 FP-ADR-056, FP-ADR-057).
 
+### DD-ADR-034
+
+Change Request data as implemented by PWA-5a (§49–§57): a public `uuid` and the human `request_code`; a checked type code; the targeted membership; a base fingerprint for stale-write protection; rejection reason codes separate from the family-visible message; the CANCELLED status; and `workflow_events` with separate family-visible and Staff-only text. Proposed values (`submitted_data`) are immutable after submission.
+
 ---
 
 # 92. Pending Data Decisions
@@ -4208,6 +4228,7 @@ Date: 2026-09-24
 | 1.2.32 | 2026-10-04 | Approved | Documentation consolidation: §20a Registered Members (active memberships, any life status) and Living Members replace Registered Household Size; §75 wording; §45a Family Profile Review and Staff Family Verification separated (DD-ADR-033; docs/11 FP-ADR-056, FP-ADR-057) |
 | 1.2.33 | 2026-10-05 | Approved | FU-10: §10 death writes scoped — `RecordPersonDeathAction` changes an EXISTING Person to DECEASED; import creation may create DECEASED; no path back to ALIVE. §20a stale-write refusal and Staff declaration sources. No data-model change |
 | 1.2.34 | 2026-10-07 | Approved | PWA-8.2: §45a Digital Household Head Card amended to the Family-subject Digital Family Card; new §45c `digital_credentials` (docs/11 FP-ADR-070) |
+| 1.2.35 | 2026-10-07 | Approved | PWA-5a: §57 Change Request data as implemented — uuid, type code, target membership, base fingerprint, rejection reason codes, CANCELLED, workflow event fields (DD-ADR-034) |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

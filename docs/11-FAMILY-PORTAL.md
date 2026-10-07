@@ -925,6 +925,11 @@ The Staff review workspace (queue, request detail, clarification,
 approve, reject, apply) is delivered in the Staff application as part of
 PWA-5.
 
+**Amended 2026-10-07 (FP-ADR-072, PWA-5a).** The lifecycle adds CANCELLED
+(the requester withdraws before approval); no V1 request starts as DRAFT.
+The foundation (tables, state machine, permissions) exists; requests become
+submittable with PWA-6.1.
+
 ---
 
 # 18. Digital Household Head Card
@@ -1650,8 +1655,8 @@ already defines them.
 | Family Profile Review — confirmations | `family_profile_confirmations` (append-only; keyed fingerprint, no registry copy) | Approved concept, not built |
 | Staff Family Verification | Verification state, version, verifier, timestamps, history | Deferred (PFP-017); names not fixed |
 | Coordinator scope assignment | User ↔ Clan / Branch Group / Branch assignment, audited | New; names not fixed |
-| Change Request and types | `change_requests`, `change_request_types` — docs/04 §36–§37 | Documented, not built |
-| Workflow history | `workflow_events` — docs/04 §33 | Documented, not built |
+| Change Request and types | `change_requests` (types are a code registry, no type table) — docs/04 §37, DB-ADR-058 | Built (PWA-5a), no request type yet |
+| Workflow history | `workflow_events` — docs/04 §33, append-only by trigger | Built (PWA-5a) |
 | Evidence documents | `documents` — docs/04 §44 | Documented, not built |
 | Card credential and issuance | Public holder ID, verification credential, status, issue/revoke history | New; names not fixed |
 | Announcement | Sender, sender context, audience definition, content | New; names not fixed |
@@ -3300,6 +3305,27 @@ layout (deferred).
   A manual Arabic rendering check (devices, viewers, printing, QR scan)
   is part of the Production verification (docs/08).
 
+## PWA-5a implementation record — Change Request foundation
+
+Implemented 2026-10-07 (FP-ADR-072; docs/05 WF-ADR-049, docs/04 DB-ADR-058,
+docs/06 AUTH-ADR-087). Foundation only: no controller, route, UI, Domain
+Action or request type; Family Auth, PWA-3B and the Digital Card unchanged.
+
+- **Schema:** `change_requests` and `workflow_events` (two additive
+  migrations); PostgreSQL CHECKs per status, the `change_request_code_seq`
+  sequence and the append-only trigger on `workflow_events`.
+- **Code:** `ChangeRequest` and `WorkflowEvent` models (proposal immutable
+  after submission, finished requests immutable, never deleted; events
+  never updated or deleted); enums `ChangeRequestStatus`,
+  `ChangeRequestType`, `ChangeRequestRejectionReason`, `WorkflowEventType`,
+  `WorkflowActorSide`; `ChangeRequestTransitions` (the one state machine),
+  `WorkflowEventRecorder` (the only event writer), `ChangeRequestCodes`;
+  `FingerprintContext::CHANGE_REQUEST_BASE` on the existing Family Auth key.
+- **Permissions:** `change-request.cancel` (FAMILY_USER); the Staff review
+  set for SUPER_ADMIN, ADMINISTRATOR and REVIEWER (AUTH-ADR-087).
+- **Tests:** transitions, enums, model, recorder and permissions on every
+  driver; CHECKs, sequence, indexes and the trigger on PostgreSQL.
+
 ---
 
 # 31. Amendment Register
@@ -4027,6 +4053,31 @@ Digital Family Card PDF (PWA-8.3 — approved 2026-10-07).
   famboook-family-card-{credential_number}.pdf;
 - no Staff PDF / reprint (Staff never receive a token, QR or verification
   URL): PWA-8.4.
+
+FP-ADR-072
+Change Request foundation for the Family Portal (PWA-5a — approved
+2026-10-07).
+- the approved order is kept: PWA-5 → first PWA-6 types → PWA-4; nothing of
+  PWA-4 is built, and PWA-5 keeps it possible (ChangeRequestStatus::open()
+  is the PENDING population: SUBMITTED, UNDER_REVIEW,
+  RETURNED_FOR_CLARIFICATION, RESUBMITTED and APPROVED — DRAFT excluded);
+- family-side transitions: submit (a request is created SUBMITTED, never
+  DRAFT), resubmit with a text response only, and cancel until approval
+  (CANCELLED); the family never reviews, returns, approves, rejects or
+  applies (WF-INV-026);
+- visibility is Family-subject: the current eligible household head sees
+  the Family's whole request history, including requests of a previous
+  head; reads use family.context and ownership, never change-request.view
+  (FU-04 resolved);
+- a request names a household member by member_ref (FP-ADR-063); the
+  server stores the internal membership id; requests are addressed by uuid
+  and shown with the CRQ-000001 reference, never the internal id;
+- family-visible text (clarification request, family response, rejection
+  message) is separate from Staff-only notes; payloads are never copied
+  into events or logs and are masked in presentation (no application-level
+  payload encryption in V1);
+- «+», «طلباتي» and the quick actions stay disabled until PWA-6.1;
+  coordinator-submitted requests are deferred.
 ```
 
 ---
@@ -4184,7 +4235,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-01 | **Head Succession.** `RecordPersonDeathAction` does not handle household-head succession and no household-head change action exists; 38 families currently have a deceased head and therefore no eligible user | **Rollout gate**: must be resolved before general Family Portal rollout; not part of PWA-1 (PFP-012) |
 | FU-02 | **Answered 2026-10-04:** `UpdateFamilyResidenceAction` corrects the current residence in place; no Domain Action records a move with history (`residence.change`). RESIDENCE_UPDATE V1 is a correction (FP-ADR-059) | A move with history needs a future `residence.change` action |
 | FU-03 | Production runs `QUEUE_CONNECTION=sync` with no worker. SMS no longer needs one (TweetsMS, after the response — FP-ADR-051); the provider is integrated but must be configured and validated on the server | **Production activation gate** (§30a, docs/08 §16a); fan-out PWA-9 (PFP-019) |
-| FU-04 | docs/06 §53 gives FAMILY_USER "scoped view access" to Change Requests; the seeder grants no view permission | PWA-5 |
+| FU-04 | **Resolved 2026-10-07 (FP-ADR-072, docs/06 AUTH-ADR-087).** docs/06 §53 "scoped view access" is the Family boundary (`family-portal.access`, `family.context`, Family ownership), not `change-request.view`, which stays Staff-only | Done |
 | FU-05 | AUTH-ADR-060 is referenced in docs/03, docs/06 and docs/07 but has no entry in the docs/06 decision list | Next docs/06 maintenance |
 | FU-06 | "Document Status" version blocks are stale relative to the change logs (e.g. docs/03) | Next documentation maintenance |
 | FU-07 | **Resolved 2026-10-04 (FP-ADR-060).** UNKNOWN life status comes from import: spouses are always created UNKNOWN, and a household head is UNKNOWN when the source life-status cell is empty. An UNKNOWN head is not eligible (ALIVE only) and cannot reach the Family Portal, so it is confirmed only by Staff (`POST /api/v1/people/{person}/confirm-alive`, `person.record-death`, verification method required). `ConfirmPersonAliveAction` is the only UNKNOWN → ALIVE path; `UpdatePersonAction` never writes life status | Done; family CONFIRM_ALIVE requests with the Change Request engine (PWA-6) |
@@ -4234,3 +4285,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.26 | 2026-10-07 | Approved | PWA-3B.7 needs and received assistance read visibility (FP-ADR-069): GET /api/v1/family/household/needs and /assistance (no client identifier, allow-lists, no-store, private); /family/household/support from «أسرتي» with independent sections; FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family; empty means nothing registered; §23a NEEDS / ASSISTANCE as implemented; implementation record in §30a. No migration |
 | 1.27 | 2026-10-07 | Approved | PWA-8.2 Digital Family Card (FP-ADR-070, supersedes FP-ADR-017 in part; §31 A-19): Family-subject credential, `digital_credentials`, FC- card number ≠ family_code ≠ QR token, lazy + Staff issuance, revoke / reissue, public /verify/{token} with browser POST and one generic failure, /family/card, Staff panel; §18 and §19 annotated; PFP-010 and PFP-018 resolved; implementation record in §30a. PDF (PFP-011) is PWA-8.3 |
 | 1.28 | 2026-10-07 | Approved | PWA-8.3 Digital Family Card PDF (FP-ADR-071): GET /api/v1/family/card/pdf for the existing ACTIVE credential only (no issuance, owner only, 404 / 409, no-store), mPDF ^8.3 (GPL-2.0-only, server-side) with bundled IBM Plex Sans Arabic (OFL), shared FamilyCardView, in-memory generation, no download audit; PFP-011 resolved; §20 annotated; implementation record in §30a |
+| 1.29 | 2026-10-07 | Approved | PWA-5a Change Request foundation (FP-ADR-072): approved order kept (PWA-4 after PWA-6); family-side transitions and CANCELLED; Family-subject request visibility; member_ref targets; separate family / Staff text; «+» and «طلباتي» stay disabled until PWA-6.1; §17, §28 and FU-04 updated; implementation record in §30a |

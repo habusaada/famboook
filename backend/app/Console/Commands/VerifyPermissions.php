@@ -55,15 +55,22 @@ class VerifyPermissions extends Command
         // Family Portal identity (docs/06 §22b). Mobile trust is granted by
         // SUPER_ADMIN and ADMINISTRATOR only; the COORDINATOR role must not
         // hold assist before coordinator scope authorization exists (PWA-1H).
+        // The Change Request review workspace (AUTH-ADR-087): reviewers can
+        // reject and return as well as approve.
         'REVIEWER' => [
-            'has' => [],
+            'has' => ['change-request.view', 'change-request.review', 'change-request.return', 'change-request.reject',
+                'change-request.approve', 'change-request.apply'],
             'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist',
                 'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
             'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
-                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
+                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
+                // Family reads use family.context, never the Staff queue; a
+                // family never reviews its own request (WF-INV-026).
+                'change-request.view', 'change-request.review', 'change-request.return', 'change-request.approve',
+                'change-request.reject', 'change-request.apply', 'change-request.view-internal-notes'],
         ],
         // A Coordinator is family-side and scope-bound (PWA-1H): summaries in
         // its scope and nothing of the Staff API, review, export or trust.
@@ -73,7 +80,10 @@ class VerifyPermissions extends Command
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
                 'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
-                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
+                'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
+                // COORDINATOR ≠ REVIEWER; coordinator-submitted requests are deferred (AUTH-ADR-087).
+                'change-request.view', 'change-request.create', 'change-request.submit', 'change-request.cancel',
+                'change-request.approve', 'change-request.reject', 'change-request.apply'],
         ],
     ];
 

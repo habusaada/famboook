@@ -17,4 +17,9 @@ enum FingerprintContext: string
     // The Family Portal's opaque household-member reference (FU-13): a
     // membership of a family. Never stored; recomputed on every request.
     case MEMBER_REF = 'famboook.family-portal.member-ref.v1:';
+    // The canonical values a Change Request is based on (PWA-5a, AE-7):
+    // change_requests.base_fingerprint, compared again at approve and apply
+    // so a stale request never overwrites newer data. Never returned to a
+    // client.
+    case CHANGE_REQUEST_BASE = 'famboook.change-request.base.v1:';
 }
