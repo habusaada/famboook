@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1\Family;
 
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureFamilyContext;
+use App\Http\Resources\FamilyHouseholdAssistanceResource;
 use App\Http\Resources\FamilyHouseholdHealthResource;
 use App\Http\Resources\FamilyHouseholdMemberResource;
+use App\Http\Resources\FamilyHouseholdNeedsResource;
 use App\Http\Resources\FamilyHouseholdProfileResource;
 use App\Http\Resources\FamilyHouseholdResource;
 use App\Support\FamilyPortal\HouseholdReadModel;
@@ -52,6 +54,36 @@ class FamilyHouseholdController extends Controller
         return (new FamilyHouseholdHealthResource($this->household->health($context)))
             ->response()
             ->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The household's registered needs, every status (PWA-3B.7). Read-only;
+     * no security event.
+     */
+    public function needs(Request $request): JsonResponse
+    {
+        $context = EnsureFamilyContext::context($request);
+
+        return (new FamilyHouseholdNeedsResource([
+            'family_id' => (int) $context->family->getKey(),
+            'needs' => $this->household->needs($context),
+        ]))->response()->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * Assistance the household actually received: non-reversed INTERNAL
+     * deliveries only (PWA-3B.7). Read-only; no security event.
+     */
+    public function assistance(Request $request): JsonResponse
+    {
+        $context = EnsureFamilyContext::context($request);
+        $deliveries = $this->household->assistance($context);
+
+        return (new FamilyHouseholdAssistanceResource([
+            'family_id' => (int) $context->family->getKey(),
+            'deliveries' => $deliveries,
+            'packages' => $this->household->packages($deliveries),
+        ]))->response()->header('Cache-Control', 'no-store, private');
     }
 
     /** The «أسرتي» profile: family facts and the current residence (PWA-3A Step 4). */

@@ -1,5 +1,12 @@
 import type { FamilyMobileTrustState } from "@/lib/api/family-account";
-import type { DeclarationSource, HealthRecordType } from "@/lib/api/family-household";
+import type {
+  AssistanceCurrency,
+  AssistanceType,
+  DeclarationSource,
+  HealthRecordType,
+  NeedStatus,
+  ReceiptMode,
+} from "@/lib/api/family-household";
 import type { DisplacementStatus, Gender } from "@/lib/types/api/family";
 
 // The Family Portal display vocabulary (docs/11 §23a). A missing value is
@@ -68,3 +75,36 @@ export const healthTypeLabels: Record<HealthRecordType, string> = {
 export function healthStatusLabel(isActive: boolean): string {
   return isActive ? "حالية" : "منتهية";
 }
+
+// Needs and received assistance (PWA-3B.7). Missing records mean nothing is
+// registered — never that the family needs nothing or received nothing.
+export const NO_NEEDS = "لا توجد احتياجات مسجّلة.";
+export const NO_DELIVERIES = "لا توجد مساعدات مستلمة مسجّلة.";
+export const REGISTERED_ONLY_NOTE = "يعرض هذا القسم ما هو مسجّل في Famboook فقط.";
+export const NEED_STATUS_NOTE = "تُحدَّث حالة الاحتياج من إدارة السجل، وهي منفصلة عن سجل المساعدات المستلمة.";
+export const NO_ITEM_DETAILS = "لا توجد تفاصيل عناصر مسجّلة";
+export const FAMILY_TARGET = "الأسرة";
+
+export const needStatusLabels: Record<NeedStatus, string> = {
+  OPEN: "قائم",
+  FULFILLED: "تمت تلبيته",
+  CLOSED: "مغلق",
+};
+
+export const assistanceTypeLabels: Record<AssistanceType, string> = {
+  IN_KIND: "عينية",
+  CASH: "نقدية",
+  SERVICE: "خدمة",
+};
+
+export const receiptModeLabels: Record<ReceiptMode, string> = {
+  PERSONAL: "شخصيًا",
+  DELEGATE: "بالنيابة",
+};
+
+export const currencyLabels: Record<AssistanceCurrency, string> = {
+  ILS: "شيكل",
+  USD: "دولار",
+  JOD: "دينار",
+  EUR: "يورو",
+};

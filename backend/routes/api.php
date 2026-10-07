@@ -105,6 +105,12 @@ Route::prefix('family')->group(function () {
             // parameter — nothing in the request chooses a member or Person.
             Route::get('/household/health', [FamilyHouseholdController::class, 'health']);
 
+            // Needs and received assistance (PWA-3B.7): two separate reads of
+            // this Family's records. No parameter — nothing in the request
+            // chooses a Family, member or Person.
+            Route::get('/household/needs', [FamilyHouseholdController::class, 'needs']);
+            Route::get('/household/assistance', [FamilyHouseholdController::class, 'assistance']);
+
             // Household-member sensitive-value reveal (PWA-3B.4): one field of
             // ANOTHER member, named by the opaque member_ref (FU-13) and
             // resolved only inside this Family — never route-model bound; any

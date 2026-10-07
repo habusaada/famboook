@@ -1018,6 +1018,18 @@ GET  /api/v1/family/me
   summary / abilities, assessment, targeting, activity or audit data.
   `Cache-Control: no-store, private`; a pure read, no security event.
   Coordinator scope never grants or widens it.
+- **`GET /family/household/needs`** and **`GET /family/household/assistance`**
+  (PWA-3B.7, AUTH-ADR-084, §124–§125): two separate reads behind
+  `auth:sanctum`, `family.side`, `can:family-portal.access` and
+  `family.context`; no route parameter and no Family, Person or member
+  identifier is read from the request; `Cache-Control: no-store, private`;
+  pure reads, no activity or security event; coordinator scope never widens
+  them. Needs: every `family_needs` row of the context Family (OPEN,
+  FULFILLED, CLOSED) with category, title, quantity, unit, status,
+  created_at, resolved_at and the person. Assistance: only
+  `assistance_deliveries` with `reversed_at IS NULL` of INTERNAL Assistances
+  whose beneficiary belongs to the context Family, with the full package
+  (docs/03 §47e). Family-specific allow-lists; no pagination in V1.
 - **Activation gate.** `family.activation` runs first on the four
   activation routes: while `family_auth.activation_enabled` is false they
   answer 503 `ACTIVATION_UNAVAILABLE` with no lookup, event or SMS.
@@ -3762,6 +3774,10 @@ title, quantity, unit, status, created_at, resolved_at, related person
 name. HIDDEN: priority, description, closure_reason, source assessment,
 resolved_by and internal ids. Seeing a need is not mutating it.
 
+**As implemented 2026-10-07 (PWA-3B.7, AUTH-ADR-084).** `GET
+/api/v1/family/household/needs` (§22b): every status as history; FULFILLED
+is a registry status and never proof of an assistance delivery.
+
 ---
 
 # 125. Assistance Portal Visibility
@@ -3778,6 +3794,12 @@ source, targeting criteria, beneficiary statuses, approval / rejection /
 not-delivered decisions and reasons, export fields, beneficiary-list
 snapshots, Staff notes, reversal internals. Nothing is presented as an
 eligibility signal. Assessments (ratings, results, notes) stay HIDDEN.
+
+**As implemented 2026-10-07 (PWA-3B.7, AUTH-ADR-084).** `GET
+/api/v1/family/household/assistance` (§22b): only non-reversed INTERNAL
+deliveries count as received; nominations, approvals, NOT_DELIVERED,
+rejections, removals and issued EXTERNAL lists never do. History stays with
+the beneficiary's Family.
 
 ---
 
@@ -4308,6 +4330,9 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+### AUTH-ADR-084
+Family needs and received assistance (2026-10-07, PWA-3B.7, docs/11 FP-ADR-069): no permission or role added or seeded. `GET /api/v1/family/household/needs` and `GET /api/v1/family/household/assistance` are two separate reads behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`; they take no parameter and no client Family / Person identifier, answer `no-store, private`, write nothing and record no security event; coordinator scope never widens them. Needs and assistance are independent domains: a FULFILLED need is never proof of a delivery. Only an `assistance_deliveries` row with `reversed_at IS NULL` of an INTERNAL Assistance is a receipt; targeting, nominations and approvals stay internal. History stays with the recorded Family; former or deceased Persons keep their names, soft-deleted Persons are unavailable. Family-specific allow-lists; no pagination in V1. Corrections remain PWA-5.
+
 ### AUTH-ADR-083
 Family household health (2026-10-06, PWA-3B.6, docs/11 FP-ADR-068): no permission or role added or seeded. `GET /api/v1/family/household/health` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no parameter and no client identifier, and answers `no-store, private` with the registered health facts (type, disability type code and name, condition_name, started_at, ended_at, is_active) of the resolved Family's ACTIVE members — head and deceased members included, soft-deleted Persons and ended memberships excluded — grouped by `member_ref`. Health is Person-based; closed records stay visible as history; `details` and all Staff / internal metadata stay hidden; no security event for this ordinary read. Coordinator scope never grants Family health access. Corrections remain the Change Request engine (PWA-5).
 
@@ -4728,6 +4753,7 @@ Date: 2026-09-24
 | 1.2.45 | 2026-10-06 | Approved | FU-15 (AUTH-ADR-081): §22b Staff Mobile Trust UI on the Person profile — card, grant and revoke gated by `person-mobile-trust.view` / `.grant` / `.revoke`; `UNAVAILABLE` state documented; REVOKED never revived, grant = new row for the current mobile, SELF_OTP never a Staff method, revoke ≠ account or session end. No permission, role or mapping change |
 | 1.2.46 | 2026-10-06 | Approved | PWA-3B.5 (AUTH-ADR-082): §22b `GET /api/v1/family/account` — self only, `family.context`, `no-store, private`, activation date and current mobile trust state with the Family mask; `/family/me` unchanged; Account Recovery not an account setting; authenticated change password a future item. No permission seeded |
 | 1.2.47 | 2026-10-06 | Approved | PWA-3B.6 (AUTH-ADR-083): §22b `GET /api/v1/family/household/health` — self household only, no client identifier, active memberships, allow-listed health facts grouped by `member_ref`, `no-store, private`, no security event; §123 as implemented (`details` hidden, history visible). No permission seeded |
+| 1.2.48 | 2026-10-07 | Approved | PWA-3B.7 (AUTH-ADR-084): §22b `GET /api/v1/family/household/needs` and `/assistance` — self household only, no client identifier, allow-lists, `no-store, private`, no security event; §124–§125 as implemented (FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family). No permission seeded |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

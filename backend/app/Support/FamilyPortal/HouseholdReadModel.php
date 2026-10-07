@@ -2,11 +2,15 @@
 
 namespace App\Support\FamilyPortal;
 
+use App\Models\AssistanceDelivery;
+use App\Models\AssistanceItem;
 use App\Models\Family;
 use App\Models\FamilyMembership;
+use App\Models\FamilyNeed;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as BaseCollection;
 
 /**
  * Read-only queries behind the Family Portal household views (PWA-3A). Every
@@ -204,6 +208,123 @@ final class HouseholdReadModel
             ->orderByDesc('person_health_records.started_at')
             ->orderBy('person_health_records.id')
             ->get();
+    }
+
+    /**
+     * Household needs (PWA-3B.7, docs/11 §23a): every family_needs row of the
+     * resolved Family — OPEN, FULFILLED and CLOSED alike (resolved needs are
+     * history). A Need belongs to its Family for good; its Person, if any,
+     * may since have left or died (the name stays) or been soft-deleted
+     * (unavailable). member_ref only while that Person still has an ACTIVE
+     * membership in this Family. One query.
+     *
+     * Order: OPEN first; created_at newest first; the need id. No id is
+     * exposed.
+     *
+     * @return Collection<int, FamilyNeed>
+     */
+    public function needs(FamilyAccessResult $context): Collection
+    {
+        $familyId = $context->family->getKey();
+
+        return FamilyNeed::query()
+            ->where('family_needs.family_id', $familyId)
+            ->join('need_categories', 'need_categories.id', '=', 'family_needs.need_category_id')
+            // Plain joins: a soft-deleted Person is kept, as unavailable.
+            ->leftJoin('persons', 'persons.id', '=', 'family_needs.person_id')
+            ->leftJoin('family_memberships as current_membership', fn ($join) => $join
+                ->on('current_membership.person_id', '=', 'family_needs.person_id')
+                ->where('current_membership.family_id', $familyId)
+                ->where('current_membership.is_active', true))
+            ->select([
+                'family_needs.status',
+                'family_needs.title',
+                'family_needs.quantity',
+                'family_needs.unit',
+                'family_needs.created_at',
+                'family_needs.resolved_at',
+                'family_needs.person_id',
+                'need_categories.code as category_code',
+                'need_categories.name as category_name',
+                'persons.full_name as person_full_name',
+                'persons.deleted_at as person_deleted_at',
+                // For the opaque member_ref (FU-13) only; never returned.
+                'current_membership.id as current_membership_id',
+            ])
+            ->orderByRaw("CASE WHEN family_needs.status = 'OPEN' THEN 0 ELSE 1 END")
+            ->orderByDesc('family_needs.created_at')
+            ->orderByDesc('family_needs.id')
+            ->get();
+    }
+
+    /**
+     * Received assistance (PWA-3B.7, docs/03 §47e): the NON-REVERSED
+     * deliveries of INTERNAL Assistances to beneficiaries of the resolved
+     * Family. Nothing else is a receipt — not a nomination, an approval, a
+     * NOT_DELIVERED decision, an issued EXTERNAL list or a program's status.
+     * The delivery belongs to the beneficiary's Family for good: a head
+     * change, a member leaving or dying moves nothing. One query.
+     *
+     * Order: delivered_at newest first; the delivery id. No id is exposed.
+     *
+     * @return Collection<int, AssistanceDelivery>
+     */
+    public function assistance(FamilyAccessResult $context): Collection
+    {
+        $familyId = $context->family->getKey();
+
+        return AssistanceDelivery::query()
+            ->join('assistance_beneficiaries', 'assistance_beneficiaries.id', '=', 'assistance_deliveries.assistance_beneficiary_id')
+            ->join('assistances', 'assistances.id', '=', 'assistance_beneficiaries.assistance_id')
+            ->join('assistance_categories', 'assistance_categories.id', '=', 'assistances.assistance_category_id')
+            // Plain joins: soft-deleted Persons are kept, as unavailable.
+            ->leftJoin('persons as beneficiary_person', 'beneficiary_person.id', '=', 'assistance_beneficiaries.person_id')
+            ->leftJoin('family_memberships as current_membership', fn ($join) => $join
+                ->on('current_membership.person_id', '=', 'assistance_beneficiaries.person_id')
+                ->where('current_membership.family_id', $familyId)
+                ->where('current_membership.is_active', true))
+            ->join('persons as recipient', 'recipient.id', '=', 'assistance_deliveries.recipient_person_id')
+            ->where('assistance_beneficiaries.family_id', $familyId)
+            ->whereNull('assistance_deliveries.reversed_at')
+            ->where('assistances.execution_mode', 'INTERNAL')
+            ->select([
+                'assistance_deliveries.delivered_at',
+                'assistance_deliveries.receipt_mode',
+                // For the package and the opaque member_ref only; never returned.
+                'assistances.id as assistance_id',
+                'assistances.title as assistance_title',
+                'assistances.assistance_type',
+                'assistances.provider_name',
+                'assistance_categories.code as category_code',
+                'assistance_categories.name as category_name',
+                'assistance_beneficiaries.person_id as beneficiary_person_id',
+                'beneficiary_person.full_name as beneficiary_full_name',
+                'beneficiary_person.deleted_at as beneficiary_deleted_at',
+                'current_membership.id as current_membership_id',
+                'recipient.full_name as recipient_full_name',
+                'recipient.deleted_at as recipient_deleted_at',
+            ])
+            ->orderByDesc('assistance_deliveries.delivered_at')
+            ->orderByDesc('assistance_deliveries.id')
+            ->get();
+    }
+
+    /**
+     * The package of each Assistance (docs/03 §47e: one delivery = every
+     * item in its planned quantity; items are locked once the Assistance
+     * leaves DRAFT, before any delivery can exist).
+     *
+     * @param  Collection<int, AssistanceDelivery>  $deliveries
+     * @return BaseCollection<int, Collection<int, AssistanceItem>> keyed by assistance id
+     */
+    public function packages(Collection $deliveries): BaseCollection
+    {
+        return AssistanceItem::query()
+            ->whereIn('assistance_id', $deliveries->pluck('assistance_id')->unique()->values())
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['assistance_id', 'item_name', 'quantity_per_beneficiary', 'unit', 'unit_value', 'currency'])
+            ->groupBy('assistance_id');
     }
 
     /** The authoritative population: the resolved Family's ACTIVE memberships. */

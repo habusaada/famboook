@@ -59,7 +59,7 @@ describe("the page", () => {
     expect(paths.join(" ")).not.toMatch(/family_id|residence_id|declaration_id|person_id|\?/);
   });
 
-  it("has one h1 «أسرتي» with the family code (LTR) beside it, and four section headings", async () => {
+  it("has one h1 «أسرتي» with the family code (LTR) beside it, and five section headings", async () => {
     const { container } = renderHousehold();
     await info();
 
@@ -71,6 +71,7 @@ describe("the page", () => {
       "الإقرار الأسري الحالي",
       "السكن",
       "أفراد الأسرة",
+      "الاحتياجات والمساعدات",
     ]);
   });
 });

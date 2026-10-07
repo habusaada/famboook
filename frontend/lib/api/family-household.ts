@@ -115,6 +115,8 @@ export const FAMILY_HOUSEHOLD_QUERY_KEY = ["family", "household"] as const;
 export const FAMILY_MEMBERS_QUERY_KEY = ["family", "household", "members"] as const;
 export const FAMILY_PROFILE_QUERY_KEY = ["family", "household", "profile"] as const;
 export const FAMILY_HEALTH_QUERY_KEY = ["family", "household", "health"] as const;
+export const FAMILY_NEEDS_QUERY_KEY = ["family", "household", "needs"] as const;
+export const FAMILY_ASSISTANCE_QUERY_KEY = ["family", "household", "assistance"] as const;
 
 /**
  * The session/access flow for a Family data request. An expired session
@@ -229,4 +231,86 @@ export function useFamilyHouseholdHealthQuery() {
 /** The records of ONE member, by member_ref only; [] when nothing is registered. */
 export function healthRecordsOf(health: FamilyHouseholdHealth, memberRef: string): FamilyHealthRecord[] {
   return health.members.find((member) => member.member_ref === memberRef)?.records ?? [];
+}
+
+// ------------------------------------------------------- needs / assistance
+
+/**
+ * A Person named on a historical household record (PWA-3B.7): a member who
+ * has since left or died keeps the name; member_ref only while still an
+ * active member; a removed Person is unavailable, with no name.
+ */
+export type FamilyRecordPerson = { member_ref: string | null; full_name: string | null; available: boolean };
+
+export type NeedStatus = "OPEN" | "FULFILLED" | "CLOSED";
+
+/**
+ * One registered need. FULFILLED is a registry status — never proof that
+ * assistance was delivered. person null = the whole family. NULL stays NULL.
+ */
+export type FamilyNeed = {
+  category: { code: string; name: string };
+  title: string;
+  /** A trimmed decimal ("2", "2.5"). */
+  quantity: string | null;
+  unit: string | null;
+  status: NeedStatus;
+  created_at: string;
+  resolved_at: string | null;
+  person: FamilyRecordPerson | null;
+};
+
+export type AssistanceType = "IN_KIND" | "CASH" | "SERVICE";
+export type ReceiptMode = "PERSONAL" | "DELEGATE";
+export type AssistanceCurrency = "ILS" | "USD" | "JOD" | "EUR";
+
+/** One item of the delivered package (one delivery = the full package). */
+export type FamilyAssistanceItem = {
+  item_name: string;
+  quantity: string | null;
+  unit: string | null;
+  unit_value: string | null;
+  currency: AssistanceCurrency | null;
+};
+
+/** One non-reversed delivery the household received. beneficiary null = the whole family. */
+export type FamilyDelivery = {
+  delivered_at: string;
+  assistance: {
+    title: string;
+    category: { code: string; name: string };
+    type: AssistanceType;
+    provider_name: string;
+    items: FamilyAssistanceItem[];
+  };
+  beneficiary: FamilyRecordPerson | null;
+  receipt_mode: ReceiptMode;
+  recipient: { full_name: string | null; available: boolean };
+};
+
+/** GET /api/v1/family/household/needs — every status; staleTime 0, query cache only. */
+export function useFamilyNeedsQuery() {
+  const query = useQuery({
+    queryKey: FAMILY_NEEDS_QUERY_KEY,
+    queryFn: async () => (await apiClient.get<{ data: { needs: FamilyNeed[] } }>("/api/v1/family/household/needs")).data.needs,
+    staleTime: 0,
+    retry: false,
+  });
+  useFamilyAccessFailure(query.error);
+
+  return query;
+}
+
+/** GET /api/v1/family/household/assistance — received (non-reversed) deliveries; staleTime 0. */
+export function useFamilyAssistanceQuery() {
+  const query = useQuery({
+    queryKey: FAMILY_ASSISTANCE_QUERY_KEY,
+    queryFn: async () =>
+      (await apiClient.get<{ data: { deliveries: FamilyDelivery[] } }>("/api/v1/family/household/assistance")).data.deliveries,
+    staleTime: 0,
+    retry: false,
+  });
+  useFamilyAccessFailure(query.error);
+
+  return query;
 }

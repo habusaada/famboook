@@ -6,7 +6,15 @@ import { apiClient } from "@/lib/api/client";
 import type { CoordinatorContext } from "@/lib/api/coordinator";
 import type { FamilyAccount } from "@/lib/api/family-account";
 import type { FamilyAuthCapabilities, FamilyUser } from "@/lib/api/family-auth";
-import type { FamilyHousehold, FamilyHouseholdHealth, FamilyMember, FamilyMembers, FamilyProfile } from "@/lib/api/family-household";
+import type {
+  FamilyDelivery,
+  FamilyHousehold,
+  FamilyHouseholdHealth,
+  FamilyMember,
+  FamilyMembers,
+  FamilyNeed,
+  FamilyProfile,
+} from "@/lib/api/family-household";
 import type { FamilySelf } from "@/lib/api/family-self";
 
 /** Renders inside a fresh, non-retrying query client. */
@@ -209,12 +217,46 @@ export function familyHealth(members: FamilyHouseholdHealth["members"] = []): Fa
   return { members };
 }
 
+/** A synthetic registered need (PWA-3B.7); nothing here is real data. */
+export function familyNeed(overrides: Partial<FamilyNeed> = {}): FamilyNeed {
+  return {
+    category: { code: "FOOD", name: "الغذاء" },
+    title: "سلة غذائية",
+    quantity: "2",
+    unit: "سلة",
+    status: "OPEN",
+    created_at: "2026-09-30",
+    resolved_at: null,
+    person: null,
+    ...overrides,
+  };
+}
+
+/** A synthetic received delivery (PWA-3B.7); nothing here is real data. */
+export function familyDelivery(overrides: Partial<FamilyDelivery> = {}): FamilyDelivery {
+  return {
+    delivered_at: "2026-09-15",
+    assistance: {
+      title: "سلة رمضان",
+      category: { code: "FOOD", name: "الغذاء" },
+      type: "IN_KIND",
+      provider_name: "جهة تجريبية",
+      items: [{ item_name: "أرز", quantity: "5", unit: "كغ", unit_value: "4.5", currency: "ILS" }],
+    },
+    beneficiary: null,
+    receipt_mode: "PERSONAL",
+    recipient: { full_name: "سالم الاختبار", available: true },
+    ...overrides,
+  };
+}
+
 type Answer = unknown | Error | (() => Promise<unknown>);
 
 /**
  * apiClient.get by path for the Family Portal: /me answers with the user,
  * /household with the summary, /household/members with the members,
- * /household/profile with the «أسرتي» profile, /household/health, /self,
+ * /household/profile with the «أسرتي» profile, /household/health,
+ * /household/needs, /household/assistance, /self,
  * /account and /coordinator/context likewise (or an error to throw, or a function for a
  * custom promise). Any other path fails the test loudly.
  */
@@ -227,6 +269,8 @@ export function familyGet({
   account = familyAccount(),
   coordinator = coordinatorContext(),
   health = familyHealth(),
+  needs = [] as unknown,
+  assistance = [] as unknown,
 }: {
   user?: FamilyUser | Error;
   household?: Answer;
@@ -236,6 +280,8 @@ export function familyGet({
   account?: Answer;
   coordinator?: Answer;
   health?: Answer;
+  needs?: Answer;
+  assistance?: Answer;
 } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
@@ -253,6 +299,12 @@ export function familyGet({
     }
     if (path === "/api/v1/family/household/profile") {
       return typeof profile === "function" || profile instanceof Error ? answer(profile) : { data: profile };
+    }
+    if (path === "/api/v1/family/household/needs") {
+      return typeof needs === "function" || needs instanceof Error ? answer(needs) : { data: { needs } };
+    }
+    if (path === "/api/v1/family/household/assistance") {
+      return typeof assistance === "function" || assistance instanceof Error ? answer(assistance) : { data: { deliveries: assistance } };
     }
     if (path === "/api/v1/family/household/health") {
       return typeof health === "function" || health instanceof Error ? answer(health) : { data: health };

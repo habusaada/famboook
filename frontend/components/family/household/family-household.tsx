@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ChevronLeft, RotateCw, UsersRound } from "lucide-react";
+import { AlertCircle, ChevronLeft, HandHeart, RotateCw, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
@@ -272,6 +272,33 @@ function MembersEntry({ count }: { count: number }) {
   );
 }
 
+/**
+ * The way to «الاحتياجات والمساعدات» (PWA-3B.7). No counts: the page shows
+ * what is registered; a figure here would need its own requests and could
+ * be read as a statement about the family's situation.
+ */
+function SupportEntry() {
+  return (
+    <section className={card} aria-labelledby="household-support-title" data-household-support>
+      <h2 id="household-support-title" className="text-base font-semibold text-foreground">
+        الاحتياجات والمساعدات
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">الاحتياجات المسجّلة للأسرة والمساعدات المستلمة.</p>
+      <Link
+        href="/family/household/support"
+        className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
+        data-support-link
+      >
+        <span className="flex items-center gap-2">
+          <HandHeart className="size-4" aria-hidden />
+          عرض الاحتياجات والمساعدات
+        </span>
+        <ChevronLeft className="size-4" aria-hidden />
+      </Link>
+    </section>
+  );
+}
+
 function HouseholdSkeleton() {
   return (
     <div className="flex flex-col gap-4" data-household-loading>
@@ -337,6 +364,7 @@ export function FamilyHousehold() {
             <Declaration declaration={data.declaration} />
             <Residence residence={data.residence} />
             <MembersEntry count={data.family.registered_member_count} />
+            <SupportEntry />
           </div>
         ) : query.isError ? (
           !isAccessFailure(query.error) && <HouseholdError onRetry={() => query.refetch()} retrying={query.isFetching} />

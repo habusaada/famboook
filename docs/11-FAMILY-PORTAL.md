@@ -1177,7 +1177,8 @@ UPDATE   never directly: corrections and new events are submitted as
                         current declaration, current residence, members
                         entry, household health summary (3B.6)
 أفراد الأسرة            /family/members — list + in-page member detail sheet
-الاحتياجات والمساعدات   recorded needs and received assistance (3B.7)
+الاحتياجات والمساعدات   /family/household/support — recorded needs and
+                        received assistance (3B.7), reached from «أسرتي»
 طلباتي                  PWA-5 / PWA-6
 حسابي                   /family/account — account state (3B.5)
   بياناتي الشخصية        /family/account/me — the head's own Person and
@@ -1240,12 +1241,16 @@ HEALTH        (PWA-3B.6, PFP-006 resolved) structured facts of household
 
 NEEDS         (PWA-3B.7) recorded family needs: category, title, quantity,
               unit, status, created_at, resolved_at, related person name.
+              As implemented (FP-ADR-069): every status as history;
+              FULFILLED is a registry status, never proof of a delivery.
 
 ASSISTANCE    (PWA-3B.7) actual, non-reversed deliveries only: assistance
               title, category, type, provider_name, delivered_at, item
               name, quantity, unit, unit_value, currency, receipt_mode,
               recipient / delegate name. Never presented as an eligibility
-              signal.
+              signal. As implemented (FP-ADR-069): a receipt is only a
+              non-reversed INTERNAL delivery; one delivery = the full
+              package; history stays with the recorded Family.
 
 ACCOUNT       (PWA-3B.5) account active state, activation date, login
               mobile trust summary, roles and capabilities, Coordinator
@@ -3117,6 +3122,70 @@ change.
   the `FamilySideBoundaryTest` inventory. Frontend `family-health.test.tsx`
   and the member-detail groups / requests assertions.
 
+## PWA-3B.7 implementation record — needs and received assistance
+
+Implemented 2026-10-07 (FP-ADR-069). No migration; no role, permission,
+authentication, SMS, FU-14, FU-15 or PWA-3B.1–3B.6 change; no Staff need
+or assistance change.
+
+- **Canonical sources (unchanged):** `family_needs` + `need_categories`; a
+  Need always belongs to a Family and optionally one Person of it (NULL =
+  family-wide); statuses OPEN → FULFILLED | CLOSED, resolved needs are
+  history, nothing is deleted. Assistance: `assistances` (program,
+  category, type, provider_name), `assistance_items` (the package, locked
+  once the Assistance leaves DRAFT), `assistance_beneficiaries`
+  (nominations — never a receipt) and `assistance_deliveries` (the
+  receipt; reversal adds `reversed_*`, rows are never deleted). Needs and
+  assistance are independent: `FulfillNeedAction` creates no delivery and
+  `RecordDeliveryAction` never changes a need.
+- **`GET /api/v1/family/household/needs`:** `{data: {needs: [{category:
+  {code, name}, title, quantity, unit, status, created_at, resolved_at,
+  person}]}}` — every need of the context Family; order OPEN first, then
+  created_at newest first, then the internal id (never serialized);
+  quantity a trimmed decimal.
+- **`GET /api/v1/family/household/assistance`:** `{data: {deliveries:
+  [{delivered_at, assistance: {title, category: {code, name}, type,
+  provider_name, items: [{item_name, quantity, unit, unit_value,
+  currency}]}, beneficiary, receipt_mode, recipient: {full_name,
+  available}}]}}` — only `assistance_deliveries` with `reversed_at IS
+  NULL`, through a beneficiary of the context Family, of an INTERNAL
+  Assistance; never filtered by the program's status; items in sort_order
+  as the delivered package (docs/03 §47e); order delivered_at newest first,
+  then the internal id. No pagination in V1 (object envelope kept for
+  later meta).
+- **Persons on historical records:** `person` / `beneficiary` null = the
+  whole family; otherwise `{member_ref | null, full_name | null,
+  available}` — member_ref only while the Person still has an ACTIVE
+  membership in the Family; a former or deceased Person keeps the name; a
+  soft-deleted Person is `available: false` with no name. History never
+  moves on a head change, a member leaving or dying.
+- **Both endpoints:** `auth:sanctum`, `family.side`,
+  `can:family-portal.access`, `family.context`; no parameter; `no-store,
+  private`; no write, activity or security event; coordinator scope never
+  widens them. Family-specific allow-lists; the Staff `NeedResource` and
+  assistance payloads are not reused.
+- **Frontend `/family/household/support` «الاحتياجات والمساعدات»:** reached
+  from an entry card on «أسرتي» (no counts); «أسرتي» stays the current
+  navigation entry; the note «يعرض هذا القسم ما هو مسجّل في Famboook فقط.».
+  «الاحتياجات المسجّلة»: «قائمة» (OPEN) and «منتهية» (FULFILLED / CLOSED);
+  per need the title, status («قائم» / «تمت تلبيته» / «مغلق»), category,
+  quantity and unit (or «غير مسجّل»), «لمن» («الأسرة», the name, or
+  «بيانات هذا الفرد غير متاحة حاليًا»), «تاريخ التسجيل» and «تاريخ التلبية»
+  / «تاريخ الإغلاق»; the note «تُحدَّث حالة الاحتياج من إدارة السجل، وهي
+  منفصلة عن سجل المساعدات المستلمة.»; empty «لا توجد احتياجات مسجّلة.».
+  «المساعدات المستلمة»: newest first; the title, category, type («عينية» /
+  «نقدية» / «خدمة»), «الجهة المقدّمة», «تاريخ الاستلام», «المستفيد», «استلمها»
+  with «شخصيًا» / «بالنيابة», the items «{item} — {quantity} {unit}» and
+  «قيمة الوحدة: {value} {currency}» (شيكل / دولار / دينار / يورو), «لا توجد
+  تفاصيل عناصر مسجّلة»; empty «لا توجد مساعدات مستلمة مسجّلة.». Each section
+  has its own query (`["family", "household", "needs" | "assistance"]`,
+  staleTime 0), skeleton and error with retry. No add, edit, resolve,
+  reverse or request control.
+- **Tests:** backend `FamilyHouseholdNeedsTest` and
+  `FamilyHouseholdAssistanceTest` (including the real delivery and reversal
+  actions), the `FamilySideBoundaryTest` inventory; frontend
+  `family-support.test.tsx` and the «أسرتي» heading list.
+
 ---
 
 # 31. Amendment Register
@@ -3768,6 +3837,28 @@ Household health read visibility (PWA-3B.6 — approved 2026-10-06).
   with registered data — never a health status, never Staff indicators;
 - no edit or request control: corrections remain PWA-5 (Change Request
   engine); health submissions remain PWA-7.
+
+FP-ADR-069
+Needs and received assistance read visibility (PWA-3B.7 — approved
+2026-10-07).
+- two separate, read-only household endpoints —
+  GET /api/v1/family/household/needs and /assistance — that take no client
+  Family / Person identifier; Family-specific allow-lists; coordinator
+  scope never grants them;
+- needs and received assistance are independent domains: a FULFILLED need
+  is a registry status and never proof that assistance was delivered;
+- only a non-reversed delivery of an INTERNAL Assistance is a receipt (one
+  delivery = the full package); targeting, nominations, approvals,
+  NOT_DELIVERED, rejections, removals and issued EXTERNAL lists stay
+  internal and are never presented as receipts or eligibility;
+- history stays with the recorded Family; former or deceased Persons keep
+  their names; soft-deleted Persons are unavailable;
+- missing records mean "nothing registered", never that the family needs
+  nothing or received nothing;
+- no pagination in V1 (revisit near about 100 deliveries per household);
+  no edit or request control — corrections remain PWA-5;
+- with PWA-3B.7 verified, PWA-3B (Family Portal Full Data Visibility) is
+  complete.
 ```
 
 ---
@@ -3964,3 +4055,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.23 | 2026-10-06 | Approved | FU-15 Staff Mobile Trust Management UI (FP-ADR-066): Staff Person profile card on the existing PWA-1E API — backend state (six states incl. UNAVAILABLE), masked current mobile only, history, grant with the three Staff methods (never SELF_OTP, never a number, always a new row), revoke with a reason code; REVOKED never revived; trust and login lifecycles separate; §33a FU-15. Staff-side only, no Family Portal change, no migration |
 | 1.24 | 2026-10-06 | Approved | PWA-3B.5 «حسابي» (FP-ADR-067): GET /api/v1/family/account (self only, no-store, private; activation date and current mobile trust state with the Family mask); /family/account with identity, access types, owner mobile trust labels (REVOKED «غير موثّق حاليًا»), Coordinator section from the coordinator context, «بياناتي الشخصية» entry and logout; «حسابي» in the navigation; Account Recovery not an account setting; §33a FU-16 Authenticated Change Password; implementation record in §30a. No migration |
 | 1.25 | 2026-10-06 | Approved | PWA-3B.6 household health read visibility (FP-ADR-068): GET /api/v1/family/household/health (no client identifier, active memberships, allow-listed facts by member_ref, no-store, private); «الحالة الصحية» in the member sheet, member-card chip, «أسرتي» count line; empty data never means healthy; history visible; details and Staff metadata hidden; §23a HEALTH as implemented; implementation record in §30a. No migration |
+| 1.26 | 2026-10-07 | Approved | PWA-3B.7 needs and received assistance read visibility (FP-ADR-069): GET /api/v1/family/household/needs and /assistance (no client identifier, allow-lists, no-store, private); /family/household/support from «أسرتي» with independent sections; FULFILLED ≠ delivery; only non-reversed INTERNAL deliveries are receipts; history stays with the Family; empty means nothing registered; §23a NEEDS / ASSISTANCE as implemented; implementation record in §30a. No migration |
