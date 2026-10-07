@@ -53,6 +53,18 @@ enum FamilyActivityType: string
     case FAMILY_CARD_ISSUED = 'FAMILY_CARD_ISSUED';
     case FAMILY_CARD_REVOKED = 'FAMILY_CARD_REVOKED';
     case FAMILY_CARD_REISSUED = 'FAMILY_CARD_REISSUED';
+    // Change Requests (PWA-5b, AE-10): only the business milestones — never
+    // review start, return, resubmission, approval, cancellation or a failed
+    // apply (those are workflow_events only). Metadata: request_type only.
+    case CHANGE_REQUEST_SUBMITTED = 'CHANGE_REQUEST_SUBMITTED';
+    case CHANGE_REQUEST_REJECTED = 'CHANGE_REQUEST_REJECTED';
+    case CHANGE_REQUEST_APPLIED = 'CHANGE_REQUEST_APPLIED';
+
+    /** @return list<self> */
+    public static function changeRequestCases(): array
+    {
+        return [self::CHANGE_REQUEST_SUBMITTED, self::CHANGE_REQUEST_REJECTED, self::CHANGE_REQUEST_APPLIED];
+    }
 
     /** @return list<self> */
     public static function familyCardCases(): array

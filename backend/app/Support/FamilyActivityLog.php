@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\ChangeRequestType;
 use App\Enums\CredentialIssueChannel;
 use App\Enums\CredentialRevokeReason;
 use App\Enums\FamilyActivityType;
@@ -51,6 +52,10 @@ class FamilyActivityLog
         'PERSON_DEATH_RECORDED' => ['verification_method' => LifeStatusVerificationMethod::class],
         'FAMILY_CARD_ISSUED' => ['issue_channel' => CredentialIssueChannel::class],
         'FAMILY_CARD_REVOKED' => ['revoke_reason' => CredentialRevokeReason::class],
+        // PWA-5b: the request type only — never the payload, a message or a value.
+        'CHANGE_REQUEST_SUBMITTED' => ['request_type' => ChangeRequestType::class],
+        'CHANGE_REQUEST_REJECTED' => ['request_type' => ChangeRequestType::class],
+        'CHANGE_REQUEST_APPLIED' => ['request_type' => ChangeRequestType::class],
     ];
 
     /**

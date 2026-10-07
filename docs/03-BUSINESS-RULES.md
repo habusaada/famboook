@@ -2169,6 +2169,19 @@ Duplicate HTTP Request
 - Rejection records a controlled reason code; the family-visible message is
   separate free text; internal notes stay Staff-only (§76).
 
+**Implemented 2026-10-07 (PWA-5b; docs/05 WF-ADR-050).**
+
+- §71: the family's identity and Family come only from the authenticated
+  Family context; the request type's handler validates the input, resolves a
+  member only inside that Family and stores only validated values.
+- §78–§81: approval and application both re-read the registry under lock,
+  re-validate the proposal and its preconditions and compare the base
+  fingerprint; application calls the existing canonical Domain Actions only
+  and commits with APPLIED, or rolls back entirely and stays APPROVED with
+  the failed attempt counted; an APPLIED request is never applied again.
+- A request type exists for the engine only once its handler is registered;
+  no type is registered in Production before PWA-6.
+
 ---
 
 # 82. Add Family Member Request
@@ -5011,6 +5024,7 @@ Date: 2026-09-24
 | 1.2.49 | 2026-10-05 | Approved | FU-10 (docs/11 FP-ADR-061): §30 Staff death recording with an explicit death date and a required verification method, `PERSON_ALREADY_DECEASED`, death irreversible in V1, head death allowed without succession, the import is not a caller (also §96a); §31 DEATH_REPORT direction; §55c stale-write protection and Staff declaration endpoint (`family.update`, Staff sources only); §97a PERSON_DEATH_RECORDED metadata |
 | 1.2.50 | 2026-10-07 | Approved | PWA-8.2 (docs/11 FP-ADR-070): «Card and QR» amended — Family-subject Digital Family Card, head change changes nothing, three distinct identifiers, ACTIVE → REVOKED with reissue as a new credential, live Family validity |
 | 1.2.51 | 2026-10-07 | Approved | PWA-5a: §67–§81 Change Request notes — cancellation until approval, text-only resubmission, base-data conflict refusal at approve and apply, NO_LONGER_APPLICABLE after a refused apply, rejection reason codes (docs/05 WF-ADR-049) |
+| 1.2.52 | 2026-10-07 | Approved | PWA-5b: Change Request engine notes after §81 — trusted family context, handler validation and member resolution, re-validation and base fingerprint at approve / apply, canonical Domain Actions only, rollback or APPLIED, no Production type before PWA-6 (docs/05 WF-ADR-050) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

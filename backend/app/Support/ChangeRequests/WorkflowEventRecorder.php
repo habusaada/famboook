@@ -2,6 +2,7 @@
 
 namespace App\Support\ChangeRequests;
 
+use App\Enums\ChangeRequestApplyFailure;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\WorkflowActorSide;
@@ -22,7 +23,8 @@ use LogicException;
  * It refuses — never repairs — an event that does not fit:
  * - the transition must be in ChangeRequestTransitions, with the event and
  *   actor side it defines, and must match the request's current status;
- * - a rejection carries a reason the transition accepts; nothing else does;
+ * - a rejection carries a reason the transition accepts; a failed apply
+ *   carries its ChangeRequestApplyFailure code; nothing else carries one;
  * - public_message (family-visible) is required to return a request and to
  *   resubmit it, optional on a rejection, refused elsewhere; internal_note
  *   (Staff-only) only on Staff events. Plain text, at most 2000 characters;
@@ -59,7 +61,7 @@ final class WorkflowEventRecorder
         WorkflowEventType $event,
         WorkflowActorSide $actorSide,
         ?int $actorUserId,
-        ?ChangeRequestRejectionReason $reason = null,
+        ChangeRequestRejectionReason|ChangeRequestApplyFailure|null $reason = null,
         ?string $publicMessage = null,
         ?string $internalNote = null,
         array $metadata = [],
@@ -77,10 +79,15 @@ final class WorkflowEventRecorder
             if ($from !== ChangeRequestStatus::APPROVED || $to !== ChangeRequestStatus::APPROVED || $actorSide !== WorkflowActorSide::STAFF) {
                 throw new LogicException('APPLY_FAILED is recorded by Staff on an APPROVED request only.');
             }
-            if ($reason !== null) {
-                throw new InvalidArgumentException('APPLY_FAILED carries no rejection reason.');
+            // PWA-5b: the safe failure code is required — it decides whether
+            // the request may later be rejected as NO_LONGER_APPLICABLE.
+            if (! $reason instanceof ChangeRequestApplyFailure) {
+                throw new InvalidArgumentException('APPLY_FAILED requires its failure code.');
             }
         } else {
+            if ($reason instanceof ChangeRequestApplyFailure) {
+                throw new InvalidArgumentException('A failure code belongs to APPLY_FAILED only.');
+            }
             $transition = ChangeRequestTransitions::assertAllowed($from, $to, $reason);
             if ($transition->event !== $event || $transition->actorSide !== $actorSide) {
                 throw new LogicException('Workflow event does not match the transition: '.$event->value.' by '.$actorSide->value);
@@ -91,8 +98,8 @@ final class WorkflowEventRecorder
             throw new InvalidArgumentException('A family or Staff event needs its acting user.');
         }
 
-        $publicMessage = self::text($publicMessage, 'public_message');
-        $internalNote = self::text($internalNote, 'internal_note');
+        $publicMessage = self::cleanText($publicMessage, 'public_message');
+        $internalNote = self::cleanText($internalNote, 'internal_note');
         if ($publicMessage === null && in_array($event, self::PUBLIC_MESSAGE_REQUIRED, true)) {
             throw new InvalidArgumentException('This event requires a family-visible message: '.$event->value);
         }
@@ -123,8 +130,9 @@ final class WorkflowEventRecorder
     /**
      * Plain text: control and invisible format characters (including bidi
      * overrides) removed, line breaks kept, trimmed, bounded; blank = none.
+     * Public so the Domain Actions validate exactly what will be stored.
      */
-    private static function text(?string $value, string $field): ?string
+    public static function cleanText(?string $value, string $field): ?string
     {
         if ($value === null) {
             return null;

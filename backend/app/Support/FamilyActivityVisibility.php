@@ -33,6 +33,9 @@ class FamilyActivityVisibility
         if (! $user->can('family-card.view')) {
             $hidden = [...$hidden, ...FamilyActivityType::familyCardCases()];
         }
+        if (! $user->can('change-request.view')) {
+            $hidden = [...$hidden, ...FamilyActivityType::changeRequestCases()];
+        }
 
         return $activities->when(
             $hidden !== [],

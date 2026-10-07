@@ -1685,6 +1685,33 @@ APPROVED → APPROVED (APPLY_FAILED)    a refused / failed apply records an even
   (`public_message`) and Staff-only notes (`internal_note`) are separate.
 - The transition Domain Actions, conflict refusal and APPLY are PWA-5b.
 
+**Implemented 2026-10-07 (WF-ADR-050, PWA-5b).** The executable engine — one
+Domain Action per transition (submit, start review, return, resubmit,
+approve, reject, cancel, apply) over the one transition table:
+
+```text
+existing request   lock change_requests row → re-read → check transition
+                   and actor → write → workflow event (→ activity)
+approve / apply    lock request → Family → target Person (the existing
+                   Family → Person order) → re-validate the proposal and
+                   preconditions → recompute the base fingerprint
+apply              … → handler.apply() → existing canonical Domain Action(s)
+                   → APPLIED → APPLIED event → CHANGE_REQUEST_APPLIED, one
+                   transaction; failure = full rollback, then a separate
+                   transaction counts the attempt and records APPLY_FAILED
+submit             lock the Family → client_reference replay check →
+                   preconditions → open-conflict check → base fingerprint
+                   → SUBMITTED + event + CHANGE_REQUEST_SUBMITTED
+```
+
+- A repeated call by the same actor that already made the transition is a
+  replay (nothing written); an APPLIED request is never applied again.
+- APPROVED → REJECTED (NO_LONGER_APPLICABLE) requires that the latest apply
+  attempt was REFUSED (base changed, precondition failed, not applicable);
+  an unexpected failure is retried, never turned into a rejection.
+- FamilyActivity only for submitted, rejected and applied (request type
+  metadata only); everything else is a workflow event only.
+
 ---
 
 # 55. Change Request DRAFT
@@ -3226,6 +3253,9 @@ Family Profile Review is a family workflow separate from Account Verification an
 
 ### WF-ADR-049
 Change Request lifecycle as implemented by PWA-5a (2026-10-07; §54 amended): CANCELLED is added — the family requester may cancel from SUBMITTED, UNDER_REVIEW, RETURNED_FOR_CLARIFICATION or RESUBMITTED, never from APPROVED or a terminal state. APPROVED → REJECTED is allowed only as NO_LONGER_APPLICABLE after an apply attempt was refused (a database CHECK requires the approval and a recorded failed apply). DRAFT stays a valid state but no V1 flow creates one: a request is created directly as SUBMITTED. Resubmission carries a text response only; the proposal is immutable after submission. A refused or failed apply leaves the request APPROVED and records an APPLY_FAILED event. One transition table is authoritative; workflow events are append-only in the model and by a PostgreSQL trigger (owner decision AE-18, strengthened from model-only). No generic maker-checker rule beyond the family / Staff separation in V1.
+
+### WF-ADR-050
+Change Request engine as implemented by PWA-5b (2026-10-07; §54 annotated): eight Domain Actions drive the WF-ADR-049 lifecycle through ChangeRequestTransitions; family transitions take the trusted family.context result and act on requests of that Family (Family-subject), Staff transitions a Staff-side account with the transition's permission. Approve and apply re-validate against fresh canonical state under the request → Family → Person locks and refuse a stale base (CHANGE_REQUEST_BASE_CHANGED); approval changes no canonical data. APPLY is one transaction (canonical Domain Action, APPLIED, APPLIED event, CHANGE_REQUEST_APPLIED); a failure rolls back completely and is then recorded in its own transaction (apply_failure_count, last_apply_failed_at, APPLY_FAILED with a safe ChangeRequestApplyFailure code); a retry runs the whole path again. Same-actor replays and client_reference replays write nothing; a reused client_reference with different material is refused. Request types come only from the ChangeRequestTypes registry, EMPTY in Production until PWA-6.
 ```
 
 ---
@@ -3497,3 +3527,4 @@ Date: 2026-09-24
 | 1.2.15 | 2026-10-06 | Approved | FU-15: §53b Staff mobile trust operation from the Person profile (grant = new row for the current mobile, revoke with a reason, history never revived, login and trust lifecycles separate) (WF-ADR-047) |
 | 1.2.16 | 2026-10-07 | Approved | PWA-8.2: §53a Digital Family Card lifecycle amended (Family subject; ACTIVE → REVOKED; reissue = new credential; head change changes nothing) (WF-ADR-048) |
 | 1.2.17 | 2026-10-07 | Approved | PWA-5a: §54 lifecycle amended — CANCELLED (requester, until approval), APPROVED → REJECTED only as NO_LONGER_APPLICABLE after a refused apply, no V1 DRAFT, text-only resubmission, APPLY_FAILED event, one transition table, append-only workflow events enforced by PostgreSQL (WF-ADR-049) |
+| 1.2.18 | 2026-10-07 | Approved | PWA-5b: §54 engine annotated — one Domain Action per transition, request → Family → Person lock order, re-validation and base fingerprint at approve and apply, single-transaction APPLY with rollback and separately recorded APPLY_FAILED, replays, refused-apply rule for APPROVED → REJECTED, activity boundary, empty Production registry (WF-ADR-050) |

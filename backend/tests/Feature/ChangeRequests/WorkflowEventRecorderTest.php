@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ChangeRequests;
 
+use App\Enums\ChangeRequestApplyFailure;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus as S;
 use App\Enums\WorkflowActorSide;
@@ -95,7 +96,7 @@ class WorkflowEventRecorderTest extends TestCase
         $this->record($this->moveTo($request, ['status' => S::RESUBMITTED]), S::RETURNED_FOR_CLARIFICATION, E::RESUBMITTED, WorkflowActorSide::FAMILY, ['public' => 'العنوان الصحيح في الحي الشمالي.']);
         $this->record($this->moveTo($request, ['status' => S::UNDER_REVIEW]), S::RESUBMITTED, E::REVIEW_STARTED, WorkflowActorSide::STAFF);
         $this->record($this->moveTo($request, ['status' => S::APPROVED, 'approved_by' => $staff, 'approved_at' => now()]), S::UNDER_REVIEW, E::APPROVED, WorkflowActorSide::STAFF);
-        $this->record($request, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF);
+        $this->record($request, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF, ['reason' => ChangeRequestApplyFailure::APPLY_FAILED]);
         $this->record($this->moveTo($request, ['status' => S::APPLIED, 'applied_by' => $staff, 'applied_at' => now()]), S::APPROVED, E::APPLIED, WorkflowActorSide::STAFF);
 
         $this->assertSame(
@@ -186,9 +187,15 @@ class WorkflowEventRecorderTest extends TestCase
     public function test_apply_failed_is_recorded_only_on_an_approved_request(): void
     {
         $approved = ChangeRequest::factory()->approved($this->staff)->create();
-        $event = $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF);
+        $event = $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF, ['reason' => ChangeRequestApplyFailure::PRECONDITION_FAILED]);
         $this->assertSame(S::APPROVED, $event->from_status);
         $this->assertSame(S::APPROVED, $event->to_status);
+        $this->assertSame('PRECONDITION_FAILED', $event->reason_code);
+
+        // PWA-5b: the failure code is required, and belongs to APPLY_FAILED only.
+        $this->refused(fn () => $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF));
+        $this->refused(fn () => $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::STAFF, ['reason' => ChangeRequestRejectionReason::OTHER]));
+        $this->refused(fn () => $this->record(ChangeRequest::factory()->create(), null, E::SUBMITTED, WorkflowActorSide::FAMILY, ['reason' => ChangeRequestApplyFailure::APPLY_FAILED]));
 
         $this->refused(fn () => $this->record(ChangeRequest::factory()->create(), S::SUBMITTED, E::APPLY_FAILED, WorkflowActorSide::STAFF), LogicException::class);
         $this->refused(fn () => $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::FAMILY), LogicException::class);

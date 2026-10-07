@@ -3326,6 +3326,40 @@ Action or request type; Family Auth, PWA-3B and the Digital Card unchanged.
 - **Tests:** transitions, enums, model, recorder and permissions on every
   driver; CHECKs, sequence, indexes and the trigger on PostgreSQL.
 
+## PWA-5b implementation record — Change Request engine
+
+Implemented 2026-10-07 (docs/05 WF-ADR-050, docs/04 DB-ADR-059, docs/06
+AUTH-ADR-088, docs/07 RM-ADR-056). No migration, controller, route, UI or
+request type; the Family Portal is unchanged («+» and «طلباتي» stay disabled).
+
+- **Domain Actions** (`app/Actions/ChangeRequests`): Submit, StartReview,
+  ReturnForClarification, Resubmit, Approve, Reject, Cancel, Apply — each
+  returns a ChangeRequestOutcome (`replayed` when nothing new was written).
+- **Family side:** Submit, Resubmit and Cancel take the trusted
+  FamilyAccessResult; the Family, the submitting User and Person come only
+  from it; members are named by member_ref and resolved inside that Family;
+  a request of another Family does not exist for the caller
+  (CHANGE_REQUEST_NOT_FOUND).
+- **Handler contract** (`ChangeRequestHandler`): familySubmittable,
+  payloadVersion, inputRules / dataRules, resolveTarget, normalize,
+  baseValues, preconditions, apply (canonical Domain Actions only),
+  present (FAMILY / STAFF audience), profileSections (the PWA-4 PENDING
+  mapping: FAMILY, HEAD, MEMBERS, RESIDENCE) and openConflictKey.
+  `ChangeRequestTypes` is the one type → handler registry — EMPTY in
+  Production; `ChangeRequestTypes::fake()` works only in tests.
+- **Submission:** input bounded (16 KB, 4 levels), client_reference replay
+  (same material → the existing request; different → refused), open
+  conflicts refused under the Family lock, base fingerprint on the existing
+  key (FingerprintContext::CHANGE_REQUEST_BASE).
+- **Activity:** CHANGE_REQUEST_SUBMITTED, CHANGE_REQUEST_REJECTED,
+  CHANGE_REQUEST_APPLIED (metadata: request_type only), visible only with
+  change-request.view. The Staff activity timeline needs labels for them
+  before any request can exist in Production (PWA-5d).
+- **Tests:** the engine through a test-only handler (submission, review loop,
+  approval, rejection incl. the refused-apply rule, apply success / rollback /
+  retry / replay, security and privacy, handler boundary) on SQLite, and the
+  row-lock races on PostgreSQL.
+
 ---
 
 # 31. Amendment Register
@@ -4286,3 +4320,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.27 | 2026-10-07 | Approved | PWA-8.2 Digital Family Card (FP-ADR-070, supersedes FP-ADR-017 in part; §31 A-19): Family-subject credential, `digital_credentials`, FC- card number ≠ family_code ≠ QR token, lazy + Staff issuance, revoke / reissue, public /verify/{token} with browser POST and one generic failure, /family/card, Staff panel; §18 and §19 annotated; PFP-010 and PFP-018 resolved; implementation record in §30a. PDF (PFP-011) is PWA-8.3 |
 | 1.28 | 2026-10-07 | Approved | PWA-8.3 Digital Family Card PDF (FP-ADR-071): GET /api/v1/family/card/pdf for the existing ACTIVE credential only (no issuance, owner only, 404 / 409, no-store), mPDF ^8.3 (GPL-2.0-only, server-side) with bundled IBM Plex Sans Arabic (OFL), shared FamilyCardView, in-memory generation, no download audit; PFP-011 resolved; §20 annotated; implementation record in §30a |
 | 1.29 | 2026-10-07 | Approved | PWA-5a Change Request foundation (FP-ADR-072): approved order kept (PWA-4 after PWA-6); family-side transitions and CANCELLED; Family-subject request visibility; member_ref targets; separate family / Staff text; «+» and «طلباتي» stay disabled until PWA-6.1; §17, §28 and FU-04 updated; implementation record in §30a |
+| 1.30 | 2026-10-07 | Approved | PWA-5b Change Request engine: implementation record in §30a — Domain Actions, family-context submissions and Family-subject ownership, handler contract and empty Production registry, replays, activity boundary; Family Portal unchanged |
