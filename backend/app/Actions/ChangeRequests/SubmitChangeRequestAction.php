@@ -61,6 +61,12 @@ class SubmitChangeRequestAction
 
     public function handle(FamilyAccessResult $context, ChangeRequestSubmission $submission): ChangeRequestOutcome
     {
+        // The family submission switch (PWA-5e), checked first and server-side:
+        // nothing is validated, read or written while it is off.
+        if (config('change_requests.family_submission_enabled') !== true) {
+            throw new ChangeRequestException(ChangeRequestException::SUBMISSION_DISABLED);
+        }
+
         $transition = ChangeRequestTransitions::assertAllowed(null, ChangeRequestStatus::SUBMITTED);
         $user = ChangeRequestActors::family($context, $transition);
         /** @var Family $family */

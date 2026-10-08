@@ -166,6 +166,22 @@ class AppServiceProvider extends ServiceProvider
             ['minute', 'hour'],
         ));
 
+        // Family Change Request submissions (PWA-5e): per signed-in user, per
+        // minute and per hour — a new request is reviewed by a person.
+        RateLimiter::for('family-change-request-submit', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('change_requests.family_limits.submit_user_hour'))
+                : Limit::perMinute((int) config('change_requests.family_limits.submit_user_minute')))
+                ->by("family-change-request-submit|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
+            ['minute', 'hour'],
+        ));
+
+        // Family resubmit / cancel (PWA-5e): per signed-in user.
+        RateLimiter::for('family-change-request-action', fn (Request $request) => Limit::perMinute((int) config('change_requests.family_limits.action_user_minute'))
+            ->by("family-change-request-action|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
         // «بطاقة الأسرة الرقمية» PDF (PWA-8.3): per signed-in user — rendering
         // a PDF costs more than the JSON card.
         RateLimiter::for('family-card-pdf', fn (Request $request) => Limit::perMinute((int) config('credentials.pdf.limits.user_minute'))

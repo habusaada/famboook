@@ -54,11 +54,17 @@ class ChangeRequestEngineSecurityTest extends TestCase
         $this->useFamilyAuthKey();
         $this->seed(RolePermissionSeeder::class);
         $context = $this->headContext();
-        try {
-            app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(ChangeRequestType::RESIDENCE_UPDATE, ['x' => 1], null, (string) Str::uuid()));
-            $this->fail('A Production type was submittable');
-        } catch (ChangeRequestException $e) {
-            $this->assertSame(ChangeRequestException::TYPE_UNAVAILABLE, $e->reason);
+        $submit = fn () => app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(ChangeRequestType::RESIDENCE_UPDATE, ['x' => 1], null, (string) Str::uuid()));
+        // PWA-5e: the submission switch is off by default …
+        foreach ([false => ChangeRequestException::SUBMISSION_DISABLED, true => ChangeRequestException::TYPE_UNAVAILABLE] as $enabled => $code) {
+            config(['change_requests.family_submission_enabled' => (bool) $enabled]);
+            try {
+                $submit();
+                $this->fail('A Production type was submittable');
+            } catch (ChangeRequestException $e) {
+                // … and even when it is on, no Production type exists.
+                $this->assertSame($code, $e->reason);
+            }
         }
     }
 

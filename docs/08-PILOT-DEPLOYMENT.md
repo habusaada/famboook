@@ -533,6 +533,14 @@ Family Portal activation may be enabled in Production.
   («لا توجد طلبات تحديث بيانات») — no request type is enabled; DATA_ENTRY,
   SOCIAL_WORKER and REPORTS_VIEWER do not see the entry. Rollback: the
   previous frontend build.
+- **Family Change Request API (PWA-5e, docs/11 FP-ADR-073).** No
+  migration or package. New `.env` key `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`
+  — keep it `false` (or absent) in Production until a request type is
+  approved and enabled (PWA-6.1); `optimize` after any change. Post-deploy:
+  as an activated household head `GET /api/v1/family/change-requests`
+  answers 200 with an empty history and `GET …/types` `{"data": [],
+  "meta": {"submission_enabled": false}}`; a POST answers 503
+  CHANGE_REQUEST_SUBMISSION_DISABLED. Rollback: code only.
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -998,6 +1006,7 @@ Never do this once real data has been entered.
 | 1.1.19 | 2026-10-07 | Approved | §16a: PWA-5a Change Request foundation — two additive migrations (PostgreSQL CHECKs, code sequence, append-only trigger), permission seeding and verify-permissions, PostgreSQL suite before the deploy, code-only rollback; no `.env` change |
 | 1.1.20 | 2026-10-08 | Approved | §16a: PWA-5c Staff Change Request API — no migration or configuration; post-deploy checks (empty queue 200 for a reviewer, 403 family-side, 401 guest); code-only rollback |
 | 1.1.21 | 2026-10-08 | Approved | §16a: PWA-5d Staff review workspace — frontend-only deploy, post-deploy checks (navigation by permission, empty queue), rollback to the previous build |
+| 1.1.22 | 2026-10-08 | Approved | §16a: PWA-5e Family Change Request API — CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED stays false in Production, post-deploy checks, code-only rollback |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

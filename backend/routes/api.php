@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
 use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardPdfController;
+use App\Http\Controllers\Api\V1\Family\FamilyChangeRequestController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -154,6 +155,21 @@ Route::prefix('family')->group(function () {
             // with no side effects, never an issuance. In memory, no-store.
             Route::get('/card/pdf', [FamilyCardPdfController::class, 'show'])
                 ->middleware('throttle:family-card-pdf');
+
+            // Change Requests (PWA-5e; docs/11 FP-ADR-073): the Family's whole
+            // request history (Family-subject), read with family-portal.access;
+            // submit / resubmit / cancel each need their change-request.*
+            // permission and a per-user throttle. A request is looked up inside
+            // this Family only — never route-model bound. /types before {uuid}.
+            Route::get('/change-requests', [FamilyChangeRequestController::class, 'index']);
+            Route::get('/change-requests/types', [FamilyChangeRequestController::class, 'types']);
+            Route::get('/change-requests/{changeRequest}', [FamilyChangeRequestController::class, 'show']);
+            Route::post('/change-requests', [FamilyChangeRequestController::class, 'store'])
+                ->middleware(['can:change-request.submit', 'throttle:family-change-request-submit']);
+            Route::post('/change-requests/{changeRequest}/resubmit', [FamilyChangeRequestController::class, 'resubmit'])
+                ->middleware(['can:change-request.resubmit', 'throttle:family-change-request-action']);
+            Route::post('/change-requests/{changeRequest}/cancel', [FamilyChangeRequestController::class, 'cancel'])
+                ->middleware(['can:change-request.cancel', 'throttle:family-change-request-action']);
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from

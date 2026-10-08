@@ -3262,6 +3262,9 @@ Staff Change Request API as implemented by PWA-5c (2026-10-08): each workflow ro
 
 ### WF-ADR-052
 Staff review workspace as implemented by PWA-5d (2026-10-08): the Staff application presents the Change Request workflow without owning it. Statuses are shown as returned (APPROVED reads «معتمد بانتظار التطبيق», never completed; APPLIED alone is the completed registry update); actions are offered from the API's `available_actions` intersected with the user's permissions and every result is re-read from the server (no optimistic status). Approval states that it changes nothing in the registry and never triggers APPLY. APPLY needs an explicit confirmation, is never retried automatically (mutation retry off), and after a failure the request is re-read so its failure count and code are visible; a retry is a new, explicit Staff action («إعادة محاولة التطبيق»).
+
+### WF-ADR-053
+Family Change Request API as implemented by PWA-5e (2026-10-08): submit, resubmit and cancel are the PWA-5b family Domain Actions behind the family.context boundary. The submission switch is checked first and by the Submit action itself (no new request while off); it never blocks resubmission or cancellation of existing requests or any Staff step. Submission replays (same user, client_reference and material) return the existing request; different material is refused. The family timeline omits APPLY_FAILED diagnostics and internal notes.
 ```
 
 ---
@@ -3536,3 +3539,4 @@ Date: 2026-09-24
 | 1.2.18 | 2026-10-07 | Approved | PWA-5b: §54 engine annotated — one Domain Action per transition, request → Family → Person lock order, re-validation and base fingerprint at approve and apply, single-transaction APPLY with rollback and separately recorded APPLY_FAILED, replays, refused-apply rule for APPROVED → REJECTED, activity boundary, empty Production registry (WF-ADR-050) |
 | 1.2.19 | 2026-10-08 | Approved | PWA-5c: Staff Change Request API over the engine — one Domain Action per route, available_actions as a hint, APPLY without any outer transaction, unregistered types readable but not approvable or appliable (WF-ADR-051) |
 | 1.2.20 | 2026-10-08 | Approved | PWA-5d: Staff review workspace semantics — statuses as returned, APPROVED never shown as complete, actions from available_actions ∩ permissions, no optimistic status, approve never applies, APPLY confirmed explicitly and never auto-retried (WF-ADR-052) |
+| 1.2.21 | 2026-10-08 | Approved | PWA-5e: Family Change Request API — family Domain Actions behind family.context, submission switch for new requests only, replay semantics, family timeline without diagnostics or internal notes (WF-ADR-053) |

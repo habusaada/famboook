@@ -3446,6 +3446,33 @@ request type; the Family Portal is unchanged.
 - **Tests:** `tests/change-requests.test.tsx`,
   `tests/change-request-activity.test.tsx`.
 
+## PWA-5e implementation record — Family Change Request API
+
+Implemented 2026-10-08 (FP-ADR-073; docs/06 AUTH-ADR-091, docs/07
+RM-ADR-059). Backend only — no migration, frontend or request type; the
+Production registry stays empty and the submission switch is off.
+
+| Route (`/api/v1/family`, `auth:sanctum` + `family.side` + `family-portal.access` + `family.context`) | Extra | Domain Action |
+|---|---|---|
+| `GET /change-requests?status=&type=&per_page=` | — | — (history, ≤ 50 per page, newest first) |
+| `GET /change-requests/types` | — | — (discovery) |
+| `GET /change-requests/{uuid}` | — | — (family view) |
+| `POST /change-requests` `{type, client_reference, reason?, data}` | change-request.submit, throttle family-change-request-submit (3 / minute, 20 / hour) | SubmitChangeRequestAction (201; replay 200) |
+| `POST /change-requests/{uuid}/resubmit` `{response}` | change-request.resubmit, throttle family-change-request-action (10 / minute) | ResubmitChangeRequestAction |
+| `POST /change-requests/{uuid}/cancel` | change-request.cancel, same throttle | CancelChangeRequestAction |
+
+- **Outcome:** `{id, request_code, status, replayed}`; every response
+  `Cache-Control: no-store, private`.
+- **Errors:** 401 guest / deactivated; 403 wrong side, no family context or
+  missing permission; 404 unknown or another Family's uuid
+  (CHANGE_REQUEST_NOT_FOUND), unknown member; 409 INVALID_TRANSITION,
+  ALREADY_OPEN, IDEMPOTENCY_CONFLICT; 422 validation, TYPE_UNAVAILABLE,
+  PRECONDITION_FAILED; 429 TOO_MANY_REQUESTS; 503 SUBMISSION_DISABLED.
+- **Available actions:** `resubmit` / `cancel`, from the transition table
+  and the account's permissions — a hint only.
+- **Type labels:** the API returns codes; Arabic wording stays in the
+  client (as for the Staff workspace).
+
 ---
 
 # 31. Amendment Register
@@ -4198,6 +4225,37 @@ Change Request foundation for the Family Portal (PWA-5a — approved
   payload encryption in V1);
 - «+», «طلباتي» and the quick actions stay disabled until PWA-6.1;
   coordinator-submitted requests are deferred.
+
+FP-ADR-073
+Family Change Request API (PWA-5e — approved 2026-10-08).
+- routes under /api/v1/family/change-requests behind auth:sanctum,
+  family.side, family-portal.access and family.context: history (GET),
+  type discovery (GET /types), detail (GET /{uuid}), submit (POST,
+  change-request.submit), resubmit (POST /{uuid}/resubmit,
+  change-request.resubmit), cancel (POST /{uuid}/cancel,
+  change-request.cancel); no review, approval, rejection or apply route;
+- the Family is ONLY the family.context Family; history is Family-subject
+  (every request of the Family, whoever submitted it — a new head sees and
+  may cancel the previous head's open request); a request is looked up
+  inside that Family only, so another Family's uuid is 404;
+- the submission switch CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED (default
+  false) blocks NEW requests only (503 CHANGE_REQUEST_SUBMISSION_DISABLED,
+  before any validation); history, detail, resubmission and cancellation
+  continue; type discovery answers `{data: [], meta: {submission_enabled}}`
+  and lists only registered, family-submittable types while the switch is
+  on and the account holds change-request.submit — empty in Production;
+- family-safe views: the proposal only through the handler's FAMILY
+  presentation; a timeline without internal notes, actor names, metadata or
+  APPLY_FAILED diagnostics; a rejection's reason code and family message
+  only; never submitted_data raw, the base fingerprint, the client
+  reference, apply-failure counts or internal ids;
+- presentation contract (approved for the first handler, PWA-6.1):
+  `{rows: [{label, current, proposed}]}` — Arabic labels and display
+  strings formatted by the handler, ordered, no nested objects, no database
+  keys, null without a registered handler. A server-computed presentation
+  context (audience, canViewSensitiveIdentity, canViewInternalNotes) is a
+  PWA-6.1 prerequisite: the handler contract does not receive the viewer yet,
+  and no permission yet grants full-identity viewing.
 ```
 
 ---
@@ -4409,3 +4467,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.30 | 2026-10-07 | Approved | PWA-5b Change Request engine: implementation record in §30a — Domain Actions, family-context submissions and Family-subject ownership, handler contract and empty Production registry, replays, activity boundary; Family Portal unchanged |
 | 1.31 | 2026-10-08 | Approved | PWA-5c Staff Change Request API: implementation record in §30a — routes and permissions, queue filters, review view and timeline, internal-note visibility, mutation bodies and outcome, error mapping, empty-registry behaviour, PWA-5d activity-label dependency; Family Portal unchanged |
 | 1.32 | 2026-10-08 | Approved | PWA-5d Staff review workspace: implementation record in §30a — queue and review screens, status vocabulary, proposal rendering and the PWA-6.1 presentation-contract proposal, timeline, permission-aware actions, Change Request activity labels; Family Portal unchanged |
+| 1.33 | 2026-10-08 | Approved | PWA-5e Family Change Request API (FP-ADR-073): routes, Family-subject history and isolation, submission switch (default off), type discovery, family-safe views and timeline, approved presentation shape and the PWA-6.1 presentation-context prerequisite; implementation record in §30a |

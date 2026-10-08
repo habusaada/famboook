@@ -36,6 +36,9 @@ class ChangeRequestException extends RuntimeException
     // The acting account is on the wrong side or lacks the transition's permission.
     public const ACTOR_NOT_ALLOWED = 'CHANGE_REQUEST_ACTOR_NOT_ALLOWED';
 
+    // PWA-5e: the family submission switch is off (no NEW request).
+    public const SUBMISSION_DISABLED = 'CHANGE_REQUEST_SUBMISSION_DISABLED';
+
     private const MESSAGES = [
         self::INVALID_TRANSITION => 'لا يمكن تنفيذ هذا الإجراء على الطلب في حالته الحالية.',
         self::TYPE_UNAVAILABLE => 'هذا النوع من الطلبات غير متاح حاليًا.',
@@ -47,6 +50,7 @@ class ChangeRequestException extends RuntimeException
         self::APPLY_FAILED => 'تعذّر تطبيق الطلب على السجل حاليًا. يمكن إعادة المحاولة.',
         self::IDEMPOTENCY_CONFLICT => 'رقم مرجع الطلب مستخدم لطلب مختلف.',
         self::ACTOR_NOT_ALLOWED => 'لا تملك صلاحية تنفيذ هذا الإجراء على الطلب.',
+        self::SUBMISSION_DISABLED => 'تقديم طلبات تحديث البيانات غير متاح حاليًا.',
     ];
 
     public function __construct(public readonly string $reason)
@@ -61,6 +65,7 @@ class ChangeRequestException extends RuntimeException
             self::TYPE_UNAVAILABLE, self::PRECONDITION_FAILED, self::NOT_APPLICABLE => 422,
             self::ACTOR_NOT_ALLOWED => 403,
             self::APPLY_FAILED => 500,
+            self::SUBMISSION_DISABLED => 503,
             default => 409,
         };
 

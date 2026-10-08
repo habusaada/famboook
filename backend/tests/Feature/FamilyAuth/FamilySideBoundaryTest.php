@@ -234,8 +234,21 @@ class FamilySideBoundaryTest extends TestCase
             if ($route->uri() === 'api/v1/family/household/members/{memberRef}/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-member-reveal'], $middleware);
             }
+            // Change Requests (PWA-5e): reads behind the Family boundary only;
+            // each mutation adds its change-request.* permission and a throttle.
+            if (str_starts_with($route->uri(), 'api/v1/family/change-requests')) {
+                $boundary = ['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context'];
+                $expected = match (true) {
+                    in_array('GET', $route->methods(), true) => $boundary,
+                    $route->uri() === 'api/v1/family/change-requests' => [...$boundary, 'can:change-request.submit', 'throttle:family-change-request-submit'],
+                    str_ends_with($route->uri(), '/resubmit') => [...$boundary, 'can:change-request.resubmit', 'throttle:family-change-request-action'],
+                    str_ends_with($route->uri(), '/cancel') => [...$boundary, 'can:change-request.cancel', 'throttle:family-change-request-action'],
+                };
+                $this->assertSame($expected, $middleware, $route->uri());
+            }
             $checked++;
         }
-        $this->assertSame(28, $checked);
+        // 28 + the six Change Request routes (PWA-5e).
+        $this->assertSame(34, $checked);
     }
 }

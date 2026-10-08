@@ -5,6 +5,8 @@ namespace Tests\Feature\ChangeRequests\Engine;
 use App\Actions\ChangeRequests\ApplyChangeRequestAction;
 use App\Actions\ChangeRequests\ApproveChangeRequestAction;
 use App\Actions\ChangeRequests\CancelChangeRequestAction;
+use App\Actions\ChangeRequests\ResubmitChangeRequestAction;
+use App\Actions\ChangeRequests\ReturnChangeRequestForClarificationAction;
 use App\Actions\ChangeRequests\StartChangeRequestReviewAction;
 use App\Actions\ChangeRequests\SubmitChangeRequestAction;
 use App\Enums\ChangeRequestStatus as S;
@@ -204,6 +206,19 @@ class ChangeRequestConcurrencyTest extends TestCase
         $this->otherCommits($request, ['status' => 'APPROVED', 'approved_by' => $this->reviewer->id, 'approved_at' => now()]);
         $this->refusedWith(fn () => app(CancelChangeRequestAction::class)->handle($this->context, $request), ChangeRequestException::INVALID_TRANSITION);
         $this->assertSame(S::APPROVED, $request->fresh()->status);
+    }
+
+    public function test_a_resubmission_waits_for_a_parallel_cancellation_and_then_refuses(): void
+    {
+        $request = $this->underReview();
+        app(ReturnChangeRequestForClarificationAction::class)->handle($request, $this->reviewer, 'وضّح');
+        $resubmit = fn () => app(ResubmitChangeRequestAction::class)->handle($this->context, $request, 'الرد');
+
+        $this->assertWaited($this->whileLocked('change_requests', $request->id, $resubmit));
+
+        $this->otherCommits($request, ['status' => 'CANCELLED', 'cancelled_by' => $this->context->user->id, 'cancelled_at' => now()]);
+        $this->refusedWith($resubmit, ChangeRequestException::INVALID_TRANSITION);
+        $this->assertSame(0, WorkflowEvent::where('event_type', WorkflowEventType::RESUBMITTED)->count());
     }
 
     public function test_a_second_apply_waits_and_then_replays_without_writing_again(): void
