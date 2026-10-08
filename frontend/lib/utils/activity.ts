@@ -1,11 +1,15 @@
 import {
+  Activity,
   ClipboardCheck,
   ClipboardList,
   ClipboardPen,
   BadgeCheck,
   CircleCheckBig,
   CircleX,
+  FileCheck,
   FileDown,
+  FileInput,
+  FileX,
   FilePlus2,
   FileSpreadsheet,
   HandHeart,
@@ -71,7 +75,22 @@ export const familyActivityPresentation: Record<
   FAMILY_CARD_ISSUED: { label: "تم إصدار بطاقة الأسرة الرقمية", icon: IdCard },
   FAMILY_CARD_REVOKED: { label: "تم إلغاء بطاقة الأسرة الرقمية", icon: CircleX },
   FAMILY_CARD_REISSUED: { label: "تمت إعادة إصدار بطاقة الأسرة الرقمية", icon: IdCard },
+  // Change Requests (PWA-5b / 5d). The canonical change itself is a separate
+  // entry recorded by its own Domain Action (e.g. RESIDENCE_UPDATED).
+  CHANGE_REQUEST_SUBMITTED: { label: "قدّمت الأسرة طلب تحديث بيانات", icon: FileInput },
+  CHANGE_REQUEST_REJECTED: { label: "رُفض طلب تحديث بيانات", icon: FileX },
+  CHANGE_REQUEST_APPLIED: { label: "طُبّق طلب تحديث بيانات على سجل الأسرة", icon: FileCheck },
 };
+
+const UNKNOWN_ACTIVITY = { label: "نشاط على سجل الأسرة", icon: Activity };
+
+/**
+ * The presentation of an event code — with a neutral fallback, so a code the
+ * client does not know yet (a newer backend) never breaks a timeline.
+ */
+export function activityPresentation(type: string): { label: string; icon: LucideIcon } {
+  return familyActivityPresentation[type as FamilyActivityType] ?? UNKNOWN_ACTIVITY;
+}
 
 export function formatActivityTime(iso: string): string {
   return new Date(iso).toLocaleString("ar", {

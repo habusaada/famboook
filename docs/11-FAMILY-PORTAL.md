@@ -3403,6 +3403,49 @@ no migration; the Family Portal is unchanged.
 - **Before PWA-6.1:** the Staff activity timeline needs labels for the three
   CHANGE_REQUEST_* activity types (PWA-5d).
 
+## PWA-5d implementation record — Staff Change Request review workspace
+
+Implemented 2026-10-08 (docs/05 WF-ADR-052, docs/06 AUTH-ADR-090, docs/07
+RM-ADR-058). Staff application only; no backend change, migration or
+request type; the Family Portal is unchanged.
+
+- **Screens:** `/change-requests` — «طلبات تحديث البيانات» («مراجعة طلبات
+  الأسر ومتابعة إجراءات اعتمادها وتطبيقها.»): search (a full CRQ code →
+  `request_code`, otherwise `family`), status, type and submission-date
+  filters, all in the URL; server pagination (20); rows with request code,
+  type, family code and head, requester, submission date, status and the
+  latest milestone. No global counts (the API has none) — only `meta.total`
+  of the current filters. `/change-requests/{uuid}` — identity, family and
+  requester, the requester's reason, the proposal, the timeline, review
+  milestones, rejection, apply failures and the actions.
+- **Statuses:** مقدّم, قيد المراجعة, مُعاد للاستكمال, أُعيد تقديمه, معتمد بانتظار
+  التطبيق, مطبّق, مرفوض, ملغى (مسودة unused); APPROVED never reads as complete.
+- **Proposal:** only a handler-labelled `{rows: [{label, current,
+  proposed}]}` presentation is rendered — «البيانات الحالية | التعديل
+  المطلوب» on wide screens, stacked on phones, changes marked by text; any
+  other shape shows «عرض تفاصيل هذا النوع من الطلبات غير مدعوم في هذه
+  الواجهة بعد.», and an unregistered type «تفاصيل هذا النوع من الطلبات غير
+  متاحة حاليًا.» — never raw data. This shape is a PWA-6.1 contract proposal.
+- **Timeline:** server order; event label, time, actor and side, status
+  change, reason (rejection reason or apply-failure label), the family-visible
+  message, and the internal note only when the API returned it.
+- **Actions:** `available_actions` ∩ permissions; start review (direct), return
+  (public message required, internal note only with view-internal-notes),
+  approve (confirmation: «اعتماد الطلب لا يغيّر بيانات السجل مباشرة. يجب تطبيق
+  التعديل بعد الاعتماد.»), reject (reason; message required for OTHER; an
+  approved request only as NO_LONGER_APPLICABLE), apply (explicit confirmation;
+  «إعادة محاولة التطبيق» after a failure). Mutations never retry; success and
+  failure re-read the request and the queue; a successful apply also refreshes
+  the Family's data. Refusals show the server's fixed message; an unexpected
+  apply failure a generic one.
+- **Activity labels:** CHANGE_REQUEST_SUBMITTED «قدّمت الأسرة طلب تحديث
+  بيانات», CHANGE_REQUEST_REJECTED «رُفض طلب تحديث بيانات»,
+  CHANGE_REQUEST_APPLIED «طُبّق طلب تحديث بيانات على سجل الأسرة», with the
+  request type as the subject; every timeline uses a safe fallback for an
+  unknown code.
+- **Tests:** `tests/change-requests.test.tsx`,
+  `tests/change-request-activity.test.tsx`.
+
 ---
 
 # 31. Amendment Register
@@ -4365,3 +4408,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.29 | 2026-10-07 | Approved | PWA-5a Change Request foundation (FP-ADR-072): approved order kept (PWA-4 after PWA-6); family-side transitions and CANCELLED; Family-subject request visibility; member_ref targets; separate family / Staff text; «+» and «طلباتي» stay disabled until PWA-6.1; §17, §28 and FU-04 updated; implementation record in §30a |
 | 1.30 | 2026-10-07 | Approved | PWA-5b Change Request engine: implementation record in §30a — Domain Actions, family-context submissions and Family-subject ownership, handler contract and empty Production registry, replays, activity boundary; Family Portal unchanged |
 | 1.31 | 2026-10-08 | Approved | PWA-5c Staff Change Request API: implementation record in §30a — routes and permissions, queue filters, review view and timeline, internal-note visibility, mutation bodies and outcome, error mapping, empty-registry behaviour, PWA-5d activity-label dependency; Family Portal unchanged |
+| 1.32 | 2026-10-08 | Approved | PWA-5d Staff review workspace: implementation record in §30a — queue and review screens, status vocabulary, proposal rendering and the PWA-6.1 presentation-contract proposal, timeline, permission-aware actions, Change Request activity labels; Family Portal unchanged |

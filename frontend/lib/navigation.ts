@@ -3,6 +3,7 @@ import {
   Users,
   User,
   ClipboardList,
+  ClipboardPen,
   HeartHandshake,
   HandHeart,
   BarChart3,
@@ -34,6 +35,9 @@ export const navItems: NavItem[] = [
   { href: "/", label: "لوحة العمليات", icon: LayoutDashboard, permissions: ["dashboard.view-operational"], group: "operations" },
   { href: "/families", label: "الأسر", icon: Users, permissions: ["family.view"], group: "registry" },
   { href: "/people", label: "الأشخاص", icon: User, permissions: ["person.view"], group: "registry" },
+  // PWA-5d: the Staff review workspace (change-request.view — SUPER_ADMIN,
+  // ADMINISTRATOR, REVIEWER). Also guards /change-requests/* in AuthGate.
+  { href: "/change-requests", label: "طلبات تحديث البيانات", icon: ClipboardPen, permissions: ["change-request.view"], group: "registry" },
   { href: "/assessments", label: "التقييمات", icon: ClipboardList, permissions: ["assessment.view"], group: "cases" },
   { href: "/needs", label: "الاحتياجات", icon: HeartHandshake, permissions: ["need.view"], group: "cases" },
   { href: "/assistances", label: "المساعدات", icon: HandHeart, permissions: ["assistance.view"], group: "cases" },

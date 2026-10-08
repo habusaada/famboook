@@ -2133,7 +2133,7 @@ PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
         5b Domain Actions, handler contract, conflict detection, APPLY
            — DONE (RM-ADR-056; no route, UI or request type)
         5c Staff API — DONE (RM-ADR-057) · 5d Staff review workspace
-           (5d must add the Change Request activity labels first)
+           — DONE (RM-ADR-058; activity labels added)
         5e Family API (submission switch, default off) · 5f Family views
         then PWA-6.1 RESIDENCE_UPDATE enables «+» and «طلباتي»
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
@@ -4748,6 +4748,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-058
+PWA-5d — Staff Change Request review workspace is done (2026-10-08; docs/05 WF-ADR-052, docs/06 AUTH-ADR-090): the «طلبات تحديث البيانات» queue (URL filters, server pagination) and review screen (comparison, timeline, action dialogs) on the PWA-5c API, and the Staff activity timeline now labels CHANGE_REQUEST_SUBMITTED / _REJECTED / _APPLIED (with a safe fallback for unknown codes) — the PWA-5c dependency is closed. No backend change, migration or request type; the Production registry stays empty, so the queue is empty. **Contract gap for PWA-6.1:** the handler presentation has no approved shape; the workspace renders only a handler-labelled `{rows: [{label, current, proposed}]}` list and refuses anything else, so the first real handler must adopt (and the docs approve) that shape — together with a viewer-aware `present()` for permission-dependent masking. PWA-5 is not complete: 5e / 5f follow.
+
 ### RM-ADR-057
 PWA-5c — Staff Change Request API is done (2026-10-08; docs/06 AUTH-ADR-089, docs/05 WF-ADR-051): queue, review detail with timeline and the start-review / return / approve / reject / apply endpoints over the PWA-5b engine. No migration, no frontend, no request type; the Production registry stays empty. PWA-5 is not complete. **Dependency for PWA-5d:** the Staff activity timeline (`frontend/lib/utils/activity.ts`) has no labels for CHANGE_REQUEST_SUBMITTED / _REJECTED / _APPLIED and would fail on them — 5d must add them before PWA-6.1 enables any request type.
 
@@ -5041,6 +5044,7 @@ Date: 2026-09-24
 | 1.2.53 | 2026-10-07 | Approved | PWA-5 slicing (RM-ADR-055); PWA-5a done: Change Request foundation — tables, CHECKs, append-only workflow events, transition table, recorder, permissions; no route, UI or request type; PWA-4 stays after PWA-6 |
 | 1.2.54 | 2026-10-07 | Approved | PWA-5b done (RM-ADR-056): Change Request Domain Actions, handler contract and empty Production registry, conflict detection, APPLY with rollback / failure recording / retry; no migration, route, UI or request type; 5c–5f next |
 | 1.2.55 | 2026-10-08 | Approved | PWA-5c done (RM-ADR-057): Staff Change Request API; no migration, frontend or request type; 5d dependency — Change Request activity labels in the Staff timeline before PWA-6.1 |
+| 1.2.56 | 2026-10-08 | Approved | PWA-5d done (RM-ADR-058): Staff review workspace and Change Request activity labels; presentation-contract gap recorded for PWA-6.1; no backend change; 5e / 5f next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

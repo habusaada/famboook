@@ -26,7 +26,7 @@ import { activitySubject } from "@/components/families/family-activity-tab";
 import type { DashboardData, AgeBand } from "@/lib/types/api/dashboard";
 import type { AssessmentRating } from "@/lib/types/api/assessment";
 import type { NeedPriority } from "@/lib/types/api/need";
-import { familyActivityPresentation, formatActivityTime } from "@/lib/utils/activity";
+import { activityPresentation, formatActivityTime } from "@/lib/utils/activity";
 import { ASSESSMENT_RATINGS, assessmentRatingLabels } from "@/lib/utils/assessment";
 import { needPriorityLabels } from "@/lib/utils/need";
 import { cn } from "cn";
@@ -529,7 +529,7 @@ export function RecentActivitySection({ data }: { data: NonNullable<DashboardDat
       ) : (
         <ul className="flex flex-col">
           {data.map((activity, index) => {
-            const { label, icon } = familyActivityPresentation[activity.event_type];
+            const { label, icon } = activityPresentation(activity.event_type);
             const subject = activitySubject(activity);
             const code = activity.family.family_code;
             return (

@@ -11,9 +11,11 @@ import { SectionHeader } from "@/components/shared/page-layout";
 import { useFamilyActivities } from "@/lib/api/activity";
 import { ApiError } from "@/lib/api/client";
 import type { FamilyActivity } from "@/lib/types/api/activity";
-import { familyActivityPresentation, formatActivityTime } from "@/lib/utils/activity";
+import { activityPresentation, formatActivityTime } from "@/lib/utils/activity";
 import { healthRecordTypeLabels } from "@/lib/utils/health";
 import { lifeStatusVerificationLabels } from "@/lib/utils/life-status";
+import { changeRequestTypeLabels } from "@/lib/utils/change-request";
+import type { ChangeRequestType } from "@/lib/types/api/change-request";
 
 /**
  * Safe subject line: the Need title (if any), the person's name and, for
@@ -22,6 +24,9 @@ import { lifeStatusVerificationLabels } from "@/lib/utils/life-status";
 export function activitySubject(activity: FamilyActivity): string | null {
   const parts: string[] = [];
   if (activity.subject.title) parts.push(activity.subject.title);
+  // A Change Request entry: its type, by label only (unknown codes are not shown raw).
+  const requestType = activity.metadata.request_type;
+  if (requestType && requestType in changeRequestTypeLabels) parts.push(changeRequestTypeLabels[requestType as ChangeRequestType]);
   const healthType = activity.metadata.health_record_type;
   if (healthType) parts.push(healthRecordTypeLabels[healthType]);
   const verification = activity.metadata.verification_method;
@@ -80,8 +85,8 @@ export function FamilyActivityTab({ familyCode }: { familyCode: string }) {
                 <ActivityItem
                   key={activity.id}
                   data-activity-id={activity.id}
-                  icon={familyActivityPresentation[activity.event_type].icon}
-                  title={familyActivityPresentation[activity.event_type].label}
+                  icon={activityPresentation(activity.event_type).icon}
+                  title={activityPresentation(activity.event_type).label}
                   entity={activitySubject(activity) ?? undefined}
                   meta={
                     <>

@@ -41,7 +41,11 @@ export type FamilyActivityType =
   | "ASSISTANCE_BENEFICIARY_LISTED"
   | "FAMILY_CARD_ISSUED"
   | "FAMILY_CARD_REVOKED"
-  | "FAMILY_CARD_REISSUED";
+  | "FAMILY_CARD_REISSUED"
+  // Change Requests (PWA-5b): the business milestones only.
+  | "CHANGE_REQUEST_SUBMITTED"
+  | "CHANGE_REQUEST_REJECTED"
+  | "CHANGE_REQUEST_APPLIED";
 
 export interface FamilyActivity {
   // Public UUID (the database id is never exposed).
@@ -52,7 +56,17 @@ export interface FamilyActivity {
   // the field researcher. Null for future system/import operations.
   actor: { name: string } | null;
   subject: {
-    type: "family" | "person" | "residence" | "health_record" | "assessment" | "need" | "assistance_nominee" | null;
+    type:
+      | "family"
+      | "person"
+      | "residence"
+      | "health_record"
+      | "assessment"
+      | "need"
+      | "assistance_nominee"
+      | "digital_credential"
+      | "change_request"
+      | null;
     person: { person_code: string; full_name: string } | null;
     // Need title or the Assistance title of a nomination, resolved at
     // read time from the current record.
@@ -61,5 +75,6 @@ export interface FamilyActivity {
   // Allow-listed keys only: the broad health category, never details.
   // Assessment events carry no metadata (no ratings, no notes).
   // A life-status confirmation carries its verification method (a code).
-  metadata: { health_record_type?: HealthRecordType; verification_method?: LifeStatusVerificationMethod };
+  // A Change Request entry carries its request type code only.
+  metadata: { health_record_type?: HealthRecordType; verification_method?: LifeStatusVerificationMethod; request_type?: string };
 }

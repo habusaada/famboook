@@ -3259,6 +3259,9 @@ Change Request engine as implemented by PWA-5b (2026-10-07; §54 annotated): eig
 
 ### WF-ADR-051
 Staff Change Request API as implemented by PWA-5c (2026-10-08): each workflow route calls exactly one PWA-5b Domain Action and returns the outcome (`id` = uuid, `request_code`, `status`, `replayed`); controllers hold no workflow logic. `available_actions` (§95) is a UX hint from status, permissions, handler availability and the refused-apply rule — never authorization. APPLY is called with NO surrounding transaction or transactional middleware: the action owns its main transaction and the separate post-rollback failure record. A request whose type has no registered handler stays readable (type_available false, no presentation) and cannot be approved or applied.
+
+### WF-ADR-052
+Staff review workspace as implemented by PWA-5d (2026-10-08): the Staff application presents the Change Request workflow without owning it. Statuses are shown as returned (APPROVED reads «معتمد بانتظار التطبيق», never completed; APPLIED alone is the completed registry update); actions are offered from the API's `available_actions` intersected with the user's permissions and every result is re-read from the server (no optimistic status). Approval states that it changes nothing in the registry and never triggers APPLY. APPLY needs an explicit confirmation, is never retried automatically (mutation retry off), and after a failure the request is re-read so its failure count and code are visible; a retry is a new, explicit Staff action («إعادة محاولة التطبيق»).
 ```
 
 ---
@@ -3532,3 +3535,4 @@ Date: 2026-09-24
 | 1.2.17 | 2026-10-07 | Approved | PWA-5a: §54 lifecycle amended — CANCELLED (requester, until approval), APPROVED → REJECTED only as NO_LONGER_APPLICABLE after a refused apply, no V1 DRAFT, text-only resubmission, APPLY_FAILED event, one transition table, append-only workflow events enforced by PostgreSQL (WF-ADR-049) |
 | 1.2.18 | 2026-10-07 | Approved | PWA-5b: §54 engine annotated — one Domain Action per transition, request → Family → Person lock order, re-validation and base fingerprint at approve and apply, single-transaction APPLY with rollback and separately recorded APPLY_FAILED, replays, refused-apply rule for APPROVED → REJECTED, activity boundary, empty Production registry (WF-ADR-050) |
 | 1.2.19 | 2026-10-08 | Approved | PWA-5c: Staff Change Request API over the engine — one Domain Action per route, available_actions as a hint, APPLY without any outer transaction, unregistered types readable but not approvable or appliable (WF-ADR-051) |
+| 1.2.20 | 2026-10-08 | Approved | PWA-5d: Staff review workspace semantics — statuses as returned, APPROVED never shown as complete, actions from available_actions ∩ permissions, no optimistic status, approve never applies, APPLY confirmed explicitly and never auto-retried (WF-ADR-052) |

@@ -18,7 +18,7 @@ import { AssessmentRatingBadge, AssessmentStatusBadge } from "@/components/asses
 import { activitySubject } from "@/components/families/family-activity-tab";
 import { usePerson } from "@/lib/api/people";
 import type { FamilyDetail } from "@/lib/types/api/family";
-import { familyActivityPresentation, formatActivityTime } from "@/lib/utils/activity";
+import { activityPresentation, formatActivityTime } from "@/lib/utils/activity";
 import { birthDateLabel, formatDateTime } from "@/lib/utils/date";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
 import { lifeStatusLabel } from "@/lib/utils/life-status";
@@ -463,8 +463,8 @@ export function FamilyOverview({
                   {snapshot.activity.recent.map((a, i) => (
                     <ActivityItem
                       key={a.id}
-                      icon={familyActivityPresentation[a.event_type].icon}
-                      title={familyActivityPresentation[a.event_type].label}
+                      icon={activityPresentation(a.event_type).icon}
+                      title={activityPresentation(a.event_type).label}
                       entity={activitySubject(a) ?? undefined}
                       meta={
                         <>
