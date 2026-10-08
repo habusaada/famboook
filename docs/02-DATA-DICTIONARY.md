@@ -2757,8 +2757,12 @@ Examples:
 ```text
 RESIDENCE_UPDATE
         ↓
-ChangeFamilyResidenceAction
+UpdateFamilyResidenceAction
 ```
+
+RESIDENCE_UPDATE corrects the current residence in place (docs/11
+FP-ADR-059, built in PWA-6.1). A real move with history would use a future
+`ChangeFamilyResidenceAction` under its own approval (docs/11 FU-02).
 
 ```text
 HOUSEHOLD_HEAD_CHANGE
@@ -4238,6 +4242,7 @@ Date: 2026-09-24
 | 1.2.34 | 2026-10-07 | Approved | PWA-8.2: §45a Digital Household Head Card amended to the Family-subject Digital Family Card; new §45c `digital_credentials` (docs/11 FP-ADR-070) |
 | 1.2.35 | 2026-10-07 | Approved | PWA-5a: §57 Change Request data as implemented — uuid, type code, target membership, base fingerprint, rejection reason codes, CANCELLED, workflow event fields (DD-ADR-034) |
 | 1.2.36 | 2026-10-08 | Approved | PWA-6.1: §47 RESIDENCE_UPDATE submitted_data (payload version 1) recorded |
+| 1.2.37 | 2026-10-08 | Approved | PWA-6.1a: §57 RESIDENCE_UPDATE maps to UpdateFamilyResidenceAction (in-place correction); the move action stays future |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

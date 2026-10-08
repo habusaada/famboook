@@ -292,7 +292,8 @@ describe("navigation and privacy", () => {
     expect(account).toHaveAttribute("href", "/family/account");
     expect(account).toHaveAttribute("aria-current", "page");
     expect(within(bar).getByRole("link", { name: "الرئيسية" })).not.toHaveAttribute("aria-current");
-    expect(within(bar).getByRole("button", { name: "طلباتي" })).toBeDisabled();
+    expect(within(bar).getByRole("link", { name: "طلباتي" })).not.toHaveAttribute("aria-current");
+    expect(await within(bar).findByRole("button", { name: "إجراء جديد (قريبًا)" })).toBeDisabled();
   });
 
   it("renders no full number, identifier or security internal, even if a response carried some", async () => {

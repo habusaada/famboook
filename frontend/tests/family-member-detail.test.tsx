@@ -78,11 +78,17 @@ describe("opening the details", () => {
     const sheet = await openDetails("زوجة الاختبار");
 
     expect(within(sheet).getByRole("heading", { name: "زوجة الاختبار" })).toBeInTheDocument();
-    // Only the session check, the list and the household health (PWA-3B.6,
-    // household-level) are ever requested (a routine refetch of any is
-    // fine): no member-specific request.
+    // Only the session check, the list, the household health (PWA-3B.6,
+    // household-level) and the navigation's request-type discovery
+    // (FP-ADR-074) are ever requested (a routine refetch of any is fine):
+    // no member-specific request.
     const paths = new Set(get.mock.calls.map(([path]) => String(path)));
-    expect([...paths].sort()).toEqual(["/api/v1/family/household/health", "/api/v1/family/household/members", "/api/v1/family/me"]);
+    expect([...paths].sort()).toEqual([
+      "/api/v1/family/change-requests/types",
+      "/api/v1/family/household/health",
+      "/api/v1/family/household/members",
+      "/api/v1/family/me",
+    ]);
   });
 
   it("offers no details for an unavailable member", async () => {

@@ -680,10 +680,14 @@ RESIDENCE_UPDATE
       ↓
 Approved Change Request
       ↓
-ChangeFamilyResidenceAction
+UpdateFamilyResidenceAction
       ↓
 Canonical Registry
 ```
+
+RESIDENCE_UPDATE corrects the current residence in place (docs/11
+FP-ADR-059, built in PWA-6.1). A real move with history would use a future
+`ChangeFamilyResidenceAction` under its own approval (docs/11 FU-02).
 
 This prevents duplicate business logic.
 
@@ -3235,6 +3239,7 @@ Date: 2026-09-22
 | 1.0 | 2026-09-22 | Superseded | Initial Product Definition |
 | 1.1 | 2026-09-22 | Superseded | Added Family User, Family Portal, User-Person Links, Change Requests, notifications, and controlled self-service |
 | 1.2.4 | 2026-10-04 | Approved | §16a module list: Family Profile Review replaces Profile Completion & Verification; Staff Family Verification separate; no review or verification state is an eligibility gate (docs/11 FP-ADR-057, FP-ADR-058) |
+| 1.2.5 | 2026-10-08 | Approved | PWA-6.1a: the RESIDENCE_UPDATE example maps to UpdateFamilyResidenceAction (in-place correction, docs/11 FP-ADR-059); ChangeFamilyResidenceAction stays the future move action |
 | 1.2.3 | 2026-10-02 | Approved | PWA-1B: §16a account separation (Staff-side vs family-side), V1 coordinator is an eligible household head, Production activation and rollout gates (PROD-ADR-048). Documentation only |
 | 1.2.2 | 2026-10-02 | Approved | PWA-0: added §16a Family Portal Program (modules, submissions, card, announcements, VERIFIED ≠ assistance); §95 PWA rule superseded (PROD-ADR-047); PPD-015 and PPD-019 decided. Documentation only |
 | 1.2.1 | 2026-09-25 | Approved | Added §25a "Clan and Branch (V1)": Clan → Branch Groups → Branches → Families → Persons; Clan ≠ Family; required Clan, optional Branch; no multi-tenancy |

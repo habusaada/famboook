@@ -4367,6 +4367,12 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+**PWA-6.1a note (2026-10-08, docs/11 FP-ADR-074): no permission or role
+added.** The Family «+» entry is shown as actionable only from the server's
+type discovery, which already requires `change-request.submit`, the
+submission switch and a registered family-submittable type; a visible entry
+is UX only — every submission is re-authorized on the server.
+
 **PWA-6.1 note (2026-10-08, docs/11 §30a): no permission or role added.**
 RESIDENCE_UPDATE uses the existing change-request permissions. A Change
 Request presentation is shaped by a server-computed context: the audience,
@@ -4830,6 +4836,7 @@ Date: 2026-09-24
 | 1.2.54 | 2026-10-08 | Approved | PWA-5d (AUTH-ADR-090): Staff review workspace — navigation and routes behind change-request.view, actions need available_actions and the permission, internal notes only as returned by the API; no permission added |
 | 1.2.55 | 2026-10-08 | Approved | PWA-5e (AUTH-ADR-091): Family Change Request API — reads behind the Family boundary, mutations behind change-request.submit / resubmit / cancel, per-user throttles; no permission added |
 | 1.2.56 | 2026-10-08 | Approved | PWA-6.1 note: no permission added; the presentation context derives internal-note visibility from change-request.view-internal-notes and grants no sensitive-identity viewing |
+| 1.2.57 | 2026-10-08 | Approved | PWA-6.1a note: Family navigation «+» follows server type discovery (change-request.submit, switch, registered type); no permission added |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

@@ -1999,30 +1999,35 @@ V1 uses review even if Contact Update is classified LOW risk.
 
 # 71. Residence Update Request
 
-**V1 as implemented (PWA-6.1, docs/11 FP-ADR-059 and §30a):** RESIDENCE_UPDATE
-is a CORRECTION of the current residence. Family proposes → review →
-approval → APPLY calls `UpdateFamilyResidenceAction` in place (no residence
-is ended or created); the base fingerprint covers the current residence,
-so a registry change after submission blocks approval and APPLY. The move
-flow below (end the old residence, create a new one) needs a future
-`ChangeFamilyResidenceAction` / `residence.change` (docs/11 FU-02) and is
-not built.
+RESIDENCE_UPDATE corrects the Family's CURRENT residence in place
+(docs/11 FP-ADR-059; built in PWA-6.1, docs/11 §30a). It never ends the
+current residence or creates another one.
 
 ```text
-Family User proposes residence
+Household head proposes a correction (changed fields only)
         ↓
-Review
+SUBMITTED — canonical residence unchanged
         ↓
-Approval
+Review (optional return for clarification)
         ↓
-ChangeFamilyResidenceAction
+APPROVED — still unchanged; base re-checked
         ↓
-End old current residence
+Staff APPLY — base and preconditions re-checked under lock
         ↓
-Create new current residence
+UpdateFamilyResidenceAction (same residence row)
         ↓
-APPLIED
+APPLIED — RESIDENCE_UPDATED / DISPLACEMENT_UPDATED + CHANGE_REQUEST_APPLIED
 ```
+
+Any change to the current residence after submission blocks approval and
+APPLY (CHANGE_REQUEST_BASE_CHANGED); the newer registry data is kept.
+
+**Different use case — a real move with history (not built).** Recording
+that a family moved to a new place, keeping the old residence as history,
+would end the current residence and create a new one through a future
+`ChangeFamilyResidenceAction` (`residence.change`, docs/11 FU-02). It is
+not RESIDENCE_UPDATE V1 and needs its own approval. (Until 2026-10-08 this
+section described only that move flow.)
 
 ---
 
@@ -3550,3 +3555,4 @@ Date: 2026-09-24
 | 1.2.20 | 2026-10-08 | Approved | PWA-5d: Staff review workspace semantics — statuses as returned, APPROVED never shown as complete, actions from available_actions ∩ permissions, no optimistic status, approve never applies, APPLY confirmed explicitly and never auto-retried (WF-ADR-052) |
 | 1.2.21 | 2026-10-08 | Approved | PWA-5e: Family Change Request API — family Domain Actions behind family.context, submission switch for new requests only, replay semantics, family timeline without diagnostics or internal notes (WF-ADR-053) |
 | 1.2.22 | 2026-10-08 | Approved | PWA-6.1: §71 annotated — V1 RESIDENCE_UPDATE is an in-place correction applied by UpdateFamilyResidenceAction; the move flow stays future (docs/11 FU-02) |
+| 1.2.23 | 2026-10-08 | Approved | PWA-6.1a: §71 rewritten — RESIDENCE_UPDATE is one in-place correction through UpdateFamilyResidenceAction; the move flow (ChangeFamilyResidenceAction) is kept as a distinct, unbuilt use case |

@@ -3648,10 +3648,14 @@ UpdatePersonContactAction
 ```text
 RESIDENCE_UPDATE
     ↓
-ResidenceUpdateData
+ResidenceUpdateHandler (submitted_data, payload version 1)
     ↓
-ChangeFamilyResidenceAction
+UpdateFamilyResidenceAction
 ```
+
+RESIDENCE_UPDATE corrects the current residence in place (docs/11
+FP-ADR-059, built in PWA-6.1). A real move with history would use a future
+`ChangeFamilyResidenceAction` under its own approval (docs/11 FU-02).
 
 ```text
 DEATH_REPORT
@@ -4361,6 +4365,7 @@ Date: 2026-09-24
 | 1.2.39 | 2026-10-07 | Approved | PWA-8.2: §55c `digital_credentials` (DB-ADR-057) — Family-subject credential, unique card number and token hash, Crypt-sealed token, one ACTIVE per Family, append-only; §55a row marked implemented |
 | 1.2.40 | 2026-10-07 | Approved | PWA-5a: `change_requests` and `workflow_events` implemented (§33, §37 annotated; §36 type table superseded by the code registry) with PostgreSQL CHECKs, the CRQ code sequence and the append-only trigger; safe down() (DB-ADR-058) |
 | 1.2.41 | 2026-10-07 | Approved | PWA-5b: no migration — the PWA-5a schema carries the engine (failure counters and codes, AE-4 CHECK, uncommitted conflict keys, replay against the stored proposal) (DB-ADR-059) |
+| 1.2.42 | 2026-10-08 | Approved | PWA-6.1a: §99 RESIDENCE_UPDATE mapping corrected to ResidenceUpdateHandler → UpdateFamilyResidenceAction (no schema change) |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyBottomNav } from "@/components/family/bottom-nav";
 import { FamilyNewRequest } from "@/components/family/requests/family-new-request";
@@ -591,19 +592,122 @@ describe("«طلب جديد» — discovery", () => {
 
 // ======================================================================== nav
 
-describe("the Family bottom navigation (PWA-5f)", () => {
-  // Built but not linked (docs/07 RM-ADR-055, docs/11 FP-ADR-072). PWA-6.1
-  // prepares activation but does not enable it: that needs an explicit
-  // decision (docs/11 §33, the navigation-activation proposal).
-  it("keeps «طلباتي» and «+» disabled, even on a request screen", () => {
-    nav.pathname = "/family/requests/" + UUID;
+describe("the Family bottom navigation (docs/11 FP-ADR-074)", () => {
+  const ACTION_OFF = "إجراء جديد (قريبًا)";
+  const OPEN = { data: [{ type: "RESIDENCE_UPDATE" }], meta: { submission_enabled: true } } satisfies FamilyChangeRequestTypes;
+
+  async function renderNav(types: Reply, pathname = "/family") {
+    nav.pathname = pathname;
+    const get = mockGet({ types });
+    const view = renderWithClient(<FamilyBottomNav />);
+    return { get, view, bar: screen.getByRole("navigation", { name: "التنقل الرئيسي" }) };
+  }
+
+  const settled = (get: ReturnType<typeof mockGet>) => waitFor(() => expect(get).toHaveBeenCalledWith(TYPES_PATH));
+
+  it("links «طلباتي» while new submissions are off, and keeps «+» disabled", async () => {
+    const { get, bar } = await renderNav({ data: [], meta: { submission_enabled: false } });
+    await settled(get);
+    expect(within(bar).getByRole("link", { name: "طلباتي" })).toHaveAttribute("href", "/family/requests");
+    const action = within(bar).getByRole("button", { name: ACTION_OFF });
+    expect(action).toBeDisabled();
+    expect(action).toHaveAttribute("aria-disabled", "true");
+    expect(within(bar).queryByRole("link", { name: "طلب جديد" })).not.toBeInTheDocument();
+  });
+
+  it("keeps «+» disabled when submission is on but no type is listed", async () => {
+    const { get, bar } = await renderNav({ data: [], meta: { submission_enabled: true } });
+    await settled(get);
+    expect(within(bar).getByRole("button", { name: ACTION_OFF })).toBeDisabled();
+  });
+
+  it("keeps «+» disabled when the only listed type has no Family form here", async () => {
+    const { get, bar } = await renderNav({ data: [{ type: "BIRTH_REPORT" }], meta: { submission_enabled: true } });
+    await settled(get);
+    expect(within(bar).getByRole("button", { name: ACTION_OFF })).toBeDisabled();
+  });
+
+  it("enables «+» when the server lists RESIDENCE_UPDATE and its form exists", async () => {
+    const { bar } = await renderNav(OPEN);
+    const action = await within(bar).findByRole("link", { name: "طلب جديد" });
+    expect(action).toHaveAttribute("href", "/family/requests/new");
+    expect(action).not.toHaveAttribute("aria-current");
+    expect(within(bar).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(bar).getAllByRole("link")).toHaveLength(5);
+  });
+
+  it("keeps «+» disabled while the answer is loading, and «طلباتي» usable", async () => {
+    const { bar } = await renderNav(() => new Promise(() => undefined));
+    expect(within(bar).getByRole("button", { name: ACTION_OFF })).toBeDisabled();
+    expect(within(bar).getByRole("link", { name: "طلباتي" })).toHaveAttribute("href", "/family/requests");
+  });
+
+  it("keeps «+» disabled on an API error, and «طلباتي» usable", async () => {
+    const { get, bar } = await renderNav(new ApiError(500, { message: "x" }));
+    await settled(get);
+    await waitFor(() => expect(within(bar).getByRole("button", { name: ACTION_OFF })).toBeDisabled());
+    expect(within(bar).getByRole("link", { name: "طلباتي" })).toBeInTheDocument();
+  });
+
+  it("follows the server when the capability changes (refetch), without a request per render", async () => {
+    let types: FamilyChangeRequestTypes = { data: [], meta: { submission_enabled: false } };
+    nav.pathname = "/family";
+    const get = mockGet({ types: () => Promise.resolve(types) });
+    const { client, rerender } = renderWithClient(<FamilyBottomNav />);
+    await settled(get);
+    expect(screen.getByRole("button", { name: ACTION_OFF })).toBeDisabled();
+
+    for (let i = 0; i < 3; i++) rerender(<QueryClientProvider client={client}><FamilyBottomNav /></QueryClientProvider>);
+    expect(get.mock.calls.filter(([path]) => path === TYPES_PATH)).toHaveLength(1);
+
+    types = OPEN;
+    await client.invalidateQueries({ queryKey: ["family", "change-requests", "types"] });
+    expect(await screen.findByRole("link", { name: "طلب جديد" })).toBeInTheDocument();
+
+    types = { data: [{ type: "RESIDENCE_UPDATE" }], meta: { submission_enabled: false } };
+    await client.invalidateQueries({ queryKey: ["family", "change-requests", "types"] });
+    expect(await screen.findByRole("button", { name: ACTION_OFF })).toBeDisabled();
+  });
+
+  it("forgets the capability when the session's cache is cleared (sign-out / another account)", async () => {
+    nav.pathname = "/family";
+    const get = mockGet({ types: OPEN });
+    const { client, unmount } = renderWithClient(<FamilyBottomNav />);
+    expect(await screen.findByRole("link", { name: "طلب جديد" })).toBeInTheDocument();
+    unmount();
+
+    // Sign-in and sign-out clear the whole query cache (use-family-sign-in / -out).
+    client.clear();
+    get.mockImplementation(async (path: string) => {
+      if (path === TYPES_PATH) return { data: [], meta: { submission_enabled: false } } as never;
+      throw new Error(`Unexpected GET: ${path}`);
+    });
     renderWithClient(<FamilyBottomNav />);
-    const bar = screen.getByRole("navigation");
-    expect(within(bar).getAllByRole("link")).toHaveLength(3);
-    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
-      expect(within(bar).getByRole("button", { name: label })).toBeDisabled();
-    }
-    expect(within(bar).queryByRole("link", { name: /طلب/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: ACTION_OFF })).toBeDisabled();
+  });
+
+  it("asks only the Family types endpoint — no family, person or member identifier", async () => {
+    const { get } = await renderNav(OPEN);
+    await settled(get);
+    expect(get.mock.calls.map(([path]) => path)).toEqual([TYPES_PATH]);
+  });
+
+  it("marks the current entry: «+» on the new-request screens, «طلباتي» on history and detail", async () => {
+    const first = await renderNav(OPEN, "/family/requests/new/residence-update");
+    expect(await within(first.bar).findByRole("link", { name: "طلب جديد" })).toHaveAttribute("aria-current", "page");
+    expect(within(first.bar).getByRole("link", { name: "طلباتي" })).not.toHaveAttribute("aria-current");
+    first.view.unmount();
+
+    const second = await renderNav(OPEN, "/family/requests/" + UUID);
+    expect(within(second.bar).getByRole("link", { name: "طلباتي" })).toHaveAttribute("aria-current", "page");
+    expect(await within(second.bar).findByRole("link", { name: "طلب جديد" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps the five entries in the approved order with accessible names", async () => {
+    const { bar } = await renderNav(OPEN);
+    await within(bar).findByRole("link", { name: "طلب جديد" });
+    const names = within(bar).getAllByRole("listitem").map((li) => within(li).getByRole("link").getAttribute("aria-label") ?? li.textContent);
+    expect(names).toEqual(["الرئيسية", "أسرتي", "طلب جديد", "طلباتي", "حسابي"]);
   });
 });
 

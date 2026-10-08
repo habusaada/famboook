@@ -86,13 +86,12 @@ describe("FamilyGate", () => {
     const account = within(nav).getByRole("link", { name: "حسابي" });
     expect(account).toHaveAttribute("href", "/family/account");
     expect(account).not.toHaveAttribute("aria-current");
-    // Only the pages that exist are links: no fake route or workflow.
-    expect(within(nav).getAllByRole("link")).toHaveLength(3);
-    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
-      const item = within(nav).getByRole("button", { name: label });
-      expect(item).toBeDisabled();
-      expect(item).toHaveAttribute("aria-disabled", "true");
-    }
+    // docs/11 FP-ADR-074: «طلباتي» always links; «+» stays disabled while no request can be started.
+    expect(within(nav).getAllByRole("link")).toHaveLength(4);
+    expect(within(nav).getByRole("link", { name: "طلباتي" })).toHaveAttribute("href", "/family/requests");
+    const action = await within(nav).findByRole("button", { name: "إجراء جديد (قريبًا)" });
+    expect(action).toBeDisabled();
+    expect(action).toHaveAttribute("aria-disabled", "true");
   });
 
   it("sends a visitor without a session to the Family login", async () => {

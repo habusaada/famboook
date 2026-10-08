@@ -193,18 +193,17 @@ describe("Coordinator Space and the quick actions", () => {
     expect(within(section).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("keeps the bottom navigation: الرئيسية (current), أسرتي and حسابي are links, the rest disabled", async () => {
+  it("keeps the bottom navigation: الرئيسية (current), أسرتي, طلباتي and حسابي are links, «+» disabled while closed", async () => {
     vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderHome();
     await summary();
 
     const nav = screen.getByRole("navigation", { name: "التنقل الرئيسي" });
-    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية", "أسرتي", "حسابي"]);
+    expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual(["الرئيسية", "أسرتي", "طلباتي", "حسابي"]);
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).toHaveAttribute("aria-current", "page");
-    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
-      expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
-    }
+    // docs/11 FP-ADR-074: «+» follows server type discovery (closed by default).
+    expect(await within(nav).findByRole("button", { name: "إجراء جديد (قريبًا)" })).toBeDisabled();
   });
 
   it("still offers the install suggestion", async () => {

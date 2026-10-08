@@ -850,6 +850,179 @@ it has been verified on the server yet.
 
 ---
 
+# 16b. Change Request release (PWA-5b … PWA-6.1a)
+
+Production runs PWA-5a (`e36ebd7`: the two Change Request tables, CHECKs,
+sequence, append-only trigger and permissions). This release brings
+PWA-5b, 5c, 5d, 5e, 5f, 6.1 and 6.1a. It is deployed **closed**: the family
+submission switch stays off, and opening the pilot is a separate,
+explicit authorization (docs/09 «طلبات تحديث السكن — التجربة المضبوطة»).
+
+## Release content since PWA-5a (verified 2026-10-08)
+
+| Item | Change |
+|---|---|
+| Migrations | **None.** No file under `backend/database/migrations` changed after `e36ebd7`; the PWA-5a schema is used as is |
+| Seeders / permissions | **None.** `RolePermissionSeeder` is unchanged since PWA-5a; seeding stays idempotent and `famboook:verify-permissions` must pass |
+| Packages | None (`composer.lock`, `package-lock.json` unchanged) |
+| Configuration | New `config/change_requests.php`; one `.env` key `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED` (absent = false). Optional limits `CHANGE_REQUESTS_FAMILY_SUBMIT_LIMIT_USER_MINUTE` (3), `…_HOUR` (20), `CHANGE_REQUESTS_FAMILY_ACTION_LIMIT_USER_MINUTE` (10) |
+| Backend | Domain engine (5b), Staff API (5c), Family API (5e), RESIDENCE_UPDATE handler and presentation context (6.1) — the only registered type |
+| Frontend | Staff «طلبات تحديث البيانات» workspace (5d), Family request screens (5f), residence form (6.1), Family navigation (6.1a) |
+| Unchanged | Family authentication, activation, login, password reset, the Digital Family Card / PDF / public verification, registry screens |
+
+## Release gates (all before the deployment)
+
+1. The exact commit to deploy is on `origin/main` and recorded (full SHA).
+2. The local repository is clean at that commit; backend SQLite suite,
+   frontend suite, typecheck, ESLint and production build pass on it.
+3. The PostgreSQL suite (§16a, isolated test cluster on port 5433) passes
+   for `tests/Feature/ChangeRequests` — including the concurrency tests,
+   which run only there.
+4. The latest nightly backup exists off-server **and** a restore test (§13)
+   has passed on it. Take a fresh `backup-db.sh` run immediately before
+   the deployment and confirm its checksum.
+5. The server `.env` contains `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false`
+   (added explicitly, not left implicit).
+6. Free disk space and memory are sufficient for `npm run build` (it
+   fails with out-of-memory errors on a 4 GB machine under load).
+
+## Deployment (runbook — do not improvise)
+
+Production's checkout is a detached HEAD owned by the `deploy` user. Every
+git and deployment command runs **as `deploy`**, never as root (a root
+checkout leaves root-owned files that break later deployments).
+`<app-root>` is the server's Famboook directory, `<sha>` the approved commit.
+
+```text
+# 0. backup, then confirm it
+sudo -u deploy <app-root>/deploy/scripts/backup-db.sh
+
+# 1. code
+sudo -u deploy git -C <app-root> fetch origin
+sudo -u deploy git -C <app-root> checkout --detach <sha>
+sudo -u deploy git -C <app-root> status --short     # must be empty
+sudo -u deploy git -C <app-root> rev-parse HEAD      # must equal <sha>
+
+# 2. configuration (server .env, by the system administrator)
+CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false
+
+# 3. backend: down → composer → migrate (expects "Nothing to migrate")
+#    → RolePermissionSeeder → famboook:verify-permissions → optimize → up
+sudo -u deploy <app-root>/deploy/scripts/deploy-backend.sh
+
+# 4. PHP-FPM picks up the new code and cached config
+sudo systemctl reload php<version>-fpm
+
+# 5. frontend: npm ci → build → restart the service
+sudo -u deploy <app-root>/deploy/scripts/deploy-frontend.sh
+
+# 6. web server
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+If `migrate` reports anything other than "Nothing to migrate", **stop**:
+the server is not at the expected PWA-5a schema.
+
+## Post-deployment smoke checks (read-only)
+
+No request is created; no data is written beyond logins.
+
+1. `curl https://api.famboook.com/api/v1/health` → `{"status":"ok"}`;
+   `famboook.com/login` and `famboook.com/family/login` load.
+2. `php artisan famboook:verify-permissions` passes.
+3. `php artisan tinker --execute="dump(config('change_requests.family_submission_enabled'));"`
+   prints `false`.
+4. A guest `GET /api/v1/change-requests` → 401; `GET /api/v1/family/change-requests/types` → 401.
+5. A Staff REVIEWER sees «طلبات تحديث البيانات» and an empty (or
+   unchanged) queue; a DATA_ENTRY user does not see the entry.
+6. An authorized household head (the pilot account, docs/09): the bottom
+   navigation shows «طلباتي» as a link and «+» disabled
+   («إجراء جديد (قريبًا)»); «طلباتي» opens an empty history;
+   `GET …/change-requests/types` answers
+   `{"data": [], "meta": {"submission_enabled": false}}`;
+   `/family/requests/new/residence-update` shows «طلبات تحديث السكن غير
+   متاحة حاليًا». Do NOT submit anything.
+7. Existing features unaffected: Family login, «أسرتي», «حسابي», the Digital
+   Family Card page and its PDF, a public `/verify` check of a known
+   synthetic or authorized card.
+8. `storage/logs/laravel.log` shows no new errors.
+
+## Opening the pilot (separate authorization)
+
+Only after the owner authorizes the pilot in writing and docs/09's
+preconditions are met:
+
+```text
+# server .env
+CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=true
+sudo -u deploy php artisan config:clear
+sudo -u deploy php artisan optimize
+sudo systemctl reload php<version>-fpm
+```
+
+`GET …/types` then lists RESIDENCE_UPDATE and «+» becomes active within a
+minute (or on refocus). The switch opens the channel for **every** eligible
+household head with an active account, not only the pilot Family: open it
+for the agreed pilot window only, while only authorized pilot accounts are
+activated, and close it afterwards.
+
+## Feature shutdown (any time, no code change)
+
+```text
+CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false
+sudo -u deploy php artisan config:clear
+sudo -u deploy php artisan optimize
+sudo systemctl reload php<version>-fpm
+```
+
+Effect: new submissions answer 503 CHANGE_REQUEST_SUBMISSION_DISABLED and
+«+» returns to disabled; existing requests stay readable; families can
+still reply to a clarification or cancel; Staff can still review, approve,
+reject and APPLY. Nothing is deleted. This is the first response to any
+incident in the request channel.
+
+## Rollback
+
+Three different operations — never mix them up:
+
+| Operation | What it does | When |
+|---|---|---|
+| Feature shutdown | Switch off (above) | First response to any problem with submissions |
+| Code rollback | Check out the previous commit (`e36ebd7`, PWA-5a) as `deploy`, re-run `deploy-backend.sh` and `deploy-frontend.sh` | A defect in the release code, and only per the cases below |
+| Data restoration | Restore a backup | Only for data loss or corruption, by decision of the owner — never as a "rollback" of this release |
+
+**A. Before any real request exists** (`change_requests` and
+`workflow_events` are empty — check with a read-only count):
+a code rollback to `e36ebd7` is compatible, because this release added no
+migration — the PWA-5a schema stays as is. Do **not** roll back the
+PWA-5a migrations, drop the tables, or truncate anything.
+
+**B. After a real request exists:**
+1. turn the switch off (feature shutdown);
+2. prefer a **forward fix** of the code; a code rollback to PWA-5a would
+   leave existing requests without the screens and actions that serve them
+   (families could not see or cancel them, Staff could not apply them);
+3. never roll back migrations, delete or edit `change_requests` rows, or
+   touch `workflow_events` (the append-only trigger refuses UPDATE / DELETE
+   — do not disable it);
+4. never restore a database backup to "undo" requests: a restore also
+   discards every other real transaction since the backup (registrations,
+   corrections, deliveries, card events). A request that should not take
+   effect is rejected (or, once APPROVED and no longer applicable,
+   rejected as NO_LONGER_APPLICABLE) through the normal workflow; an
+   applied correction is corrected by a new correction, never by deleting
+   history.
+
+## Remaining Production prerequisites
+
+- The deployment above, by the system administrator.
+- §13 restore test passed on a current backup (still marked REQUIRED).
+- Written pilot authorization and the pilot Family / accounts (docs/09).
+- A designated Staff reviewer with `change-request.apply`, briefed.
+- The incident contact in docs/09 filled in by the owner.
+
+---
+
 # 17. Post-deployment smoke test
 
 Use synthetic data only, before any real entry. The smoke Family cannot be
@@ -1007,6 +1180,7 @@ Never do this once real data has been entered.
 | 1.1.20 | 2026-10-08 | Approved | §16a: PWA-5c Staff Change Request API — no migration or configuration; post-deploy checks (empty queue 200 for a reviewer, 403 family-side, 401 guest); code-only rollback |
 | 1.1.21 | 2026-10-08 | Approved | §16a: PWA-5d Staff review workspace — frontend-only deploy, post-deploy checks (navigation by permission, empty queue), rollback to the previous build |
 | 1.1.22 | 2026-10-08 | Approved | §16a: PWA-5e Family Change Request API — CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED stays false in Production, post-deploy checks, code-only rollback |
+| 1.1.23 | 2026-10-08 | Approved | §16b: Change Request release PWA-5b … PWA-6.1a — content since PWA-5a (no migration, no seeder change, one `.env` key), release gates, deployment with the switch off, read-only smoke checks, feature shutdown, rollback before / after real requests; env template carries the switch |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

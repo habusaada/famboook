@@ -303,13 +303,12 @@ describe("navigation and privacy", () => {
     expect(members).toHaveAttribute("href", "/family/household");
     expect(members).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "الرئيسية" })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getAllByRole("link")).toHaveLength(3);
+    expect(within(nav).getAllByRole("link")).toHaveLength(4);
     const account = within(nav).getByRole("link", { name: "حسابي" });
     expect(account).toHaveAttribute("href", "/family/account");
     expect(account).not.toHaveAttribute("aria-current");
-    for (const label of ["طلباتي", "إجراء جديد (قريبًا)"]) {
-      expect(within(nav).getByRole("button", { name: label })).toBeDisabled();
-    }
+    expect(within(nav).getByRole("link", { name: "طلباتي" })).toHaveAttribute("href", "/family/requests");
+    expect(await within(nav).findByRole("button", { name: "إجراء جديد (قريبًا)" })).toBeDisabled();
   });
 
   it("renders no identifier or contact data, even if a response carried some", async () => {

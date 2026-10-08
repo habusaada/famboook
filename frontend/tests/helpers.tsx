@@ -271,6 +271,8 @@ export function familyGet({
   health = familyHealth(),
   needs = [] as unknown,
   assistance = [] as unknown,
+  // The Production default: no new request can be started (docs/11 FP-ADR-074).
+  requestTypes = { data: [], meta: { submission_enabled: false } } as unknown,
 }: {
   user?: FamilyUser | Error;
   household?: Answer;
@@ -282,6 +284,7 @@ export function familyGet({
   health?: Answer;
   needs?: Answer;
   assistance?: Answer;
+  requestTypes?: Answer;
 } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
@@ -318,6 +321,7 @@ export function familyGet({
     if (path === "/api/v1/family/coordinator/context") {
       return typeof coordinator === "function" || coordinator instanceof Error ? answer(coordinator) : { data: coordinator };
     }
+    if (path === "/api/v1/family/change-requests/types") return answer(requestTypes);
     throw new Error(`Unexpected GET ${path}`);
   };
 }

@@ -76,7 +76,7 @@ describe("the page", () => {
 
     const nav = await screen.findByRole("navigation", { name: "التنقل الرئيسي" });
     expect(within(nav).getByRole("link", { name: "أسرتي" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["الرئيسية", "أسرتي", "حسابي"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["الرئيسية", "أسرتي", "طلباتي", "حسابي"]);
   });
 
   it("is reached from an entry card on «أسرتي», without counts", async () => {

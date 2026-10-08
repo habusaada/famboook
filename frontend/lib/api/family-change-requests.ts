@@ -126,6 +126,9 @@ export function useFamilyChangeRequestTypesQuery() {
   const result = useQuery({
     queryKey: familyChangeRequestKeys.types,
     queryFn: () => apiClient.get<FamilyChangeRequestTypes>(`${PATH}/types`),
+    // Shared by the bottom navigation and the request screens: one read per
+    // minute at most, refreshed on focus; cleared with the cache on sign-out.
+    staleTime: 60 * 1000,
     retry: false,
   });
   useFamilyAccessFailure(result.error);
@@ -196,6 +199,17 @@ export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = 
 
 export function familyRequestFormFor(type: ChangeRequestType): string | null {
   return FAMILY_REQUEST_FORMS[type] ?? null;
+}
+
+/**
+ * May the household head START a new request now (docs/11 FP-ADR-074)? Only
+ * from a successful server answer: submission enabled, and at least one
+ * listed (registered, family-submittable, permitted) type with a Family
+ * form in this client. Loading, an error or no answer → false.
+ */
+export function canStartFamilyRequest(types: FamilyChangeRequestTypes | undefined): boolean {
+  if (!types?.meta.submission_enabled) return false;
+  return types.data.some(({ type }) => familyRequestFormFor(type) !== null);
 }
 
 /** A friendly Arabic message for a failed family action — never a raw error. */

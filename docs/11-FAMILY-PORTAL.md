@@ -1217,7 +1217,9 @@ UPDATE   never directly: corrections and new events are submitted as
 أفراد الأسرة            /family/members — list + in-page member detail sheet
 الاحتياجات والمساعدات   /family/household/support — recorded needs and
                         received assistance (3B.7), reached from «أسرتي»
-طلباتي                  PWA-5 / PWA-6
+طلباتي                  /family/requests — the Family's requests (always
+                        linked); «+» → /family/requests/new only while a
+                        request can be started (FP-ADR-074)
 حسابي                   /family/account — account state (3B.5)
   بياناتي الشخصية        /family/account/me — the head's own Person and
                         membership data (3B.1); also linked from the head's
@@ -3568,6 +3570,31 @@ the navigation (PFP-025); then `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`
 on the server; Staff briefed on the residence review; the pilot SOP
 (docs/09) updated for residence requests.
 
+## PWA-6.1a implementation record — residence pilot readiness
+
+Implemented 2026-10-08. No migration, permission, role or backend change;
+nothing deployed or enabled.
+
+- **Navigation (FP-ADR-074, PFP-025 closed):** `FamilyBottomNav` links
+  «طلباتي» always and «+» from `canStartFamilyRequest(types)` over the
+  shared type-discovery query (`staleTime` 60 s). With Production's switch
+  off, «+» stays disabled and «طلباتي» opens the (empty) history.
+- **Documentation reconciled:** RESIDENCE_UPDATE maps to
+  `UpdateFamilyResidenceAction` (in-place correction) in docs/01 §99,
+  docs/02 §57, docs/04 and docs/05 §71; a real move with history stays a
+  separate, future use case (`ChangeFamilyResidenceAction`,
+  `residence.change`, FU-02). Earlier records and change-log rows are kept.
+- **Release readiness:** docs/08 §16b (release content since PWA-5a,
+  gates, deployment, feature shutdown, rollback) and docs/09 «طلبات تحديث
+  السكن — التجربة المضبوطة» (controlled pilot runbook). The Production
+  env template now carries `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false`.
+- **Tests:** frontend navigation matrix (switch off / empty / no form /
+  available / loading / error / capability change / cache cleared /
+  identifiers / current entry / order and names) and the existing Family
+  navigation tests updated for the linked «طلباتي».
+- **Not done (pilot prerequisites):** the deployment itself, the restore
+  test, the pilot authorization, and the switch — see docs/08 §16b.
+
 ---
 
 # 31. Amendment Register
@@ -4351,6 +4378,29 @@ Family Change Request API (PWA-5e — approved 2026-10-08).
   context (audience, canViewSensitiveIdentity, canViewInternalNotes) is a
   PWA-6.1 prerequisite: the handler contract does not receive the viewer yet,
   and no permission yet grants full-identity viewing.
+
+FP-ADR-074
+Family navigation activation (PWA-6.1a — approved 2026-10-08; resolves
+PFP-025).
+- «طلباتي» is a link to /family/requests for every household head WITH a
+  Family context (the only users who see the bottom navigation). It does
+  not depend on CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED: history,
+  clarification replies and cancellation stay available while new
+  submissions are closed;
+- «+» links to /family/requests/new only when the server's type discovery
+  (GET /api/v1/family/change-requests/types) answers successfully with
+  `submission_enabled: true` AND lists at least one type that has an
+  implemented Family form in the client (PWA-6.1: RESIDENCE_UPDATE). The
+  server lists a type only when it is registered, family-submittable and
+  the account holds change-request.submit. Otherwise — switch off, empty
+  list, no form, loading, any error — «+» keeps the established disabled
+  state («إجراء جديد (قريبًا)»);
+- never derived from a frontend environment variable; one shared TanStack
+  Query read (stale after a minute, refreshed on focus), cleared with the
+  whole cache at sign-in and sign-out;
+- the home quick actions are not part of this decision and stay disabled;
+- the server remains the authority: a visible «+» grants nothing, and every
+  submission is re-checked (switch, eligibility, type, validation).
 ```
 
 ---
@@ -4491,9 +4541,10 @@ The Domain Action path for confirming an UNKNOWN member as ALIVE:
 ConfirmPersonAliveAction, Staff endpoint with a verification method, and
 PERSON_CORRECTION / CONFIRM_ALIVE (statement + Staff review) later.
 
-PFP-025  (before Family self-service is enabled)
+PFP-025  — RESOLVED 2026-10-08 (FP-ADR-074)
 Activating «+», «طلباتي» and the quick actions in the Family bottom
-navigation. FP-ADR-072 keeps them disabled UNTIL PWA-6.1; PWA-6.1 is built
+navigation. Decided: «طلباتي» always; «+» from server type discovery; the
+quick actions stay disabled. The original question: FP-ADR-072 keeps them disabled UNTIL PWA-6.1; PWA-6.1 is built
 but keeps them disabled pending this decision. Proposal: enable them only
 while the server reports `submission_enabled` (type discovery) — so they
 follow the existing CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED switch and
@@ -4574,3 +4625,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.33 | 2026-10-08 | Approved | PWA-5e Family Change Request API (FP-ADR-073): routes, Family-subject history and isolation, submission switch (default off), type discovery, family-safe views and timeline, approved presentation shape and the PWA-6.1 presentation-context prerequisite; implementation record in §30a |
 | 1.34 | 2026-10-08 | Approved | PWA-5f Family request views: implementation record in §30a — «طلباتي», request detail and «طلب جديد» discovery on the PWA-5e API, built but not linked («+» and «طلباتي» stay disabled until PWA-6.1); no backend change |
 | 1.35 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE: implementation record in §30a — V1 field set, strict input, changed-fields proposal, base fingerprint, APPLY through UpdateFamilyResidenceAction, `{rows}` presentation and the server-computed presentation context; §14 status; PFP-025 navigation activation left open (navigation stays disabled, switch off) |
+| 1.36 | 2026-10-08 | Approved | PWA-6.1a: FP-ADR-074 Family navigation activation («طلباتي» always, «+» from server type discovery); PFP-025 resolved; §23 navigation map; implementation record in §30a; residence documentation reconciled in docs/01, 02, 04, 05 |
