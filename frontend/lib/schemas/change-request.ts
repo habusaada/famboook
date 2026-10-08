@@ -39,3 +39,10 @@ export const rejectChangeRequestSchema = z
     }
   });
 export type RejectChangeRequestValues = z.infer<typeof rejectChangeRequestSchema>;
+
+// The household head's reply to a clarification (PWA-5f). Laravel's
+// ResubmitFamilyChangeRequestRequest is authoritative.
+export const resubmitFamilyChangeRequestSchema = z.object({
+  response: text.refine((v) => v.trim().length > 0, "اكتب ردّك على طلب الاستكمال."),
+});
+export type ResubmitFamilyChangeRequestValues = z.infer<typeof resubmitFamilyChangeRequestSchema>;

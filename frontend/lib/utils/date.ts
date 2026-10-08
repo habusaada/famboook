@@ -36,3 +36,8 @@ const LONG_DATE = new Intl.DateTimeFormat("ar-u-nu-latn", { day: "numeric", mont
 export function formatDateLong(date: string): string {
   return LONG_DATE.format(new Date(`${date}T00:00:00Z`));
 }
+
+/** The local calendar date of a system timestamp (ISO 8601) in words, e.g. submitted_at. */
+export function formatTimestampDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ar", { day: "numeric", month: "long", year: "numeric" });
+}

@@ -3473,6 +3473,39 @@ Production registry stays empty and the submission switch is off.
 - **Type labels:** the API returns codes; Arabic wording stays in the
   client (as for the Staff workspace).
 
+## PWA-5f implementation record — Family request views
+
+Implemented 2026-10-08 on the PWA-5e Family API (FP-ADR-073). Frontend
+only — no backend change, migration or request type. The views are built
+but NOT linked: «+», «طلباتي» and the quick actions stay disabled until
+PWA-6.1 (FP-ADR-072; docs/07 RM-ADR-055).
+
+| Route | Screen |
+|---|---|
+| `/family/requests` | «طلباتي» — the whole Family's history (Family-subject); status and type filters and the page in the URL; server pagination |
+| `/family/requests/{uuid}` | Request detail — status and its meaning, request code, reason, the proposal, the family-visible timeline, the action required, the outcome |
+| `/family/requests/new` | «طلب جديد» — type discovery only; a type is startable only when the server lists it AND a Family form exists in the client (none before PWA-6.1) |
+
+- **Status vocabulary:** APPROVED reads «معتمد بانتظار التطبيق», never as
+  an update; only APPLIED («تم تطبيق التعديل») uses the success tone.
+- **Proposal:** rendered only in the approved `{rows: [{label, current,
+  proposed}]}` shape; null or any other shape shows a neutral note and is
+  never interpreted.
+- **Timeline:** server order; no names or internal notes are received;
+  APPLY_FAILED is skipped even if one arrived; public messages are labelled
+  «ردّك» (RESUBMITTED) or as the review team's.
+- **Actions:** «إرسال الاستكمال» (response required, length-limited) and
+  «إلغاء الطلب» (confirmation only) are offered only from
+  `available_actions`; one send in flight, never retried, no optimistic
+  status; after any result the request and history are re-read, so a 409
+  shows the current state.
+- **Discovery:** switch off → «غير متاحة حاليًا»; empty list → no types
+  message; no invented options, free-form JSON or form builder.
+- **Privacy:** no family, person, member or submitter identifier is sent;
+  data lives only in the query cache (cleared on sign-out), never in
+  browser storage; access failures (401 / 403 family-context) go through
+  the shared Family access handling.
+
 ---
 
 # 31. Amendment Register
@@ -4468,3 +4501,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.31 | 2026-10-08 | Approved | PWA-5c Staff Change Request API: implementation record in §30a — routes and permissions, queue filters, review view and timeline, internal-note visibility, mutation bodies and outcome, error mapping, empty-registry behaviour, PWA-5d activity-label dependency; Family Portal unchanged |
 | 1.32 | 2026-10-08 | Approved | PWA-5d Staff review workspace: implementation record in §30a — queue and review screens, status vocabulary, proposal rendering and the PWA-6.1 presentation-contract proposal, timeline, permission-aware actions, Change Request activity labels; Family Portal unchanged |
 | 1.33 | 2026-10-08 | Approved | PWA-5e Family Change Request API (FP-ADR-073): routes, Family-subject history and isolation, submission switch (default off), type discovery, family-safe views and timeline, approved presentation shape and the PWA-6.1 presentation-context prerequisite; implementation record in §30a |
+| 1.34 | 2026-10-08 | Approved | PWA-5f Family request views: implementation record in §30a — «طلباتي», request detail and «طلب جديد» discovery on the PWA-5e API, built but not linked («+» and «طلباتي» stay disabled until PWA-6.1); no backend change |

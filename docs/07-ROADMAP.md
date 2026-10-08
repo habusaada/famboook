@@ -2135,7 +2135,8 @@ PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
         5c Staff API — DONE (RM-ADR-057) · 5d Staff review workspace
            — DONE (RM-ADR-058; activity labels added)
         5e Family API (submission switch, default off) — DONE
-           (RM-ADR-059) · 5f Family views
+           (RM-ADR-059) · 5f Family views — DONE (RM-ADR-060;
+           built, not linked)
         then PWA-6.1 RESIDENCE_UPDATE enables «+» and «طلباتي»
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
@@ -4749,6 +4750,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-060
+PWA-5f — Family request views are done (2026-10-08; docs/11 §30a): «طلباتي» (Family-subject history, URL filters, server pagination), the request detail (status meaning, proposal in the approved `{rows}` shape only, family-visible timeline, resubmit / cancel from `available_actions`) and «طلب جديد» discovery, on the PWA-5e API. Frontend only — no backend change, migration or request type. The views are built but not linked: «+», «طلباتي» and the quick actions stay disabled until PWA-6.1 (RM-ADR-055). PWA-5 is complete; PWA-6.1 RESIDENCE_UPDATE follows, with the presentation prerequisites of RM-ADR-059.
+
 ### RM-ADR-059
 PWA-5e — Family Change Request API is done (2026-10-08; docs/11 FP-ADR-073, docs/06 AUTH-ADR-091): history, detail, type discovery, submit, resubmit and cancel for the eligible household head, with the submission switch (default off). No migration, frontend or request type; the Production registry stays empty, so nothing can be submitted. PWA-5 is not complete: 5f (Family request views) follows. PWA-6.1 prerequisites: the first handler adopts the approved `{rows}` presentation, and a server-computed presentation context (audience, sensitive-identity and internal-note visibility) is added to the handler contract.
 
@@ -5050,6 +5054,7 @@ Date: 2026-09-24
 | 1.2.55 | 2026-10-08 | Approved | PWA-5c done (RM-ADR-057): Staff Change Request API; no migration, frontend or request type; 5d dependency — Change Request activity labels in the Staff timeline before PWA-6.1 |
 | 1.2.56 | 2026-10-08 | Approved | PWA-5d done (RM-ADR-058): Staff review workspace and Change Request activity labels; presentation-contract gap recorded for PWA-6.1; no backend change; 5e / 5f next |
 | 1.2.57 | 2026-10-08 | Approved | PWA-5e done (RM-ADR-059): Family Change Request API with the submission switch off; PWA-6.1 presentation prerequisites recorded; 5f next |
+| 1.2.58 | 2026-10-08 | Approved | PWA-5f done (RM-ADR-060): Family request views built but not linked; PWA-5 complete; PWA-6.1 next |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |
