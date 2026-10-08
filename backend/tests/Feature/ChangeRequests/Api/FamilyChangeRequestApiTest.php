@@ -282,13 +282,13 @@ class FamilyChangeRequestApiTest extends TestCase
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => true]]);
         FakeChangeRequestHandler::$submittable = true;
 
-        config(['change_requests.family_submission_enabled' => false]);
+        config(['change_requests.family_submission_mode' => 'OFF']);
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
 
         // The real Production registry: RESIDENCE_UPDATE only (PWA-6.1), and only while the switch is on.
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::production());
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
-        config(['change_requests.family_submission_enabled' => true]);
+        config(['change_requests.family_submission_mode' => 'GENERAL']);
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE']], 'meta' => ['submission_enabled' => true]]);
     }
 
@@ -296,7 +296,7 @@ class FamilyChangeRequestApiTest extends TestCase
     {
         $returned = $this->returned();
         $open = $this->submit($this->headContext('133456789'));
-        config(['change_requests.family_submission_enabled' => false]);
+        config(['change_requests.family_submission_mode' => 'OFF']);
         $before = [ChangeRequest::count(), WorkflowEvent::count(), FamilyActivity::count()];
 
         $this->api($this->context->user, 'POST', '', $this->body())->assertStatus(503)
@@ -312,7 +312,7 @@ class FamilyChangeRequestApiTest extends TestCase
         $this->api($this->context->user, 'POST', "/{$returned->uuid}/cancel")->assertOk()->assertJsonPath('data.status', 'CANCELLED');
         $this->assertSame(S::SUBMITTED, $open->fresh()->status);
         // And the switch defaults to off.
-        $this->assertFalse((require config_path('change_requests.php'))['family_submission_enabled']);
+        $this->assertSame('OFF', (require config_path('change_requests.php'))['family_submission_mode']);
     }
 
     public function test_the_production_registry_accepts_no_unregistered_type(): void

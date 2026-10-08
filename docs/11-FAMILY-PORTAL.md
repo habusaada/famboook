@@ -3595,6 +3595,32 @@ nothing deployed or enabled.
 - **Not done (pilot prerequisites):** the deployment itself, the restore
   test, the pilot authorization, and the switch — see docs/08 §16b.
 
+## PWA-6.1b implementation record — controlled pilot submission gate
+
+Implemented 2026-10-08 (FP-ADR-075). No migration, permission, route or
+frontend change; nothing deployed or enabled.
+
+- `App\Enums\FamilySubmissionMode` (OFF / PILOT / GENERAL) and
+  `App\Support\ChangeRequests\FamilySubmissionPolicy` (`mode()`,
+  `pilotFamilyIds()`, `allows(FamilyAccessResult)`), read by
+  `SubmitChangeRequestAction`, `SubmitFamilyChangeRequestRequest` and
+  `FamilyChangeRequestController::types`; `config/change_requests.php` keys
+  `family_submission_mode`, `pilot_family_ids`,
+  `legacy_family_submission_enabled` (warning only).
+- `php artisan famboook:change-requests-check`: effective mode, allowlist
+  state as counts (ids, active Families), legacy key present YES / NO;
+  exit 1 on warnings. Never prints an id.
+- Tests: `tests/Feature/ChangeRequests/Api/FamilySubmissionGateTest.php`
+  (modes, normalization, malformed allowlists, legacy key, Domain Action
+  enforcement, missing Family context, client-chosen Family, disclosure,
+  history / resubmit / cancel, Staff workflow, idempotency and open
+  conflict, readiness command) and a PostgreSQL test (a non-allowlisted
+  Family is refused without waiting on its locked row; the allowlisted one
+  waits). Existing tests now set the mode instead of the boolean.
+- Operations: docs/08 §16b (modes, allowlist format, opening, changing,
+  shutdown, configuration cache), docs/09 (pilot uses PILOT, never
+  GENERAL).
+
 ---
 
 # 31. Amendment Register
@@ -4401,6 +4427,36 @@ PFP-025).
 - the home quick actions are not part of this decision and stay disabled;
 - the server remains the authority: a visible «+» grants nothing, and every
   submission is re-checked (switch, eligibility, type, validation).
+
+FP-ADR-075
+Controlled pilot submission gate (PWA-6.1b — approved 2026-10-08;
+supersedes the boolean switch of FP-ADR-073).
+- NEW family submissions follow one mode, CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE:
+  OFF (default) — nobody; PILOT — only the Families on the allowlist;
+  GENERAL — every otherwise eligible household head. Trimmed and
+  upper-cased; missing, empty or any other value is OFF;
+- the PILOT allowlist, CHANGE_REQUESTS_PILOT_FAMILY_IDS, is a comma-separated
+  list of canonical Family database ids (positive integers); empty means no
+  Family and ONE malformed entry invalidates the whole list (no Family). It
+  is server configuration only: no table, no Staff screen, no endpoint; it is
+  never logged, returned, shown or committed with real ids;
+- FamilySubmissionPolicy is the one decision, from trusted inputs only (the
+  family.context Family and the configuration — never a client Family id).
+  SubmitChangeRequestAction enforces it (authoritative) after the actor
+  check, before any input is validated, read or written;
+  SubmitFamilyChangeRequestRequest asks it early (same 503
+  CHANGE_REQUEST_SUBMISSION_DISABLED after the 401 / 403 boundary); type
+  discovery reports it per Family: `submission_enabled` is THIS Family's
+  channel state and the list is empty when it is closed — the response
+  shape is unchanged, so FP-ADR-074's «+» needs no client change;
+- the replaced CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED is never read as a
+  switch: a leftover `true` can never open GENERAL;
+  famboook:change-requests-check (read-only, counts only) warns while it
+  is set;
+- only NEW submissions are gated: history, detail, resubmission,
+  cancellation and the whole Staff workflow are unaffected in every mode;
+- OFF → PILOT → GENERAL is always an explicit administrator change; the
+  pilot uses PILOT only; GENERAL needs its own decision after the pilot.
 ```
 
 ---
@@ -4626,3 +4682,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.34 | 2026-10-08 | Approved | PWA-5f Family request views: implementation record in §30a — «طلباتي», request detail and «طلب جديد» discovery on the PWA-5e API, built but not linked («+» and «طلباتي» stay disabled until PWA-6.1); no backend change |
 | 1.35 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE: implementation record in §30a — V1 field set, strict input, changed-fields proposal, base fingerprint, APPLY through UpdateFamilyResidenceAction, `{rows}` presentation and the server-computed presentation context; §14 status; PFP-025 navigation activation left open (navigation stays disabled, switch off) |
 | 1.36 | 2026-10-08 | Approved | PWA-6.1a: FP-ADR-074 Family navigation activation («طلباتي» always, «+» from server type discovery); PFP-025 resolved; §23 navigation map; implementation record in §30a; residence documentation reconciled in docs/01, 02, 04, 05 |
+| 1.37 | 2026-10-08 | Approved | PWA-6.1b: FP-ADR-075 controlled pilot submission gate — modes OFF / PILOT / GENERAL, server-only Family allowlist, FamilySubmissionPolicy enforced in SubmitChangeRequestAction, per-Family type discovery, legacy boolean never opens; implementation record in §30a |

@@ -64,7 +64,7 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         parent::setUp();
         config(['database.connections.other_runner' => config('database.connections.pgsql')]);
         $this->useFamilyAuthKey();
-        config(['change_requests.family_submission_enabled' => true]);
+        config(['change_requests.family_submission_mode' => 'GENERAL']);
         $this->seed(RolePermissionSeeder::class);
         $this->context = app(FamilyAccessResolver::class)->familyContext($this->activatedHead()['user']);
         $this->residence = FamilyResidence::factory()->create([
@@ -133,9 +133,10 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         $this->assertSame(self::LOCK_NOT_AVAILABLE, (string) $e->getCode());
     }
 
-    private function submit(string $neighborhood = 'حي النصر'): ChangeRequest
+    private function submit(string $neighborhood = 'حي النصر', ?FamilyAccessResult $context = null): ChangeRequest
     {
-        $residence = $this->residence->fresh();
+        $context ??= $this->context;
+        $residence = FamilyResidence::query()->where('family_id', $context->family->id)->where('is_current', true)->firstOrFail();
         $input = [
             'governorate' => $residence->governorate, 'city' => $residence->city, 'area' => $residence->area,
             'neighborhood' => $neighborhood, 'address_text' => $residence->address_text,
@@ -143,7 +144,7 @@ class ResidenceUpdateConcurrencyTest extends TestCase
             'displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => null,
         ];
 
-        return app(SubmitChangeRequestAction::class)->handle($this->context, new ChangeRequestSubmission(
+        return app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(
             ChangeRequestType::RESIDENCE_UPDATE, $input, null, (string) Str::uuid(),
         ))->request;
     }
@@ -210,5 +211,24 @@ class ResidenceUpdateConcurrencyTest extends TestCase
             $this->assertSame(ChangeRequestException::ALREADY_OPEN, $e->reason);
         }
         $this->assertSame(1, ChangeRequest::count());
+    }
+
+    public function test_the_pilot_gate_refuses_before_any_lock_and_admits_the_allowlisted_family(): void
+    {
+        $outsider = app(FamilyAccessResolver::class)->familyContext($this->activatedHead('223456789')['user']);
+        FamilyResidence::factory()->create(['family_id' => $outsider->family->id, 'displacement_status' => DisplacementStatus::NOT_DISPLACED]);
+        config(['change_requests.family_submission_mode' => 'PILOT', 'change_requests.pilot_family_ids' => (string) $this->context->family->id]);
+
+        // A non-allowlisted Family is refused at once — it never waits on (or reads) its locked Family row.
+        $refused = $this->whileLocked('families', $outsider->family->id, fn () => $this->submit(context: $outsider));
+        $this->assertInstanceOf(ChangeRequestException::class, $refused);
+        $this->assertSame(ChangeRequestException::SUBMISSION_DISABLED, $refused->reason);
+
+        // The allowlisted Family goes through the normal serialized path: it waits for the parallel holder.
+        $this->assertWaited($this->whileLocked('families', $this->context->family->id, fn () => $this->submit()));
+        $this->assertSame(0, ChangeRequest::count());
+
+        $this->submit();
+        $this->assertSame([$this->context->family->id], ChangeRequest::pluck('family_id')->all());
     }
 }

@@ -28,7 +28,7 @@ trait ChangeRequestFixtures
     {
         $this->useFamilyAuthKey();
         // The engine tests submit; the switch itself is tested in the Family API tests.
-        config(['change_requests.family_submission_enabled' => true]);
+        config(['change_requests.family_submission_mode' => 'GENERAL']);
         $this->seed(RolePermissionSeeder::class);
         FakeChangeRequestHandler::reset();
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::fake([

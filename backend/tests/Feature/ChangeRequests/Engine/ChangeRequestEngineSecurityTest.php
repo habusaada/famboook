@@ -58,7 +58,7 @@ class ChangeRequestEngineSecurityTest extends TestCase
         $submit = fn () => app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(ChangeRequestType::BIRTH_REPORT, ['x' => 1], null, (string) Str::uuid()));
         // PWA-5e: the submission switch is off by default …
         foreach ([false => ChangeRequestException::SUBMISSION_DISABLED, true => ChangeRequestException::TYPE_UNAVAILABLE] as $enabled => $code) {
-            config(['change_requests.family_submission_enabled' => (bool) $enabled]);
+            config(['change_requests.family_submission_mode' => $enabled ? 'GENERAL' : 'OFF']);
             try {
                 $submit();
                 $this->fail('A Production type was submittable');

@@ -18,6 +18,7 @@ use App\Support\ChangeRequests\ChangeRequestTarget;
 use App\Support\ChangeRequests\ChangeRequestTransitions;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\ChangeRequestWorkflow;
+use App\Support\ChangeRequests\FamilySubmissionPolicy;
 use App\Support\ChangeRequests\WorkflowEventRecorder;
 use App\Support\FamilyActivityLog;
 use App\Support\FamilyAuth\FamilyAccessResult;
@@ -61,14 +62,16 @@ class SubmitChangeRequestAction
 
     public function handle(FamilyAccessResult $context, ChangeRequestSubmission $submission): ChangeRequestOutcome
     {
-        // The family submission switch (PWA-5e), checked first and server-side:
-        // nothing is validated, read or written while it is off.
-        if (config('change_requests.family_submission_enabled') !== true) {
-            throw new ChangeRequestException(ChangeRequestException::SUBMISSION_DISABLED);
-        }
-
+        // WHO first (the actor refusal keeps its precedence), then the family
+        // submission channel (PWA-6.1b, FamilySubmissionPolicy: OFF / PILOT
+        // allowlist / GENERAL) for THIS context's Family — before any input is
+        // validated, read or written. Authoritative: the HTTP layer only asks
+        // earlier.
         $transition = ChangeRequestTransitions::assertAllowed(null, ChangeRequestStatus::SUBMITTED);
         $user = ChangeRequestActors::family($context, $transition);
+        if (! FamilySubmissionPolicy::allows($context)) {
+            throw new ChangeRequestException(ChangeRequestException::SUBMISSION_DISABLED);
+        }
         /** @var Family $family */
         $family = $context->family;
         $person = $context->person ?? throw new ChangeRequestException(ChangeRequestException::ACTOR_NOT_ALLOWED);

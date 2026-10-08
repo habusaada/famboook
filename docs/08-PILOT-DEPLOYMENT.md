@@ -534,7 +534,8 @@ Family Portal activation may be enabled in Production.
   SOCIAL_WORKER and REPORTS_VIEWER do not see the entry. Rollback: the
   previous frontend build.
 - **Family Change Request API (PWA-5e, docs/11 FP-ADR-073).** No
-  migration or package. New `.env` key `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`
+  migration or package. **Replaced in PWA-6.1b** by `CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE`
+  (§16b) — the boolean below no longer opens anything. Original note: new `.env` key `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`
   — keep it `false` (or absent) in Production until a request type is
   approved and enabled (PWA-6.1); `optimize` after any change. Post-deploy:
   as an activated household head `GET /api/v1/family/change-requests`
@@ -850,12 +851,12 @@ it has been verified on the server yet.
 
 ---
 
-# 16b. Change Request release (PWA-5b … PWA-6.1a)
+# 16b. Change Request release (PWA-5b … PWA-6.1b)
 
 Production runs PWA-5a (`e36ebd7`: the two Change Request tables, CHECKs,
 sequence, append-only trigger and permissions). This release brings
-PWA-5b, 5c, 5d, 5e, 5f, 6.1 and 6.1a. It is deployed **closed**: the family
-submission switch stays off, and opening the pilot is a separate,
+PWA-5b, 5c, 5d, 5e, 5f, 6.1, 6.1a and 6.1b. It is deployed **closed**: the
+family submission mode stays `OFF`, and opening the pilot is a separate,
 explicit authorization (docs/09 «طلبات تحديث السكن — التجربة المضبوطة»).
 
 ## Release content since PWA-5a (verified 2026-10-08)
@@ -865,7 +866,7 @@ explicit authorization (docs/09 «طلبات تحديث السكن — التج�
 | Migrations | **None.** No file under `backend/database/migrations` changed after `e36ebd7`; the PWA-5a schema is used as is |
 | Seeders / permissions | **None.** `RolePermissionSeeder` is unchanged since PWA-5a; seeding stays idempotent and `famboook:verify-permissions` must pass |
 | Packages | None (`composer.lock`, `package-lock.json` unchanged) |
-| Configuration | New `config/change_requests.php`; one `.env` key `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED` (absent = false). Optional limits `CHANGE_REQUESTS_FAMILY_SUBMIT_LIMIT_USER_MINUTE` (3), `…_HOUR` (20), `CHANGE_REQUESTS_FAMILY_ACTION_LIMIT_USER_MINUTE` (10) |
+| Configuration | New `config/change_requests.php`; `.env` keys `CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE` (`OFF` / `PILOT` / `GENERAL`; absent or invalid = `OFF`) and `CHANGE_REQUESTS_PILOT_FAMILY_IDS` (PILOT allowlist, see below). The PWA-5e boolean `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED` is replaced and opens nothing. Optional limits `CHANGE_REQUESTS_FAMILY_SUBMIT_LIMIT_USER_MINUTE` (3), `…_HOUR` (20), `CHANGE_REQUESTS_FAMILY_ACTION_LIMIT_USER_MINUTE` (10) |
 | Backend | Domain engine (5b), Staff API (5c), Family API (5e), RESIDENCE_UPDATE handler and presentation context (6.1) — the only registered type |
 | Frontend | Staff «طلبات تحديث البيانات» workspace (5d), Family request screens (5f), residence form (6.1), Family navigation (6.1a) |
 | Unchanged | Family authentication, activation, login, password reset, the Digital Family Card / PDF / public verification, registry screens |
@@ -881,8 +882,9 @@ explicit authorization (docs/09 «طلبات تحديث السكن — التج�
 4. The latest nightly backup exists off-server **and** a restore test (§13)
    has passed on it. Take a fresh `backup-db.sh` run immediately before
    the deployment and confirm its checksum.
-5. The server `.env` contains `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false`
-   (added explicitly, not left implicit).
+5. The server `.env` contains `CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE=OFF`
+   and an empty `CHANGE_REQUESTS_PILOT_FAMILY_IDS=` (explicit, not
+   implicit), and does NOT contain `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`.
 6. Free disk space and memory are sufficient for `npm run build` (it
    fails with out-of-memory errors on a 4 GB machine under load).
 
@@ -904,7 +906,9 @@ sudo -u deploy git -C <app-root> status --short     # must be empty
 sudo -u deploy git -C <app-root> rev-parse HEAD      # must equal <sha>
 
 # 2. configuration (server .env, by the system administrator)
-CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false
+CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE=OFF
+CHANGE_REQUESTS_PILOT_FAMILY_IDS=
+#   (remove any CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED line)
 
 # 3. backend: down → composer → migrate (expects "Nothing to migrate")
 #    → RolePermissionSeeder → famboook:verify-permissions → optimize → up
@@ -930,8 +934,10 @@ No request is created; no data is written beyond logins.
 1. `curl https://api.famboook.com/api/v1/health` → `{"status":"ok"}`;
    `famboook.com/login` and `famboook.com/family/login` load.
 2. `php artisan famboook:verify-permissions` passes.
-3. `php artisan tinker --execute="dump(config('change_requests.family_submission_enabled'));"`
-   prints `false`.
+3. `sudo -u deploy php artisan famboook:change-requests-check` prints
+   `Family submission mode (effective): OFF`, `Pilot allowlist: empty`,
+   `Legacy … set: NO` and "no warnings" (counts only — it never prints a
+   Family id).
 4. A guest `GET /api/v1/change-requests` → 401; `GET /api/v1/family/change-requests/types` → 401.
 5. A Staff REVIEWER sees «طلبات تحديث البيانات» and an empty (or
    unchanged) queue; a DATA_ENTRY user does not see the entry.
@@ -947,39 +953,87 @@ No request is created; no data is written beyond logins.
    synthetic or authorized card.
 8. `storage/logs/laravel.log` shows no new errors.
 
+## Submission modes (docs/11 FP-ADR-075)
+
+| Mode | Who may submit a NEW request |
+|---|---|
+| `OFF` (default) | Nobody |
+| `PILOT` | Only household heads of the Families in `CHANGE_REQUESTS_PILOT_FAMILY_IDS` |
+| `GENERAL` | Every otherwise eligible household head |
+
+- The mode is enforced in `SubmitChangeRequestAction` (the server), not in
+  the browser; type discovery and the «+» entry only reflect it, per Family.
+- Missing, empty or invalid mode → `OFF`. A malformed allowlist (anything
+  but positive integer Family ids, comma-separated) → no Family.
+- Moving `OFF → PILOT → GENERAL` (or back) is always an explicit
+  administrator change to the server `.env`; nothing changes automatically.
+- Only NEW submissions are gated: history, detail, clarification replies,
+  cancellation and the whole Staff workflow work in every mode.
+- `GENERAL` is NOT part of the pilot. It needs its own written decision
+  after the pilot sign-off.
+
+**Allowlist format.** Canonical Family database ids (the `families.id`
+primary key — not the Family code, a National ID or a mobile), separated by
+commas: `CHANGE_REQUESTS_PILOT_FAMILY_IDS=1234` or `1234,5678`. Look the id up
+read-only from the Family code given in the written authorization, e.g.
+`sudo -u deploy php artisan tinker --execute="echo App\Models\Family::where('family_code', '<FAM-code>')->value('id');"`.
+Write it only into the server `.env`: never into Git, a ticket, a chat or a
+log.
+
 ## Opening the pilot (separate authorization)
 
 Only after the owner authorizes the pilot in writing and docs/09's
-preconditions are met:
+preconditions are met. As the system administrator:
 
 ```text
 # server .env
-CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=true
+CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE=PILOT
+CHANGE_REQUESTS_PILOT_FAMILY_IDS=<pilot family id(s)>
+
 sudo -u deploy php artisan config:clear
 sudo -u deploy php artisan optimize
 sudo systemctl reload php<version>-fpm
+sudo -u deploy php artisan famboook:change-requests-check
+#   expect: mode PILOT, "1 id(s), 1 active Family(ies)", no warnings
 ```
 
-`GET …/types` then lists RESIDENCE_UPDATE and «+» becomes active within a
-minute (or on refocus). The switch opens the channel for **every** eligible
-household head with an active account, not only the pilot Family: open it
-for the agreed pilot window only, while only authorized pilot accounts are
-activated, and close it afterwards.
+Verify, read-only, with two signed-in household heads:
+
+- the pilot Family's head: `GET …/change-requests/types` lists
+  RESIDENCE_UPDATE with `submission_enabled: true`; «+» becomes active
+  within a minute (or on refocus);
+- any other head (an authorized non-pilot test account, or a Staff
+  observer's check with the head's consent — never a random Family):
+  `{"data": [], "meta": {"submission_enabled": false}}`, «+» disabled,
+  «طلباتي» still opens.
+
+## Changing the allowlist
+
+Same procedure: edit `CHANGE_REQUESTS_PILOT_FAMILY_IDS`, then `config:clear`,
+`optimize`, reload PHP-FPM and `famboook:change-requests-check`. Only for a
+Family named in a written authorization. Removing a Family closes NEW
+submissions for it immediately; its existing requests continue.
 
 ## Feature shutdown (any time, no code change)
 
 ```text
-CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED=false
+CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE=OFF
 sudo -u deploy php artisan config:clear
 sudo -u deploy php artisan optimize
 sudo systemctl reload php<version>-fpm
+sudo -u deploy php artisan famboook:change-requests-check   # mode OFF
 ```
 
 Effect: new submissions answer 503 CHANGE_REQUEST_SUBMISSION_DISABLED and
 «+» returns to disabled; existing requests stay readable; families can
 still reply to a clarification or cancel; Staff can still review, approve,
 reject and APPLY. Nothing is deleted. This is the first response to any
-incident in the request channel.
+incident in the request channel. The allowlist may stay as it is (it has no
+effect while `OFF`).
+
+**Configuration cache.** Production caches configuration (`optimize`). A
+`.env` edit has NO effect until `config:clear` + `optimize` and a PHP-FPM
+reload; always finish with `famboook:change-requests-check`.
 
 ## Rollback
 
@@ -987,7 +1041,7 @@ Three different operations — never mix them up:
 
 | Operation | What it does | When |
 |---|---|---|
-| Feature shutdown | Switch off (above) | First response to any problem with submissions |
+| Feature shutdown | Mode `OFF` (above) | First response to any problem with submissions |
 | Code rollback | Check out the previous commit (`e36ebd7`, PWA-5a) as `deploy`, re-run `deploy-backend.sh` and `deploy-frontend.sh` | A defect in the release code, and only per the cases below |
 | Data restoration | Restore a backup | Only for data loss or corruption, by decision of the owner — never as a "rollback" of this release |
 
@@ -998,7 +1052,7 @@ migration — the PWA-5a schema stays as is. Do **not** roll back the
 PWA-5a migrations, drop the tables, or truncate anything.
 
 **B. After a real request exists:**
-1. turn the switch off (feature shutdown);
+1. set the mode to `OFF` (feature shutdown);
 2. prefer a **forward fix** of the code; a code rollback to PWA-5a would
    leave existing requests without the screens and actions that serve them
    (families could not see or cancel them, Staff could not apply them);
@@ -1015,7 +1069,9 @@ PWA-5a migrations, drop the tables, or truncate anything.
 
 ## Remaining Production prerequisites
 
-- The deployment above, by the system administrator.
+- The deployment above, by the system administrator, with mode `OFF`.
+- Any leftover `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED` removed from the
+  server `.env` (`famboook:change-requests-check` warns while it is set).
 - §13 restore test passed on a current backup (still marked REQUIRED).
 - Written pilot authorization and the pilot Family / accounts (docs/09).
 - A designated Staff reviewer with `change-request.apply`, briefed.
@@ -1181,6 +1237,7 @@ Never do this once real data has been entered.
 | 1.1.21 | 2026-10-08 | Approved | §16a: PWA-5d Staff review workspace — frontend-only deploy, post-deploy checks (navigation by permission, empty queue), rollback to the previous build |
 | 1.1.22 | 2026-10-08 | Approved | §16a: PWA-5e Family Change Request API — CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED stays false in Production, post-deploy checks, code-only rollback |
 | 1.1.23 | 2026-10-08 | Approved | §16b: Change Request release PWA-5b … PWA-6.1a — content since PWA-5a (no migration, no seeder change, one `.env` key), release gates, deployment with the switch off, read-only smoke checks, feature shutdown, rollback before / after real requests; env template carries the switch |
+| 1.1.24 | 2026-10-08 | Approved | §16b: PWA-6.1b submission modes OFF / PILOT / GENERAL with a Family allowlist (replaces the boolean), allowlist format, opening the pilot in PILOT, changing the allowlist, feature shutdown to OFF, configuration-cache rule, famboook:change-requests-check |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

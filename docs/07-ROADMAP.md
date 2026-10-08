@@ -2142,6 +2142,9 @@ PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
         6.1a pilot readiness — DONE 2026-10-08: navigation (docs/11
         FP-ADR-074), docs reconciled, docs/08 §16b release plan, docs/09
         pilot runbook; NOT deployed, switch off, pilot not started
+        6.1b controlled pilot gate — DONE 2026-10-08: submission mode
+        OFF / PILOT / GENERAL with a Family allowlist (docs/11
+        FP-ADR-075); NOT deployed, mode OFF, pilot not started
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
         DEATH_REPORT (non-head); «طلباتي»
@@ -5061,6 +5064,7 @@ Date: 2026-09-24
 | 1.2.58 | 2026-10-08 | Approved | PWA-5f done (RM-ADR-060): Family request views built but not linked; PWA-5 complete; PWA-6.1 next |
 | 1.2.59 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE built (docs/11 §30a): first registered request type, presentation context, family form; navigation activation open (docs/11 PFP-025); not enabled in Production |
 | 1.2.60 | 2026-10-08 | Approved | PWA-6.1a done: Family navigation (docs/11 FP-ADR-074), residence docs reconciled, release plan (docs/08 §16b) and pilot runbook (docs/09); Production pilot not started |
+| 1.2.61 | 2026-10-08 | Approved | PWA-6.1b done: controlled pilot submission gate (docs/11 FP-ADR-075); Production pilot not started |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

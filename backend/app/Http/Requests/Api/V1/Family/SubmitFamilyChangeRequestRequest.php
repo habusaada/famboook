@@ -4,7 +4,9 @@ namespace App\Http\Requests\Api\V1\Family;
 
 use App\Enums\ChangeRequestType;
 use App\Exceptions\ChangeRequestException;
+use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Requests\Api\V1\Concerns\ValidatesWorkflowMessages;
+use App\Support\ChangeRequests\FamilySubmissionPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,13 +27,15 @@ class SubmitFamilyChangeRequestRequest extends FormRequest
     }
 
     /**
-     * The submission switch answers before any validation, so a closed
-     * channel always gives the same response (SubmitChangeRequestAction
-     * checks it again — it is the authority).
+     * The submission channel (FamilySubmissionPolicy) answers before any
+     * validation, so a closed channel — OFF, or PILOT for a Family not on the
+     * allowlist — always gives the same response (SubmitChangeRequestAction
+     * checks it again — it is the authority). Runs after the family.context
+     * middleware, so 401 / 403 keep their precedence.
      */
     protected function prepareForValidation(): void
     {
-        if (config('change_requests.family_submission_enabled') !== true) {
+        if (! FamilySubmissionPolicy::allows(EnsureFamilyContext::context($this))) {
             throw new ChangeRequestException(ChangeRequestException::SUBMISSION_DISABLED);
         }
     }

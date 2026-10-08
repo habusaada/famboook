@@ -63,11 +63,11 @@ release and switch steps are in docs/08 §16b.
       (docs/08 §13) has passed.
 - [ ] `famboook:verify-permissions` passed after the deployment; no
       migration ran (this release has none).
-- [ ] The read-only smoke checks of docs/08 §16b passed with the switch
-      **off**.
+- [ ] The read-only smoke checks of docs/08 §16b passed with the mode
+      **OFF**.
 - [ ] Written pilot authorization from the owner: dates, the pilot Family
       (by Family code only), the household head's account, the Staff
-      reviewer, and who opens and closes the switch.
+      reviewer, and who sets and resets the submission mode.
 
 ### Choosing the pilot Family
 
@@ -76,15 +76,19 @@ release and switch steps are in docs/08 §16b.
 - The household head has an active Family Portal account and is the
   current head; the Family has a current residence.
 - The head agrees to take part and knows the request is reviewed by Staff.
+- The authorization names the Family by its Family code; the system
+  administrator turns it into the server-only allowlist entry (docs/08
+  §16b). Staff never see or handle the allowlist.
 - Refer to the Family by its Family code (`FAM-…`) and the request by its
   code (`CRQ-…`) only. Never write a National ID, mobile number, OTP,
   password, card number or QR link in notes, chats or screenshots.
 
 ### Opening
 
-The administrator turns the switch on (docs/08 §16b, "Opening the pilot")
-for the agreed window only. Opening it opens the channel for every active
-household head account, so keep the window short and close it after.
+The administrator sets the mode to `PILOT` with the pilot Family on the
+allowlist (docs/08 §16b, "Opening the pilot") for the agreed window. Only
+that Family can start a request; every other household head still sees
+«+» disabled. Never use `GENERAL` for the pilot.
 
 ### Family submission (with the household head)
 
@@ -125,8 +129,9 @@ household head account, so keep the window short and close it after.
 
 | Check | Expected |
 |---|---|
-| Switch off: «+» | Disabled; «طلباتي» still opens the history |
-| Switch off: open the form URL | «طلبات تحديث السكن غير متاحة حاليًا» |
+| Mode OFF: «+» | Disabled; «طلباتي» still opens the history |
+| Mode OFF: open the form URL | «طلبات تحديث السكن غير متاحة حاليًا» |
+| Mode PILOT, a Family not on the allowlist (authorized test account only) | «+» disabled; the form says unavailable; «طلباتي» opens |
 | A Staff account opening the Family Portal | Refused |
 | Another Family's request link | «الطلب غير متاح» |
 | A second request while one is open | Refused: a request is already open |
@@ -141,7 +146,7 @@ requests on a non-pilot Family.
 
 ### Closing
 
-The administrator turns the switch off at the end of the window. Open
+The administrator sets the mode back to `OFF` at the end of the window. Open
 requests stay visible and can still be reviewed, applied, answered or
 cancelled.
 
@@ -159,10 +164,10 @@ Acceptance (all required):
 - [ ] Every status shown to the family matched the Staff view.
 - [ ] Every negative check gave the expected result.
 - [ ] No error page, no raw error text, no data of another Family seen.
-- [ ] The switch was off again at the end.
+- [ ] The mode was `OFF` again at the end (`famboook:change-requests-check`).
 - [ ] Signed by the pilot Staff reviewer and the owner.
 
-If anything is wrong: turn the switch off first (docs/08 §16b, "Feature
+If anything is wrong: set the mode to `OFF` first (docs/08 §16b, "Feature
 shutdown"), then report — never delete or edit a request or its history.
 
 ## Security

@@ -19,6 +19,7 @@ use App\Models\ChangeRequest;
 use App\Support\ChangeRequests\ChangeRequestOutcome;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\ChangeRequests\FamilySubmissionPolicy;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,13 +54,15 @@ class FamilyChangeRequestController extends Controller
 
     /**
      * The request types this household head may submit NOW: registered,
-     * family-submittable handlers, while the submission switch is on and the
-     * account holds change-request.submit. Empty in Production (no handler is
-     * registered before PWA-6). `meta.submission_enabled` reports the switch.
+     * family-submittable handlers, while the submission channel is open FOR
+     * THIS FAMILY (FamilySubmissionPolicy: OFF / PILOT allowlist / GENERAL)
+     * and the account holds change-request.submit. `meta.submission_enabled`
+     * is this Family's channel state only — never the mode, the allowlist or
+     * anything about another Family.
      */
     public function types(Request $request, ChangeRequestTypes $types): JsonResponse
     {
-        $enabled = config('change_requests.family_submission_enabled') === true;
+        $enabled = FamilySubmissionPolicy::allows(EnsureFamilyContext::context($request));
         $available = $enabled && $request->user()->can('change-request.submit') ? $types->familySubmittable() : [];
 
         return response()->json([

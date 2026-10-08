@@ -64,7 +64,7 @@ class ResidenceUpdateTest extends TestCase
     {
         parent::setUp();
         $this->useFamilyAuthKey();
-        config(['change_requests.family_submission_enabled' => true]);
+        config(['change_requests.family_submission_mode' => 'GENERAL']);
         $this->seed(RolePermissionSeeder::class);
 
         $head = $this->activatedHead();
@@ -210,7 +210,7 @@ class ResidenceUpdateTest extends TestCase
 
     public function test_the_switch_off_refuses_before_anything_is_read(): void
     {
-        config(['change_requests.family_submission_enabled' => false]);
+        config(['change_requests.family_submission_mode' => 'OFF']);
 
         $this->submit(['anything' => 1])->assertStatus(503)->assertJsonPath('code', 'CHANGE_REQUEST_SUBMISSION_DISABLED');
         $this->family('GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
