@@ -3360,6 +3360,49 @@ request type; the Family Portal is unchanged («+» and «طلباتي» stay di
   retry / replay, security and privacy, handler boundary) on SQLite, and the
   row-lock races on PostgreSQL.
 
+## PWA-5c implementation record — Staff Change Request API
+
+Implemented 2026-10-08 (docs/06 AUTH-ADR-089, docs/05 WF-ADR-051, docs/07
+RM-ADR-057). Staff side only — no Family endpoint, no UI, no request type,
+no migration; the Family Portal is unchanged.
+
+| Route (`/api/v1`, `auth:sanctum` + `staff.side`) | Permission | Domain Action |
+|---|---|---|
+| `GET /change-requests` | change-request.view | — (queue) |
+| `GET /change-requests/{uuid}` | change-request.view | — (review view) |
+| `POST /change-requests/{uuid}/start-review` | change-request.review | StartChangeRequestReviewAction |
+| `POST /change-requests/{uuid}/return` | change-request.return | ReturnChangeRequestForClarificationAction |
+| `POST /change-requests/{uuid}/approve` | change-request.approve | ApproveChangeRequestAction |
+| `POST /change-requests/{uuid}/reject` | change-request.reject | RejectChangeRequestAction |
+| `POST /change-requests/{uuid}/apply` | change-request.apply | ApplyChangeRequestAction (no outer transaction) |
+
+- **Queue:** filters `status`, `type`, `family` (family_code), `request_code`
+  (CRQ-…), `submitted_from` / `submitted_to` (Y-m-d), `per_page` ≤ 50;
+  newest submission first, then id; rows carry identity, family code and
+  head name, requester name, milestones, apply_failure_count,
+  type_available and available_actions — never the proposal, the reason or
+  a message. No per-row queries.
+- **Review view:** the proposal only through the type handler's STAFF
+  presentation (`presentation`), the requester's reason, review milestones,
+  rejection, apply-failure summary and the chronological timeline (event,
+  statuses, actor name, actor side, reason code, public_message;
+  internal_note only with change-request.view-internal-notes). Without a
+  registered handler: `type_available: false`, `presentation: null`.
+  Never: submitted_data raw, base fingerprint / key version, client
+  reference, internal ids, event metadata.
+- **Mutations:** bodies `return {public_message, internal_note?}`, `reject
+  {rejection_reason_code, public_message? (required for OTHER),
+  internal_note?}` — text validated as stored (control and bidi characters
+  removed, ≤ 2000, blank = missing). Response `{id, request_code, status,
+  replayed}`; every response `Cache-Control: no-store, private`.
+- **Errors** (`{message, code}`): 401 guest or deactivated; 403 wrong side,
+  missing permission or ACTOR_NOT_ALLOWED; 404 unknown / malformed uuid or
+  NOT_FOUND; 422 validation, TYPE_UNAVAILABLE, PRECONDITION_FAILED,
+  NOT_APPLICABLE; 409 INVALID_TRANSITION, BASE_CHANGED, ALREADY_OPEN,
+  IDEMPOTENCY_CONFLICT; 500 APPLY_FAILED (generic message only).
+- **Before PWA-6.1:** the Staff activity timeline needs labels for the three
+  CHANGE_REQUEST_* activity types (PWA-5d).
+
 ---
 
 # 31. Amendment Register
@@ -4321,3 +4364,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.28 | 2026-10-07 | Approved | PWA-8.3 Digital Family Card PDF (FP-ADR-071): GET /api/v1/family/card/pdf for the existing ACTIVE credential only (no issuance, owner only, 404 / 409, no-store), mPDF ^8.3 (GPL-2.0-only, server-side) with bundled IBM Plex Sans Arabic (OFL), shared FamilyCardView, in-memory generation, no download audit; PFP-011 resolved; §20 annotated; implementation record in §30a |
 | 1.29 | 2026-10-07 | Approved | PWA-5a Change Request foundation (FP-ADR-072): approved order kept (PWA-4 after PWA-6); family-side transitions and CANCELLED; Family-subject request visibility; member_ref targets; separate family / Staff text; «+» and «طلباتي» stay disabled until PWA-6.1; §17, §28 and FU-04 updated; implementation record in §30a |
 | 1.30 | 2026-10-07 | Approved | PWA-5b Change Request engine: implementation record in §30a — Domain Actions, family-context submissions and Family-subject ownership, handler contract and empty Production registry, replays, activity boundary; Family Portal unchanged |
+| 1.31 | 2026-10-08 | Approved | PWA-5c Staff Change Request API: implementation record in §30a — routes and permissions, queue filters, review view and timeline, internal-note visibility, mutation bodies and outcome, error mapping, empty-registry behaviour, PWA-5d activity-label dependency; Family Portal unchanged |

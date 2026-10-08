@@ -2,7 +2,6 @@
 
 namespace App\Actions\ChangeRequests;
 
-use App\Enums\ChangeRequestApplyFailure;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\FamilyActivityType;
@@ -56,7 +55,7 @@ class RejectChangeRequestAction
                 throw ChangeRequestWorkflow::invalidTransition();
             }
             ChangeRequestActors::staff($staff, $transition);
-            if ($from === ChangeRequestStatus::APPROVED && ! $this->applyWasRefused($locked)) {
+            if ($from === ChangeRequestStatus::APPROVED && ! ChangeRequestWorkflow::applyWasRefused($locked)) {
                 throw ChangeRequestWorkflow::invalidTransition();
             }
 
@@ -75,15 +74,5 @@ class RejectChangeRequestAction
 
             return new ChangeRequestOutcome($locked);
         });
-    }
-
-    /** The latest apply attempt was refused because the request can no longer be applied. */
-    private function applyWasRefused(ChangeRequest $locked): bool
-    {
-        $failure = ChangeRequestWorkflow::lastEvent($locked, WorkflowEventType::APPLY_FAILED)?->reason_code;
-
-        return $locked->last_apply_failed_at !== null
-            && $failure !== null
-            && ChangeRequestApplyFailure::tryFrom($failure)?->isRefusal() === true;
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\AssistanceExecutionController;
 use App\Http\Controllers\Api\V1\AssistanceExportController;
 use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
@@ -258,6 +259,28 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
 
     Route::post('/families/{family}/card/reissue', [FamilyCredentialController::class, 'reissue'])
         ->middleware('can:family-card.reissue');
+
+    // Change Requests — the Staff workflow API (PWA-5c; docs/06 AUTH-ADR-089).
+    // Addressed by uuid only (ChangeRequest::resolveRouteBinding — after
+    // authentication, so a guest always gets 401). Each step is its PWA-5b Domain Action, which
+    // re-checks actor, transition, fresh canonical state and the base
+    // fingerprint. Apply runs WITHOUT any surrounding transaction.
+    Route::prefix('change-requests')->group(function () {
+        Route::get('/', [ChangeRequestController::class, 'index'])
+            ->middleware('can:change-request.view');
+        Route::get('/{changeRequest}', [ChangeRequestController::class, 'show'])
+            ->middleware('can:change-request.view');
+        Route::post('/{changeRequest}/start-review', [ChangeRequestController::class, 'startReview'])
+            ->middleware('can:change-request.review');
+        Route::post('/{changeRequest}/return', [ChangeRequestController::class, 'return'])
+            ->middleware('can:change-request.return');
+        Route::post('/{changeRequest}/approve', [ChangeRequestController::class, 'approve'])
+            ->middleware('can:change-request.approve');
+        Route::post('/{changeRequest}/reject', [ChangeRequestController::class, 'reject'])
+            ->middleware('can:change-request.reject');
+        Route::post('/{changeRequest}/apply', [ChangeRequestController::class, 'apply'])
+            ->middleware('can:change-request.apply');
+    });
 
     // Mobile trust (docs/06 §22b, PWA-1E): Staff-side only. The mobile number
     // is never an input — the Person's stored mobile is what gets trusted.

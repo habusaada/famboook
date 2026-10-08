@@ -521,6 +521,12 @@ Family Portal activation may be enabled in Production.
   5. rollback: CODE only. Both migrations' `down()` refuse while a request
      or event exists; never drop or truncate request history (the trigger
      refuses UPDATE and DELETE on `workflow_events`).
+- **Staff Change Request API (PWA-5c, docs/06 AUTH-ADR-089).** No
+  migration, package, `.env` key or frontend change; `deploy-backend.sh`
+  and `optimize` as usual. With the Production registry empty no request
+  can be submitted, so the queue stays empty: after the deploy a Staff
+  reviewer's `GET /api/v1/change-requests` answers 200 with no data, a
+  family-side account 403, a guest 401. Rollback: code only.
 - **Password reset enablement (FU-14, docs/11 FP-ADR-065).** Deploying
   FU-14 enables nothing: `FAMILY_PASSWORD_RESET_ENABLED` stays `false`
   in the server `.env` through the deployment, and the login page shows
@@ -984,6 +990,7 @@ Never do this once real data has been entered.
 | 1.1.17 | 2026-10-07 | Approved | §16a: PWA-8.2 Digital Family Card — deployment order (backend migration and seeding first), environment switches and limits, APP_KEY / APP_PREVIOUS_KEYS, smoke test, optional nginx `/verify/` access-log hardening, rollback / forward-fix |
 | 1.1.18 | 2026-10-07 | Approved | §16a: PWA-8.3 Digital Family Card PDF — `php -m` gd / mbstring / xml / zlib, composer adds mPDF (no migration), mPDF temp / font cache under storage/framework/cache/mpdf, bundled fonts, manual Arabic and print check, rollback |
 | 1.1.19 | 2026-10-07 | Approved | §16a: PWA-5a Change Request foundation — two additive migrations (PostgreSQL CHECKs, code sequence, append-only trigger), permission seeding and verify-permissions, PostgreSQL suite before the deploy, code-only rollback; no `.env` change |
+| 1.1.20 | 2026-10-08 | Approved | §16a: PWA-5c Staff Change Request API — no migration or configuration; post-deploy checks (empty queue 200 for a reviewer, 403 family-side, 401 guest); code-only rollback |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

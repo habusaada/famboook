@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 use LogicException;
 
 /**
@@ -113,9 +114,22 @@ class ChangeRequest extends Model
         return 'uuid';
     }
 
+    /**
+     * Only a well-formed UUID is looked up: anything else (an internal id, a
+     * request code, junk) is simply not found — and never reaches a
+     * PostgreSQL uuid comparison.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        return is_string($value) && Str::isUuid($value)
+            ? $this->newQuery()->where($field ?? $this->getRouteKeyName(), $value)->first()
+            : null;
+    }
+
+    /** The request's Family for good — still resolved if the Family is later archived (soft-deleted). */
     public function family(): BelongsTo
     {
-        return $this->belongsTo(Family::class);
+        return $this->belongsTo(Family::class)->withTrashed();
     }
 
     /** The targeted Person, when the type names one. */

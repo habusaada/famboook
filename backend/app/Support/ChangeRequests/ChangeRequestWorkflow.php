@@ -2,6 +2,7 @@
 
 namespace App\Support\ChangeRequests;
 
+use App\Enums\ChangeRequestApplyFailure;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\FamilyStatus;
 use App\Enums\WorkflowEventType;
@@ -97,6 +98,23 @@ final class ChangeRequestWorkflow
         }
 
         return $clean;
+    }
+
+    /**
+     * Was the latest apply attempt REFUSED — the request can no longer be
+     * applied as approved (AE-4)? Only then may an APPROVED request be
+     * rejected, as NO_LONGER_APPLICABLE. $latestFailureCode is the latest
+     * APPLY_FAILED reason code when the caller already selected it (lists);
+     * otherwise it is read.
+     */
+    public static function applyWasRefused(ChangeRequest $request, ?string $latestFailureCode = null): bool
+    {
+        if ($request->last_apply_failed_at === null) {
+            return false;
+        }
+        $code = $latestFailureCode ?? self::lastEvent($request, WorkflowEventType::APPLY_FAILED)?->reason_code;
+
+        return $code !== null && ChangeRequestApplyFailure::tryFrom($code)?->isRefusal() === true;
     }
 
     /** The most recent event of a type on the request (for replay and AE-4 checks). */

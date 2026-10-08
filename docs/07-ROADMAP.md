@@ -2132,7 +2132,8 @@ PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
            permissions — DONE (no route, UI or request type)
         5b Domain Actions, handler contract, conflict detection, APPLY
            — DONE (RM-ADR-056; no route, UI or request type)
-        5c Staff API · 5d Staff review workspace
+        5c Staff API — DONE (RM-ADR-057) · 5d Staff review workspace
+           (5d must add the Change Request activity labels first)
         5e Family API (submission switch, default off) · 5f Family views
         then PWA-6.1 RESIDENCE_UPDATE enables «+» and «طلباتي»
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
@@ -4747,6 +4748,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-057
+PWA-5c — Staff Change Request API is done (2026-10-08; docs/06 AUTH-ADR-089, docs/05 WF-ADR-051): queue, review detail with timeline and the start-review / return / approve / reject / apply endpoints over the PWA-5b engine. No migration, no frontend, no request type; the Production registry stays empty. PWA-5 is not complete. **Dependency for PWA-5d:** the Staff activity timeline (`frontend/lib/utils/activity.ts`) has no labels for CHANGE_REQUEST_SUBMITTED / _REJECTED / _APPLIED and would fail on them — 5d must add them before PWA-6.1 enables any request type.
+
 ### RM-ADR-056
 PWA-5b — Change Request engine is done (2026-10-07; docs/05 WF-ADR-050): the eight transition Domain Actions, the ChangeRequestHandler contract and the ChangeRequestTypes registry (EMPTY in Production), base-fingerprint conflict detection, single-transaction APPLY with failure recording and retry, idempotent replays, PostgreSQL concurrency coverage. No migration, route, UI or request type; proven with a test-only handler. PWA-5 is not complete: 5c / 5d and 5e / 5f follow, then PWA-6.1.
 
@@ -5036,6 +5040,7 @@ Date: 2026-09-24
 | 1.2.52 | 2026-10-07 | Approved | PWA-8.3 done: Digital Family Card PDF for the household head (existing ACTIVE credential only, mPDF ^8.3, bundled IBM Plex Sans Arabic, in memory); no migration (RM-ADR-054). PWA-8.4 deferred |
 | 1.2.53 | 2026-10-07 | Approved | PWA-5 slicing (RM-ADR-055); PWA-5a done: Change Request foundation — tables, CHECKs, append-only workflow events, transition table, recorder, permissions; no route, UI or request type; PWA-4 stays after PWA-6 |
 | 1.2.54 | 2026-10-07 | Approved | PWA-5b done (RM-ADR-056): Change Request Domain Actions, handler contract and empty Production registry, conflict detection, APPLY with rollback / failure recording / retry; no migration, route, UI or request type; 5c–5f next |
+| 1.2.55 | 2026-10-08 | Approved | PWA-5c done (RM-ADR-057): Staff Change Request API; no migration, frontend or request type; 5d dependency — Change Request activity labels in the Staff timeline before PWA-6.1 |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |
