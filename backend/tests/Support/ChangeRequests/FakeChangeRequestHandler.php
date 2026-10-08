@@ -3,13 +3,14 @@
 namespace Tests\Support\ChangeRequests;
 
 use App\Actions\UpdateFamilyAction;
-use App\Enums\ChangeRequestAudience;
 use App\Enums\ProfileReviewSection;
 use App\Exceptions\ChangeRequestException;
 use App\Models\ChangeRequest;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Support\ChangeRequests\ChangeRequestHandler;
+use App\Support\ChangeRequests\ChangeRequestPresentation;
+use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestTarget;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\FamilyPortal\HouseholdMemberReference;
@@ -116,13 +117,12 @@ final class FakeChangeRequestHandler implements ChangeRequestHandler
         };
     }
 
-    public function present(ChangeRequest $request, ChangeRequestAudience $audience): array
+    public function present(ChangeRequest $request, ChangeRequestPresentationContext $context): array
     {
-        $proposed = ['paper_form_no' => $request->submitted_data['paper_form_no']];
+        // Staff see the live current value; the family sees its proposal only.
+        $current = $context->isStaff() ? $this->baseValues(ChangeRequestTarget::of($request, $request->family))['paper_form_no'] : null;
 
-        return $audience === ChangeRequestAudience::STAFF
-            ? ['current' => $this->baseValues(ChangeRequestTarget::of($request, $request->family)), 'proposed' => $proposed]
-            : ['proposed' => $proposed];
+        return ChangeRequestPresentation::make()->row('رقم الاستمارة', $current, $request->submitted_data['paper_form_no'])->toArray();
     }
 
     public function profileSections(): array

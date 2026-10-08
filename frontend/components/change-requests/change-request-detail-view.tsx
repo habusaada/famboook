@@ -153,7 +153,7 @@ export function ChangeRequestDetailView({ id }: { id: string }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
           <Section title="التعديل المطلوب" description="البيانات الحالية في السجل مقابل ما تطلبه الأسرة." data-proposal>
-            <ChangeRequestProposal typeAvailable={request.type_available} presentation={request.presentation} />
+            <ChangeRequestProposal typeAvailable={request.type_available} presentation={request.presentation} applied={request.status === "APPLIED"} />
           </Section>
 
           {request.reason && (

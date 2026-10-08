@@ -9,10 +9,12 @@ import { StatusBadge } from "@/components/shared/status-badge";
 //
 //   { rows: [{ label: string, current: string | null, proposed: string | null }] }
 //
-// — any other shape (including the PWA-5c test handler's {current, proposed}
-// maps) is NOT rendered: raw keys and values could be sensitive registry
-// fields. This row shape is the proposed presentation contract for the first
-// real handler (PWA-6.1); it is not yet produced in Production.
+// — the approved V1 presentation contract (docs/11 FP-ADR-073, produced since
+// PWA-6.1 by RESIDENCE_UPDATE for Staff and family alike). Any other shape is
+// NOT rendered: raw keys and values could be sensitive registry fields.
+//
+// "current" is the LIVE registry value. Once a request is APPLIED it equals
+// the proposal, so the applied view drops the change markers and says so.
 
 export type ComparisonRow = { label: string; current: string | null; proposed: string | null };
 
@@ -54,9 +56,17 @@ function ChangeMarker({ changed }: { changed: boolean }) {
   );
 }
 
-export function ChangeRequestComparison({ rows }: { rows: ComparisonRow[] }) {
+export function ChangeRequestComparison({ rows, applied = false }: { rows: ComparisonRow[]; applied?: boolean }) {
+  const currentLabel = applied ? "السجل الآن" : "البيانات الحالية";
+  const proposedLabel = applied ? "التعديل المطبَّق" : "التعديل المطلوب";
   return (
-    <div data-comparison>
+    <div data-comparison data-applied={applied || undefined}>
+      {applied && (
+        <p className="mb-2 flex items-start gap-2 text-[13px] text-muted-foreground" data-comparison-applied>
+          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+          طُبّق هذا التعديل على السجل؛ «السجل الآن» يعرض القيم الحالية في السجل.
+        </p>
+      )}
       {/* Desktop: البيانات الحالية | التعديل المطلوب */}
       <table className="hidden w-full text-sm md:table">
         <caption className="sr-only">مقارنة البيانات الحالية بالتعديل المطلوب</caption>
@@ -66,10 +76,10 @@ export function ChangeRequestComparison({ rows }: { rows: ComparisonRow[] }) {
               الحقل
             </th>
             <th scope="col" className="py-2 text-start font-medium">
-              البيانات الحالية
+              {currentLabel}
             </th>
             <th scope="col" className="py-2 text-start font-medium">
-              التعديل المطلوب
+              {proposedLabel}
             </th>
             <th scope="col" className="w-28 py-2 text-start font-medium">
               <span className="sr-only">حالة الحقل</span>
@@ -90,9 +100,7 @@ export function ChangeRequestComparison({ rows }: { rows: ComparisonRow[] }) {
                 <td className={changed ? "py-2.5 pe-3 font-semibold text-foreground" : "py-2.5 pe-3 text-foreground/80"}>
                   <Value value={row.proposed} />
                 </td>
-                <td className="py-2.5">
-                  <ChangeMarker changed={changed} />
-                </td>
+                <td className="py-2.5">{!applied && <ChangeMarker changed={changed} />}</td>
               </tr>
             );
           })}
@@ -107,14 +115,14 @@ export function ChangeRequestComparison({ rows }: { rows: ComparisonRow[] }) {
             <li key={i} className="flex flex-col gap-1.5 py-3" data-changed={changed}>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-medium text-muted-foreground">{row.label}</span>
-                <ChangeMarker changed={changed} />
+                {!applied && <ChangeMarker changed={changed} />}
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                <dt className="text-xs text-subtle-foreground">الحالية</dt>
+                <dt className="text-xs text-subtle-foreground">{applied ? "السجل الآن" : "الحالية"}</dt>
                 <dd className="min-w-0 text-foreground/80">
                   <Value value={row.current} />
                 </dd>
-                <dt className="text-xs text-subtle-foreground">المطلوبة</dt>
+                <dt className="text-xs text-subtle-foreground">{applied ? "المطبَّقة" : "المطلوبة"}</dt>
                 <dd className={changed ? "min-w-0 font-semibold text-foreground" : "min-w-0 text-foreground/80"}>
                   <Value value={row.proposed} />
                 </dd>
@@ -128,9 +136,17 @@ export function ChangeRequestComparison({ rows }: { rows: ComparisonRow[] }) {
 }
 
 /** What the review screen shows for a request's proposal — never raw data. */
-export function ChangeRequestProposal({ typeAvailable, presentation }: { typeAvailable: boolean; presentation: unknown }) {
+export function ChangeRequestProposal({
+  typeAvailable,
+  presentation,
+  applied = false,
+}: {
+  typeAvailable: boolean;
+  presentation: unknown;
+  applied?: boolean;
+}) {
   const rows = typeAvailable ? comparisonRows(presentation) : null;
-  if (rows) return <ChangeRequestComparison rows={rows} />;
+  if (rows) return <ChangeRequestComparison rows={rows} applied={applied} />;
 
   return (
     <div className="flex items-start gap-2.5 rounded-control bg-surface-2 px-3.5 py-3 text-sm text-muted-foreground" data-proposal-unavailable>

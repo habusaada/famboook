@@ -2137,7 +2137,9 @@ PWA-5   Change Request engine + Staff review workspace (RM-ADR-055):
         5e Family API (submission switch, default off) — DONE
            (RM-ADR-059) · 5f Family views — DONE (RM-ADR-060;
            built, not linked)
-        then PWA-6.1 RESIDENCE_UPDATE enables «+» and «طلباتي»
+        then PWA-6.1 RESIDENCE_UPDATE — BUILT 2026-10-08 (docs/11
+        §30a): handler, presentation context, family form; «+» and
+        «طلباتي» stay disabled pending docs/11 PFP-025; switch off
 PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
         DEATH_REPORT (non-head); «طلباتي»
@@ -5055,6 +5057,7 @@ Date: 2026-09-24
 | 1.2.56 | 2026-10-08 | Approved | PWA-5d done (RM-ADR-058): Staff review workspace and Change Request activity labels; presentation-contract gap recorded for PWA-6.1; no backend change; 5e / 5f next |
 | 1.2.57 | 2026-10-08 | Approved | PWA-5e done (RM-ADR-059): Family Change Request API with the submission switch off; PWA-6.1 presentation prerequisites recorded; 5f next |
 | 1.2.58 | 2026-10-08 | Approved | PWA-5f done (RM-ADR-060): Family request views built but not linked; PWA-5 complete; PWA-6.1 next |
+| 1.2.59 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE built (docs/11 §30a): first registered request type, presentation context, family form; navigation activation open (docs/11 PFP-025); not enabled in Production |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

@@ -4,6 +4,7 @@ namespace App\Support\ChangeRequests;
 
 use App\Enums\ChangeRequestType;
 use App\Exceptions\ChangeRequestException;
+use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use InvalidArgumentException;
 use LogicException;
 
@@ -12,8 +13,9 @@ use LogicException;
  * A type without a handler here does not exist for the engine: it cannot be
  * submitted, approved or applied (CHANGE_REQUEST_TYPE_UNAVAILABLE).
  *
- * PRODUCTION is EMPTY in PWA-5: no request type is enabled until PWA-6
- * registers its handler here (PWA-6.1 RESIDENCE_UPDATE first). The container
+ * PRODUCTION holds the approved types only: RESIDENCE_UPDATE since PWA-6.1
+ * (docs/11 FP-ADR-059). Registration makes a type known to the engine; a
+ * family can submit it only while the submission switch is on. The container
  * binds production(); only the unit-test environment may build a registry
  * with other handlers (fake()), so a test handler can never become a
  * Production type.
@@ -21,11 +23,13 @@ use LogicException;
 final class ChangeRequestTypes
 {
     /**
-     * Production registrations: type value => handler class. EMPTY in PWA-5.
+     * Production registrations: type value => handler class.
      *
      * @var array<string, class-string<ChangeRequestHandler>>
      */
-    public const PRODUCTION = [];
+    public const PRODUCTION = [
+        'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
+    ];
 
     /** @param array<string, ChangeRequestHandler> $handlers keyed by type value */
     private function __construct(private readonly array $handlers)

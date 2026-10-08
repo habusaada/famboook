@@ -228,7 +228,7 @@ class FamilyChangeRequestApiTest extends TestCase
 
         $response = $this->api($this->context->user, 'GET', "/{$request->uuid}")->assertOk()->assertHeader('Cache-Control', 'no-store, private');
         $response->assertJsonPath('data.status', 'APPROVED')
-            ->assertJsonPath('data.presentation', ['proposed' => ['paper_form_no' => 'PF-NEW-1']])
+            ->assertJsonPath('data.presentation', ['rows' => [['label' => 'رقم الاستمارة', 'current' => null, 'proposed' => 'PF-NEW-1']]])
             ->assertJsonPath('data.available_actions', []);
         $this->assertSame(
             ['SUBMITTED', 'REVIEW_STARTED', 'RETURNED', 'RESUBMITTED', 'REVIEW_STARTED', 'APPROVED'],
@@ -263,7 +263,7 @@ class FamilyChangeRequestApiTest extends TestCase
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::production());
         $orphan = ChangeRequest::factory()->create([
             'family_id' => $this->context->family->id, 'submitted_by_person_id' => $this->context->person->id,
-            'type' => 'RESIDENCE_UPDATE', 'submitted_data' => ['governorate' => 'SECRET-GOV'],
+            'type' => 'BIRTH_REPORT', 'submitted_data' => ['governorate' => 'SECRET-GOV'],
         ]);
 
         $response = $this->api($this->context->user, 'GET', "/{$orphan->uuid}")->assertOk();
@@ -285,10 +285,11 @@ class FamilyChangeRequestApiTest extends TestCase
         config(['change_requests.family_submission_enabled' => false]);
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
 
-        // The real Production registry: nothing, whatever the switch.
-        config(['change_requests.family_submission_enabled' => true]);
+        // The real Production registry: RESIDENCE_UPDATE only (PWA-6.1), and only while the switch is on.
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::production());
-        $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => true]]);
+        $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
+        config(['change_requests.family_submission_enabled' => true]);
+        $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE']], 'meta' => ['submission_enabled' => true]]);
     }
 
     public function test_the_switch_blocks_new_submissions_only(): void
@@ -314,12 +315,12 @@ class FamilyChangeRequestApiTest extends TestCase
         $this->assertFalse((require config_path('change_requests.php'))['family_submission_enabled']);
     }
 
-    public function test_the_empty_production_registry_accepts_no_submission(): void
+    public function test_the_production_registry_accepts_no_unregistered_type(): void
     {
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::production());
 
         $this->api($this->context->user, 'POST', '', $this->body())->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_TYPE_UNAVAILABLE');
-        $this->api($this->context->user, 'POST', '', $this->body(['type' => 'RESIDENCE_UPDATE']))->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_TYPE_UNAVAILABLE');
+        $this->api($this->context->user, 'POST', '', $this->body(['type' => 'BIRTH_REPORT']))->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_TYPE_UNAVAILABLE');
         $this->assertSame(0, ChangeRequest::count());
     }
 

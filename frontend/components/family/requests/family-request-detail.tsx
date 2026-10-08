@@ -48,7 +48,7 @@ function Proposal({ request }: { request: FamilyChangeRequest }) {
   }
   const rows = comparisonRows(request.presentation);
   if (!rows) return <Note>عرض تفاصيل هذا النوع من الطلبات غير مدعوم في هذه الواجهة بعد.</Note>;
-  return <ChangeRequestComparison rows={rows} />;
+  return <ChangeRequestComparison rows={rows} applied={request.status === "APPLIED"} />;
 }
 
 function Outcome({ request }: { request: FamilyChangeRequest }) {

@@ -3,6 +3,7 @@
 namespace Tests\Feature\ChangeRequests\Api;
 
 use App\Enums\ChangeRequestStatus as S;
+use App\Enums\ChangeRequestType;
 use App\Models\ChangeRequest;
 use App\Models\User;
 use App\Support\ChangeRequests\ChangeRequestTypes;
@@ -11,10 +12,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * The Staff API on the REAL, EMPTY Production registry (PWA-5c): no handler
- * is registered here — not even the test one. Persisted requests (built as
- * rows) stay readable with type_available = false and no presentation;
- * approve and apply refuse; nothing of the stored proposal leaks.
+ * The Staff API on the REAL Production registry for a type WITHOUT a handler
+ * (PWA-5c; since PWA-6.1 only RESIDENCE_UPDATE is registered, so BIRTH_REPORT
+ * stands for an unregistered type). Persisted requests (built as rows) stay
+ * readable with type_available = false and no presentation; approve and
+ * apply refuse; nothing of the stored proposal leaks.
  * Synthetic data only.
  */
 class EmptyRegistryApiTest extends TestCase
@@ -30,15 +32,15 @@ class EmptyRegistryApiTest extends TestCase
         $this->reviewer = tap(User::factory()->create(), fn (User $u) => $u->assignRole('REVIEWER'));
     }
 
-    public function test_the_registry_really_is_empty(): void
+    public function test_the_type_used_here_really_has_no_handler(): void
     {
-        $this->assertSame([], app(ChangeRequestTypes::class)->registered());
+        $this->assertFalse(app(ChangeRequestTypes::class)->has(ChangeRequestType::BIRTH_REPORT));
     }
 
     public function test_index_detail_and_timeline_load_without_any_handler_and_leak_nothing(): void
     {
         $request = ChangeRequest::factory()->create([
-            'type' => 'RESIDENCE_UPDATE', 'submitted_data' => ['governorate' => 'SECRET-GOV', 'mobile' => '0590000000'],
+            'type' => 'BIRTH_REPORT', 'submitted_data' => ['governorate' => 'SECRET-GOV', 'mobile' => '0590000000'],
             'reason' => 'سبب',
         ]);
 
@@ -48,7 +50,7 @@ class EmptyRegistryApiTest extends TestCase
             ->assertJsonPath('data.0.available_actions', ['start_review']);
 
         $detail = $this->actingAs($this->reviewer)->getJson("/api/v1/change-requests/{$request->uuid}")->assertOk();
-        $detail->assertJsonPath('data.type', 'RESIDENCE_UPDATE')
+        $detail->assertJsonPath('data.type', 'BIRTH_REPORT')
             ->assertJsonPath('data.type_available', false)
             ->assertJsonPath('data.presentation', null)
             ->assertJsonPath('data.timeline', []);
@@ -62,7 +64,7 @@ class EmptyRegistryApiTest extends TestCase
 
     public function test_review_can_start_but_approve_and_apply_refuse_an_unregistered_type(): void
     {
-        $request = ChangeRequest::factory()->create(['type' => 'RESIDENCE_UPDATE']);
+        $request = ChangeRequest::factory()->create(['type' => 'BIRTH_REPORT']);
 
         // Workflow steps that need no handler still work.
         $this->actingAs($this->reviewer)->postJson("/api/v1/change-requests/{$request->uuid}/start-review")
@@ -71,7 +73,7 @@ class EmptyRegistryApiTest extends TestCase
             ->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_TYPE_UNAVAILABLE');
         $this->assertSame(S::UNDER_REVIEW, $request->fresh()->status);
 
-        $approved = ChangeRequest::factory()->approved($this->reviewer)->create(['type' => 'RESIDENCE_UPDATE']);
+        $approved = ChangeRequest::factory()->approved($this->reviewer)->create(['type' => 'BIRTH_REPORT']);
         $this->actingAs($this->reviewer)->postJson("/api/v1/change-requests/{$approved->uuid}/apply")
             ->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_TYPE_UNAVAILABLE');
         $fresh = $approved->fresh();

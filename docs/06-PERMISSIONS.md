@@ -4367,6 +4367,14 @@ PWA-1H coordinator authorization (§22b): one resolver decides Coordinator Space
 ### AUTH-ADR-071
 TweetsMS SMS delivery adds no permission, role or route. OTP destinations are always resolved server-side from the trusted mobile; provider codes are never returned to Family Portal users; `famboook:sms-check` is a shell-only operator command that never reveals credentials or full numbers; TweetsMS credentials live only in the server environment.
 
+**PWA-6.1 note (2026-10-08, docs/11 §30a): no permission or role added.**
+RESIDENCE_UPDATE uses the existing change-request permissions. A Change
+Request presentation is shaped by a server-computed context: the audience,
+`canViewInternalNotes` (`change-request.view-internal-notes`, Staff only)
+and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
+permission grants full identity viewing — Staff status alone never does.
+The context is never taken from client input.
+
 ### AUTH-ADR-091
 Family Change Request API (2026-10-08, PWA-5e, docs/11 FP-ADR-073): no permission or role added. Reads (history, detail, type discovery) need the Family boundary only — `family.side`, `family-portal.access`, `family.context` — and see the context Family's requests (Family-subject, FU-04); submit, resubmit and cancel additionally need `change-request.submit`, `.resubmit`, `.cancel` (FAMILY_USER). Staff, coordinator-only and mixed accounts are refused by `family.side`; a FAMILY_USER + COORDINATOR acts only for their own Family; a coordinator scope never opens another Family's requests. Per-user throttles `family-change-request-submit` and `family-change-request-action`. The Domain Actions re-check side, permission and ownership (AUTH-ADR-088).
 
@@ -4821,6 +4829,7 @@ Date: 2026-09-24
 | 1.2.53 | 2026-10-08 | Approved | PWA-5c (AUTH-ADR-089): Staff Change Request API — staff.side, one permission per route, internal notes only with view-internal-notes, uuid addressing; no permission added |
 | 1.2.54 | 2026-10-08 | Approved | PWA-5d (AUTH-ADR-090): Staff review workspace — navigation and routes behind change-request.view, actions need available_actions and the permission, internal notes only as returned by the API; no permission added |
 | 1.2.55 | 2026-10-08 | Approved | PWA-5e (AUTH-ADR-091): Family Change Request API — reads behind the Family boundary, mutations behind change-request.submit / resubmit / cancel, per-user throttles; no permission added |
+| 1.2.56 | 2026-10-08 | Approved | PWA-6.1 note: no permission added; the presentation context derives internal-note visibility from change-request.view-internal-notes and grants no sensitive-identity viewing |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

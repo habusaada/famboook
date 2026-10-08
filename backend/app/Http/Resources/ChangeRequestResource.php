@@ -2,8 +2,8 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\ChangeRequestAudience;
 use App\Enums\WorkflowEventType;
+use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestStaffActions;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use Illuminate\Http\Request;
@@ -59,7 +59,7 @@ class ChangeRequestResource extends JsonResource
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'reason' => $this->reason,
             'presentation' => $typeAvailable
-                ? $types->handler($this->type)->present($this->resource, ChangeRequestAudience::STAFF)
+                ? $types->handler($this->type)->present($this->resource, ChangeRequestPresentationContext::staff($request->user()))
                 : null,
             'review' => [
                 'reviewed_by' => $this->reviewer ? ['name' => $this->reviewer->name] : null,

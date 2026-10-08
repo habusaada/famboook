@@ -754,7 +754,7 @@ Actions.
 | Request | Approved type | Apply target today |
 |---|---|---|
 | Contact update | CONTACT_UPDATE | `UpdatePersonAction` exists |
-| Residence / displacement update | RESIDENCE_UPDATE | `UpdateFamilyResidenceAction` exists; history-preserving change to be confirmed against docs/03 §32 |
+| Residence / displacement update | RESIDENCE_UPDATE | **Built (PWA-6.1):** in-place correction through `UpdateFamilyResidenceAction` (§30a); a move with history still needs `residence.change` (FU-02) |
 | Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist; CONFIRM_ALIVE → `ConfirmPersonAliveAction` (exists) |
 | Add missing family member | ADD_FAMILY_MEMBER | `AddFamilyMemberAction` exists |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
@@ -3506,6 +3506,68 @@ PWA-6.1 (FP-ADR-072; docs/07 RM-ADR-055).
   browser storage; access failures (401 / 403 family-context) go through
   the shared Family access handling.
 
+## PWA-6.1 implementation record — RESIDENCE_UPDATE
+
+Implemented 2026-10-08: the first real Change Request type, end to end.
+No migration, permission or role. The submission switch stays OFF by
+default and the Family navigation stays disabled (PFP-025): nothing is
+enabled in Production by this slice.
+
+| Item | Decision |
+|---|---|
+| Semantics | A CORRECTION of the Family's CURRENT residence, in place (FP-ADR-059). Never a move, never a new residence row, never another Family's residence |
+| Domain Action | `UpdateFamilyResidenceAction` (existing, unchanged) — the only writer; it records RESIDENCE_UPDATED / DISPLACEMENT_UPDATED itself |
+| Handler | `App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler`, registered in `ChangeRequestTypes::PRODUCTION`; family-submittable; payload version 1 |
+| V1 field set | `governorate`, `city`, `area`, `neighborhood`, `address_text`, `original_residence_text`, `displacement_status`, `displacement_location_text` — exactly what the Domain Action corrects. Never `residence_type`, dates, coordinates, source, notes, `is_current` or any id |
+| Input | The whole proposed residence: every V1 key present (null = not recorded); any other key is refused by name (422), never dropped; strings ≤ 255 (address_text ≤ 1000), trimmed, blank → null; status DISPLACED / NOT_DISPLACED / null, and a family cannot clear a KNOWN status back to null; a location only with DISPLACED (`prohibited_unless`), and a non-displaced proposal stores the location as null (as the Domain Action does) |
+| Proposal (`submitted_data`) | Only the fields that differ from the current residence — APPLY never rewrites a field the family did not change. An unchanged proposal is refused (422 on `data`) |
+| Target | Always the family.context Family (`ChangeRequestTarget::family`); no `member_ref`, id or Family is read from the input |
+| Preconditions | A current residence exists (else 422 PRECONDITION_FAILED, at submit, approve and apply); the location ↔ status rule against the residence as it will be after the change |
+| Base fingerprint | The current residence id and all eight V1 fields, read with the residence row locked (`FOR UPDATE`) — any change to them after submission blocks approve / apply (409 BASE_CHANGED). No timestamps |
+| Open conflict | One open RESIDENCE_UPDATE per Family (409 ALREADY_OPEN) |
+| APPLY | Inside the engine's transaction: re-read under lock, re-validate, re-fingerprint, then the Domain Action with the stored proposal; rollback, failure recording, retry and replay are the PWA-5b semantics unchanged |
+| Presentation | `{rows: [{label, current, proposed}]}` built with `ChangeRequestPresentation`: one row per proposed field, in V1 order, Arabic labels, status shown as «نازحة» / «غير نازحة», current = the LIVE registry value. Same rows for Staff and family (residence is family-visible data); no identity value |
+| Profile section | RESIDENCE |
+
+**Presentation contract and viewer context (FP-ADR-073 prerequisites, now
+met).** `ChangeRequestHandler::present()` takes a server-computed
+`ChangeRequestPresentationContext` (audience STAFF / FAMILY,
+`canViewSensitiveIdentity`, `canViewInternalNotes`) instead of the bare
+audience. It is built in the resources from the authenticated user — never
+from input. `canViewSensitiveIdentity` is false for every viewer (no
+permission grants it; being Staff is not enough); `canViewInternalNotes` is
+`change-request.view-internal-notes` for Staff, false for a family.
+
+**Frontend.** `/family/requests/new/residence-update`: shown only while
+type discovery lists RESIDENCE_UPDATE (switch on, registered, permitted);
+prefilled from `/family/household/profile`; React Hook Form + Zod for
+length and the known-status rule (Laravel stays the authority); the review
+notice «سيُرسل طلبك للمراجعة، ولن تتغير بيانات السجل الرسمي إلا بعد
+اعتماد الطلب وتطبيقه.»; one UUID `client_reference` per proposal, re-sent
+unchanged on a retry of the same proposal and replaced after any change or
+an idempotency conflict; server field errors on their fields; refusals
+(ALREADY_OPEN, PRECONDITION_FAILED, SUBMISSION_DISABLED, 429) as fixed
+Arabic messages; success opens the new request. «طلب جديد» links
+RESIDENCE_UPDATE to this form and still lists any other type as not yet
+available. The Staff review screen and the family detail render the same
+rows; once APPLIED the comparison drops its change markers and labels the
+current column «السجل الآن», because current then equals the proposal.
+
+**Tests.** Backend `tests/Feature/ChangeRequests/Residence/`: submission,
+validation, unknown fields, no-change, missing residence, switch, discovery,
+isolation, inactive Family, head change, idempotency, open conflict,
+approve / apply through the Domain Action (call spied), untouched
+unrelated fields, base change before approve and before apply, rollback and
+retry, presentation and privacy, family timeline; PostgreSQL concurrency
+(approve and apply wait for a parallel residence write, then detect the
+stale base; a second submission waits for the Family lock). Frontend
+`tests/family-residence-update.test.tsx`.
+
+**Rollout prerequisites (not done here).** An explicit decision to enable
+the navigation (PFP-025); then `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`
+on the server; Staff briefed on the residence review; the pilot SOP
+(docs/09) updated for residence requests.
+
 ---
 
 # 31. Amendment Register
@@ -4428,6 +4490,15 @@ PFP-024  — RESOLVED 2026-10-04 (FP-ADR-060)
 The Domain Action path for confirming an UNKNOWN member as ALIVE:
 ConfirmPersonAliveAction, Staff endpoint with a verification method, and
 PERSON_CORRECTION / CONFIRM_ALIVE (statement + Staff review) later.
+
+PFP-025  (before Family self-service is enabled)
+Activating «+», «طلباتي» and the quick actions in the Family bottom
+navigation. FP-ADR-072 keeps them disabled UNTIL PWA-6.1; PWA-6.1 is built
+but keeps them disabled pending this decision. Proposal: enable them only
+while the server reports `submission_enabled` (type discovery) — so they
+follow the existing CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED switch and
+no new flag is added — or enable «طلباتي» (read-only history) always and
+«+» with the switch. The request screens remain reachable by URL.
 ```
 
 Proposals that stay PENDING until product-owner review: the request types
@@ -4502,3 +4573,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.32 | 2026-10-08 | Approved | PWA-5d Staff review workspace: implementation record in §30a — queue and review screens, status vocabulary, proposal rendering and the PWA-6.1 presentation-contract proposal, timeline, permission-aware actions, Change Request activity labels; Family Portal unchanged |
 | 1.33 | 2026-10-08 | Approved | PWA-5e Family Change Request API (FP-ADR-073): routes, Family-subject history and isolation, submission switch (default off), type discovery, family-safe views and timeline, approved presentation shape and the PWA-6.1 presentation-context prerequisite; implementation record in §30a |
 | 1.34 | 2026-10-08 | Approved | PWA-5f Family request views: implementation record in §30a — «طلباتي», request detail and «طلب جديد» discovery on the PWA-5e API, built but not linked («+» and «طلباتي» stay disabled until PWA-6.1); no backend change |
+| 1.35 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE: implementation record in §30a — V1 field set, strict input, changed-fields proposal, base fingerprint, APPLY through UpdateFamilyResidenceAction, `{rows}` presentation and the server-computed presentation context; §14 status; PFP-025 navigation activation left open (navigation stays disabled, switch off) |

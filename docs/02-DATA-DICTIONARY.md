@@ -2501,6 +2501,14 @@ OTHER
 
 Not every type must be enabled for Family Users immediately.
 
+**RESIDENCE_UPDATE `submitted_data` (payload version 1, PWA-6.1):** a map
+of the changed current-residence fields only, from `governorate`, `city`,
+`area`, `neighborhood`, `address_text`, `original_residence_text`,
+`displacement_status` (DISPLACED / NOT_DISPLACED) and
+`displacement_location_text`; values are trimmed strings or null. No
+target membership or person (the Family is the target). Details: docs/11
+§30a.
+
 Family Portal V1 plans CONTACT_UPDATE, RESIDENCE_UPDATE, PERSON_CORRECTION,
 ADD_FAMILY_MEMBER, BIRTH_REPORT and DEATH_REPORT (docs/11 §14). The
 following are **proposals, not approved types** (docs/11 PFP-008):
@@ -4229,6 +4237,7 @@ Date: 2026-09-24
 | 1.2.33 | 2026-10-05 | Approved | FU-10: §10 death writes scoped — `RecordPersonDeathAction` changes an EXISTING Person to DECEASED; import creation may create DECEASED; no path back to ALIVE. §20a stale-write refusal and Staff declaration sources. No data-model change |
 | 1.2.34 | 2026-10-07 | Approved | PWA-8.2: §45a Digital Household Head Card amended to the Family-subject Digital Family Card; new §45c `digital_credentials` (docs/11 FP-ADR-070) |
 | 1.2.35 | 2026-10-07 | Approved | PWA-5a: §57 Change Request data as implemented — uuid, type code, target membership, base fingerprint, rejection reason codes, CANCELLED, workflow event fields (DD-ADR-034) |
+| 1.2.36 | 2026-10-08 | Approved | PWA-6.1: §47 RESIDENCE_UPDATE submitted_data (payload version 1) recorded |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

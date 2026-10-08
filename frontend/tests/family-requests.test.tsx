@@ -560,15 +560,25 @@ describe("«طلب جديد» — discovery", () => {
   });
 
   it("lists a registered type without a Family form as not yet available, never as a fake form", async () => {
-    mockGet({ types: { data: [{ type: "RESIDENCE_UPDATE" }], meta: { submission_enabled: true } } });
+    mockGet({ types: { data: [{ type: "BIRTH_REPORT" }], meta: { submission_enabled: true } } });
     renderWithClient(<FamilyNewRequest />);
 
     const types = await screen.findByRole("list", { name: "أنواع الطلبات" });
     const item = within(types).getByRole("listitem");
-    expect(item).toHaveTextContent("تحديث بيانات السكن");
     expect(item).toHaveTextContent("غير متاح للتقديم بعد");
     expect(within(types).queryByRole("link")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("links RESIDENCE_UPDATE to its real form (PWA-6.1) and nothing else", async () => {
+    mockGet({ types: { data: [{ type: "RESIDENCE_UPDATE" }, { type: "BIRTH_REPORT" }], meta: { submission_enabled: true } } });
+    renderWithClient(<FamilyNewRequest />);
+
+    const types = await screen.findByRole("list", { name: "أنواع الطلبات" });
+    const links = within(types).getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveTextContent("تحديث بيانات السكن");
+    expect(links[0]).toHaveAttribute("href", "/family/requests/new/residence-update");
   });
 
   it("shows an error with retry", async () => {
@@ -582,8 +592,9 @@ describe("«طلب جديد» — discovery", () => {
 // ======================================================================== nav
 
 describe("the Family bottom navigation (PWA-5f)", () => {
-  // 5f views are built but not linked (docs/07 RM-ADR-055, docs/11
-  // FP-ADR-072): «+» and «طلباتي» stay disabled until PWA-6.1.
+  // Built but not linked (docs/07 RM-ADR-055, docs/11 FP-ADR-072). PWA-6.1
+  // prepares activation but does not enable it: that needs an explicit
+  // decision (docs/11 §33, the navigation-activation proposal).
   it("keeps «طلباتي» and «+» disabled, even on a request screen", () => {
     nav.pathname = "/family/requests/" + UUID;
     renderWithClient(<FamilyBottomNav />);

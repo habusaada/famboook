@@ -215,7 +215,7 @@ class StaffChangeRequestApiTest extends TestCase
             ->assertJsonPath('data.type', 'OTHER')
             ->assertJsonPath('data.type_available', true)
             ->assertJsonPath('data.status', 'RETURNED_FOR_CLARIFICATION')
-            ->assertJsonPath('data.presentation', ['current' => ['paper_form_no' => 'PF-OLD'], 'proposed' => ['paper_form_no' => 'PF-NEW']])
+            ->assertJsonPath('data.presentation', ['rows' => [['label' => 'رقم الاستمارة', 'current' => 'PF-OLD', 'proposed' => 'PF-NEW']]])
             ->assertJsonPath('data.submitted_by.name', $this->context->person->full_name)
             ->assertJsonPath('data.review.reviewed_by.name', $this->reviewer->name);
         $this->assertSame(['SUBMITTED', 'REVIEW_STARTED', 'RETURNED'], collect($response->json('data.timeline'))->pluck('event_type')->all());

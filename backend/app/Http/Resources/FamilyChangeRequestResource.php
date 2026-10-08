@@ -2,8 +2,8 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\ChangeRequestAudience;
 use App\Enums\WorkflowEventType;
+use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\FamilyChangeRequestActions;
 use Illuminate\Http\Request;
@@ -41,7 +41,7 @@ class FamilyChangeRequestResource extends JsonResource
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'reason' => $this->reason,
             'presentation' => $typeAvailable
-                ? $types->handler($this->type)->present($this->resource, ChangeRequestAudience::FAMILY)
+                ? $types->handler($this->type)->present($this->resource, ChangeRequestPresentationContext::family())
                 : null,
             'approved_at' => $this->approved_at?->toIso8601String(),
             'applied_at' => $this->applied_at?->toIso8601String(),

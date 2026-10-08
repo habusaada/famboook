@@ -9,7 +9,6 @@ use App\Actions\ChangeRequests\ResubmitChangeRequestAction;
 use App\Actions\ChangeRequests\ReturnChangeRequestForClarificationAction;
 use App\Actions\ChangeRequests\StartChangeRequestReviewAction;
 use App\Actions\ChangeRequests\SubmitChangeRequestAction;
-use App\Enums\ChangeRequestAudience;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestType;
 use App\Enums\FamilyActivityType;
@@ -17,8 +16,10 @@ use App\Enums\ProfileReviewSection;
 use App\Exceptions\ChangeRequestException;
 use App\Models\FamilyActivity;
 use App\Models\WorkflowEvent;
+use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use App\Support\FamilyActivityVisibility;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,21 +41,21 @@ class ChangeRequestEngineSecurityTest extends TestCase
 {
     use ChangeRequestFixtures, FamilyIdentityFixtures, RefreshDatabase;
 
-    public function test_the_production_registry_is_empty_and_nothing_is_submittable(): void
+    public function test_the_production_registry_holds_residence_update_only(): void
     {
-        $this->assertSame([], ChangeRequestTypes::PRODUCTION);
+        $this->assertSame(['RESIDENCE_UPDATE' => ResidenceUpdateHandler::class], ChangeRequestTypes::PRODUCTION);
         $registry = app(ChangeRequestTypes::class);
-        $this->assertSame([], $registry->registered());
-        $this->assertSame([], $registry->familySubmittable());
+        $this->assertSame([ChangeRequestType::RESIDENCE_UPDATE], $registry->registered());
+        $this->assertSame([ChangeRequestType::RESIDENCE_UPDATE], $registry->familySubmittable());
         foreach (ChangeRequestType::cases() as $type) {
-            $this->assertFalse($registry->has($type), $type->value);
+            $this->assertSame($type === ChangeRequestType::RESIDENCE_UPDATE, $registry->has($type), $type->value);
         }
 
-        // With the real container binding, a family can submit nothing.
+        // With the real container binding, an unregistered type cannot be submitted.
         $this->useFamilyAuthKey();
         $this->seed(RolePermissionSeeder::class);
         $context = $this->headContext();
-        $submit = fn () => app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(ChangeRequestType::RESIDENCE_UPDATE, ['x' => 1], null, (string) Str::uuid()));
+        $submit = fn () => app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(ChangeRequestType::BIRTH_REPORT, ['x' => 1], null, (string) Str::uuid()));
         // PWA-5e: the submission switch is off by default …
         foreach ([false => ChangeRequestException::SUBMISSION_DISABLED, true => ChangeRequestException::TYPE_UNAVAILABLE] as $enabled => $code) {
             config(['change_requests.family_submission_enabled' => (bool) $enabled]);
@@ -62,7 +63,7 @@ class ChangeRequestEngineSecurityTest extends TestCase
                 $submit();
                 $this->fail('A Production type was submittable');
             } catch (ChangeRequestException $e) {
-                // … and even when it is on, no Production type exists.
+                // … and even when it is on, BIRTH_REPORT has no handler yet.
                 $this->assertSame($code, $e->reason);
             }
         }
@@ -93,8 +94,10 @@ class ChangeRequestEngineSecurityTest extends TestCase
         $request = $this->submit($context, ['paper_form_no' => 'PF-NEW']);
         $handler = app(ChangeRequestTypes::class)->handler(self::FAKE_TYPE);
 
-        $this->assertSame(['proposed' => ['paper_form_no' => 'PF-NEW']], $handler->present($request, ChangeRequestAudience::FAMILY));
-        $this->assertSame(['current' => ['paper_form_no' => 'PF-OLD'], 'proposed' => ['paper_form_no' => 'PF-NEW']], $handler->present($request, ChangeRequestAudience::STAFF));
+        $this->assertSame(['rows' => [['label' => 'رقم الاستمارة', 'current' => null, 'proposed' => 'PF-NEW']]],
+            $handler->present($request, ChangeRequestPresentationContext::family()));
+        $this->assertSame(['rows' => [['label' => 'رقم الاستمارة', 'current' => 'PF-OLD', 'proposed' => 'PF-NEW']]],
+            $handler->present($request, ChangeRequestPresentationContext::staff(null)));
         $this->assertSame([ProfileReviewSection::FAMILY], $handler->profileSections());
     }
 

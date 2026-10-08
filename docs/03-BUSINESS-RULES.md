@@ -2386,6 +2386,13 @@ still requires service criteria, nomination, review and approval (§47).
 
 - V1 registry requests: CONTACT_UPDATE, RESIDENCE_UPDATE,
   PERSON_CORRECTION, ADD_FAMILY_MEMBER, BIRTH_REPORT, DEATH_REPORT (§68).
+- RESIDENCE_UPDATE (built in PWA-6.1, docs/11 §30a) corrects the CURRENT
+  residence in place: only the eight address / displacement fields, only
+  the changed ones are proposed, an unchanged proposal or unknown field is
+  refused, one open request per Family, a displacement location only for a
+  displaced family, a known displacement status is never cleared by a
+  family, and any registry change to the residence after submission blocks
+  approval and APPLY. Canonical data changes only at APPLY.
 - Family-data, household-declaration, health and need submissions need
   request types that are **PROPOSED and not approved** (docs/11 §14,
   PFP-008).
@@ -5025,6 +5032,7 @@ Date: 2026-09-24
 | 1.2.50 | 2026-10-07 | Approved | PWA-8.2 (docs/11 FP-ADR-070): «Card and QR» amended — Family-subject Digital Family Card, head change changes nothing, three distinct identifiers, ACTIVE → REVOKED with reissue as a new credential, live Family validity |
 | 1.2.51 | 2026-10-07 | Approved | PWA-5a: §67–§81 Change Request notes — cancellation until approval, text-only resubmission, base-data conflict refusal at approve and apply, NO_LONGER_APPLICABLE after a refused apply, rejection reason codes (docs/05 WF-ADR-049) |
 | 1.2.52 | 2026-10-07 | Approved | PWA-5b: Change Request engine notes after §81 — trusted family context, handler validation and member resolution, re-validation and base fingerprint at approve / apply, canonical Domain Actions only, rollback or APPLIED, no Production type before PWA-6 (docs/05 WF-ADR-050) |
+| 1.2.53 | 2026-10-08 | Approved | PWA-6.1: RESIDENCE_UPDATE rules recorded under "Submissions" (in-place correction, changed fields only, one open per Family, base protection) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

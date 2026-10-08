@@ -2,7 +2,6 @@
 
 namespace App\Support\ChangeRequests;
 
-use App\Enums\ChangeRequestAudience;
 use App\Enums\ProfileReviewSection;
 use App\Models\ChangeRequest;
 use App\Models\Family;
@@ -93,13 +92,15 @@ interface ChangeRequestHandler
     public function apply(ChangeRequest $request, ChangeRequestTarget $target, int $actingUserId): void;
 
     /**
-     * The proposal shaped for one audience: Staff (current vs proposed) or
-     * the family (its own proposal, masked like the Family Portal). Never a
-     * raw sensitive value the audience may not see.
+     * The proposal for one viewer, in the approved V1 shape
+     * `{rows: [{label, current, proposed}]}` built with
+     * ChangeRequestPresentation (PWA-6.1). The context is computed on the
+     * server (audience, canViewSensitiveIdentity, canViewInternalNotes);
+     * never a raw sensitive value the viewer may not see.
      *
-     * @return array<string, mixed>
+     * @return array{rows: list<array{label: string, current: ?string, proposed: ?string}>}
      */
-    public function present(ChangeRequest $request, ChangeRequestAudience $audience): array;
+    public function present(ChangeRequest $request, ChangeRequestPresentationContext $context): array;
 
     /**
      * The Family Profile Review sections this type touches (the PWA-4 PENDING

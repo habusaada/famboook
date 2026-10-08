@@ -133,6 +133,32 @@ export function useFamilyChangeRequestTypesQuery() {
   return result;
 }
 
+export type FamilyChangeRequestSubmission = {
+  type: ChangeRequestType;
+  /** A UUID per proposal: the same one is re-sent on a retry, so the server replays instead of duplicating. */
+  client_reference: string;
+  reason: string | null;
+  data: Record<string, unknown>;
+};
+
+/**
+ * Submit a new request (POST /api/v1/family/change-requests). The Family,
+ * requester and target come from the session on the server — never from here.
+ * retry: false — a retry is the user's, with the same client_reference.
+ */
+export function useSubmitFamilyChangeRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: FamilyChangeRequestSubmission) =>
+      (await apiClient.post<{ data: ChangeRequestOutcome }>(PATH, input)).data,
+    retry: false,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["family", "change-requests", "list"] });
+    },
+  });
+}
+
 export type FamilyChangeRequestMutation = { action: "resubmit"; response: string } | { action: "cancel" };
 
 /**
@@ -162,9 +188,11 @@ export function useFamilyChangeRequestMutation(id: string) {
 /**
  * Whether a type could be STARTED from the Family Portal: the server lists it
  * (registered, family-submittable, switch on) AND a Family form for it exists
- * in this client. No form exists before PWA-6.1, so nothing can be started.
+ * in this client. PWA-6.1: RESIDENCE_UPDATE only.
  */
-export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = {};
+export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = {
+  RESIDENCE_UPDATE: "/family/requests/new/residence-update",
+};
 
 export function familyRequestFormFor(type: ChangeRequestType): string | null {
   return FAMILY_REQUEST_FORMS[type] ?? null;
