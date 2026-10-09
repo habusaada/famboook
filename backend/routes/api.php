@@ -163,6 +163,8 @@ Route::prefix('family')->group(function () {
             // this Family only — never route-model bound. /types before {uuid}.
             Route::get('/change-requests', [FamilyChangeRequestController::class, 'index']);
             Route::get('/change-requests/types', [FamilyChangeRequestController::class, 'types']);
+            // FP-ADR-076: the relationship options of the add-member form (active, never HEAD).
+            Route::get('/change-requests/relationship-types', [FamilyChangeRequestController::class, 'relationshipTypes']);
             Route::get('/change-requests/{changeRequest}', [FamilyChangeRequestController::class, 'show']);
             Route::post('/change-requests', [FamilyChangeRequestController::class, 'store'])
                 ->middleware(['can:change-request.submit', 'throttle:family-change-request-submit']);
@@ -291,7 +293,7 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
         Route::post('/{changeRequest}/return', [ChangeRequestController::class, 'return'])
             ->middleware('can:change-request.return');
         Route::post('/{changeRequest}/approve', [ChangeRequestController::class, 'approve'])
-            ->middleware('can:change-request.approve');
+            ->middleware(['can:change-request.approve', 'throttle:change-request-approve']);
         Route::post('/{changeRequest}/reject', [ChangeRequestController::class, 'reject'])
             ->middleware('can:change-request.reject');
         Route::post('/{changeRequest}/apply', [ChangeRequestController::class, 'apply'])

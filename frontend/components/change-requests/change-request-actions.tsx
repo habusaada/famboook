@@ -28,12 +28,14 @@ import {
 import {
   REJECTION_REASONS,
   WORKFLOW_TEXT_MAX,
+  attestedApproveSchema,
+  type AttestedApproveValues,
   rejectChangeRequestSchema,
   returnChangeRequestSchema,
   type RejectChangeRequestValues,
   type ReturnChangeRequestValues,
 } from "@/lib/schemas/change-request";
-import type { ChangeRequestAction, ChangeRequestDetail, ChangeRequestOutcome } from "@/lib/types/api/change-request";
+import type { ChangeRequestAction, ChangeRequestAttestation, ChangeRequestDetail, ChangeRequestOutcome } from "@/lib/types/api/change-request";
 import {
   changeRequestActionLabel,
   changeRequestActionPermissions,
@@ -176,6 +178,112 @@ function ConfirmActionDialog({
           <Button type="button" onClick={() => send({ action }, () => setOpen(false))} disabled={mutation.isPending} data-confirm={action}>
             {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
             {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ------------------------------------------------------------------ attested approval (FP-ADR-076)
+
+const ATTESTATION_TEXT: Record<ChangeRequestAttestation, string> = {
+  IDENTITY_VERIFIED: "تحققتُ من هوية الشخص من وثيقة رسمية (بطاقة الهوية أو شهادة الميلاد).",
+  RELATIONSHIP_VERIFIED: "تحققتُ من صلة القرابة برب الأسرة وأن الشخص يعيش مع الأسرة.",
+};
+
+/**
+ * Approval for a type that requires reviewer attestations: both checkboxes
+ * and the National ID typed from the document. The typed value is sent once
+ * for comparison with the proposal and is cleared when the dialog closes; it
+ * is never stored, cached or shown back. The server decides — a wrong or
+ * missing value refuses the approval with a field error.
+ */
+function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: Mutation; onDone: (n: ActionNotice) => void; attestations: ChangeRequestAttestation[] }) {
+  const [open, setOpen] = useState(false);
+  const blank: AttestedApproveValues = { identity: false, relationship: false, verifiedNationalId: "" };
+  const form = useForm<AttestedApproveValues>({ resolver: zodResolver(attestedApproveSchema), defaultValues: blank });
+  const { error, setError, send } = useActionSend<AttestedApproveValues>(
+    mutation,
+    onDone,
+    { verified_national_id: "verifiedNationalId", attestations: "identity" },
+    form.setError
+  );
+  const errors = form.formState.errors;
+
+  function close(next: boolean) {
+    if (mutation.isPending) return;
+    setOpen(next);
+    form.reset(blank);
+    if (next) setError(null);
+  }
+
+  const submit = (values: AttestedApproveValues) =>
+    send({ action: "approve", body: { attestations, verified_national_id: values.verifiedNationalId } }, () => close(false));
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" data-action="approve">
+          <ClipboardCheck className="size-4" />
+          {changeRequestActionLabel("approve")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>اعتماد الطلب</DialogTitle>
+          <DialogDescription>
+            يتطلب هذا النوع من الطلبات إقرارك بالتحقق قبل الاعتماد. الاعتماد لا يغيّر بيانات السجل مباشرة؛ يجب تطبيق التعديل بعده.
+          </DialogDescription>
+        </DialogHeader>
+        <form id="attested-approve-form" onSubmit={(event) => void form.handleSubmit(submit)(event)} className="flex flex-col gap-3" noValidate data-attested-approve>
+          {attestations.includes("IDENTITY_VERIFIED") && (
+            <div className="flex flex-col gap-1">
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" aria-invalid={Boolean(errors.identity)} {...form.register("identity")} />
+                {ATTESTATION_TEXT.IDENTITY_VERIFIED}
+              </label>
+              <FieldError message={errors.identity?.message} />
+            </div>
+          )}
+          {attestations.includes("RELATIONSHIP_VERIFIED") && (
+            <div className="flex flex-col gap-1">
+              <label className="flex items-start gap-2 text-sm text-foreground">
+                <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" aria-invalid={Boolean(errors.relationship)} {...form.register("relationship")} />
+                {ATTESTATION_TEXT.RELATIONSHIP_VERIFIED}
+              </label>
+              <FieldError message={errors.relationship?.message} />
+            </div>
+          )}
+          {attestations.includes("IDENTITY_VERIFIED") && (
+            <div className="flex flex-col gap-1.5">
+              <FieldLabel htmlFor="attested-national-id">رقم الهوية كما في الوثيقة</FieldLabel>
+              <input
+                id="attested-national-id"
+                className="h-10 rounded-control border border-border bg-surface-1 px-3 text-sm"
+                dir="ltr"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={32}
+                aria-describedby="attested-national-id-hint"
+                aria-invalid={Boolean(errors.verifiedNationalId)}
+                {...form.register("verifiedNationalId")}
+              />
+              <p id="attested-national-id-hint" className="text-xs text-muted-foreground">
+                يُقارَن بالرقم في الطلب فقط ولا يُحفظ. لا يُعرض الرقم المسجّل في الطلب.
+              </p>
+              <FieldError message={errors.verifiedNationalId?.message} />
+            </div>
+          )}
+        </form>
+        <ActionError message={error} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => close(false)} disabled={mutation.isPending}>
+            إلغاء
+          </Button>
+          <Button type="submit" form="attested-approve-form" disabled={mutation.isPending} data-confirm="approve">
+            {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
+            {changeRequestActionLabel("approve")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -461,7 +569,10 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
           </Button>
         )}
         {actions.includes("return") && <ReturnDialog mutation={mutation} onDone={onNotice} canWriteNote={canWriteNote} />}
-        {actions.includes("approve") && (
+        {actions.includes("approve") && (request.approval_attestations ?? []).length > 0 && (
+          <AttestedApproveDialog mutation={mutation} onDone={onNotice} attestations={request.approval_attestations} />
+        )}
+        {actions.includes("approve") && (request.approval_attestations ?? []).length === 0 && (
           <ConfirmActionDialog
             action="approve"
             mutation={mutation}

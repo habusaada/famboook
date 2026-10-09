@@ -9,6 +9,7 @@ use App\Actions\ChangeRequests\ReturnChangeRequestForClarificationAction;
 use App\Actions\ChangeRequests\StartChangeRequestReviewAction;
 use App\Enums\WorkflowEventType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\ApproveChangeRequestRequest;
 use App\Http\Requests\Api\V1\ChangeRequestIndexRequest;
 use App\Http\Requests\Api\V1\RejectChangeRequestRequest;
 use App\Http\Requests\Api\V1\ReturnChangeRequestRequest;
@@ -86,9 +87,9 @@ class ChangeRequestController extends Controller
         ));
     }
 
-    public function approve(Request $request, ChangeRequest $changeRequest, ApproveChangeRequestAction $action): JsonResponse
+    public function approve(ApproveChangeRequestRequest $request, ChangeRequest $changeRequest, ApproveChangeRequestAction $action): JsonResponse
     {
-        return $this->outcome($action->handle($changeRequest, $request->user()));
+        return $this->outcome($action->handle($changeRequest, $request->user(), $request->evidence()));
     }
 
     public function reject(RejectChangeRequestRequest $request, ChangeRequest $changeRequest, RejectChangeRequestAction $action): JsonResponse

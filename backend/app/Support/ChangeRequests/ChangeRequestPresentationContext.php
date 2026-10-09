@@ -17,6 +17,11 @@ use App\Models\User;
  *   only here.
  * - canViewInternalNotes: Staff holding change-request.view-internal-notes
  *   (the same rule as WorkflowEventResource); never a family.
+ * - canViewMaskedIdentity: a masked National ID (`*****6789`): Staff with
+ *   person.national-id.view-masked (docs/06 §39); the family for what it
+ *   submitted itself (FP-ADR-062 masks its own members' IDs the same way).
+ * - canViewPersonNames: names of OTHER registry Persons (e.g. an existing
+ *   Person a proposal matches): Staff with person.view; never a family.
  */
 final readonly class ChangeRequestPresentationContext
 {
@@ -24,6 +29,8 @@ final readonly class ChangeRequestPresentationContext
         public ChangeRequestAudience $audience,
         public bool $canViewSensitiveIdentity,
         public bool $canViewInternalNotes,
+        public bool $canViewMaskedIdentity = false,
+        public bool $canViewPersonNames = false,
     ) {}
 
     /** The Staff review view, for the authenticated Staff user. */
@@ -33,13 +40,15 @@ final readonly class ChangeRequestPresentationContext
             ChangeRequestAudience::STAFF,
             canViewSensitiveIdentity: false,
             canViewInternalNotes: $user?->can('change-request.view-internal-notes') === true,
+            canViewMaskedIdentity: $user?->can('person.national-id.view-masked') === true,
+            canViewPersonNames: $user?->can('person.view') === true,
         );
     }
 
     /** The Family Portal view: the family's own request, nothing Staff-only. */
     public static function family(): self
     {
-        return new self(ChangeRequestAudience::FAMILY, canViewSensitiveIdentity: false, canViewInternalNotes: false);
+        return new self(ChangeRequestAudience::FAMILY, canViewSensitiveIdentity: false, canViewInternalNotes: false, canViewMaskedIdentity: true);
     }
 
     public function isStaff(): bool

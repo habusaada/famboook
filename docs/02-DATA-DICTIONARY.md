@@ -2509,6 +2509,13 @@ of the changed current-residence fields only, from `governorate`, `city`,
 target membership or person (the Family is the target). Details: docs/11
 §30a.
 
+**ADD_FAMILY_MEMBER `submitted_data` (payload version 1, FP-ADR-076):**
+`full_name`, `national_id` (nine ASCII digits), `gender`, `relationship`
+(a relationship_types code, never HEAD), `birth_date`, `marital_status`,
+`mobile` (or null). The Family is the target; no Person or membership id
+is stored. The APPROVED workflow event of this type carries metadata
+`identity: IDENTITY_VERIFIED`, `relationship: RELATIONSHIP_VERIFIED`.
+
 Family Portal V1 plans CONTACT_UPDATE, RESIDENCE_UPDATE, PERSON_CORRECTION,
 ADD_FAMILY_MEMBER, BIRTH_REPORT and DEATH_REPORT (docs/11 §14). The
 following are **proposals, not approved types** (docs/11 PFP-008):
@@ -4243,6 +4250,7 @@ Date: 2026-09-24
 | 1.2.35 | 2026-10-07 | Approved | PWA-5a: §57 Change Request data as implemented — uuid, type code, target membership, base fingerprint, rejection reason codes, CANCELLED, workflow event fields (DD-ADR-034) |
 | 1.2.36 | 2026-10-08 | Approved | PWA-6.1: §47 RESIDENCE_UPDATE submitted_data (payload version 1) recorded |
 | 1.2.37 | 2026-10-08 | Approved | PWA-6.1a: §57 RESIDENCE_UPDATE maps to UpdateFamilyResidenceAction (in-place correction); the move action stays future |
+| 1.2.38 | 2026-10-09 | Approved | §47 ADD_FAMILY_MEMBER submitted_data and APPROVED attestation metadata recorded (docs/11 FP-ADR-076) |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

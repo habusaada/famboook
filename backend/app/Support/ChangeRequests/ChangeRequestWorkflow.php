@@ -72,7 +72,7 @@ final class ChangeRequestWorkflow
     /** The fresh base values still match the stored base fingerprint. */
     public static function assertBaseUnchanged(ChangeRequestHandler $handler, ChangeRequest $locked, ChangeRequestTarget $target): void
     {
-        if (! ChangeRequestBase::matches($locked, $handler->baseValues($target))) {
+        if (! ChangeRequestBase::matches($locked, $handler->baseValues($target, $locked->submitted_data))) {
             throw new ChangeRequestException(ChangeRequestException::BASE_CHANGED);
         }
     }

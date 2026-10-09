@@ -89,7 +89,7 @@ final class FakeChangeRequestHandler implements ChangeRequestHandler
         return ['paper_form_no' => trim($validated['paper_form_no'])];
     }
 
-    public function baseValues(ChangeRequestTarget $target): array
+    public function baseValues(ChangeRequestTarget $target, array $data): array
     {
         return ['paper_form_no' => Family::withTrashed()->whereKey($target->family->getKey())->value('paper_form_no')];
     }
@@ -120,7 +120,7 @@ final class FakeChangeRequestHandler implements ChangeRequestHandler
     public function present(ChangeRequest $request, ChangeRequestPresentationContext $context): array
     {
         // Staff see the live current value; the family sees its proposal only.
-        $current = $context->isStaff() ? $this->baseValues(ChangeRequestTarget::of($request, $request->family))['paper_form_no'] : null;
+        $current = $context->isStaff() ? $this->baseValues(ChangeRequestTarget::of($request, $request->family), $request->submitted_data)['paper_form_no'] : null;
 
         return ChangeRequestPresentation::make()->row('رقم الاستمارة', $current, $request->submitted_data['paper_form_no'])->toArray();
     }

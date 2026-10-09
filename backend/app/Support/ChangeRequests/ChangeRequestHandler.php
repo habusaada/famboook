@@ -68,12 +68,16 @@ interface ChangeRequestHandler
     public function normalize(array $validated, ChangeRequestTarget $target): array;
 
     /**
-     * Exactly the CURRENT canonical values this request would change, read
-     * fresh. Only their keyed fingerprint is stored (base_fingerprint).
+     * Exactly the CURRENT canonical state this request depends on, read
+     * fresh — the values it would change or, for something that does not
+     * exist yet (a new member), the registry state that decides it (e.g. who
+     * holds the proposed National ID). Only their keyed fingerprint is
+     * stored (base_fingerprint).
      *
+     * @param  array<string, mixed>  $data  the normalized proposal
      * @return array<string, mixed>
      */
-    public function baseValues(ChangeRequestTarget $target): array;
+    public function baseValues(ChangeRequestTarget $target, array $data): array;
 
     /**
      * Business preconditions against current canonical state (e.g. the target

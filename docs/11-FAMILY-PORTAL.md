@@ -756,7 +756,7 @@ Actions.
 | Contact update | CONTACT_UPDATE | `UpdatePersonAction` exists |
 | Residence / displacement update | RESIDENCE_UPDATE | **Built (PWA-6.1):** in-place correction through `UpdateFamilyResidenceAction` (§30a); a move with history still needs `residence.change` (FU-02) |
 | Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist; CONFIRM_ALIVE → `ConfirmPersonAliveAction` (exists) |
-| Add missing family member | ADD_FAMILY_MEMBER | `AddFamilyMemberAction` exists |
+| Add missing family member | ADD_FAMILY_MEMBER | **Built, not in Production (FP-ADR-076):** `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person without an active membership) |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
 | Death report | DEATH_REPORT | `RecordPersonDeathAction` exists, with a Staff route and action (FU-10, FP-ADR-061); head succession is not handled |
 
@@ -3621,6 +3621,44 @@ frontend change; nothing deployed or enabled.
   shutdown, configuration cache), docs/09 (pilot uses PILOT, never
   GENERAL).
 
+## ADD_FAMILY_MEMBER implementation record
+
+Implemented 2026-10-09 (FP-ADR-076). Not registered in Production; no
+migration (chk_change_request_type already allows the type), permission
+or role change.
+
+- Backend: `AddFamilyMemberHandler`, `AttachFamilyMemberAction`,
+  `NationalIdGuard::lock()` / `equivalentMatches()`,
+  `ChangeRequestAttestation`, `ChangeRequestApprovalEvidence`,
+  `RequiresApprovalAttestation`, `ApproveChangeRequestRequest`
+  (`attestations[]`, `verified_national_id`), `approval_attestations` in the
+  Staff resource, APPROVED metadata keys `identity` / `relationship`,
+  throttle `change-request-approve`, family read
+  `GET /api/v1/family/change-requests/relationship-types`. Engine:
+  `baseValues()` receives the proposal; the presentation context adds
+  `canViewMaskedIdentity` and `canViewPersonNames` (existing permissions).
+- Frontend: `/family/requests/new/add-family-member` (offered only when the
+  server lists the type); the Staff approve dialog asks for both
+  attestations and the typed document number when the request lists
+  `approval_attestations`.
+- Tests: `tests/Feature/ChangeRequests/AddMember/` (submission, strict ID,
+  placeholders, fields, no enumeration, open conflict, replay, scenario A,
+  scenario B with history, legacy equivalent reuse, active elsewhere, own
+  member, ambiguous legacy, base change before approval and apply, two
+  Families, rollback and retry, attestations, other types, authorization,
+  isolation, masking, logs, relationship options, not Production, the
+  attach action, equivalent matching, approve throttle) and PostgreSQL
+  concurrency (APPLY waits for a parallel creation's ID lock and for a
+  parallel attachment's Person row; never a duplicate); frontend
+  `tests/family-add-member.test.tsx` and the attested approval in
+  `tests/change-requests.test.tsx`.
+- Known limitations: Staff entry still stores National IDs "as entered"
+  (PDD-001), so a Staff creation typed in another format takes a different
+  advisory-lock key — the equivalent-match base check catches it at the
+  next approval / APPLY, but not inside the same instant; there is no
+  database UNIQUE on National ID (legacy duplicates are not remediated).
+  The equivalent lookup scans stored IDs (adequate at pilot scale).
+
 ---
 
 # 31. Amendment Register
@@ -4457,6 +4495,50 @@ supersedes the boolean switch of FP-ADR-073).
   cancellation and the whole Staff workflow are unaffected in every mode;
 - OFF → PILOT → GENERAL is always an explicit administrator change; the
   pilot uses PILOT only; GENERAL needs its own decision after the pilot.
+
+FP-ADR-076
+ADD_FAMILY_MEMBER (approved 2026-10-09; built, NOT a Production type).
+- the household head proposes adding a person to their OWN Family; it is
+  not BIRTH_REPORT — newborns keep that dedicated future type (docs/05
+  §74), and FP-ADR-059's order is unchanged;
+- National ID REQUIRED for this type (and for BIRTH_REPORT when it is
+  built) — an exception to docs/03 §19 for these submissions only; legacy
+  registry rules are unchanged. Accepted and stored as exactly nine ASCII
+  digits (FamilyNationalId); nine identical digits are refused as a
+  placeholder. Other fields: full name, gender, relationship (an ACTIVE
+  relationship_types code, never HEAD — read from the registry), optional
+  birth date, marital status and mobile (05 + 8 digits); any other key is
+  refused;
+- legacy equivalence: registry values are compared through NationalId::
+  normalize (NationalIdGuard::equivalentMatches) and never rewritten,
+  merged or deleted; more than one equivalent holder is ambiguous and is
+  never resolved automatically;
+- no enumeration: nothing identity-dependent is checked or answered at
+  submission; the family never learns whether the ID is known. Only Staff
+  see a safe match summary (Person code, name with person.view, Family
+  code), and only while the request is open;
+- at approval and APPLY, under the National ID advisory lock: no holder →
+  new Person + membership (AddFamilyMemberAction); exactly one holder with
+  no active membership → that Person is attached as recorded
+  (AttachFamilyMemberAction — new: CreateFamilyMembershipAction + the
+  FAMILY_MEMBER_ADDED activity; never a transfer, never a head); a holder
+  with an active membership anywhere, or several holders →
+  PRECONDITION_FAILED;
+- base fingerprint: the holders of the National ID and their active
+  memberships (the handler contract's baseValues() now receives the
+  proposal); one open request per Family and National ID;
+- approval requires two reviewer attestations, IDENTITY_VERIFIED and
+  RELATIONSHIP_VERIFIED (handler capability RequiresApprovalAttestation),
+  stored only as codes in the APPROVED event metadata. Identity also needs
+  the National ID typed from the person's document, compared in constant
+  time with the proposal (the docs/03 §47e purpose-limited pattern) and
+  never stored, logged or returned; the approve route is throttled per
+  user (CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR, 10 / 60) so the
+  comparison cannot be used to guess an ID. No permission is added: a
+  masked ID is shown only with person.national-id.view-masked; nobody sees
+  the full value;
+- not in ChangeRequestTypes::PRODUCTION: tests register it through the
+  test-only registry; activation is a separate explicit decision.
 ```
 
 ---
@@ -4683,3 +4765,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.35 | 2026-10-08 | Approved | PWA-6.1 RESIDENCE_UPDATE: implementation record in §30a — V1 field set, strict input, changed-fields proposal, base fingerprint, APPLY through UpdateFamilyResidenceAction, `{rows}` presentation and the server-computed presentation context; §14 status; PFP-025 navigation activation left open (navigation stays disabled, switch off) |
 | 1.36 | 2026-10-08 | Approved | PWA-6.1a: FP-ADR-074 Family navigation activation («طلباتي» always, «+» from server type discovery); PFP-025 resolved; §23 navigation map; implementation record in §30a; residence documentation reconciled in docs/01, 02, 04, 05 |
 | 1.37 | 2026-10-08 | Approved | PWA-6.1b: FP-ADR-075 controlled pilot submission gate — modes OFF / PILOT / GENERAL, server-only Family allowlist, FamilySubmissionPolicy enforced in SubmitChangeRequestAction, per-Family type discovery, legacy boolean never opens; implementation record in §30a |
+| 1.38 | 2026-10-09 | Approved | FP-ADR-076 ADD_FAMILY_MEMBER: required nine-digit National ID, no enumeration, new vs existing Person at approval / APPLY, AttachFamilyMemberAction, reviewer attestations with a typed-ID comparison, approve throttle; built but not a Production type; implementation record in §30a |

@@ -412,6 +412,12 @@ If National ID is unknown, the system must not create fake values such as:
 
 The value should remain NULL or otherwise explicitly unknown according to the approved model.
 
+**Exception for family submissions (docs/11 FP-ADR-076):** an
+ADD_FAMILY_MEMBER request (and BIRTH_REPORT when built) REQUIRES the
+National ID — nine ASCII digits, never a placeholder. This changes nothing
+for existing records or Staff entry, where an unknown National ID stays
+NULL.
+
 ---
 
 # 20. National ID Normalization
@@ -5033,6 +5039,7 @@ Date: 2026-09-24
 | 1.2.51 | 2026-10-07 | Approved | PWA-5a: §67–§81 Change Request notes — cancellation until approval, text-only resubmission, base-data conflict refusal at approve and apply, NO_LONGER_APPLICABLE after a refused apply, rejection reason codes (docs/05 WF-ADR-049) |
 | 1.2.52 | 2026-10-07 | Approved | PWA-5b: Change Request engine notes after §81 — trusted family context, handler validation and member resolution, re-validation and base fingerprint at approve / apply, canonical Domain Actions only, rollback or APPLIED, no Production type before PWA-6 (docs/05 WF-ADR-050) |
 | 1.2.53 | 2026-10-08 | Approved | PWA-6.1: RESIDENCE_UPDATE rules recorded under "Submissions" (in-place correction, changed fields only, one open per Family, base protection) |
+| 1.2.54 | 2026-10-09 | Approved | §19: ADD_FAMILY_MEMBER (and future BIRTH_REPORT) family submissions require a nine-digit National ID (docs/11 FP-ADR-076); legacy and Staff rules unchanged |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

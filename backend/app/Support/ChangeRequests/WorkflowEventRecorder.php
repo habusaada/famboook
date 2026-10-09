@@ -3,6 +3,7 @@
 namespace App\Support\ChangeRequests;
 
 use App\Enums\ChangeRequestApplyFailure;
+use App\Enums\ChangeRequestAttestation;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\WorkflowActorSide;
@@ -29,8 +30,8 @@ use LogicException;
  *   resubmit it, optional on a rejection, refused elsewhere; internal_note
  *   (Staff-only) only on Staff events. Plain text, at most 2000 characters;
  * - metadata keys are allow-listed per event, each value a controlled code.
- *   No key is allowed yet: PWA-5b adds them with their enum contracts. The
- *   request payload and any registry value are never copied into an event.
+ *   Only APPROVED has keys (attestation codes, FP-ADR-076). The request
+ *   payload and any registry value are never copied into an event.
  *
  * Nothing is logged; exception messages carry codes and key names only.
  */
@@ -46,11 +47,17 @@ final class WorkflowEventRecorder
 
     /**
      * Allowed metadata per event type: key => the enum its value must be a
-     * case of. Any other key is refused. Empty until PWA-5b defines one.
+     * case of. Any other key is refused. APPROVED carries the reviewer's
+     * attestation codes for types that require them (FP-ADR-076).
      *
      * @var array<string, array<string, class-string<\BackedEnum>>>
      */
-    public const EVENT_CODE_METADATA = [];
+    public const EVENT_CODE_METADATA = [
+        'APPROVED' => [
+            'identity' => ChangeRequestAttestation::class,
+            'relationship' => ChangeRequestAttestation::class,
+        ],
+    ];
 
     /**
      * @param  array<string, string>  $metadata

@@ -248,7 +248,8 @@ class FamilySideBoundaryTest extends TestCase
             }
             $checked++;
         }
-        // 28 + the six Change Request routes (PWA-5e).
-        $this->assertSame(34, $checked);
+        // 28 + the six Change Request routes (PWA-5e) + the add-member
+        // relationship options (FP-ADR-076).
+        $this->assertSame(35, $checked);
     }
 }

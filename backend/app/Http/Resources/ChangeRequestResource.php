@@ -2,10 +2,12 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\ChangeRequestAttestation;
 use App\Enums\WorkflowEventType;
 use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestStaffActions;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\ChangeRequests\RequiresApprovalAttestation;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -82,6 +84,11 @@ class ChangeRequestResource extends JsonResource
                 'last_code' => $lastFailure?->reason_code,
             ],
             'timeline' => WorkflowEventResource::collection($events),
+            // FP-ADR-076: what approving this type requires from the reviewer
+            // (codes only); empty for types without attestations.
+            'approval_attestations' => $typeAvailable && ($handler = $types->handler($this->type)) instanceof RequiresApprovalAttestation
+                ? array_map(fn (ChangeRequestAttestation $a) => $a->value, $handler->requiredAttestations())
+                : [],
             // UX hint only; every action is re-authorized and re-checked.
             'available_actions' => ChangeRequestStaffActions::for($this->resource, $request->user(), $typeAvailable, $lastFailure?->reason_code),
         ];

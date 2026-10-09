@@ -201,14 +201,25 @@ class WorkflowEventRecorderTest extends TestCase
         $this->refused(fn () => $this->record($approved, S::APPROVED, E::APPLY_FAILED, WorkflowActorSide::FAMILY), LogicException::class);
     }
 
-    public function test_metadata_is_allow_listed_and_nothing_is_allowed_yet(): void
+    public function test_metadata_is_allow_listed_per_event_and_holds_codes_only(): void
     {
         $request = ChangeRequest::factory()->create();
 
-        foreach ([['mobile' => '0590000000'], ['national_id' => '000000000'], ['submitted_data' => 'x'], [0 => 'x']] as $metadata) {
+        foreach ([['mobile' => '0590000000'], ['national_id' => '000000000'], ['submitted_data' => 'x'], [0 => 'x'], ['identity' => 'IDENTITY_VERIFIED']] as $metadata) {
             $this->refused(fn () => $this->record($request, null, E::SUBMITTED, WorkflowActorSide::FAMILY, ['metadata' => $metadata]));
         }
         $this->assertSame(0, WorkflowEvent::count());
+
+        // FP-ADR-076: APPROVED may carry the reviewer's attestation codes — nothing else.
+        $reviewer = User::factory()->create();
+        $approved = ChangeRequest::factory()->approved($reviewer)->create();
+        foreach ([['identity' => '123456789'], ['national_id' => 'IDENTITY_VERIFIED'], ['identity' => ['IDENTITY_VERIFIED']]] as $metadata) {
+            $this->refused(fn () => $this->record($approved, S::UNDER_REVIEW, E::APPROVED, WorkflowActorSide::STAFF, ['actor' => $reviewer->id, 'metadata' => $metadata]));
+        }
+        $row = $this->record($approved, S::UNDER_REVIEW, E::APPROVED, WorkflowActorSide::STAFF, [
+            'actor' => $reviewer->id, 'metadata' => ['identity' => 'IDENTITY_VERIFIED', 'relationship' => 'RELATIONSHIP_VERIFIED'],
+        ]);
+        $this->assertSame(['identity' => 'IDENTITY_VERIFIED', 'relationship' => 'RELATIONSHIP_VERIFIED'], $row->fresh()->metadata);
     }
 
     public function test_it_logs_nothing(): void

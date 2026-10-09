@@ -46,3 +46,13 @@ export const resubmitFamilyChangeRequestSchema = z.object({
   response: text.refine((v) => v.trim().length > 0, "اكتب ردّك على طلب الاستكمال."),
 });
 export type ResubmitFamilyChangeRequestValues = z.infer<typeof resubmitFamilyChangeRequestSchema>;
+
+// FP-ADR-076: approving a type that requires attestations. The reviewer
+// confirms both and types the National ID from the person's document; Laravel
+// compares it with the proposal (never stored or returned) and is the authority.
+export const attestedApproveSchema = z.object({
+  identity: z.boolean().refine((v) => v, "أكّد أنك تحققت من الهوية."),
+  relationship: z.boolean().refine((v) => v, "أكّد أنك تحققت من صلة القرابة."),
+  verifiedNationalId: z.string().refine((v) => v.trim().length > 0, "أدخل رقم الهوية كما في الوثيقة.").refine((v) => v.length <= 32, "الرقم طويل جدًا."),
+});
+export type AttestedApproveValues = z.infer<typeof attestedApproveSchema>;
