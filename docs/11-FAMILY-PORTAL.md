@@ -3652,6 +3652,16 @@ or role change.
   parallel attachment's Person row; never a duplicate); frontend
   `tests/family-add-member.test.tsx` and the attested approval in
   `tests/change-requests.test.tsx`.
+- Review fixes (2026-10-10): lock order Family → National ID → Person in
+  CorrectNationalIdAction and AddFamilyMemberAction (two deadlocks with
+  APPLY reproduced on PostgreSQL by
+  `AddFamilyMemberDeadlockTest`, which runs the real Staff action in a
+  separate process — both PostgreSQL 40P01 before the fix, none after);
+  existing-Person eligibility (ALIVE, active) in the handler and in
+  AttachFamilyMemberAction, with status in the Staff summary and in the
+  base fingerprint; evidence-only approval throttle; per-key attestation
+  codes; the relationship attestation worded as recorded here; the Staff
+  dialog clears the typed value and resets the mutation (gcTime 0).
 - Known limitations: Staff entry still stores National IDs "as entered"
   (PDD-001), so a Staff creation typed in another format takes a different
   advisory-lock key — the equivalent-match base check catches it at the
@@ -4518,12 +4528,25 @@ ADD_FAMILY_MEMBER (approved 2026-10-09; built, NOT a Production type).
   see a safe match summary (Person code, name with person.view, Family
   code), and only while the request is open;
 - at approval and APPLY, under the National ID advisory lock: no holder →
-  new Person + membership (AddFamilyMemberAction); exactly one holder with
-  no active membership → that Person is attached as recorded
-  (AttachFamilyMemberAction — new: CreateFamilyMembershipAction + the
-  FAMILY_MEMBER_ADDED activity; never a transfer, never a head); a holder
-  with an active membership anywhere, or several holders →
-  PRECONDITION_FAILED;
+  new Person + membership (AddFamilyMemberAction); exactly one holder that
+  is ALIVE, ACTIVE (is_active) and has no active membership → that Person
+  is attached as recorded (AttachFamilyMemberAction — new:
+  CreateFamilyMembershipAction + the FAMILY_MEMBER_ADDED activity; never a
+  transfer, never a head); a holder that is DECEASED, of UNKNOWN life
+  status, inactive, or has an active membership anywhere, or several
+  holders → PRECONDITION_FAILED. The eligibility is re-checked with the
+  Person row locked, and AttachFamilyMemberAction enforces it itself
+  (amended 2026-10-10, review fixes);
+- Staff see the matched Person's life status and active / inactive state
+  in the match summary (Staff only, open requests only); a family never
+  does;
+- lock order for every National ID writer (amended 2026-10-10): Family row
+  → National ID advisory lock → Person row. CorrectNationalIdAction takes
+  the Person's current Family (KEY SHARE) and the new value's ID lock
+  before the Person, and refuses (retry, nothing changed) if the Person's
+  active Family changed meanwhile; AddFamilyMemberAction takes the Family
+  (KEY SHARE) before CreatePersonAction's ID lock; a matched Person who is
+  active in a Family is refused before their row is locked;
 - base fingerprint: the holders of the National ID and their active
   memberships (the handler contract's baseValues() now receives the
   proposal); one open request per Family and National ID;
@@ -4532,9 +4555,14 @@ ADD_FAMILY_MEMBER (approved 2026-10-09; built, NOT a Production type).
   stored only as codes in the APPROVED event metadata. Identity also needs
   the National ID typed from the person's document, compared in constant
   time with the proposal (the docs/03 §47e purpose-limited pattern) and
-  never stored, logged or returned; the approve route is throttled per
-  user (CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR, 10 / 60) so the
-  comparison cannot be used to guess an ID. No permission is added: a
+  never stored, logged or returned; an approval that carries evidence
+  (`verified_national_id` or `attestations`) is throttled per user
+  (CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR, 10 / 60) so the
+  comparison cannot be used to guess an ID; an ordinary approval without
+  evidence compares nothing and is not limited (amended 2026-10-10). Each
+  APPROVED metadata key accepts only its own code, and the two appear
+  together or not at all. In the Staff UI the typed value is cleared, and
+  the approval mutation reset, on success, close and cancel. No permission is added: a
   masked ID is shown only with person.national-id.view-masked; nobody sees
   the full value;
 - not in ChangeRequestTypes::PRODUCTION: tests register it through the
@@ -4766,3 +4794,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.36 | 2026-10-08 | Approved | PWA-6.1a: FP-ADR-074 Family navigation activation («طلباتي» always, «+» from server type discovery); PFP-025 resolved; §23 navigation map; implementation record in §30a; residence documentation reconciled in docs/01, 02, 04, 05 |
 | 1.37 | 2026-10-08 | Approved | PWA-6.1b: FP-ADR-075 controlled pilot submission gate — modes OFF / PILOT / GENERAL, server-only Family allowlist, FamilySubmissionPolicy enforced in SubmitChangeRequestAction, per-Family type discovery, legacy boolean never opens; implementation record in §30a |
 | 1.38 | 2026-10-09 | Approved | FP-ADR-076 ADD_FAMILY_MEMBER: required nine-digit National ID, no enumeration, new vs existing Person at approval / APPLY, AttachFamilyMemberAction, reviewer attestations with a typed-ID comparison, approve throttle; built but not a Production type; implementation record in §30a |
+| 1.39 | 2026-10-10 | Approved | FP-ADR-076 amended after review: existing-Person eligibility (ALIVE, active, no active membership), Staff-only status in the match summary, lock order Family → National ID → Person for every National ID writer, evidence-only approval throttle, per-key attestation codes |

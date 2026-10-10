@@ -5,6 +5,7 @@ namespace Tests\Feature\ChangeRequests\AddMember;
 use App\Actions\AttachFamilyMemberAction;
 use App\Enums\ChangeRequestType;
 use App\Enums\FamilyActivityType;
+use App\Enums\LifeStatus;
 use App\Models\ChangeRequest;
 use App\Models\Family;
 use App\Models\FamilyActivity;
@@ -71,6 +72,17 @@ class AttachFamilyMemberActionTest extends TestCase
         $this->refused(fn () => app(AttachFamilyMemberAction::class)->handle($family, Person::factory()->create(), 'HEAD', null));
 
         $this->assertSame(0, FamilyMembership::where('family_id', $family->id)->count());
+        $this->assertSame(0, FamilyActivity::count());
+    }
+
+    public function test_only_a_living_active_person_can_be_attached(): void
+    {
+        $family = Family::factory()->create();
+        foreach ([['life_status' => LifeStatus::DECEASED], ['life_status' => LifeStatus::UNKNOWN], ['is_active' => false]] as $attributes) {
+            $person = Person::factory()->create($attributes);
+            $this->refused(fn () => app(AttachFamilyMemberAction::class)->handle($family, $person, 'SON', null));
+            $this->assertSame(0, FamilyMembership::where('person_id', $person->id)->count());
+        }
         $this->assertSame(0, FamilyActivity::count());
     }
 

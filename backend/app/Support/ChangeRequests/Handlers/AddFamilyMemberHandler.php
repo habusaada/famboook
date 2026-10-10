@@ -7,6 +7,7 @@ use App\Actions\AttachFamilyMemberAction;
 use App\Enums\ChangeRequestAttestation;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\Gender;
+use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
 use App\Enums\ProfileReviewSection;
 use App\Exceptions\ChangeRequestException;
@@ -53,13 +54,17 @@ use Illuminate\Validation\ValidationException;
  *   equivalent registry matches (NationalIdGuard::equivalentMatches) decide:
  *     none                                  → new Person + membership
  *                                             (AddFamilyMemberAction)
- *     exactly one, no active membership     → attach that Person
- *                                             (AttachFamilyMemberAction)
- *     one with an active membership, or several (ambiguous legacy data)
+ *     exactly one: ALIVE, active, with no   → attach that Person
+ *     active membership                       (AttachFamilyMemberAction)
+ *     one with an active membership, one that is DECEASED / of UNKNOWN life
+ *     status / inactive, or several (ambiguous legacy data)
  *                                           → PRECONDITION_FAILED — no
  *                                             transfer, no merge, no choice.
- * - Base: who holds the ID (Person ids and their active memberships), so a
- *   registry change while the request waits blocks approval and APPLY.
+ * - Lock order: Family (engine) → National ID advisory lock → Person — the
+ *   same order as CorrectNationalIdAction and AddFamilyMemberAction.
+ * - Base: who holds the ID (Person ids, their active memberships, life
+ *   status and active flag), so a registry change while the request waits
+ *   blocks approval and APPLY.
  * - One open request per Family and National ID.
  */
 final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresApprovalAttestation
@@ -159,6 +164,8 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresAppr
         return ['holders' => self::matches($nationalId)->map(fn (Person $person) => [
             'person' => (int) $person->getKey(),
             'membership' => $person->activeMembership?->getKey(),
+            'life' => $person->life_status?->value,
+            'active' => (bool) $person->is_active,
         ])->values()->all()];
     }
 
@@ -247,9 +254,16 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresAppr
 
     /**
      * The registry Person to attach, NULL for a new Person, or a refusal for
-     * every unsafe case (active membership anywhere — a transfer is not this
-     * type; several equivalent holders — ambiguous legacy data). Called with
-     * the National ID lock held (baseValues ran first in the same transaction).
+     * every unsafe case: an active membership anywhere (a transfer is not
+     * this type), a Person who is not ALIVE or not active (FP-ADR-076), or
+     * several equivalent holders (ambiguous legacy data).
+     *
+     * Lock order: called with the Family locked (engine) and takes the
+     * National ID lock, then — only for a Person with no active membership —
+     * the Person row, and re-checks under it. A Person who is active in a
+     * Family is refused WITHOUT locking their row: that Family's own writers
+     * lock Person → Family (e.g. a death record's activity), so locking it
+     * here could close a cycle.
      */
     private static function resolve(string $nationalId): ?Person
     {
@@ -258,12 +272,26 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresAppr
         if ($matches->count() > 1) {
             throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
         }
-        $person = $matches->first();
-        if ($person !== null && $person->activeMembership !== null) {
+        $match = $matches->first();
+        if ($match === null) {
+            return null;
+        }
+        if ($match->activeMembership !== null) {
+            throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
+        }
+
+        $person = Person::query()->whereKey($match->getKey())->lockForUpdate()->first();
+        if ($person === null || ! self::attachable($person) || $person->activeMembership()->exists()) {
             throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
         }
 
         return $person;
+    }
+
+    /** FP-ADR-076: only a living, active registry Person may be attached. */
+    private static function attachable(Person $person): bool
+    {
+        return $person->life_status === LifeStatus::ALIVE && (bool) $person->is_active;
     }
 
     /** @return Collection<int, Person> */
@@ -285,15 +313,29 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresAppr
 
         $person = $matches->first();
         $who = $person->person_code.($context->canViewPersonNames ? ' — '.$person->full_name : '');
+        // Staff only: the facts that decide whether this Person may be attached.
+        $status = 'الحالة: '.self::lifeLabel($person->life_status).'، السجل '.($person->is_active ? 'نشط' : 'غير نشط');
         $membership = $person->activeMembership;
+        if ($membership === null && ! self::attachable($person)) {
+            return "شخص مسجّل دون عضوية نشطة ({$who}؛ {$status}) — لا يُربط إلا شخص على قيد الحياة وسجله نشط؛ لا يمكن اعتماد الطلب.";
+        }
         if ($membership === null) {
-            return "شخص مسجّل دون عضوية نشطة ({$who}) — يُربط بالأسرة كما هو مسجّل، دون تعديل بياناته.";
+            return "شخص مسجّل دون عضوية نشطة ({$who}؛ {$status}) — يُربط بالأسرة كما هو مسجّل، دون تعديل بياناته.";
         }
         if ((int) $membership->family_id === (int) $request->family_id) {
-            return "عضو نشط في هذه الأسرة بالفعل ({$who}) — لا يمكن اعتماد الطلب.";
+            return "عضو نشط في هذه الأسرة بالفعل ({$who}؛ {$status}) — لا يمكن اعتماد الطلب.";
         }
 
-        return "عضو نشط في أسرة أخرى ({$membership->family->family_code}، {$who}) — النقل غير مدعوم؛ لا يمكن اعتماد الطلب.";
+        return "عضو نشط في أسرة أخرى ({$membership->family->family_code}، {$who}؛ {$status}) — النقل غير مدعوم؛ لا يمكن اعتماد الطلب.";
+    }
+
+    private static function lifeLabel(?LifeStatus $status): string
+    {
+        return match ($status) {
+            LifeStatus::ALIVE => 'على قيد الحياة',
+            LifeStatus::DECEASED => 'متوفى',
+            default => 'غير مؤكدة الحياة',
+        };
     }
 
     /** Nine identical digits (000000000, 999999999 …) — a fabricated value (docs/03 §19). */

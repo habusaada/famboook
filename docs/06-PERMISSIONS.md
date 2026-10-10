@@ -4373,7 +4373,10 @@ attestations; identity is attested by typing the National ID from the
 document, compared with the proposal and never revealed (no permission
 grants the full value). A masked ID appears in the review only with
 `person.national-id.view-masked`; other Persons' names in the match
-summary only with `person.view`. The approve route is throttled per user.
+summary only with `person.view`; the matched Person's life status and
+active state appear in that Staff-only summary, never to a family. An
+approval carrying identity evidence is throttled per user; ordinary
+approvals are not.
 
 **PWA-6.1b note (2026-10-08, docs/11 FP-ADR-075): no permission or role
 added.** Who may submit a NEW family request is additionally limited by
@@ -4854,6 +4857,7 @@ Date: 2026-09-24
 | 1.2.57 | 2026-10-08 | Approved | PWA-6.1a note: Family navigation «+» follows server type discovery (change-request.submit, switch, registered type); no permission added |
 | 1.2.58 | 2026-10-08 | Approved | PWA-6.1b note: submission mode and pilot Family allowlist gate NEW family submissions after the permission check; no permission added |
 | 1.2.59 | 2026-10-09 | Approved | ADD_FAMILY_MEMBER note (FP-ADR-076): attested approval within change-request.approve, typed-ID comparison, masked ID only with view-masked, approve throttle; no permission added |
+| 1.2.60 | 2026-10-10 | Approved | ADD_FAMILY_MEMBER note amended: Staff-only status in the match summary; only evidence-bearing approvals are throttled; no permission added |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

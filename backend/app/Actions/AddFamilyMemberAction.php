@@ -18,6 +18,11 @@ use Illuminate\Support\Facades\DB;
  * creates a Residence, never creates another Family (docs/03-BUSINESS-
  * RULES.md §11-13: membership changes preserve history and use
  * controlled Domain Actions; this only ever adds new state).
+ *
+ * Lock order (docs/11 FP-ADR-076): the Family (KEY SHARE — the membership
+ * and activity inserts need it) BEFORE the National ID advisory lock that
+ * CreatePersonAction takes, as a Change Request APPLY does (Family → National
+ * ID → Person); otherwise the two could deadlock on the same Family and ID.
  */
 class AddFamilyMemberAction
 {
@@ -37,6 +42,8 @@ class AddFamilyMemberAction
     public function handle(Family $family, array $data, ?int $actingUserId): FamilyMembership
     {
         return DB::transaction(function () use ($family, $data, $actingUserId) {
+            Family::withTrashed()->whereKey($family->id)->lock('for key share')->first();
+
             // Never a second Person with the same National ID (docs/03 §21):
             // no new Person, no attaching the existing one, no merge
             // (enforced by CreatePersonAction). Staff always add a living

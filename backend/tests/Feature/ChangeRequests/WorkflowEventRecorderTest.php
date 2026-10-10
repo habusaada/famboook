@@ -213,7 +213,14 @@ class WorkflowEventRecorderTest extends TestCase
         // FP-ADR-076: APPROVED may carry the reviewer's attestation codes — nothing else.
         $reviewer = User::factory()->create();
         $approved = ChangeRequest::factory()->approved($reviewer)->create();
-        foreach ([['identity' => '123456789'], ['national_id' => 'IDENTITY_VERIFIED'], ['identity' => ['IDENTITY_VERIFIED']]] as $metadata) {
+        foreach ([
+            ['identity' => '123456789'], ['national_id' => 'IDENTITY_VERIFIED'], ['identity' => ['IDENTITY_VERIFIED']],
+            // each key accepts only its own code …
+            ['identity' => 'RELATIONSHIP_VERIFIED', 'relationship' => 'IDENTITY_VERIFIED'],
+            ['identity' => 'IDENTITY_VERIFIED', 'relationship' => 'IDENTITY_VERIFIED'],
+            // … and the two appear together or not at all
+            ['identity' => 'IDENTITY_VERIFIED'], ['relationship' => 'RELATIONSHIP_VERIFIED'],
+        ] as $metadata) {
             $this->refused(fn () => $this->record($approved, S::UNDER_REVIEW, E::APPROVED, WorkflowActorSide::STAFF, ['actor' => $reviewer->id, 'metadata' => $metadata]));
         }
         $row = $this->record($approved, S::UNDER_REVIEW, E::APPROVED, WorkflowActorSide::STAFF, [

@@ -189,15 +189,17 @@ function ConfirmActionDialog({
 
 const ATTESTATION_TEXT: Record<ChangeRequestAttestation, string> = {
   IDENTITY_VERIFIED: "تحققتُ من هوية الشخص من وثيقة رسمية (بطاقة الهوية أو شهادة الميلاد).",
-  RELATIONSHIP_VERIFIED: "تحققتُ من صلة القرابة برب الأسرة وأن الشخص يعيش مع الأسرة.",
+  RELATIONSHIP_VERIFIED: "تحققتُ من صلة القرابة المذكورة برب الأسرة.",
 };
 
 /**
  * Approval for a type that requires reviewer attestations: both checkboxes
  * and the National ID typed from the document. The typed value is sent once
- * for comparison with the proposal and is cleared when the dialog closes; it
- * is never stored, cached or shown back. The server decides — a wrong or
- * missing value refuses the approval with a field error.
+ * for comparison with the proposal and is never stored or shown back: on
+ * success, on close and on cancel the form is cleared AND the mutation is
+ * reset, so the request body (with the typed value) does not stay in the
+ * mutation state; the action mutation is not cached either (gcTime 0). The
+ * server decides — a wrong or missing value refuses with a field error.
  */
 function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: Mutation; onDone: (n: ActionNotice) => void; attestations: ChangeRequestAttestation[] }) {
   const [open, setOpen] = useState(false);
@@ -215,6 +217,7 @@ function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: M
     if (mutation.isPending) return;
     setOpen(next);
     form.reset(blank);
+    mutation.reset();
     if (next) setError(null);
   }
 

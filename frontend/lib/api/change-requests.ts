@@ -93,6 +93,9 @@ export function useChangeRequestAction(id: string, familyCode: string) {
         )
       ).data,
     retry: false,
+    // Never kept once settled and unobserved: an approval body may carry a
+    // National ID typed from a document (FP-ADR-076).
+    gcTime: 0,
     onSuccess: (_outcome, input) => {
       if (input.action === "apply" && familyCode) {
         void queryClient.invalidateQueries({ queryKey: ["families", familyCode] });

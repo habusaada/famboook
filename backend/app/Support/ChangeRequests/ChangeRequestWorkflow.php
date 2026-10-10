@@ -18,10 +18,13 @@ use InvalidArgumentException;
 
 /**
  * Shared steps of the Change Request Domain Actions (PWA-5b). Lock order,
- * everywhere: the change_requests row FIRST, then the Family row, then the
- * target Person — the same Family → Person order as the existing actions
- * (CreateFamilyMembershipAction); Person-only actions never take a Family
- * lock after it, so no cycle exists. A submission locks only its Family.
+ * everywhere: the change_requests row FIRST, then the Family row, then (for
+ * a type that needs it) the National ID advisory lock, then the target
+ * Person — the same Family → National ID → Person order as the Staff
+ * actions (CreateFamilyMembershipAction, AddFamilyMemberAction,
+ * CorrectNationalIdAction; docs/11 FP-ADR-076). A handler never locks a
+ * Person who is active in a Family (whose own writers lock Person → Family).
+ * A submission locks only its Family.
  */
 final class ChangeRequestWorkflow
 {

@@ -367,6 +367,76 @@ class AddFamilyMemberTest extends TestCase
         $this->assertSame(0, FamilyMembership::whereIn('person_id', [$a->id, $b->id])->count());
     }
 
+    // ================================================================ existing Person eligibility (FP-ADR-076)
+
+    public function test_a_deceased_unknown_or_inactive_person_is_never_attached(): void
+    {
+        $cases = [
+            'deceased' => ['life_status' => LifeStatus::DECEASED],
+            'unknown' => ['life_status' => LifeStatus::UNKNOWN],
+            'inactive' => ['is_active' => false],
+        ];
+        $expected = ['deceased' => 'الحالة: متوفى، السجل نشط', 'unknown' => 'الحالة: غير مؤكدة الحياة، السجل نشط', 'inactive' => 'الحالة: على قيد الحياة، السجل غير نشط'];
+        foreach ($cases as $label => $attributes) {
+            $nid = ['deceased' => '411234567', 'unknown' => '412234567', 'inactive' => '413234567'][$label];
+            $person = $this->person($nid, null, $attributes);
+            $request = $this->underReview(['national_id' => $nid]);
+
+            $summary = collect($this->staff('GET', "/{$request->uuid}")->json('data.presentation.rows'))->firstWhere('label', 'مطابقة رقم الهوية في السجل');
+            $this->assertStringContainsString($expected[$label], $summary['current'], $label);
+            $this->assertStringContainsString('لا يمكن اعتماد الطلب', $summary['current'], $label);
+
+            $this->staff('POST', "/{$request->uuid}/approve", $this->evidence($nid))->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_PRECONDITION_FAILED');
+            $this->assertSame(S::UNDER_REVIEW, $request->fresh()->status, $label);
+            $this->assertSame(0, FamilyMembership::where('person_id', $person->id)->count(), $label);
+        }
+    }
+
+    public function test_a_person_who_dies_or_is_deactivated_after_approval_is_not_attached(): void
+    {
+        foreach (['life_status' => LifeStatus::DECEASED, 'is_active' => false] as $column => $value) {
+            $nid = $column === 'life_status' ? '414234567' : '415234567';
+            $person = $this->person($nid);
+            $request = $this->approved(['national_id' => $nid]);
+            $person->forceFill([$column => $value])->save();
+
+            $this->staff('POST', "/{$request->uuid}/apply")->assertConflict()->assertJsonPath('code', 'CHANGE_REQUEST_BASE_CHANGED');
+            $this->assertSame(0, FamilyMembership::where('person_id', $person->id)->count(), $column);
+            $this->assertSame(S::APPROVED, $request->fresh()->status, $column);
+        }
+    }
+
+    public function test_the_family_never_sees_the_matched_persons_status(): void
+    {
+        $this->person(self::NID, null, ['life_status' => LifeStatus::DECEASED, 'is_active' => false]);
+        $request = $this->underReview();
+
+        $family = $this->family('GET', "/{$request->uuid}")->assertOk();
+        foreach (['متوفى', 'غير نشط', 'الحالة', 'مطابقة رقم الهوية', 'PER-'] as $leak) {
+            $this->assertStringNotContainsString($leak, $family->getContent(), $leak);
+        }
+    }
+
+    public function test_ordinary_approvals_are_not_throttled_but_identity_attempts_are(): void
+    {
+        $this->withMiddleware(ThrottleRequests::class);
+        config(['change_requests.staff_limits.approve_user_minute' => 2]);
+        $request = $this->underReview();
+
+        // Requests with no evidence never compare an ID: not limited (here they fail validation instead).
+        for ($i = 0; $i < 4; $i++) {
+            $this->staff('POST', "/{$request->uuid}/approve")->assertUnprocessable();
+        }
+        // Requests carrying a typed ID are limited per user.
+        for ($i = 0; $i < 2; $i++) {
+            $this->staff('POST', "/{$request->uuid}/approve", $this->evidence('40999999'.$i))->assertUnprocessable();
+        }
+        $this->staff('POST', "/{$request->uuid}/approve", $this->evidence())->assertStatus(429);
+        // Attestation codes alone count as evidence too.
+        $this->staff('POST', "/{$request->uuid}/approve", ['attestations' => ['IDENTITY_VERIFIED']])->assertStatus(429);
+        $this->assertSame(S::UNDER_REVIEW, $request->fresh()->status);
+    }
+
     // ================================================================ stale base and concurrency outcomes
 
     public function test_a_registry_change_after_submission_blocks_approval(): void
@@ -454,12 +524,17 @@ class AddFamilyMemberTest extends TestCase
         $this->assertStringNotContainsString(self::NID, json_encode($event->getAttributes(), JSON_UNESCAPED_UNICODE));
     }
 
-    public function test_other_types_take_no_evidence(): void
+    public function test_add_family_member_never_approves_without_evidence_and_other_types_take_none(): void
     {
-        $residenceId = $this->family('POST', '', ['type' => 'RESIDENCE_UPDATE', 'client_reference' => (string) Str::uuid(), 'data' => ['x' => 1]])->status();
-        $this->assertSame(422, $residenceId, 'a family without a residence cannot propose one (sanity)');
+        // ADD_FAMILY_MEMBER: an approval without any evidence is refused and changes nothing.
+        $member = $this->underReview();
+        $this->staff('POST', "/{$member->uuid}/approve")->assertUnprocessable()->assertJsonValidationErrors('attestations');
+        $this->staff('POST', "/{$member->uuid}/approve", ['attestations' => ['IDENTITY_VERIFIED', 'RELATIONSHIP_VERIFIED']])
+            ->assertUnprocessable()->assertJsonValidationErrors('verified_national_id');
+        $this->assertSame(S::UNDER_REVIEW, $member->fresh()->status);
+        $this->assertSame(0, WorkflowEvent::where('event_type', WorkflowEventType::APPROVED)->count());
 
-        // The attestation hint is empty for a type without attestations, and evidence is refused.
+        // A type without attestations: no hint, and evidence is refused.
         $fake = ChangeRequest::factory()->create(['type' => ChangeRequestType::RESIDENCE_UPDATE, 'family_id' => $this->context->family->id, 'submitted_data' => ['city' => 'غزة']]);
         $this->staff('GET', "/{$fake->uuid}")->assertJsonPath('data.approval_attestations', []);
         $this->staff('POST', "/{$fake->uuid}/start-review")->assertOk();
