@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Menu, NotebookText } from "lucide-react";
+import { Menu } from "lucide-react";
+import { BrandLogo } from "@/components/shared/brand-logo";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -32,10 +33,10 @@ export function AppTopbar() {
         </SheetTrigger>
         <SheetContent side="right" className="w-64 p-0">
           <SheetHeader className="h-14 flex-row items-center gap-2.5 space-y-0 border-b px-5">
-            <span className="flex size-8 items-center justify-center rounded-md bg-brand-700 text-white">
-              <NotebookText className="size-4" />
-            </span>
-            <SheetTitle className="text-[15px] text-brand-900">Famboook</SheetTitle>
+            {/* The dialog's accessible title is the logo's alt text. */}
+            <SheetTitle>
+              <BrandLogo className="h-8" />
+            </SheetTitle>
           </SheetHeader>
           <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
         </SheetContent>

@@ -1,5 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import { FamilyBrand } from "@/components/family/family-brand";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { cn } from "@/lib/utils";
 
 // The shared pieces of the Family Portal's public screens — activation,
@@ -53,6 +54,8 @@ export function FamilyAuthCard({
         <p className="mt-4 text-center text-xs leading-relaxed text-subtle-foreground">
           لا تشارك رمز التحقق أو كلمة المرور مع أي شخص.
         </p>
+
+        <SiteFooter className="mt-8" />
       </div>
     </main>
   );

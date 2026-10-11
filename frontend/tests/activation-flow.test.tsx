@@ -116,8 +116,10 @@ describe("step 1 — National ID", () => {
     expect(idField()).toHaveAttribute("type", "text");
     expect(idField()).toHaveAttribute("inputmode", "numeric");
     expect(idField()).toHaveAttribute("dir", "ltr");
-    // The only link: to the Family login, for someone already activated.
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    // The only in-app link: to the Family login, for someone already
+    // activated (besides the footer's external developer credit, FB-BRAND-01).
+    const links = screen.getAllByRole("link").filter((link) => !link.closest("[data-site-footer]"));
+    expect(links).toHaveLength(1);
     expect(screen.getByRole("link", { name: "تسجيل الدخول" })).toHaveAttribute("href", "/family/login");
     // The head-only rule, up front and attached to the field.
     expect(screen.getByText("التفعيل متاح لرب الأسرة فقط، باستخدام رقم هويته.")).toBeInTheDocument();

@@ -67,7 +67,7 @@ describe("/family/login", () => {
   it("shows the official logo above the portal name and the card", () => {
     const { container } = renderWithClient(<FamilyLoginForm />);
 
-    expect(screen.getByRole("img", { name: "Famboook" })).toHaveAttribute("src", "/brand/famboook-logo.svg");
+    expect(screen.getByRole("img", { name: "Famboook" })).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
     expect(container.querySelector("[data-family-brand]")).toHaveTextContent("بوابة الأسرة");
     expect(container.querySelector("[data-family-brand] svg")).toBeNull();
   });

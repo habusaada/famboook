@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NotebookText } from "lucide-react";
+import { BrandLogo } from "@/components/shared/brand-logo";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 
 export function AppSidebar() {
@@ -9,13 +9,8 @@ export function AppSidebar() {
       <div className="sticky top-0 flex h-svh flex-col">
         <div className="flex h-14 items-center border-b border-stroke-subtle px-5">
           <Link href="/" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-700 text-white shadow-e1">
-              <NotebookText className="size-4" strokeWidth={2} />
-            </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[15px] font-bold text-brand-900">Famboook</span>
-              <span className="text-[11px] text-subtle-foreground">بوابة الطاقم</span>
-            </span>
+            <BrandLogo className="h-8" />
+            <span className="text-[11px] leading-tight text-subtle-foreground">بوابة الطاقم</span>
           </Link>
         </div>
         <SidebarNav />

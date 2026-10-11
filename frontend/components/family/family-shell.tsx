@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ArrowRight, Loader2, LogOut, Network, ShieldAlert } from "lucide-react";
 import { FamilyBottomNav } from "@/components/family/bottom-nav";
 import { FamilyBrand } from "@/components/family/family-brand";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { useFamilyUser } from "@/components/family/family-context";
 import { useFamilySignOut } from "@/components/family/use-family-sign-out";
 
@@ -100,6 +101,7 @@ export function FamilyShell({ children }: { children: React.ReactNode }) {
 
       <main className={`mx-auto w-full max-w-md flex-1 px-4 pt-6 ${available && !coordinatorMode ? "pb-28" : "pb-10"}`}>
         {available ? children : <AccessUnavailable />}
+        <SiteFooter className="mt-10" />
       </main>
 
       {available && !coordinatorMode && <FamilyBottomNav />}

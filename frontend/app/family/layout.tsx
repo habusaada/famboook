@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { FamilyServiceWorker } from "@/components/family/pwa/family-service-worker";
 
 // The installable Family app: its manifest, the official Famboook icon
-// (public/icons, rendered from famboook-icon.svg) and the Apple home-screen
+// (public/icons/v2, rendered from public/brand/FamboookLogoColoredIcon.svg —
+// versioned paths so installed apps fetch the new icon; the legacy
+// public/icons files stay for one release) and the Apple home-screen
 // metadata. Linked from the Family Portal only — the Staff application is
 // not an installable app.
 export const metadata: Metadata = {
@@ -11,10 +13,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/icons/famboook-icon.svg", type: "image/svg+xml" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icons/v2/famboook-icon.svg", type: "image/svg+xml" },
+      { url: "/icons/v2/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/icons/v2/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: { capable: true, title: "فامبوك", statusBarStyle: "default" },
 };

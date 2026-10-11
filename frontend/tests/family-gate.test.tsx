@@ -48,10 +48,11 @@ describe("FamilyGate", () => {
     const { container } = renderPortal();
 
     const logo = await screen.findByRole("img", { name: "Famboook" });
-    expect(logo).toHaveAttribute("src", "/brand/famboook-logo.svg");
-    // Intrinsic 648 × 83: only the height is styled, so the ratio is kept.
-    expect(logo).toHaveAttribute("width", "648");
-    expect(logo).toHaveAttribute("height", "83");
+    // FB-BRAND-01: the official full logo, intrinsic 432 × 144 — only the
+    // height is styled, so the ratio is kept.
+    expect(logo).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
+    expect(logo).toHaveAttribute("width", "432");
+    expect(logo).toHaveAttribute("height", "144");
     const brand = container.querySelector("[data-family-brand]");
     expect(brand).toHaveTextContent("بوابة الأسرة");
     expect(brand?.textContent).not.toContain("Famboook");

@@ -29,7 +29,18 @@ function pngSize(file: string): [number, number] {
 }
 
 describe("the Famboook app icon", () => {
-  it("is the official SVG, unchanged", () => {
+  it("serves the official FB-BRAND-01 icon, unchanged, from /icons/v2", () => {
+    const official = readFileSync(join(PUBLIC, "brand", "FamboookLogoColoredIcon.svg"));
+    expect(readFileSync(join(PUBLIC, "icons", "v2", "famboook-icon.svg")).equals(official)).toBe(true);
+    expect(pngSize("icons/v2/icon-192.png")).toEqual([192, 192]);
+    expect(pngSize("icons/v2/icon-512.png")).toEqual([512, 512]);
+    expect(pngSize("icons/v2/icon-maskable-192.png")).toEqual([192, 192]);
+    expect(pngSize("icons/v2/icon-maskable-512.png")).toEqual([512, 512]);
+    expect(pngSize("icons/v2/apple-touch-icon.png")).toEqual([180, 180]);
+  });
+
+  // The legacy icon set stays one release for installed apps.
+  it("keeps the legacy SVG, unchanged", () => {
     const svg = readFileSync(join(PUBLIC, "icons", "famboook-icon.svg"));
     expect(createHash("sha256").update(svg).digest("hex")).toBe(OFFICIAL_SVG_SHA256);
   });
@@ -60,7 +71,8 @@ describe("the web app manifest", () => {
 
   it("is linked, with the Apple icon, from the Family Portal", () => {
     expect(metadata.manifest).toBe("/manifest.webmanifest");
-    expect(JSON.stringify(metadata.icons)).toContain("/icons/apple-touch-icon.png");
+    // FB-BRAND-01: the versioned icons generated from the official icon.
+    expect(JSON.stringify(metadata.icons)).toContain("/icons/v2/apple-touch-icon.png");
     expect(metadata.appleWebApp).toMatchObject({ capable: true });
     expect(viewport.themeColor).toBe("#751BD5");
   });

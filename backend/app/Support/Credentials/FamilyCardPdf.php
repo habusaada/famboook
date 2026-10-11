@@ -27,7 +27,9 @@ final class FamilyCardPdf
 {
     public const FONT = 'ibmplexsansarabic';
 
-    public const LOGO = 'pdf/famboook-logo.svg';
+    // The official full logo (FB-BRAND-01), a byte-for-byte copy of
+    // frontend/public/brand/FamboookLogoColored.svg (432 × 144.39).
+    public const LOGO = 'pdf/famboook-logo-full.svg';
 
     /** The HTML handed to mPDF — every value escaped by Blade. */
     public static function html(FamilyCardView $card): string

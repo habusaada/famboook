@@ -2675,7 +2675,12 @@ Implemented 2026-10-04 (FP-ADR-055). Frontend only; no backend change.
 
 - **Identity:** `public/manifest.webmanifest` — id, start_url and scope
   `/family`, `display: standalone`, Arabic RTL, theme `#751BD5`; the
-  official Famboook icon (`public/icons/famboook-icon.svg`, kept
+  official Famboook icon (superseded 2026-10-11 by FB-BRAND-01: the manifest
+  and the Family layout now point to `public/icons/v2/`, generated from
+  `public/brand/FamboookLogoColoredIcon.svg` — 192, 512, maskable 192 / 512,
+  Apple 180, SVG — with every other manifest property unchanged; the
+  files below stay for one release for installed apps;
+  formerly `public/icons/famboook-icon.svg`, kept
   byte-for-byte) and PNGs rendered from it (192, 512, 512 maskable, 180
   Apple). Linked from the Family Portal layout only.
 - **Service worker** (`public/family-sw.js`), registered from the Family
@@ -3296,7 +3301,10 @@ layout (deferred).
   `useKashida` 75, DejaVu Sans Condensed substitution, stream wrappers
   limited to `file`, no debug), the Blade view `pdf.family-card` (tables
   only; identifiers in `<bdo dir="ltr">`), `QrCodes::pngDataUri()`, the
-  PDF-safe logo copy `resources/pdf/famboook-logo.svg`.
+  PDF-safe logo copy `resources/pdf/famboook-logo.svg` (since FB-BRAND-01,
+  2026-10-11: the official full logo `resources/pdf/famboook-logo-full.svg`,
+  a byte copy of `public/brand/FamboookLogoColored.svg`, 30 mm wide —
+  rendered and checked with mPDF; the old file is kept).
 - **Assets:** `backend/resources/fonts/ibm-plex-sans-arabic/`
   (`IBMPlexSansArabic-Regular.ttf`, `IBMPlexSansArabic-SemiBold.ttf`,
   `OFL.txt`, `SOURCE.md` with the official release and checksums).
@@ -5068,3 +5076,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.42 | 2026-10-11 | Approved | FP-ADR-078 Authenticated Family password change (closes FU-16): current password, Family password policy, unchanged refused, all sessions ended and the browser signed in afresh, PASSWORD_CHANGED events, 5 / 15 min per user, gate `password_change_enabled` off by default; FP-ADR-067 amended (entry shown only while open); implementation record in §30a |
 | 1.43 | 2026-10-11 | Approved | FP-ADR-079 mobile CONTACT_UPDATE: approved policy exception (no Staff review), OTP to the proposed number, head R2 (current password + old and new number codes, trust transferred as SELF_OTP_TRANSFER) / R1 (no trust), SUBMITTED → APPROVED / APPLIED by SYSTEM, system close, Staff read-only, limits and gate (off by default); built, not registered in Production; implementation record in §30a |
 | 1.44 | 2026-10-11 | Approved | CONTACT_UPDATE V1 LIVE in Production: registered in `ChangeRequestTypes::PRODUCTION` (activation commit `01fa663`), `FAMILY_CONTACT_UPDATE_ENABLED=true` on Production (default false in code and env templates), verified on Production 2026-10-11 (Family Auth readiness without warnings, TweetsMS OTP delivery, a contact update through the Family Portal); status statements updated in §14, §30a and FP-ADR-079 |
+| 1.45 | 2026-10-11 | Approved | FB-BRAND-01 official Famboook identity: `FamilyBrand` and the Staff lockups use the official full logo (`BrandLogo`, docs/10 §7a); the installable app's icons regenerated from the official icon at `/icons/v2` (manifest `icons` only — id, start_url, scope, display and colours unchanged; legacy icons kept one release; no service-worker change: it never caches icons); site favicon `app/icon.svg` / `favicon.ico` / `apple-icon.png`; the Family Card PDF logo; the shared copyright footer `SiteFooter`. No colour, workflow or API change |

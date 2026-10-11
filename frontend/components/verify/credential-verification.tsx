@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BadgeCheck, Info, Loader2, ShieldAlert } from "lucide-react";
 import { FamilyBrand } from "@/components/family/family-brand";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { ApiError } from "@/lib/api/client";
 import { type VerifiedFamilyCard, verifyCredential } from "@/lib/api/credentials";
 import { formatDateLong } from "@/lib/utils/date";
@@ -120,6 +121,8 @@ export function CredentialVerification({ token }: { token: string }) {
         <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
         {FAMILY_CARD_DISCLAIMER}
       </p>
+
+      <SiteFooter className="mt-auto pt-4" />
     </main>
   );
 }

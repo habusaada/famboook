@@ -62,7 +62,7 @@
     <table class="header">
         <tr>
             <td class="title">بطاقة الأسرة الرقمية</td>
-            <td class="brand"><img src="{{ $logo }}" style="width: 34mm;" alt="Famboook"></td>
+            <td class="brand"><img src="{{ $logo }}" style="width: 30mm;" alt="Famboook"></td>
         </tr>
     </table>
 

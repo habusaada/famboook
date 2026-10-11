@@ -106,7 +106,12 @@ describe("the public verification page", () => {
     render(<CredentialVerification token={TOKEN} />);
     await screen.findByText("بطاقة صالحة");
 
-    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    // No portal or login link: the only link is the footer's external
+    // developer credit (FB-BRAND-01), opened in a new tab.
+    const links = screen.queryAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "https://www.facebook.com/pcdcd.gaza");
+    expect(links[0]).toHaveAttribute("target", "_blank");
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     // No PDF, download or print control on the public page (PWA-8.3).
     expect(screen.queryAllByRole("button")).toHaveLength(0);

@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertCircle, Eye, EyeOff, Loader2, LockKeyhole, NotebookText } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
+import { BrandLogo } from "@/components/shared/brand-logo";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -83,14 +85,9 @@ export function LoginView() {
     <main className="flex min-h-svh flex-col items-center justify-center bg-canvas px-4 py-8">
       <div className="flex w-full max-w-[400px] flex-col">
         {/* Brand identity, as in the Staff Portal sidebar. */}
-        <div className="mb-5 flex items-center justify-center gap-3" data-brand-lockup>
-          <span className="flex size-11 items-center justify-center rounded-lg bg-brand-700 text-white shadow-e1" aria-hidden>
-            <NotebookText className="size-[22px]" strokeWidth={2} />
-          </span>
-          <span className="flex flex-col gap-0.5 leading-none">
-            <span className="text-xl font-bold tracking-tight text-brand-900">Famboook</span>
-            <span className="text-[13px] font-medium text-brand-700">بوابة الطاقم</span>
-          </span>
+        <div className="mb-5 flex flex-col items-center gap-2.5" data-brand-lockup>
+          <BrandLogo className="h-12" />
+          <span className="text-[13px] leading-none font-medium text-brand-700">بوابة الطاقم</span>
         </div>
 
         <section className="rounded-widget border border-stroke-subtle bg-surface-1 p-6 shadow-e2 sm:p-7" aria-labelledby="login-title">
@@ -174,6 +171,8 @@ export function LoginView() {
           <LockKeyhole className="size-3.5 shrink-0 text-brand-700/70" aria-hidden />
           الدخول مخصص للطاقم المصرّح لهم فقط.
         </p>
+
+        <SiteFooter className="mt-8" />
       </div>
     </main>
   );

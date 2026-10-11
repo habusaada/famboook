@@ -89,6 +89,41 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
   8 px (panels, nested groups), `rounded-widget` 12 px (dashboard widgets).
   No pill-shaped containers.
 
+## 7a. Brand assets (FB-BRAND-01)
+
+- The official identity is two files, used **untouched** (never redrawn,
+  recoloured, cropped, distorted or mirrored in RTL):
+  `frontend/public/brand/FamboookLogoColored.svg` (full logo, viewBox
+  432 × 144.39, about 3 : 1) and
+  `frontend/public/brand/FamboookLogoColoredIcon.svg` (standalone icon,
+  143.57 × 144.39). Transparent backgrounds.
+- One component renders them: `BrandLogo` (`components/shared/brand-logo.tsx`,
+  `variant` full / icon). Only the HEIGHT is set; the width follows. The full
+  logo is readable from about 28 px tall: Staff sidebar and mobile sheet
+  `h-8`, Staff and Family public pages `h-12`, Family header `h-7`
+  (`FamilyBrand` keeps «بوابة الأسرة»; the Staff lockups keep «بوابة الطاقم»).
+- **The logo's colours stay inside the assets.** They are never extracted
+  into the application palette: tokens, Tailwind, `globals.css`, the
+  Filament colours and every UI colour are unchanged by the brand.
+- The wordmark is near-black: the full logo is for light surfaces. A dark
+  variant is required before any dark theme ships.
+- Icons generated from the official icon (no artwork edits): `app/icon.svg`
+  (byte copy), `app/favicon.ico` (16 / 32 / 48), `app/apple-icon.png` (180),
+  and `public/icons/v2/` (192, 512, maskable 192 / 512, Apple 180, SVG).
+  Maskable and Apple icons place the unchanged icon on the manifest
+  `background_color` `#F7F7FA`, inset so its silhouette survives the
+  platform mask. The legacy `public/icons/*` and `public/brand/famboook-logo.svg`
+  stay for one release (installed apps).
+- Copies elsewhere, byte for byte: `backend/public/brand/` (Filament logo
+  and favicon), `backend/resources/pdf/famboook-logo-full.svg` (Family Card
+  PDF, mPDF, 30 mm wide).
+- Copyright footer: `SiteFooter` (`components/shared/site-footer.tsx`) —
+  «© 2026 فامبوك. جميع الحقوق محفوظة.» and «تطوير المركز الفلسطيني للبيانات
+  والتنمية – PCDCD» linked to https://www.facebook.com/pcdcd.gaza (new
+  tab, `rel="noopener noreferrer"`); small text, existing tokens. On the
+  Family authentication pages, the Family Portal, the Staff login, the
+  Staff application and the public verification page.
+
 ## 8. Icons
 
 - Lucide, stroke 1.75. Navigation 18 px, inline 14–16 px.
@@ -176,3 +211,4 @@ These become tokens in PWA-3; no raw hex in components (§4).
 |---|---|---|
 | 1.0 | 2026-09-27 | Foundations (surfaces, elevation, radius, type, motion) and Dashboard components; applied to the Operational Dashboard only |
 | 1.1 | 2026-10-02 | §11a Family Portal visual direction (PWA-0); kingfisher / spring palette scoped to the Family Portal — the Staff teal scale of §3 is unchanged. Direction only, not implemented |
+| 1.2 | 2026-10-11 | §7a Brand assets (FB-BRAND-01): official full logo and icon, `BrandLogo`, generated favicon / PWA icons (`/icons/v2`), `SiteFooter`; the brand's colours stay inside the assets — no palette change |

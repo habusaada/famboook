@@ -75,7 +75,9 @@ class FamilyCardPdfViewTest extends TestCase
         $this->assertStringContainsString(self::DISCLAIMER, $html);
         $this->assertStringContainsString('dir="rtl"', $html);
         $this->assertMatchesRegularExpression('/<img src="data:image\/png;base64,[A-Za-z0-9+\/=]+"/', $html);
-        $this->assertStringContainsString(resource_path('pdf/famboook-logo.svg'), $html);
+        // FB-BRAND-01: the official full logo, a byte-for-byte copy of the frontend asset.
+        $this->assertStringContainsString(resource_path('pdf/famboook-logo-full.svg'), $html);
+        $this->assertFileEquals(base_path('../frontend/public/brand/FamboookLogoColored.svg'), resource_path('pdf/famboook-logo-full.svg'));
     }
 
     public function test_the_branch_row_is_omitted_when_the_family_has_no_branch(): void
