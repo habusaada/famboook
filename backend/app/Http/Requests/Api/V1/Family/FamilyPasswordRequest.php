@@ -31,14 +31,7 @@ class FamilyPasswordRequest extends FormRequest
     {
         return [
             'challenge' => ['required', 'string', 'uuid'],
-            'password' => [
-                'required', 'string', 'min:'.(int) config('family_auth.password_min_length'), 'confirmed',
-                function (string $attribute, mixed $value, Closure $fail) {
-                    if (is_string($value) && strlen($value) > (int) config('family_auth.password_max_bytes')) {
-                        $fail(self::TOO_LONG);
-                    }
-                },
-            ],
+            'password' => self::newPasswordRules(),
         ];
     }
 
@@ -48,6 +41,33 @@ class FamilyPasswordRequest extends FormRequest
         return [
             'challenge.required' => 'مرجع التحقق مطلوب.',
             'challenge.uuid' => 'مرجع التحقق غير صالح.',
+            ...self::newPasswordMessages(),
+        ];
+    }
+
+    /**
+     * The Family password policy for a NEW password — shared with the
+     * authenticated password change (FU-16): minimum length, confirmation,
+     * the 72-byte bcrypt limit, no composition rule.
+     *
+     * @return list<mixed>
+     */
+    public static function newPasswordRules(): array
+    {
+        return [
+            'required', 'string', 'min:'.(int) config('family_auth.password_min_length'), 'confirmed',
+            function (string $attribute, mixed $value, Closure $fail) {
+                if (is_string($value) && strlen($value) > (int) config('family_auth.password_max_bytes')) {
+                    $fail(self::TOO_LONG);
+                }
+            },
+        ];
+    }
+
+    /** @return array<string, string> */
+    public static function newPasswordMessages(): array
+    {
+        return [
             'password.required' => 'كلمة المرور مطلوبة.',
             'password.min' => 'كلمة المرور يجب ألا تقل عن :min أحرف.',
             'password.confirmed' => 'كلمتا المرور غير متطابقتين.',

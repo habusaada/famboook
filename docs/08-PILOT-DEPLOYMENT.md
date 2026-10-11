@@ -593,6 +593,19 @@ Family Portal activation may be enabled in Production.
   disappears on the next page load. No migration and no data change;
   open reset challenges simply expire. Login and activation are not
   affected.
+- **Signed-in password change (FU-16, docs/11 FP-ADR-078).** Implemented,
+  OFF by default and in the Production template:
+  `FAMILY_PASSWORD_CHANGE_ENABLED=false`. Opening it is its own decision:
+  set `FAMILY_PASSWORD_CHANGE_ENABLED=true`, then `php artisan
+  config:cache`; capabilities then answer `password_change: true` and
+  «حسابي» shows «تغيير كلمة المرور». It sends no SMS and does not depend
+  on SMS readiness, but it needs Family login (a signed-in head) and
+  `SESSION_DRIVER=database` so the account's other sessions are actually
+  ended. Limit: `FAMILY_PASSWORD_CHANGE_LIMIT_USER_ATTEMPTS` (5) per
+  `FAMILY_PASSWORD_CHANGE_LIMIT_DECAY_SECONDS` (900). Rollback: set it back
+  to `false` and `config:cache` — the route answers 503; no data change.
+  This is the FAMILY password change only; Staff still have no
+  self-service password change (§18).
 - **Coordinators (PWA-1H).** Deploying PWA-1H adds one permission,
   `coordinator-family.view-summary`, granted to COORDINATOR: run the
   RolePermissionSeeder and `famboook:verify-permissions` as usual (§7). No

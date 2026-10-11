@@ -2153,8 +2153,10 @@ PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         DEATH_REPORT (non-head); «طلباتي»
 PWA-4   Family Profile Review (/family/verification; docs/11 FP-ADR-057)
 later   contact update (CONTACT_UPDATE); the «حسابي» view itself is PWA-3B.5
-later   authenticated change password (docs/11 FU-16), a Family Auth phase
-        separate from Account Recovery (FU-14)
+done    authenticated change password (docs/11 FU-16, FP-ADR-078), a Family
+        Auth item separate from Account Recovery (FU-14): implemented
+        2026-10-11, OFF by default — FAMILY_PASSWORD_CHANGE_ENABLED=true
+        opens it
 PWA-7   health and need submissions (PFP-008, PFP-009; health visibility
         decided for PWA-3B.6 — docs/11 FP-ADR-062)
 later   optional Staff Family Verification (PFP-017) / PWA-8 card
@@ -5069,6 +5071,7 @@ Date: 2026-09-24
 | 1.2.60 | 2026-10-08 | Approved | PWA-6.1a done: Family navigation (docs/11 FP-ADR-074), residence docs reconciled, release plan (docs/08 §16b) and pilot runbook (docs/09); Production pilot not started |
 | 1.2.61 | 2026-10-08 | Approved | PWA-6.1b done: controlled pilot submission gate (docs/11 FP-ADR-075); Production pilot not started |
 | 1.2.62 | 2026-10-09 | Approved | ADD_FAMILY_MEMBER built (docs/11 FP-ADR-076), not registered in Production |
+| 1.2.63 | 2026-10-11 | Approved | FU-16 done (docs/11 FP-ADR-078): signed-in Family password change, implemented and OFF by default (`FAMILY_PASSWORD_CHANGE_ENABLED=true`); no migration, no role or permission |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

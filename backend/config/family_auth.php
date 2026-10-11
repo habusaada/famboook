@@ -186,6 +186,30 @@ return [
 
     'password_reset_enabled' => (bool) env('FAMILY_PASSWORD_RESET_ENABLED', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Family authenticated password change gate and limit (docs/11 FU-16)
+    |--------------------------------------------------------------------------
+    |
+    | password_change_enabled: off by default, independent of the other
+    | gates; read by App\Http\Middleware\EnsurePasswordChangeEnabled (503
+    | while off). Deploying the code enables nothing. No SMS is sent.
+    |
+    | limits: every change attempt of one signed-in user over decay_seconds
+    | (route limiter, 429). A wrong current password never locks the account
+    | or ends its session.
+    |
+    */
+
+    'password_change_enabled' => (bool) env('FAMILY_PASSWORD_CHANGE_ENABLED', false),
+
+    'password_change' => [
+        'limits' => [
+            'decay_seconds' => (int) env('FAMILY_PASSWORD_CHANGE_LIMIT_DECAY_SECONDS', 900),
+            'user_attempts' => (int) env('FAMILY_PASSWORD_CHANGE_LIMIT_USER_ATTEMPTS', 5),
+        ],
+    ],
+
     'password_reset' => [
         'limits' => [
             'start_ip_minute' => (int) env('FAMILY_PASSWORD_RESET_LIMIT_START_IP_MINUTE', 10),

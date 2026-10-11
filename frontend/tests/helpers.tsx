@@ -28,7 +28,7 @@ export const CAPABILITIES_PATH = "/api/v1/family/auth/capabilities";
 
 /** The three global Family Auth capabilities (FU-14); all open unless overridden. */
 export function familyAuthCapabilities(overrides: Partial<FamilyAuthCapabilities> = {}): FamilyAuthCapabilities {
-  return { activation: true, login: true, password_reset: true, ...overrides };
+  return { activation: true, login: true, password_reset: true, password_change: true, ...overrides };
 }
 
 /**
@@ -273,6 +273,8 @@ export function familyGet({
   assistance = [] as unknown,
   // The Production default: no new request can be started (docs/11 FP-ADR-074).
   requestTypes = { data: [], meta: { submission_enabled: false } } as unknown,
+  // Every Family Auth surface closed unless a test opens it (the server default).
+  capabilities = { activation: false, login: false, password_reset: false, password_change: false } as unknown,
 }: {
   user?: FamilyUser | Error;
   household?: Answer;
@@ -285,6 +287,7 @@ export function familyGet({
   needs?: Answer;
   assistance?: Answer;
   requestTypes?: Answer;
+  capabilities?: Answer;
 } = {}) {
   const answer = async (value: Answer) => {
     if (typeof value === "function") return (value as () => Promise<unknown>)();
@@ -322,6 +325,9 @@ export function familyGet({
       return typeof coordinator === "function" || coordinator instanceof Error ? answer(coordinator) : { data: coordinator };
     }
     if (path === "/api/v1/family/change-requests/types") return answer(requestTypes);
+    if (path === "/api/v1/family/auth/capabilities") {
+      return typeof capabilities === "function" || capabilities instanceof Error ? answer(capabilities) : { data: capabilities };
+    }
     throw new Error(`Unexpected GET ${path}`);
   };
 }

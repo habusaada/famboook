@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureCoordinatorSpace;
 use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Middleware\EnsureFamilyLoginEnabled;
 use App\Http\Middleware\EnsureFamilySideAccount;
+use App\Http\Middleware\EnsurePasswordChangeEnabled;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -41,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // Independent gates, each off by default.
             'family.login' => EnsureFamilyLoginEnabled::class,
             'family.password-reset' => EnsurePasswordResetEnabled::class,
+            'family.password-change' => EnsurePasswordChangeEnabled::class,
             // Coordinator Space (PWA-1H): after family.side, never instead of it.
             'coordinator.space' => EnsureCoordinatorSpace::class,
             // Family data (PWA-3A): the server-resolved Family context.
@@ -48,6 +51,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // OTP SMS after the response, same process, no queue (A′).
             'sms.after-response' => SendSmsAfterResponse::class,
         ]);
+        // FU-16: the password-change gate runs BEFORE the route limiter (which
+        // the priority list would otherwise move ahead of `can:`), so a closed
+        // gate counts nothing — like the other Family Auth gates.
+        $middleware->prependToPriorityList(ThrottleRequests::class, EnsurePasswordChangeEnabled::class);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
         $middleware->appendToGroup('web', EnsureUserIsActive::class);

@@ -187,14 +187,31 @@ describe("password and recovery (decision: not an account setting)", () => {
     }
   });
 
-  it("introduces no fake or disabled password-change control", async () => {
+  it("shows no password-change control — not even a disabled one — while the server reports it closed", async () => {
     renderAccount();
     await loaded();
 
     expect(screen.queryByText(/كلمة المرور/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /تغيير/ })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/family/account/password"]')).toBeNull();
     const disabled = Array.from(document.querySelectorAll("[data-account] button:disabled, [data-account] [aria-disabled='true']"));
     expect(disabled).toHaveLength(0);
+  });
+
+  it("links «تغيير كلمة المرور» only when the server reports it open (FU-16)", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({ capabilities: { activation: false, login: true, password_reset: false, password_change: true } })
+    );
+    renderWithClient(
+      <FamilyGate>
+        <AccountView />
+      </FamilyGate>
+    );
+
+    const link = await screen.findByRole("link", { name: /تغيير كلمة المرور/ });
+    expect(link).toHaveAttribute("href", "/family/account/password");
+    // Recovery stays a login-side flow.
+    expect(document.querySelector('a[href*="forgot-password"]')).toBeNull();
   });
 
   it("still shows the mobile trust state without any password action", async () => {

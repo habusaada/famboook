@@ -61,6 +61,7 @@ class FamilyAuthCapabilitiesTest extends TestCase
             'activation' => $activation,
             'login' => $login,
             'password_reset' => $reset,
+            'password_change' => false,
         ]]);
     }
 
@@ -70,8 +71,9 @@ class FamilyAuthCapabilitiesTest extends TestCase
         $this->assertFalse(config('family_auth.activation_enabled'));
         $this->assertFalse(config('family_auth.login_enabled'));
         $this->assertFalse(config('family_auth.password_reset_enabled'));
+        $this->assertFalse(config('family_auth.password_change_enabled'));
 
-        $this->capabilities()->assertOk()->assertExactJson(['data' => ['activation' => false, 'login' => false, 'password_reset' => false]]);
+        $this->capabilities()->assertOk()->assertExactJson(['data' => ['activation' => false, 'login' => false, 'password_reset' => false, 'password_change' => false]]);
 
         // What it reports is what the gates do.
         $this->postJson('/api/v1/family/auth/password/reset/start', ['national_id' => '123456789'])
@@ -88,9 +90,10 @@ class FamilyAuthCapabilitiesTest extends TestCase
             'family_auth.activation_enabled' => 'true',
             'family_auth.login_enabled' => 1,
             'family_auth.password_reset_enabled' => 'yes',
+            'family_auth.password_change_enabled' => 'yes',
         ]);
 
-        $this->capabilities()->assertOk()->assertExactJson(['data' => ['activation' => false, 'login' => false, 'password_reset' => false]]);
+        $this->capabilities()->assertOk()->assertExactJson(['data' => ['activation' => false, 'login' => false, 'password_reset' => false, 'password_change' => false]]);
     }
 
     public function test_the_answer_is_never_cached(): void
@@ -104,7 +107,7 @@ class FamilyAuthCapabilitiesTest extends TestCase
     public function test_it_needs_no_authentication_and_ignores_who_is_signed_in(): void
     {
         $this->flags(true, true, false);
-        $expected = ['data' => ['activation' => true, 'login' => true, 'password_reset' => false]];
+        $expected = ['data' => ['activation' => true, 'login' => true, 'password_reset' => false, 'password_change' => false]];
 
         $this->assertGuest('web');
         $this->capabilities()->assertOk()->assertExactJson($expected);
@@ -128,7 +131,7 @@ class FamilyAuthCapabilitiesTest extends TestCase
 
         $this->assertNotNull($route);
         $this->assertSame(['GET', 'HEAD'], $route->methods());
-        foreach (['family.activation', 'family.login', 'family.password-reset', 'auth:sanctum', 'family.side'] as $middleware) {
+        foreach (['family.activation', 'family.login', 'family.password-reset', 'family.password-change', 'auth:sanctum', 'family.side'] as $middleware) {
             $this->assertNotContains($middleware, $route->gatherMiddleware());
         }
         $this->capabilities()->assertOk();
@@ -140,7 +143,7 @@ class FamilyAuthCapabilitiesTest extends TestCase
 
         $response = $this->getJson(self::URL.'?national_id=123456789&user=1')->assertOk();
 
-        $response->assertExactJson(['data' => ['activation' => true, 'login' => true, 'password_reset' => true]]);
+        $response->assertExactJson(['data' => ['activation' => true, 'login' => true, 'password_reset' => true, 'password_change' => false]]);
         foreach (['FAMILY_', 'sms', 'tweet', 'limit', 'throttle', 'min_response', 'fingerprint', '123456789'] as $forbidden) {
             $this->assertStringNotContainsStringIgnoringCase($forbidden, $response->getContent());
         }

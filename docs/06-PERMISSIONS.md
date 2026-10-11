@@ -1003,8 +1003,18 @@ GET  /api/v1/family/me
   sessions, security events, ids or permissions. `Cache-Control: no-store,
   private`; a pure read. `/family/me` is unchanged. Account Recovery (the
   public password reset, PWA-1G / FU-14) is a login-side flow and is not
-  exposed as an account setting; there is no authenticated password change
-  (a future Family Auth item, docs/11 FU-16).
+  exposed as an account setting. The signed-in password change (docs/11
+  FU-16, FP-ADR-078) is a separate endpoint, below.
+- **`POST /family/account/password`** (FU-16, docs/11 FP-ADR-078, amended
+  2026-10-11): behind `auth:sanctum`, `family.side`,
+  `can:family-portal.access`, `family.context`, its own gate
+  `family.password-change` and `throttle:family-password-change` (5 per 15
+  minutes per user). SELF only — the account is the resolved one; the
+  current password is required, the new one follows the Family password
+  policy and must differ; every session of the account is ended and the
+  completing browser signed in afresh. Implemented but OFF by default:
+  `FAMILY_PASSWORD_CHANGE_ENABLED=true` opens it (503 while closed). No
+  permission or role added; no Staff password change.
 - **`GET /family/household/health`** (PWA-3B.6, AUTH-ADR-083, §123): behind
   `auth:sanctum`, `family.side`, `can:family-portal.access` and
   `family.context`; no route parameter and no Person, member or Family
@@ -4427,7 +4437,7 @@ Family needs and received assistance (2026-10-07, PWA-3B.7, docs/11 FP-ADR-069):
 Family household health (2026-10-06, PWA-3B.6, docs/11 FP-ADR-068): no permission or role added or seeded. `GET /api/v1/family/household/health` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no parameter and no client identifier, and answers `no-store, private` with the registered health facts (type, disability type code and name, condition_name, started_at, ended_at, is_active) of the resolved Family's ACTIVE members — head and deceased members included, soft-deleted Persons and ended memberships excluded — grouped by `member_ref`. Health is Person-based; closed records stay visible as history; `details` and all Staff / internal metadata stay hidden; no security event for this ordinary read. Coordinator scope never grants Family health access. Corrections remain the Change Request engine (PWA-5).
 
 ### AUTH-ADR-082
-Family account view (2026-10-06, PWA-3B.5, docs/11 FP-ADR-067): no permission or role added or seeded. `GET /api/v1/family/account` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no target and answers `no-store, private` with the activation date and the CURRENT mobile trust state and Family-masked mobile of the signed-in head only — never trust history, internals, ids or permissions. `/family/me` keeps its minimal contract. The Coordinator scope shown on «حسابي» comes only from `GET /family/coordinator/context`. Account Recovery (FU-14) and an authenticated password change are separate flows: the reset is not offered from «حسابي», and authenticated change password is a future Family Auth item with its own decisions.
+Family account view (2026-10-06, PWA-3B.5, docs/11 FP-ADR-067): no permission or role added or seeded. `GET /api/v1/family/account` sits behind `auth:sanctum`, `family.side`, `can:family-portal.access` and `family.context`, takes no target and answers `no-store, private` with the activation date and the CURRENT mobile trust state and Family-masked mobile of the signed-in head only — never trust history, internals, ids or permissions. `/family/me` keeps its minimal contract. The Coordinator scope shown on «حسابي» comes only from `GET /family/coordinator/context`. Account Recovery (FU-14) and an authenticated password change are separate flows: the reset is not offered from «حسابي», and authenticated change password is a future Family Auth item with its own decisions. Amended 2026-10-11 (docs/11 FU-16, FP-ADR-078): the signed-in password change is implemented as `POST /api/v1/family/account/password` behind the same boundary plus its own gate and per-user throttle; it is OFF by default (`FAMILY_PASSWORD_CHANGE_ENABLED=true` opens it), «حسابي» links to it only while it is open, and no permission or role is added.
 
 ### AUTH-ADR-081
 Staff Mobile Trust UI (2026-10-06, FU-15, docs/11 FP-ADR-066): no permission, role, route or migration added; no mapping changed. The Staff Person profile card «توثيق رقم الجوال» consumes the three PWA-1E routes: the card needs `person-mobile-trust.view`, the grant `person-mobile-trust.grant`, the revoke `person-mobile-trust.revoke` — checked as permissions, never as roles, and UX only. Grant sends only `verification_method` (the three Staff methods; never `SELF_OTP`, never a number) and creates a new TRUSTED row for the current `Person.mobile`; REVOKED and STALE rows are never revived. Revoke requires a `MobileTrustRevokeReason` code and does not deactivate the account or end sessions. Only `mobile_masked` is displayed; no fingerprint, key version or full number reaches the frontend.
@@ -4857,6 +4867,7 @@ Date: 2026-09-24
 | 1.2.57 | 2026-10-08 | Approved | PWA-6.1a note: Family navigation «+» follows server type discovery (change-request.submit, switch, registered type); no permission added |
 | 1.2.58 | 2026-10-08 | Approved | PWA-6.1b note: submission mode and pilot Family allowlist gate NEW family submissions after the permission check; no permission added |
 | 1.2.59 | 2026-10-09 | Approved | ADD_FAMILY_MEMBER note (FP-ADR-076): attested approval within change-request.approve, typed-ID comparison, masked ID only with view-masked, approve throttle; no permission added |
+| 1.2.61 | 2026-10-11 | Approved | FU-16 (docs/11 FP-ADR-078): §22b `POST /api/v1/family/account/password` — self only, current password, Family password policy, all sessions ended and the browser signed in afresh, own gate (off by default; `FAMILY_PASSWORD_CHANGE_ENABLED=true`) and per-user throttle; AUTH-ADR-082 amended. No permission seeded |
 | 1.2.60 | 2026-10-10 | Approved | ADD_FAMILY_MEMBER note amended: Staff-only status in the match summary; only evidence-bearing approvals are throttled; no permission added |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |

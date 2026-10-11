@@ -145,6 +145,12 @@ Route::prefix('family')->group(function () {
             // current mobile trust state with the masked mobile; no-store.
             Route::get('/account', [FamilyAccountController::class, 'show']);
 
+            // «تغيير كلمة المرور» (docs/11 FU-16, FP-ADR-078): SELF only, behind
+            // its own gate (off by default) and a per-user limit; the browser
+            // gets a fresh session. Passwords travel in the body only.
+            Route::post('/account/password', [FamilyAccountController::class, 'changePassword'])
+                ->middleware(['family.password-change', 'throttle:family-password-change']);
+
             // «بطاقة الأسرة الرقمية» (PWA-8.2): ensures the Family's ACTIVE
             // card (lazy, idempotent issuance) and returns it with its QR.
             // POST — never a write on GET.

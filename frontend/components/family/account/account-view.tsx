@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ChevronLeft, Info, Loader2, LogOut, Network, RotateCw, Smartphone, UserRound, UsersRound } from "lucide-react";
+import { AlertCircle, ChevronLeft, Info, KeyRound, Loader2, LogOut, Network, RotateCw, Smartphone, UserRound, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFamilyUser } from "@/components/family/family-context";
@@ -9,6 +9,7 @@ import { useFamilySignOut } from "@/components/family/use-family-sign-out";
 import { ApiError } from "@/lib/api/client";
 import { scopeLabel, useCoordinatorContextQuery } from "@/lib/api/coordinator";
 import { type FamilyAccount, type FamilyMobileTrustState, useFamilyAccountQuery } from "@/lib/api/family-account";
+import { usePasswordChangeAvailability } from "@/lib/api/family-auth";
 import { isAccessFailure } from "@/lib/api/family-household";
 import { formatDateLong } from "@/lib/utils/date";
 import { NOT_RECORDED, mobileTrustOwnerLabels } from "@/lib/utils/family-portal-labels";
@@ -247,6 +248,31 @@ function Coordinator() {
   );
 }
 
+/**
+ * «تغيير كلمة المرور» (FU-16, FP-ADR-078): an entry only while the server
+ * reports the surface open — nothing (no disabled control) otherwise.
+ */
+function ChangePasswordEntry() {
+  if (usePasswordChangeAvailability() !== "available") return null;
+
+  return (
+    <Link
+      href="/family/account/password"
+      className={`${card} flex items-center gap-3 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring`}
+      data-account-change-password
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
+        <KeyRound className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-base font-semibold text-foreground">تغيير كلمة المرور</span>
+        <span className="mt-0.5 block text-[13px] text-muted-foreground">بكلمة المرور الحالية؛ تُنهى جلساتك على الأجهزة الأخرى.</span>
+      </span>
+      <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+    </Link>
+  );
+}
+
 function SignOut() {
   const { signOut, pending } = useFamilySignOut();
 
@@ -271,8 +297,9 @@ function SignOut() {
  * summary, the Coordinator entry (coordinator accounts only), the way to
  * «بياناتي الشخصية» and sign-out. Not a registry view: the Person record
  * stays on /family/account/me. Account Recovery (FU-14) is a login-side flow
- * and is deliberately not offered here; there is no authenticated password
- * change yet. A 401 or 403 is handled by the session/access flow.
+ * and is deliberately not offered here; the signed-in password change
+ * (FU-16, FP-ADR-078) is an entry shown only while the server reports it
+ * open. A 401 or 403 is handled by the session/access flow.
  */
 export function AccountView() {
   const query = useFamilyAccountQuery();
@@ -320,6 +347,8 @@ export function AccountView() {
           </span>
           <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
+
+        <ChangePasswordEntry />
 
         <SignOut />
       </div>

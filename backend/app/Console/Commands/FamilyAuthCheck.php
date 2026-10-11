@@ -184,6 +184,7 @@ class FamilyAuthCheck extends Command
         $activation = config('family_auth.activation_enabled') === true;
         $login = config('family_auth.login_enabled') === true;
         $reset = config('family_auth.password_reset_enabled') === true;
+        $change = config('family_auth.password_change_enabled') === true;
         $driver = (string) config('family_auth.sms.driver');
         $tweetsms = TweetsSmsSender::fromConfig((array) config('family_auth.sms.tweetsms'))->configured();
         $production = app()->environment('production');
@@ -196,6 +197,7 @@ class FamilyAuthCheck extends Command
         $this->line('  Activation enabled:     '.self::yesNo($activation));
         $this->line('  Login enabled:          '.self::yesNo($login));
         $this->line('  Password reset enabled: '.self::yesNo($reset));
+        $this->line('  Password change enabled: '.self::yesNo($change));
         $this->line('  SMS driver:             '.($driver !== '' ? $driver : '(none)'));
         $this->line('  TweetsMS configured:    '.self::yesNo($tweetsms));
         $this->line('  SESSION_DRIVER:         '.config('session.driver'));

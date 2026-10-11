@@ -129,6 +129,16 @@ class AppServiceProvider extends ServiceProvider
             ->by('family-login|ip|'.hash('sha256', (string) $request->ip()))
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
 
+        // Authenticated password change (docs/11 FU-16): every attempt of one
+        // signed-in user, 5 per 15 minutes by default. A refusal never locks
+        // the account or ends its session.
+        RateLimiter::for('family-password-change', fn (Request $request) => Limit::perSecond(
+            (int) config('family_auth.password_change.limits.user_attempts'),
+            (int) config('family_auth.password_change.limits.decay_seconds'),
+        )
+            ->by("family-password-change|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
         // Self sensitive-value reveal (docs/11 §23a, PWA-3B.2): per signed-in
         // user — the route is authenticated — per minute and per hour.
         RateLimiter::for('family-self-reveal', fn (Request $request) => array_map(

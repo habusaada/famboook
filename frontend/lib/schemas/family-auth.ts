@@ -73,6 +73,31 @@ export const passwordSchema = z
   });
 export type PasswordValues = z.infer<typeof passwordSchema>;
 
+/**
+ * The signed-in password change (FU-16): the current password, merely
+ * present (the server checks it), and a new one under the same policy that
+ * differs from it.
+ */
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "كلمة المرور الحالية مطلوبة."),
+    password: z
+      .string()
+      .min(1, "كلمة المرور الجديدة مطلوبة.")
+      .min(FAMILY_PASSWORD_MIN_LENGTH, `كلمة المرور يجب ألا تقل عن ${FAMILY_PASSWORD_MIN_LENGTH} أحرف.`)
+      .refine((value) => passwordByteLength(value) <= FAMILY_PASSWORD_MAX_BYTES, PASSWORD_TOO_LONG),
+    password_confirmation: z.string().min(1, "تأكيد كلمة المرور مطلوب."),
+  })
+  .refine((values) => values.password === values.password_confirmation, {
+    path: ["password_confirmation"],
+    message: "كلمتا المرور غير متطابقتين.",
+  })
+  .refine((values) => values.current_password === "" || values.password !== values.current_password, {
+    path: ["password"],
+    message: "كلمة المرور الجديدة مطابقة لكلمة المرور الحالية. اختر كلمة مرور مختلفة.",
+  });
+export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
+
 /** Login: the format of the identifier, and a password that is merely present. */
 export const loginSchema = nationalIdSchema.extend({
   password: z.string().min(1, "كلمة المرور مطلوبة."),

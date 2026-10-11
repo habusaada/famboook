@@ -3646,6 +3646,30 @@ in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
 - Activation: add `'PERSON_CORRECTION' => PersonCorrectionHandler::class` to
   `PRODUCTION` in a reviewed release (docs/12).
 
+## Authenticated password change implementation record
+
+Implemented 2026-10-11 (FP-ADR-078, closes FU-16). No migration,
+permission or role; the gate is off by default.
+
+- Backend: `ChangeFamilyPasswordAction`, `FamilyAccountController::
+  changePassword`, `FamilyPasswordChangeRequest` (new-password rules shared
+  with `FamilyPasswordRequest::newPasswordRules()`),
+  `EnsurePasswordChangeEnabled` (`family.password-change`, placed before
+  the route limiter in the middleware priority), limiter
+  `family-password-change`, `AuthSecurityEventType::PASSWORD_CHANGED`,
+  `PasswordChangeDenial`, `FamilyAuthError::PASSWORD_CHANGE_FAILED` /
+  `PASSWORD_CHANGE_UNAVAILABLE`, `password_change` in capabilities and in
+  `famboook:family-auth-check`.
+- Frontend: `/family/account/password` (`ChangePassword`: current, new and
+  confirmation with `PasswordField`; success, field, 429 and 503 messages;
+  nothing stored in the browser); «حسابي» entry only while capabilities
+  report `password_change: true`.
+- Tests: `tests/Feature/FamilyPortal/FamilyPasswordChangeTest.php`,
+  `FamilyAuthCapabilitiesTest`, `frontend/tests/family-change-password.test.tsx`,
+  `frontend/tests/family-account.test.tsx`.
+- Operations: set `FAMILY_PASSWORD_CHANGE_ENABLED=true` to open it; it
+  sends no SMS and does not depend on SMS readiness.
+
 ## DEATH_REPORT implementation record
 
 Implemented 2026-10-11 (FP-ADR-059, FP-ADR-061, FP-ADR-077); not registered
@@ -4361,7 +4385,11 @@ Family account view «حسابي» (PWA-3B.5 — approved 2026-10-06).
 - Account Recovery (FU-14) and Authenticated Change Password are separate
   product / security flows. «حسابي» does not offer the Forgot Password
   flow as an account setting and has no disabled or placeholder password
-  control; Authenticated Change Password is FU-16;
+  control; Authenticated Change Password is FU-16 (amended 2026-10-11,
+  FP-ADR-078: «حسابي» shows a «تغيير كلمة المرور» entry to
+  /family/account/password ONLY while the server reports
+  `password_change` open — still no disabled or placeholder control, and
+  still no Forgot Password entry);
 - logout is the existing Family logout; no migration, no role or
   permission change; FU-14 and FU-15 unchanged.
 
@@ -4656,6 +4684,42 @@ Production type).
   demands it;
 - no permission, role or migration: approve and APPLY use the existing
   change-request.approve / change-request.apply.
+
+FP-ADR-078
+Authenticated Family password change (approved 2026-10-11; closes FU-16).
+- POST /api/v1/family/account/password: the signed-in household head's
+  OWN password, behind auth:sanctum, family.side, family-portal.access and
+  family.context; the account is the resolved one — nothing in the body
+  chooses it;
+- the current password is required and verified (Hash::check); the new
+  password follows the activation / reset policy (minimum length,
+  confirmation, the 72-byte bcrypt limit, no composition rule) and must
+  differ from the current one;
+- success, in one transaction (ChangeFamilyPasswordAction): new password
+  (hashed by the model), EVERY session of the account ended
+  (FamilySessions::revoke, reason PASSWORD_CHANGED), PASSWORD_CHANGED
+  SUCCESS recorded. After the commit the completing browser is signed in
+  afresh (the password-reset pattern: new session id, new CSRF token) and
+  receives the /me representation; `Cache-Control: no-store, private`;
+- refusals: a wrong current password (current_password field error) or an
+  unchanged password (password field error) are recorded as
+  PASSWORD_CHANGED FAILURE with PasswordChangeDenial WRONG_CURRENT_PASSWORD
+  / PASSWORD_UNCHANGED; a request without a session is refused before any
+  password check (409 PASSWORD_CHANGE_FAILED, DENIED SESSION_REQUIRED).
+  None locks the account or ends a session. No password, hash or secret
+  is recorded or logged;
+- limit: 5 attempts per 15 minutes per signed-in user (route limiter
+  family-password-change; FAMILY_PASSWORD_CHANGE_LIMIT_USER_ATTEMPTS /
+  _DECAY_SECONDS), 429 TOO_MANY_REQUESTS;
+- gate: family_auth.password_change_enabled (FAMILY_PASSWORD_CHANGE_ENABLED),
+  off by default, independent of the other gates, reported by GET
+  /family/auth/capabilities as `password_change`; 503
+  PASSWORD_CHANGE_UNAVAILABLE while off. It runs before the limiter
+  (middleware priority), so a closed gate checks, counts and records
+  nothing;
+- no SMS, no mobile or trust change, no CONTACT_UPDATE; no Staff password
+  change; no permission, role or migration (the new security event type
+  fits the existing event-code CHECK).
 ```
 
 ---
@@ -4835,7 +4899,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-13 | **Resolved 2026-10-05 (FP-ADR-063).** The Family Portal member reference is `member_ref`: the full keyed HMAC-SHA256 (64 lowercase hex characters) of a FAMILY MEMBERSHIP (`FingerprintContext::MEMBER_REF`, Family Auth key and versions), resolved only among the ACTIVE memberships of the `family.context` Family. Never an id, never stored, never authorization. No migration | Done; the member reveal (PWA-3B.4) and member-specific Change Requests use it |
 | FU-14 | **Implemented 2026-10-06 (FP-ADR-065); enablement pending.** Password reset Production readiness: the PWA-1G / PWA-1I reset is kept unchanged (automatic sign-in, head eligibility, no masked mobile, no trust created); runtime `GET /api/v1/family/auth/capabilities` and a fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; realistic coverage (self-OTP account journey, coordinator, Staff boundary, changed / revoked mobile, no registry mutation). No migration | `FAMILY_PASSWORD_RESET_ENABLED=true` only through the docs/08 §16a enablement checklist, as its own decision |
 | FU-15 | **Resolved 2026-10-06 (FP-ADR-066).** Staff Mobile Trust Management UI: the Staff Person profile card «توثيق رقم الجوال» (state, masked current mobile, trust history; grant with IN_PERSON / STAFF_CALLBACK / AUTHORIZED_RECORD_REVIEW, revoke with a reason code) on the existing PWA-1E API and Domain Actions. REVOKED never revived; a grant is a new row for the current `Person.mobile`; SELF_OTP never a Staff method; revoke does not deactivate the account or end sessions. Staff-side only — no Family Portal change. No migration | Done |
-| FU-16 | **Authenticated Change Password** (recorded 2026-10-06, FP-ADR-067). There is no authenticated Family password-change endpoint; Account Recovery (FU-14) is a login-side flow and is not offered from «حسابي». The future phase must define: current-password verification; new-password validation; throttling; the session revocation policy and whether the completing browser stays signed in; security event / audit semantics; CSRF / session behavior | A future Family Auth phase, its own decision |
+| FU-16 | **Resolved 2026-10-11 (FP-ADR-078).** Authenticated Change Password: `POST /api/v1/family/account/password` (self only, `family.context`) — current password required, the activation / reset policy with the 72-byte limit, a new password different from the current one, every session ended and the completing browser signed in afresh (reset pattern), PASSWORD_CHANGED SUCCESS / FAILURE events without any secret, 5 attempts per 15 minutes per user (429), behind `password_change_enabled` (off by default, reported by capabilities); «تغيير كلمة المرور» at `/family/account/password`. No SMS, no migration, no role or permission | Done; enabling the gate is an operational decision |
 
 ---
 
@@ -4886,3 +4950,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.39 | 2026-10-10 | Approved | FP-ADR-076 amended after review: existing-Person eligibility (ALIVE, active, no active membership), Staff-only status in the match summary, lock order Family → National ID → Person for every National ID writer, evidence-only approval throttle, per-key attestation codes |
 | 1.40 | 2026-10-11 | Approved | PERSON_CORRECTION built (full name, birth date, gender, marital status through UpdatePersonAction); not registered in Production; implementation record in §30a |
 | 1.41 | 2026-10-11 | Approved | FP-ADR-077 DEATH_REPORT: reviewer's verification method at approval (APPROVED metadata `verification_method`, read at APPLY), V1 without document upload, explicit unknown death date stored as NULL, V1 provenance through the CHANGE_REQUEST_APPLIED record (no request field on the death record); built (non-head member, RecordPersonDeathAction), not registered in Production; implementation record in §30a |
+| 1.42 | 2026-10-11 | Approved | FP-ADR-078 Authenticated Family password change (closes FU-16): current password, Family password policy, unchanged refused, all sessions ended and the browser signed in afresh, PASSWORD_CHANGED events, 5 / 15 min per user, gate `password_change_enabled` off by default; FP-ADR-067 amended (entry shown only while open); implementation record in §30a |

@@ -28,6 +28,9 @@ enum FamilyAuthError: string
     // Password reset.
     case RESET_FAILED = 'RESET_FAILED';
     case PASSWORD_RESET_UNAVAILABLE = 'PASSWORD_RESET_UNAVAILABLE';
+    // Authenticated password change (FU-16).
+    case PASSWORD_CHANGE_FAILED = 'PASSWORD_CHANGE_FAILED';
+    case PASSWORD_CHANGE_UNAVAILABLE = 'PASSWORD_CHANGE_UNAVAILABLE';
 
     public function status(): int
     {
@@ -36,8 +39,8 @@ enum FamilyAuthError: string
             self::OTP_EXPIRED, self::GRANT_EXPIRED => 410,
             self::OTP_LOCKED => 423,
             self::OTP_COOLDOWN, self::OTP_SEND_LIMIT, self::TOO_MANY_REQUESTS => 429,
-            self::ACTIVATION_FAILED, self::RESET_FAILED => 409,
-            self::ACTIVATION_UNAVAILABLE, self::FAMILY_AUTH_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE => 503,
+            self::ACTIVATION_FAILED, self::RESET_FAILED, self::PASSWORD_CHANGE_FAILED => 409,
+            self::ACTIVATION_UNAVAILABLE, self::FAMILY_AUTH_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE => 503,
             self::INVALID_CREDENTIALS => 401,
         };
     }
@@ -54,10 +57,11 @@ enum FamilyAuthError: string
             self::GRANT_EXPIRED => 'انتهت مهلة إنشاء كلمة المرور. ابدأ من جديد.',
             self::ACTIVATION_FAILED => 'تعذّر إكمال التفعيل. ابدأ من جديد أو راجع الإدارة.',
             self::TOO_MANY_REQUESTS => 'محاولات كثيرة. حاول مجددًا بعد قليل.',
-            self::ACTIVATION_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE => 'الخدمة غير متاحة حاليًا.',
+            self::ACTIVATION_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE => 'الخدمة غير متاحة حاليًا.',
             self::INVALID_CREDENTIALS => 'رقم الهوية أو كلمة المرور غير صحيحة.',
             self::FAMILY_AUTH_UNAVAILABLE => 'تسجيل الدخول غير متاح حاليًا.',
             self::RESET_FAILED => 'تعذّر تغيير كلمة المرور. ابدأ من جديد أو راجع الإدارة.',
+            self::PASSWORD_CHANGE_FAILED => 'تعذّر تغيير كلمة المرور. حدّث الصفحة وحاول مرة أخرى.',
         };
     }
 }

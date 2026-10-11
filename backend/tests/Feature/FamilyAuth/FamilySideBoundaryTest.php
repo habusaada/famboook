@@ -234,6 +234,12 @@ class FamilySideBoundaryTest extends TestCase
             if ($route->uri() === 'api/v1/family/household/members/{memberRef}/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-member-reveal'], $middleware);
             }
+            // Authenticated password change (FU-16): the same boundary, its own
+            // gate (off by default), then its own per-user throttle.
+            if ($route->uri() === 'api/v1/family/account/password') {
+                $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.password-change', 'throttle:family-password-change'], $middleware);
+                $this->assertSame(['POST'], $route->methods());
+            }
             // Change Requests (PWA-5e): reads behind the Family boundary only;
             // each mutation adds its change-request.* permission and a throttle.
             if (str_starts_with($route->uri(), 'api/v1/family/change-requests')) {
@@ -249,7 +255,7 @@ class FamilySideBoundaryTest extends TestCase
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
-        // relationship options (FP-ADR-076).
-        $this->assertSame(35, $checked);
+        // relationship options (FP-ADR-076) + the password change (FU-16).
+        $this->assertSame(36, $checked);
     }
 }

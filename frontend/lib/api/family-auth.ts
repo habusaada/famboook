@@ -55,6 +55,8 @@ export type FamilyAuthCapabilities = {
   activation: boolean;
   login: boolean;
   password_reset: boolean;
+  /** The signed-in password change (FU-16, FP-ADR-078). */
+  password_change: boolean;
 };
 
 export const FAMILY_AUTH_CAPABILITIES_QUERY_KEY = ["family", "auth", "capabilities"] as const;
@@ -82,6 +84,30 @@ export function usePasswordResetAvailability(): "loading" | "available" | "unava
   if (capabilities.data?.password_reset === true) return "available";
 
   return capabilities.isPending ? "loading" : "unavailable";
+}
+
+/** The signed-in password change is offered only on an explicit server `true`. */
+export function usePasswordChangeAvailability(): "loading" | "available" | "unavailable" {
+  const capabilities = useFamilyAuthCapabilitiesQuery();
+  if (capabilities.data?.password_change === true) return "available";
+
+  return capabilities.isPending ? "loading" : "unavailable";
+}
+
+/**
+ * «تغيير كلمة المرور» (FU-16, FP-ADR-078): the signed-in head's own
+ * password. The server ends every session and signs this browser in again;
+ * the answer is the fresh /me representation. The passwords live only in
+ * the form's memory and this request body.
+ */
+export async function changeFamilyPassword(currentPassword: string, password: string, passwordConfirmation: string): Promise<FamilyUser> {
+  return (
+    await apiClient.post<{ user: FamilyUser }>("/api/v1/family/account/password", {
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    })
+  ).user;
 }
 
 export async function familyLogout(): Promise<void> {
@@ -179,7 +205,9 @@ export type FamilyAuthErrorCode =
   | "INVALID_CREDENTIALS"
   | "FAMILY_AUTH_UNAVAILABLE"
   | "RESET_FAILED"
-  | "PASSWORD_RESET_UNAVAILABLE";
+  | "PASSWORD_RESET_UNAVAILABLE"
+  | "PASSWORD_CHANGE_FAILED"
+  | "PASSWORD_CHANGE_UNAVAILABLE";
 
 const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   OTP_INVALID: "رمز التحقق غير صحيح.",
@@ -199,6 +227,8 @@ const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   FAMILY_AUTH_UNAVAILABLE: "تسجيل الدخول غير متاح حاليًا.",
   RESET_FAILED: "تعذّر تغيير كلمة المرور. ابدأ من جديد أو راجع الإدارة.",
   PASSWORD_RESET_UNAVAILABLE: "الخدمة غير متاحة حاليًا.",
+  PASSWORD_CHANGE_FAILED: "تعذّر تغيير كلمة المرور. حدّث الصفحة وحاول مرة أخرى.",
+  PASSWORD_CHANGE_UNAVAILABLE: "تغيير كلمة المرور غير متاح حاليًا.",
 };
 
 export const CONNECTION_ERROR = "تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.";

@@ -18,6 +18,10 @@ enum AuthSecurityEventType: string
     case LOGIN_FAILED = 'LOGIN_FAILED';
     case PASSWORD_RESET_REQUESTED = 'PASSWORD_RESET_REQUESTED';
     case PASSWORD_RESET_COMPLETED = 'PASSWORD_RESET_COMPLETED';
+    // The signed-in household head changed their password (FU-16): SUCCESS,
+    // or FAILURE / DENIED with a PasswordChangeDenial or LoginDenial code.
+    // Never a password.
+    case PASSWORD_CHANGED = 'PASSWORD_CHANGED';
     case MOBILE_TRUST_OPENED = 'MOBILE_TRUST_OPENED';
     case MOBILE_TRUST_ASSISTED = 'MOBILE_TRUST_ASSISTED';
     case MOBILE_TRUST_GRANTED = 'MOBILE_TRUST_GRANTED';
