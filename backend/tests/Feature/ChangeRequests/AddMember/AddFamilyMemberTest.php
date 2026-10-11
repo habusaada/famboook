@@ -614,6 +614,6 @@ class AddFamilyMemberTest extends TestCase
     {
         $this->assertSame(AddFamilyMemberHandler::class, ChangeRequestTypes::PRODUCTION['ADD_FAMILY_MEMBER'] ?? null);
         $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::ADD_FAMILY_MEMBER));
-        $this->assertFalse(ChangeRequestTypes::production()->has(ChangeRequestType::PERSON_CORRECTION));
+        $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::RESIDENCE_UPDATE));
     }
 }

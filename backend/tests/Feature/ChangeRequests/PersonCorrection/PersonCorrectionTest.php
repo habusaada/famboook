@@ -35,7 +35,7 @@ use Tests\TestCase;
 
 /**
  * PERSON_CORRECTION end to end through the Family and Staff APIs, with the
- * real handler registered through the test-only registry (it is not in
+ * real handler registered through the test-only registry (it is also in
  * ChangeRequestTypes::PRODUCTION). Synthetic data only.
  */
 class PersonCorrectionTest extends TestCase
@@ -325,8 +325,9 @@ class PersonCorrectionTest extends TestCase
         $this->assertSame(S::UNDER_REVIEW, $request->fresh()->status);
     }
 
-    public function test_it_is_not_a_production_type(): void
+    public function test_it_is_a_production_type(): void
     {
-        $this->assertArrayNotHasKey('PERSON_CORRECTION', ChangeRequestTypes::PRODUCTION);
+        $this->assertSame(PersonCorrectionHandler::class, ChangeRequestTypes::PRODUCTION['PERSON_CORRECTION'] ?? null);
+        $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::PERSON_CORRECTION));
     }
 }

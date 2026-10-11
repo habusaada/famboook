@@ -20,6 +20,7 @@ use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
+use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use App\Support\FamilyActivityVisibility;
 use Database\Seeders\RolePermissionSeeder;
@@ -47,13 +48,13 @@ class ChangeRequestEngineSecurityTest extends TestCase
         $this->assertSame([
             'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
             'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
+            'PERSON_CORRECTION' => PersonCorrectionHandler::class,
         ], ChangeRequestTypes::PRODUCTION);
         $registry = app(ChangeRequestTypes::class);
-        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER];
+        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER, ChangeRequestType::PERSON_CORRECTION];
         $this->assertSame($production, $registry->registered());
         $this->assertSame($production, $registry->familySubmittable());
         foreach (ChangeRequestType::cases() as $type) {
-            // PERSON_CORRECTION is built but deliberately not registered.
             $this->assertSame(in_array($type, $production, true), $registry->has($type), $type->value);
         }
 

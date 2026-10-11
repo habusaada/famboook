@@ -285,11 +285,11 @@ class FamilyChangeRequestApiTest extends TestCase
         config(['change_requests.family_submission_mode' => 'OFF']);
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
 
-        // The real Production registry: RESIDENCE_UPDATE and ADD_FAMILY_MEMBER (f8b1b1e), and only while the channel is open.
+        // The real Production registry: RESIDENCE_UPDATE, ADD_FAMILY_MEMBER and PERSON_CORRECTION, only while the channel is open.
         $this->app->instance(ChangeRequestTypes::class, ChangeRequestTypes::production());
         $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [], 'meta' => ['submission_enabled' => false]]);
         config(['change_requests.family_submission_mode' => 'GENERAL']);
-        $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE'], ['type' => 'ADD_FAMILY_MEMBER']], 'meta' => ['submission_enabled' => true]]);
+        $this->api($this->context->user, 'GET', '/types')->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE'], ['type' => 'ADD_FAMILY_MEMBER'], ['type' => 'PERSON_CORRECTION']], 'meta' => ['submission_enabled' => true]]);
     }
 
     public function test_the_switch_blocks_new_submissions_only(): void

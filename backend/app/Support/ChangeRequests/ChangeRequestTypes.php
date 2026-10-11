@@ -4,10 +4,11 @@ namespace App\Support\ChangeRequests;
 
 use App\Enums\ChangeRequestType;
 use App\Exceptions\ChangeRequestException;
+use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
+use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use InvalidArgumentException;
 use LogicException;
-use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
 
 /**
  * The ONE authoritative mapping ChangeRequestType → handler (PWA-5b, AE-1).
@@ -31,6 +32,7 @@ final class ChangeRequestTypes
     public const PRODUCTION = [
         'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
         'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
+        'PERSON_CORRECTION' => PersonCorrectionHandler::class,
     ];
 
     /** @param array<string, ChangeRequestHandler> $handlers keyed by type value */

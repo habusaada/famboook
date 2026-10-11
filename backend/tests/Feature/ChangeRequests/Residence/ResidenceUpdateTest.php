@@ -219,9 +219,9 @@ class ResidenceUpdateTest extends TestCase
 
     public function test_type_discovery_lists_residence_update_while_the_switch_is_on(): void
     {
-        // The real Production registry (f8b1b1e): RESIDENCE_UPDATE and ADD_FAMILY_MEMBER.
+        // The real Production registry: RESIDENCE_UPDATE, ADD_FAMILY_MEMBER and PERSON_CORRECTION.
         $this->family('GET', '/types')->assertOk()
-            ->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE'], ['type' => 'ADD_FAMILY_MEMBER']], 'meta' => ['submission_enabled' => true]]);
+            ->assertExactJson(['data' => [['type' => 'RESIDENCE_UPDATE'], ['type' => 'ADD_FAMILY_MEMBER'], ['type' => 'PERSON_CORRECTION']], 'meta' => ['submission_enabled' => true]]);
     }
 
     public function test_the_target_is_always_the_context_family(): void
