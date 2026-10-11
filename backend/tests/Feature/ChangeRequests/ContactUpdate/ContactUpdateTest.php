@@ -517,8 +517,11 @@ class ContactUpdateTest extends TestCase
         }
     }
 
-    public function test_it_is_not_a_production_type(): void
+    public function test_it_is_a_production_type_reachable_only_through_its_gate(): void
     {
-        $this->assertArrayNotHasKey('CONTACT_UPDATE', ChangeRequestTypes::PRODUCTION);
+        $this->assertSame(ContactUpdateHandler::class, ChangeRequestTypes::PRODUCTION['CONTACT_UPDATE'] ?? null);
+        $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::CONTACT_UPDATE));
+        // Registered, yet still closed by default: the gate decides.
+        $this->assertFalse((require config_path('family_auth.php'))['contact_update_enabled']);
     }
 }
