@@ -110,7 +110,7 @@ class SubmitChangeRequestAction
 
                 $handler->preconditions($target, $data);
                 $this->assertNoOpenConflict($handler, $family, $submission, $target, $data);
-                $base = ChangeRequestBase::of($handler->baseValues($target));
+                $base = ChangeRequestBase::of($handler->baseValues($target, $data));
 
                 $request = new ChangeRequest([
                     'family_id' => $family->getKey(),

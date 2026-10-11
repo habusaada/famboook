@@ -3,6 +3,7 @@
 namespace App\Support\ChangeRequests;
 
 use App\Enums\ChangeRequestApplyFailure;
+use App\Enums\ChangeRequestAttestation;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\WorkflowActorSide;
@@ -29,8 +30,8 @@ use LogicException;
  *   resubmit it, optional on a rejection, refused elsewhere; internal_note
  *   (Staff-only) only on Staff events. Plain text, at most 2000 characters;
  * - metadata keys are allow-listed per event, each value a controlled code.
- *   No key is allowed yet: PWA-5b adds them with their enum contracts. The
- *   request payload and any registry value are never copied into an event.
+ *   Only APPROVED has keys (attestation codes, FP-ADR-076). The request
+ *   payload and any registry value are never copied into an event.
  *
  * Nothing is logged; exception messages carry codes and key names only.
  */
@@ -45,12 +46,29 @@ final class WorkflowEventRecorder
     private const PUBLIC_MESSAGE_ALLOWED = [WorkflowEventType::RETURNED, WorkflowEventType::RESUBMITTED, WorkflowEventType::REJECTED];
 
     /**
-     * Allowed metadata per event type: key => the enum its value must be a
-     * case of. Any other key is refused. Empty until PWA-5b defines one.
+     * Allowed metadata per event type: key => either the enum its value must
+     * be a case of, or the ONE enum case its value must be. Any other key is
+     * refused. APPROVED carries the reviewer's attestation codes for types
+     * that require them (FP-ADR-076): each key accepts only its own code.
      *
-     * @var array<string, array<string, class-string<\BackedEnum>>>
+     * @var array<string, array<string, class-string<\BackedEnum>|\BackedEnum>>
      */
-    public const EVENT_CODE_METADATA = [];
+    public const EVENT_CODE_METADATA = [
+        'APPROVED' => [
+            'identity' => ChangeRequestAttestation::IDENTITY_VERIFIED,
+            'relationship' => ChangeRequestAttestation::RELATIONSHIP_VERIFIED,
+        ],
+    ];
+
+    /**
+     * Keys that may only appear together (all or none) per event type: an
+     * approval attests identity AND relationship, never one of them.
+     *
+     * @var array<string, list<string>>
+     */
+    public const EVENT_METADATA_TOGETHER = [
+        'APPROVED' => ['identity', 'relationship'],
+    ];
 
     /**
      * @param  array<string, string>  $metadata
@@ -153,13 +171,19 @@ final class WorkflowEventRecorder
     {
         $contract = self::EVENT_CODE_METADATA[$event->value] ?? [];
         foreach ($metadata as $key => $value) {
-            $enum = is_string($key) ? ($contract[$key] ?? null) : null;
-            if ($enum === null) {
+            $allowed = is_string($key) ? ($contract[$key] ?? null) : null;
+            if ($allowed === null) {
                 throw new InvalidArgumentException('Metadata key not allowed: '.(is_string($key) ? $key : 'non-string key'));
             }
-            if (! is_string($value) || $enum::tryFrom($value) === null) {
-                throw new InvalidArgumentException("Metadata {$key} must be a controlled code.");
+            $valid = is_string($value) && ($allowed instanceof \BackedEnum ? $value === $allowed->value : $allowed::tryFrom($value) !== null);
+            if (! $valid) {
+                throw new InvalidArgumentException("Metadata {$key} must be its controlled code.");
             }
+        }
+        $together = self::EVENT_METADATA_TOGETHER[$event->value] ?? [];
+        $present = array_intersect($together, array_keys($metadata));
+        if ($present !== [] && count($present) !== count($together)) {
+            throw new InvalidArgumentException('Metadata keys must appear together: '.implode(', ', $together));
         }
     }
 }

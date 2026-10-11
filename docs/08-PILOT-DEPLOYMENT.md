@@ -1035,6 +1035,26 @@ effect while `OFF`).
 `.env` edit has NO effect until `config:clear` + `optimize` and a PHP-FPM
 reload; always finish with `famboook:change-requests-check`.
 
+## Activating ADD_FAMILY_MEMBER (separate decision — not done)
+
+ADD_FAMILY_MEMBER (docs/11 FP-ADR-076) is deployed with the code but is
+NOT a Production type: no family can submit it whatever the mode. To
+activate it, only after explicit written approval:
+
+1. a code change adding `'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class`
+   to `ChangeRequestTypes::PRODUCTION`, reviewed, tested and deployed as a
+   normal release (no migration);
+2. brief the reviewers: two attestations and the document's National ID
+   typed at approval; a REVIEWER without
+   `person.national-id.view-masked` sees no ID in the review;
+3. with the mode `PILOT` (never `GENERAL` first), check with the pilot
+   Family that type discovery lists ADD_FAMILY_MEMBER and «طلب جديد»
+   offers «إضافة فرد إلى الأسرة»; follow docs/09.
+
+Deactivation: mode `OFF` stops new submissions at once; removing the type
+from `PRODUCTION` is a code release (existing requests then show
+`type_available: false` and cannot be approved or applied — prefer `OFF`).
+
 ## Rollback
 
 Three different operations — never mix them up:
@@ -1238,6 +1258,7 @@ Never do this once real data has been entered.
 | 1.1.22 | 2026-10-08 | Approved | §16a: PWA-5e Family Change Request API — CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED stays false in Production, post-deploy checks, code-only rollback |
 | 1.1.23 | 2026-10-08 | Approved | §16b: Change Request release PWA-5b … PWA-6.1a — content since PWA-5a (no migration, no seeder change, one `.env` key), release gates, deployment with the switch off, read-only smoke checks, feature shutdown, rollback before / after real requests; env template carries the switch |
 | 1.1.24 | 2026-10-08 | Approved | §16b: PWA-6.1b submission modes OFF / PILOT / GENERAL with a Family allowlist (replaces the boolean), allowlist format, opening the pilot in PILOT, changing the allowlist, feature shutdown to OFF, configuration-cache rule, famboook:change-requests-check |
+| 1.1.25 | 2026-10-09 | Approved | §16b: ADD_FAMILY_MEMBER activation steps (code registration, reviewer briefing, PILOT check) — not performed; new optional limits CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

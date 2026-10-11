@@ -2051,6 +2051,18 @@ Audit old/new values
 
 # 73. Add Family Member Request
 
+**As implemented (docs/11 FP-ADR-076; not yet a Production type).** The
+family's proposal never reveals whether the National ID is known. Review →
+approval with two reviewer attestations (identity, with the document's ID
+typed and compared; relationship) → APPLY. "Duplicate Detection" is the
+equivalent National ID match under the ID lock: none → Create Person
+(AddFamilyMemberAction); one holder that is ALIVE, active and without an
+active membership → Reuse Person (AttachFamilyMemberAction); a holder that
+is DECEASED, of UNKNOWN life status, inactive or with an active
+membership, or several holders → refused (no transfer, no merge, no
+automatic choice). Locks: Family → National ID → Person, the same order as
+the Staff National ID correction and Staff add-member actions.
+
 ```text
 Proposed Member
       ↓
@@ -3556,3 +3568,5 @@ Date: 2026-09-24
 | 1.2.21 | 2026-10-08 | Approved | PWA-5e: Family Change Request API — family Domain Actions behind family.context, submission switch for new requests only, replay semantics, family timeline without diagnostics or internal notes (WF-ADR-053) |
 | 1.2.22 | 2026-10-08 | Approved | PWA-6.1: §71 annotated — V1 RESIDENCE_UPDATE is an in-place correction applied by UpdateFamilyResidenceAction; the move flow stays future (docs/11 FU-02) |
 | 1.2.23 | 2026-10-08 | Approved | PWA-6.1a: §71 rewritten — RESIDENCE_UPDATE is one in-place correction through UpdateFamilyResidenceAction; the move flow (ChangeFamilyResidenceAction) is kept as a distinct, unbuilt use case |
+| 1.2.24 | 2026-10-09 | Approved | §73 annotated — ADD_FAMILY_MEMBER as implemented (docs/11 FP-ADR-076): attested approval, equivalent-ID resolution at approval / APPLY, reuse only without an active membership |
+| 1.2.25 | 2026-10-10 | Approved | §73: existing-Person eligibility and the Family → National ID → Person lock order (docs/11 FP-ADR-076 amended) |

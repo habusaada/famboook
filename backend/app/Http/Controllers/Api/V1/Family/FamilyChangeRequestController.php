@@ -16,11 +16,13 @@ use App\Http\Resources\ChangeRequestOutcomeResource;
 use App\Http\Resources\FamilyChangeRequestResource;
 use App\Http\Resources\FamilyChangeRequestSummaryResource;
 use App\Models\ChangeRequest;
+use App\Models\RelationshipType;
 use App\Support\ChangeRequests\ChangeRequestOutcome;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\FamilySubmissionPolicy;
 use App\Support\FamilyAuth\FamilyAccessResult;
+use App\Support\RelationshipTypes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -68,6 +70,24 @@ class FamilyChangeRequestController extends Controller
         return response()->json([
             'data' => array_map(fn (ChangeRequestType $type) => ['type' => $type->value], $available),
             'meta' => ['submission_enabled' => $enabled],
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The relationship options for proposing a new member (FP-ADR-076): the
+     * ACTIVE relationship types except HEAD, by code and Arabic name, in the
+     * registry's order — read from relationship_types, never a client list.
+     */
+    public function relationshipTypes(): JsonResponse
+    {
+        $types = RelationshipType::query()
+            ->where('is_active', true)
+            ->where('code', '!=', RelationshipTypes::HEAD)
+            ->orderBy('sort_order')
+            ->get(['code', 'name']);
+
+        return response()->json([
+            'data' => $types->map(fn (RelationshipType $type) => ['code' => $type->code, 'name' => $type->name])->values(),
         ])->header('Cache-Control', 'no-store, private');
     }
 

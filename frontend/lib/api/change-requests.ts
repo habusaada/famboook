@@ -5,6 +5,7 @@ import { ApiError, apiClient } from "@/lib/api/client";
 import type { PaginatedResponse } from "@/lib/types/api/family";
 import type {
   ChangeRequestAction,
+  ChangeRequestAttestation,
   ChangeRequestDetail,
   ChangeRequestFilters,
   ChangeRequestOutcome,
@@ -65,6 +66,8 @@ const ENDPOINTS: Record<ChangeRequestAction, string> = {
 
 export type ChangeRequestActionInput =
   | { action: "start_review" | "approve" | "apply" }
+  // FP-ADR-076: the typed National ID is sent once and never kept or cached.
+  | { action: "approve"; body: { attestations: ChangeRequestAttestation[]; verified_national_id: string } }
   | { action: "return"; body: { public_message: string; internal_note?: string } }
   | {
       action: "reject";
@@ -90,6 +93,9 @@ export function useChangeRequestAction(id: string, familyCode: string) {
         )
       ).data,
     retry: false,
+    // Never kept once settled and unobserved: an approval body may carry a
+    // National ID typed from a document (FP-ADR-076).
+    gcTime: 0,
     onSuccess: (_outcome, input) => {
       if (input.action === "apply" && familyCode) {
         void queryClient.invalidateQueries({ queryKey: ["families", familyCode] });

@@ -178,6 +178,21 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         // Family resubmit / cancel (PWA-5e): per signed-in user.
+        // Staff approval (FP-ADR-076): an approval that carries identity
+        // evidence (a National ID typed from a document, compared with the
+        // proposal, or attestation codes) is bounded per user, so the
+        // comparison can never be used to guess a submitted ID. An ordinary
+        // approval without evidence compares nothing and is not limited — a
+        // request without `verified_national_id` cannot make a comparison.
+        RateLimiter::for('change-request-approve', fn (Request $request) => $request->exists('verified_national_id') || $request->exists('attestations')
+            ? [
+                Limit::perMinute((int) config('change_requests.staff_limits.approve_user_minute'))
+                    ->by("change-request-approve|user|{$request->user()?->getAuthIdentifier()}|minute"),
+                Limit::perHour((int) config('change_requests.staff_limits.approve_user_hour'))
+                    ->by("change-request-approve|user|{$request->user()?->getAuthIdentifier()}|hour"),
+            ]
+            : Limit::none());
+
         RateLimiter::for('family-change-request-action', fn (Request $request) => Limit::perMinute((int) config('change_requests.family_limits.action_user_minute'))
             ->by("family-change-request-action|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));

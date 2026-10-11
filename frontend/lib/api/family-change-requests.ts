@@ -86,6 +86,7 @@ export const familyChangeRequestKeys = {
   list: (filters: FamilyChangeRequestFilters) => ["family", "change-requests", "list", filters] as const,
   detail: (id: string) => ["family", "change-requests", "detail", id] as const,
   types: ["family", "change-requests", "types"] as const,
+  relationshipTypes: ["family", "change-requests", "relationship-types"] as const,
 };
 
 /** Only the PWA-5e history filters, and only those that are set. */
@@ -162,6 +163,23 @@ export function useSubmitFamilyChangeRequest() {
   });
 }
 
+/** An active, non-HEAD relationship type (GET …/change-requests/relationship-types). */
+export type FamilyRelationshipOption = { code: string; name: string };
+
+/** The add-member relationship options, from the registry (never a client list). */
+export function useFamilyRelationshipTypesQuery(enabled = true) {
+  const result = useQuery({
+    queryKey: familyChangeRequestKeys.relationshipTypes,
+    queryFn: async () => (await apiClient.get<{ data: FamilyRelationshipOption[] }>(`${PATH}/relationship-types`)).data,
+    staleTime: 5 * 60 * 1000,
+    enabled,
+    retry: false,
+  });
+  useFamilyAccessFailure(result.error);
+
+  return result;
+}
+
 export type FamilyChangeRequestMutation = { action: "resubmit"; response: string } | { action: "cancel" };
 
 /**
@@ -195,6 +213,9 @@ export function useFamilyChangeRequestMutation(id: string) {
  */
 export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = {
   RESIDENCE_UPDATE: "/family/requests/new/residence-update",
+  // FP-ADR-076. Offered only when the server lists the type — it is not a
+  // Production type yet, so discovery never lists it there.
+  ADD_FAMILY_MEMBER: "/family/requests/new/add-family-member",
 };
 
 export function familyRequestFormFor(type: ChangeRequestType): string | null {

@@ -21,6 +21,13 @@ return [
     // nothing — a leftover `true` never becomes GENERAL.
     'legacy_family_submission_enabled' => env('CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED'),
 
+    // Staff approval limits, per user (FP-ADR-076: an approval may compare a
+    // typed National ID, so attempts are bounded).
+    'staff_limits' => [
+        'approve_user_minute' => (int) env('CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE', 10),
+        'approve_user_hour' => (int) env('CHANGE_REQUESTS_APPROVE_LIMIT_USER_HOUR', 60),
+    ],
+
     // Family-side mutation limits, per signed-in user.
     'family_limits' => [
         'submit_user_minute' => (int) env('CHANGE_REQUESTS_FAMILY_SUBMIT_LIMIT_USER_MINUTE', 3),

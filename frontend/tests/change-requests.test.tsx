@@ -1,4 +1,5 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
+import type { QueryClient } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthContext, authValue } from "@/components/auth/auth-context";
@@ -124,6 +125,7 @@ function detail(overrides: Partial<ChangeRequestDetail> = {}): ChangeRequestDeta
       event({ event_type: "REVIEW_STARTED", from_status: "SUBMITTED", to_status: "UNDER_REVIEW", actor: { name: "مراجع تجريبي" }, actor_side: "STAFF", created_at: "2026-10-08T10:00:00+03:00" }),
     ],
     available_actions: ["return", "approve", "reject"],
+    approval_attestations: [],
     ...overrides,
   };
 }
@@ -595,5 +597,125 @@ describe("workflow actions", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "تطبيق التعديل" }));
     expect(await screen.findByText("لم يتغير شيء: سبق تنفيذ هذا الإجراء على الطلب.")).toBeInTheDocument();
     expect(browserStorageDump()).not.toMatch(/CRQ|محافظة|انتقلنا/);
+  });
+});
+
+// ------------------------------------------------------------------ attested approval (FP-ADR-076)
+
+describe("approval with reviewer attestations (ADD_FAMILY_MEMBER)", () => {
+  const MEMBER = detail({
+    type: "ADD_FAMILY_MEMBER",
+    presentation: { rows: [{ label: "الاسم الكامل", current: null, proposed: "فرد تجريبي" }, { label: "مطابقة رقم الهوية في السجل", current: "لا يوجد شخص مسجّل بهذا الرقم — يُنشأ شخص جديد عند التطبيق.", proposed: null }] },
+    approval_attestations: ["IDENTITY_VERIFIED", "RELATIONSHIP_VERIFIED"],
+  });
+
+  async function openApprove() {
+    await userEvent.click(await screen.findByRole("button", { name: "اعتماد الطلب" }));
+    return screen.findByRole("dialog");
+  }
+
+  it("requires both attestations and the typed National ID before sending anything", async () => {
+    const { post } = renderDetail(MEMBER, ALL, () => outcome("APPROVED"));
+    const dialog = await openApprove();
+
+    expect(within(dialog).getByText(/يتطلب هذا النوع من الطلبات إقرارك بالتحقق/)).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(2);
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+
+    expect(await within(dialog).findByText("أكّد أنك تحققت من الهوية.")).toBeInTheDocument();
+    expect(within(dialog).getByText("أكّد أنك تحققت من صلة القرابة.")).toBeInTheDocument();
+    expect(within(dialog).getByText("أدخل رقم الهوية كما في الوثيقة.")).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("sends the attestation codes and the typed ID once, then clears it", async () => {
+    const { post } = renderDetail(MEMBER, ALL, (path, body, server) => {
+      expect(path).toBe(`${DETAIL_PATH}/approve`);
+      expect(body).toEqual({ attestations: ["IDENTITY_VERIFIED", "RELATIONSHIP_VERIFIED"], verified_national_id: "401234567" });
+      server.state = { ...MEMBER, status: "APPROVED", available_actions: ["apply"] };
+      return outcome("APPROVED");
+    });
+    const dialog = await openApprove();
+
+    for (const box of within(dialog).getAllByRole("checkbox")) await userEvent.click(box);
+    await userEvent.type(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة"), "401234567");
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+
+    expect(await screen.findByText(/اعتُمد الطلب\. لم تتغير بيانات السجل بعد/)).toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(browserStorageDump()).not.toMatch(/401234567/);
+    expect(document.body).not.toHaveTextContent("401234567");
+  });
+
+  it("shows the server's refusal on the typed ID without revealing the stored value", async () => {
+    renderDetail(MEMBER, ALL, () => {
+      throw new ApiError(422, { message: "x", errors: { verified_national_id: ["رقم الهوية المدخل من الوثيقة لا يطابق رقم الهوية في الطلب."] } });
+    });
+    const dialog = await openApprove();
+
+    for (const box of within(dialog).getAllByRole("checkbox")) await userEvent.click(box);
+    await userEvent.type(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة"), "409999999");
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+
+    expect(await within(dialog).findByText("رقم الهوية المدخل من الوثيقة لا يطابق رقم الهوية في الطلب.")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  /** Every mutation still held by the client that carries the typed value. */
+  const held = (client: QueryClient, value: string) =>
+    client.getMutationCache().getAll().filter((m) => JSON.stringify(m.state.variables ?? null).includes(value));
+
+  it("forgets the typed ID after a successful approval", async () => {
+    const { client } = renderDetail(MEMBER, ALL, (_p, _b, server) => {
+      server.state = { ...MEMBER, status: "APPROVED", available_actions: ["apply"] };
+      return outcome("APPROVED");
+    });
+    const dialog = await openApprove();
+    for (const box of within(dialog).getAllByRole("checkbox")) await userEvent.click(box);
+    await userEvent.type(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة"), "401234567");
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+
+    expect(await screen.findByText(/اعتُمد الطلب/)).toBeInTheDocument();
+    await waitFor(() => expect(held(client, "401234567")).toHaveLength(0));
+    expect(document.body).not.toHaveTextContent("401234567");
+  });
+
+  it("clears the typed ID and the failed attempt when the dialog is cancelled or closed", async () => {
+    const { client } = renderDetail(MEMBER, ALL, () => {
+      throw new ApiError(422, { message: "x", errors: { verified_national_id: ["رقم الهوية المدخل من الوثيقة لا يطابق رقم الهوية في الطلب."] } });
+    });
+    let dialog = await openApprove();
+    for (const box of within(dialog).getAllByRole("checkbox")) await userEvent.click(box);
+    await userEvent.type(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة"), "409999999");
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+    await within(dialog).findByText("رقم الهوية المدخل من الوثيقة لا يطابق رقم الهوية في الطلب.");
+
+    // Cancel: the field, the checkboxes and the failed mutation are all gone.
+    await userEvent.click(within(dialog).getByRole("button", { name: "إلغاء" }));
+    await waitFor(() => expect(held(client, "409999999")).toHaveLength(0));
+    dialog = await openApprove();
+    expect(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة")).toHaveValue("");
+    for (const box of within(dialog).getAllByRole("checkbox")) expect(box).not.toBeChecked();
+    expect(within(dialog).queryByText("رقم الهوية المدخل من الوثيقة لا يطابق رقم الهوية في الطلب.")).not.toBeInTheDocument();
+
+    // Escape (dialog close) clears it too.
+    await userEvent.type(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة"), "408888888");
+    await userEvent.keyboard("{Escape}");
+    dialog = await openApprove();
+    expect(within(dialog).getByLabelText("رقم الهوية كما في الوثيقة")).toHaveValue("");
+  });
+
+  it("words the attestations exactly as FP-ADR-076 records them", async () => {
+    renderDetail(MEMBER, ALL, () => outcome("APPROVED"));
+    const dialog = await openApprove();
+    expect(within(dialog).getByText("تحققتُ من صلة القرابة المذكورة برب الأسرة.")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/يعيش مع الأسرة/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the plain confirmation for types without attestations", async () => {
+    renderDetail(detail(), ALL, () => outcome("APPROVED"));
+    const dialog = await openApprove();
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("رقم الهوية كما في الوثيقة")).not.toBeInTheDocument();
   });
 });

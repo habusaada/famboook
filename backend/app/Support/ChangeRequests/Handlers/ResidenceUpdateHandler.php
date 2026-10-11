@@ -125,7 +125,7 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         return $changed;
     }
 
-    public function baseValues(ChangeRequestTarget $target): array
+    public function baseValues(ChangeRequestTarget $target, array $data): array
     {
         $current = FamilyResidence::query()
             ->where('family_id', $target->family->getKey())

@@ -146,7 +146,15 @@ export interface ChangeRequestDetail {
   };
   timeline: WorkflowEvent[];
   available_actions: ChangeRequestAction[];
+  /**
+   * What approving this type requires from the reviewer (FP-ADR-076); empty
+   * for types without attestations. Codes only.
+   */
+  approval_attestations: ChangeRequestAttestation[];
 }
+
+/** A reviewer attestation required to approve some types (FP-ADR-076). */
+export type ChangeRequestAttestation = "IDENTITY_VERIFIED" | "RELATIONSHIP_VERIFIED";
 
 /** The outcome of a workflow action: identity, new status, replay flag. */
 export interface ChangeRequestOutcome {

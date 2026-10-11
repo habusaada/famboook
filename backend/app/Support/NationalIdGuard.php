@@ -52,14 +52,59 @@ final class NationalIdGuard
             return;
         }
 
-        if (DB::getDriverName() === 'pgsql') {
-            DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['famboook.national_id:'.$nationalId]);
-        }
+        self::lock($nationalId);
 
         $matches = self::matches($nationalId, $exceptPersonId);
         if ($matches->isNotEmpty()) {
             throw new DuplicateNationalIdException($field, $matches);
         }
+    }
+
+    /**
+     * Inside the caller's transaction: serialize on this exact National ID
+     * value (PostgreSQL transaction-level advisory lock; released at commit or
+     * rollback). The same key assertAvailable() uses, so a creation and a
+     * Change Request check of the same value cannot interleave.
+     */
+    public static function lock(#[\SensitiveParameter] string $nationalId): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', ['famboook.national_id:'.$nationalId]);
+        }
+    }
+
+    /**
+     * Non-deleted Persons whose STORED National ID is equivalent to the given
+     * canonical value under NationalId::normalize (Arabic-Indic / Persian
+     * digits, spaces, dashes, dots, slashes): the conservative legacy match
+     * for flows that store canonical nine-digit values (docs/11 FP-ADR-076).
+     * Stored values are only compared, never rewritten. At most
+     * MAX_MATCHES + 1 are returned, so "more than one" stays detectable.
+     *
+     * @return Collection<int, Person>
+     */
+    public static function equivalentMatches(#[\SensitiveParameter] string $canonical): Collection
+    {
+        $target = NationalId::normalize($canonical);
+        if ($target === '') {
+            return new Collection;
+        }
+
+        $ids = [];
+        Person::query()->whereNotNull('national_id')->select(['id', 'national_id'])
+            ->lazyById(1000)
+            ->each(function (Person $person) use ($target, &$ids) {
+                if (hash_equals($target, NationalId::normalize($person->national_id))) {
+                    $ids[] = $person->id;
+                }
+
+                return count($ids) <= self::MAX_MATCHES;
+            });
+
+        return $ids === [] ? new Collection : Person::query()->whereKey($ids)
+            ->with(['activeMembership.family', 'activeMembership.relationshipType'])
+            ->orderBy('id')
+            ->get();
     }
 
     /**
