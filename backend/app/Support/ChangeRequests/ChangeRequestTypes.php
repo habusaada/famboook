@@ -7,6 +7,7 @@ use App\Exceptions\ChangeRequestException;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use InvalidArgumentException;
 use LogicException;
+use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
 
 /**
  * The ONE authoritative mapping ChangeRequestType → handler (PWA-5b, AE-1).
@@ -29,6 +30,7 @@ final class ChangeRequestTypes
      */
     public const PRODUCTION = [
         'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
+        'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
     ];
 
     /** @param array<string, ChangeRequestHandler> $handlers keyed by type value */
