@@ -44,6 +44,10 @@ class ApproveChangeRequestAction
 
         return DB::transaction(function () use ($request, $staff, $evidence) {
             $locked = ChangeRequestWorkflow::lock($request);
+            // FP-ADR-079: a system-verified type is never approved by Staff.
+            if ($locked->type->isSystemVerified()) {
+                throw ChangeRequestWorkflow::invalidTransition();
+            }
             if (ChangeRequestWorkflow::alreadyDoneBy($locked, ChangeRequestStatus::APPROVED, WorkflowEventType::APPROVED, $staff->getKey())) {
                 return new ChangeRequestOutcome($locked, replayed: true);
             }

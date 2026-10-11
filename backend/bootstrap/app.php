@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureActivationEnabled;
+use App\Http\Middleware\EnsureContactUpdateEnabled;
 use App\Http\Middleware\EnsureCoordinatorSpace;
 use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Middleware\EnsureFamilyLoginEnabled;
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'family.login' => EnsureFamilyLoginEnabled::class,
             'family.password-reset' => EnsurePasswordResetEnabled::class,
             'family.password-change' => EnsurePasswordChangeEnabled::class,
+            'family.contact-update' => EnsureContactUpdateEnabled::class,
             // Coordinator Space (PWA-1H): after family.side, never instead of it.
             'coordinator.space' => EnsureCoordinatorSpace::class,
             // Family data (PWA-3A): the server-resolved Family context.
@@ -55,6 +57,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // the priority list would otherwise move ahead of `can:`), so a closed
         // gate counts nothing — like the other Family Auth gates.
         $middleware->prependToPriorityList(ThrottleRequests::class, EnsurePasswordChangeEnabled::class);
+        // FP-ADR-079: the same for the contact-update gate.
+        $middleware->prependToPriorityList(ThrottleRequests::class, EnsureContactUpdateEnabled::class);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
         $middleware->appendToGroup('web', EnsureUserIsActive::class);

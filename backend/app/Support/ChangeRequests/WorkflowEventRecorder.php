@@ -111,7 +111,15 @@ final class WorkflowEventRecorder
             if ($reason instanceof ChangeRequestApplyFailure) {
                 throw new InvalidArgumentException('A failure code belongs to APPLY_FAILED only.');
             }
-            $transition = ChangeRequestTransitions::assertAllowed($from, $to, $reason);
+            if ($actorSide === WorkflowActorSide::SYSTEM) {
+                // FP-ADR-079: only a system-verified type moves by the system.
+                if (! $request->type->isSystemVerified() || $reason !== null) {
+                    throw new LogicException('Only a system-verified request type has SYSTEM transitions.');
+                }
+                $transition = ChangeRequestTransitions::assertSystemAllowed($from, $to);
+            } else {
+                $transition = ChangeRequestTransitions::assertAllowed($from, $to, $reason);
+            }
             if ($transition->event !== $event || $transition->actorSide !== $actorSide) {
                 throw new LogicException('Workflow event does not match the transition: '.$event->value.' by '.$actorSide->value);
             }

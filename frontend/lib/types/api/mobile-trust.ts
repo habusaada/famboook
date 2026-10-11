@@ -9,10 +9,14 @@ export type MobileTrustState = "TRUSTED" | "STALE" | "REVOKED" | "UNVERIFIED" | 
 /** Stored status of one history row; PENDING_VERIFICATION is never returned. */
 export type MobileTrustRowStatus = "TRUSTED" | "STALE" | "REVOKED";
 
-/** Every recorded method. SELF_OTP is first self-activation, never a Staff grant. */
-export type MobileVerificationMethod = "IN_PERSON" | "STAFF_CALLBACK" | "AUTHORIZED_RECORD_REVIEW" | "SELF_OTP";
+/**
+ * Every recorded method. SELF_OTP is first self-activation and
+ * SELF_OTP_TRANSFER the head's own number change (docs/11 FP-ADR-079) —
+ * never a Staff grant.
+ */
+export type MobileVerificationMethod = "IN_PERSON" | "STAFF_CALLBACK" | "AUTHORIZED_RECORD_REVIEW" | "SELF_OTP" | "SELF_OTP_TRANSFER";
 
-export type StaffMobileVerificationMethod = Exclude<MobileVerificationMethod, "SELF_OTP">;
+export type StaffMobileVerificationMethod = Exclude<MobileVerificationMethod, "SELF_OTP" | "SELF_OTP_TRANSFER">;
 
 export type MobileTrustRevokeReason = "REPORTED_LOST" | "NOT_OWNER" | "VERIFICATION_ERROR" | "ADMINISTRATIVE";
 

@@ -207,7 +207,10 @@ export type FamilyAuthErrorCode =
   | "RESET_FAILED"
   | "PASSWORD_RESET_UNAVAILABLE"
   | "PASSWORD_CHANGE_FAILED"
-  | "PASSWORD_CHANGE_UNAVAILABLE";
+  | "PASSWORD_CHANGE_UNAVAILABLE"
+  | "CONTACT_UPDATE_FAILED"
+  | "CONTACT_UPDATE_EXPIRED"
+  | "CONTACT_UPDATE_UNAVAILABLE";
 
 const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   OTP_INVALID: "رمز التحقق غير صحيح.",
@@ -229,6 +232,9 @@ const MESSAGES: Record<FamilyAuthErrorCode, string> = {
   PASSWORD_RESET_UNAVAILABLE: "الخدمة غير متاحة حاليًا.",
   PASSWORD_CHANGE_FAILED: "تعذّر تغيير كلمة المرور. حدّث الصفحة وحاول مرة أخرى.",
   PASSWORD_CHANGE_UNAVAILABLE: "تغيير كلمة المرور غير متاح حاليًا.",
+  CONTACT_UPDATE_FAILED: "تعذّر إكمال تحديث رقم الجوال. أُغلق الطلب؛ ابدأ طلبًا جديدًا.",
+  CONTACT_UPDATE_EXPIRED: "انتهت مهلة تأكيد الطلب. ابدأ طلبًا جديدًا.",
+  CONTACT_UPDATE_UNAVAILABLE: "تحديث رقم الجوال غير متاح حاليًا.",
 };
 
 export const CONNECTION_ERROR = "تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.";

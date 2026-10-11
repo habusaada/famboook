@@ -221,6 +221,8 @@ export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = 
   // Offered only when the server lists the type — it is not a Production
   // type yet, so discovery never lists it there.
   DEATH_REPORT: "/family/requests/new/death-report",
+  // FP-ADR-079: listed by the server only while its own gate is open.
+  CONTACT_UPDATE: "/family/requests/new/contact-update",
 };
 
 export function familyRequestFormFor(type: ChangeRequestType): string | null {

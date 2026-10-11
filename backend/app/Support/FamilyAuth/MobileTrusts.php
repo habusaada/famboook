@@ -151,6 +151,50 @@ final class MobileTrusts
         return $pending;
     }
 
+    /**
+     * CONTACT_UPDATE of the household head's OWN number (docs/11 FP-ADR-079,
+     * R2): the head proved the current password, the OLD trusted number and
+     * the NEW number, and the registry now holds the new number. The trust
+     * moves with it: a NEW TRUSTED row for the current number, verification
+     * method SELF_OTP_TRANSFER, no Staff verifier. The previous TRUSTED row
+     * is already STALE (the Person model hook ran when the number changed);
+     * any TRUSTED row still left is made stale first, as for a grant.
+     *
+     * Never for a member's number and never without both codes — the caller
+     * (CompleteContactUpdateAction) is the only one. Inside its transaction,
+     * with the Person row locked. NULL when the Person's current number is
+     * not exactly $mobile.
+     */
+    public static function transferAfterContactChange(Person $person, #[\SensitiveParameter] string $mobile, User|int|null $actor = null): ?PersonMobileTrust
+    {
+        self::assertInTransaction();
+        if (FamilyMobile::normalize($person->mobile) !== $mobile) {
+            return null;
+        }
+        if (PersonMobileTrust::query()->where('person_id', $person->getKey())->where('status', MobileTrustStatus::TRUSTED->value)->lockForUpdate()->exists()) {
+            self::markStale($person, $actor);
+        }
+
+        $trust = PersonMobileTrust::create([
+            'person_id' => $person->getKey(),
+            'mobile_fingerprint' => KeyedFingerprint::of(FingerprintContext::MOBILE, $mobile),
+            'mobile_last2' => substr($mobile, -2),
+            'key_version' => KeyedFingerprint::currentVersion(),
+            'status' => MobileTrustStatus::TRUSTED,
+            'verification_method' => MobileVerificationMethod::SELF_OTP_TRANSFER,
+            'verified_at' => now(),
+        ]);
+        AuthSecurityLog::record(
+            AuthSecurityEventType::MOBILE_TRUST_GRANTED,
+            AuthSecurityEventOutcome::SUCCESS,
+            MobileVerificationMethod::SELF_OTP_TRANSFER,
+            person: $person, actor: $actor, trust: $trust,
+            metadata: ['verification_method' => MobileVerificationMethod::SELF_OTP_TRANSFER->value],
+        );
+
+        return $trust;
+    }
+
     private static function assertInTransaction(): void
     {
         if (DB::transactionLevel() === 0) {

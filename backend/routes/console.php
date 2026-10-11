@@ -12,3 +12,7 @@ Artisan::command('inspire', function () {
 // the retention period. Defining the schedule does not run it: the Laravel
 // scheduler cron is a Production deployment prerequisite (docs/08 §16a).
 Schedule::command('famboook:purge-otp-challenges')->daily();
+
+// Abandoned mobile contact updates (docs/11 FP-ADR-079): closed once their
+// verification window passed.
+Schedule::command('famboook:close-expired-contact-updates')->everyFiveMinutes();

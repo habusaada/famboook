@@ -45,6 +45,9 @@ export const mobileVerificationMethodLabels: Record<MobileVerificationMethod, st
   AUTHORIZED_RECORD_REVIEW: "مراجعة سجل موثوق",
   // History only: established by the first-activation code, never by Staff.
   SELF_OTP: "تحقق ذاتي برمز التفعيل",
+  // History only: the head changed their own number with the current
+  // password and codes to the old and the new number (FP-ADR-079).
+  SELF_OTP_TRANSFER: "نقل التوثيق عند تغيير الرقم",
 };
 
 /** The only methods a Staff grant may use (MobileVerificationMethod::staffMethods). */

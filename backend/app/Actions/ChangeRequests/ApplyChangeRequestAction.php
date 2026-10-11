@@ -62,6 +62,10 @@ class ApplyChangeRequestAction
         try {
             return DB::transaction(function () use ($request, $staff, &$attempted) {
                 $locked = ChangeRequestWorkflow::lock($request);
+                // FP-ADR-079: a system-verified type is applied by the system only.
+                if ($locked->type->isSystemVerified()) {
+                    throw ChangeRequestWorkflow::invalidTransition();
+                }
                 if ($locked->status === ChangeRequestStatus::APPLIED) {
                     return new ChangeRequestOutcome($locked, replayed: true);
                 }

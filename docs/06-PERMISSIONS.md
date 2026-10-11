@@ -1015,6 +1015,17 @@ GET  /api/v1/family/me
   completing browser signed in afresh. Implemented but OFF by default:
   `FAMILY_PASSWORD_CHANGE_ENABLED=true` opens it (503 while closed). No
   permission or role added; no Staff password change.
+- **`/family/contact-updates`** (CONTACT_UPDATE, docs/11 FP-ADR-079):
+  `POST /`, `GET /{uuid}`, `POST /{uuid}/verify`, `POST /{uuid}/resend` —
+  behind the same Family boundary, `can:change-request.submit`, the gate
+  `family.contact-update` (off by default) and per-user / per-Family
+  throttles. The Person is a member of the context Family only
+  (member_ref); the head's own number needs the current password. No
+  permission or role added. Staff hold no transition on this type: the
+  request is approved and applied by the SYSTEM and Staff see it
+  read-only; trust for a changed number still comes from
+  `person-mobile-trust.grant` (SUPER_ADMIN, ADMINISTRATOR) or, for the
+  head's own number with both codes, the SELF_OTP_TRANSFER transfer.
 - **`GET /family/household/health`** (PWA-3B.6, AUTH-ADR-083, §123): behind
   `auth:sanctum`, `family.side`, `can:family-portal.access` and
   `family.context`; no route parameter and no Person, member or Family

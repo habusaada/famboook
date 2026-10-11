@@ -19,6 +19,10 @@ final class ChangeRequestStaffActions
     /** @return list<string> */
     public static function for(ChangeRequest $request, User $user, bool $typeAvailable, ?string $latestApplyFailure = null): array
     {
+        // FP-ADR-079: a system-verified type is history only for Staff.
+        if ($request->type->isSystemVerified()) {
+            return [];
+        }
         $status = $request->status;
         $actions = [];
 

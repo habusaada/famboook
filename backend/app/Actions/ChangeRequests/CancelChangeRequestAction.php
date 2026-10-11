@@ -5,6 +5,7 @@ namespace App\Actions\ChangeRequests;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\WorkflowActorSide;
 use App\Enums\WorkflowEventType;
+use App\Models\AuthOtpChallenge;
 use App\Models\ChangeRequest;
 use App\Support\ChangeRequests\ChangeRequestActors;
 use App\Support\ChangeRequests\ChangeRequestOutcome;
@@ -41,6 +42,10 @@ class CancelChangeRequestAction
 
             $locked->forceFill(['status' => ChangeRequestStatus::CANCELLED, 'cancelled_by' => $user->getKey(), 'cancelled_at' => now()])->save();
             WorkflowEventRecorder::record($locked, $from, WorkflowEventType::CANCELLED, WorkflowActorSide::FAMILY, $user->getKey());
+            // FP-ADR-079: a cancelled contact update's codes stop working at once.
+            if ($locked->type->isSystemVerified()) {
+                AuthOtpChallenge::supersedeOpenForChangeRequest($locked->getKey());
+            }
 
             return new ChangeRequestOutcome($locked);
         });

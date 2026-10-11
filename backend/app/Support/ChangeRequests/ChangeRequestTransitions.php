@@ -61,6 +61,39 @@ final class ChangeRequestTransitions
         ];
     }
 
+    /**
+     * The SYSTEM transitions of a system-verified type (docs/11 FP-ADR-079,
+     * CONTACT_UPDATE only — ChangeRequestType::isSystemVerified): approved
+     * and applied by the system once its OTP verification succeeded, in one
+     * transaction, as two distinct events; closed by the system when it can
+     * no longer be verified. Kept apart from all(): Staff and family
+     * transitions are unchanged, and nothing reaches these through find().
+     *
+     * @return list<ChangeRequestTransition>
+     */
+    public static function system(): array
+    {
+        $system = WorkflowActorSide::SYSTEM;
+
+        return [
+            new ChangeRequestTransition(S::SUBMITTED, S::APPROVED, E::APPROVED, $system, ''),
+            new ChangeRequestTransition(S::APPROVED, S::APPLIED, E::APPLIED, $system, ''),
+            new ChangeRequestTransition(S::SUBMITTED, S::CANCELLED, E::CANCELLED, $system, ''),
+        ];
+    }
+
+    /** A SYSTEM transition, or a LogicException (codes only). */
+    public static function assertSystemAllowed(?S $from, S $to): ChangeRequestTransition
+    {
+        foreach (self::system() as $transition) {
+            if ($transition->from === $from && $transition->to === $to) {
+                return $transition;
+            }
+        }
+
+        throw new LogicException('System change request transition not allowed: '.($from->value ?? 'NEW').' → '.$to->value);
+    }
+
     public static function find(?S $from, S $to): ?ChangeRequestTransition
     {
         foreach (self::all() as $transition) {

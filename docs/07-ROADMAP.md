@@ -2152,7 +2152,10 @@ PWA-6   first request types (docs/11 FP-ADR-059): RESIDENCE_UPDATE
         (correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION,
         DEATH_REPORT (non-head); «طلباتي»
 PWA-4   Family Profile Review (/family/verification; docs/11 FP-ADR-057)
-later   contact update (CONTACT_UPDATE); the «حسابي» view itself is PWA-3B.5
+built   contact update (CONTACT_UPDATE, docs/11 FP-ADR-079): primary mobile,
+        OTP-verified, applied by the system; not a Production type yet,
+        FAMILY_CONTACT_UPDATE_ENABLED off by default; the «حسابي» view
+        itself is PWA-3B.5
 done    authenticated change password (docs/11 FU-16, FP-ADR-078), a Family
         Auth item separate from Account Recovery (FU-14): implemented
         2026-10-11, OFF by default — FAMILY_PASSWORD_CHANGE_ENABLED=true

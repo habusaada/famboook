@@ -106,6 +106,13 @@ return [
         'global' => [
             'hour' => (int) env('FAMILY_OTP_THROTTLE_GLOBAL_HOUR', 500),
         ],
+        // CONTACT_UPDATE's own system-wide quota (docs/11 FP-ADR-079), kept
+        // below the global ceiling so activation and password reset always
+        // keep capacity. Contact-update sends count here AND globally.
+        'contact_update' => [
+            'hour' => (int) env('FAMILY_OTP_THROTTLE_CONTACT_UPDATE_HOUR', 100),
+            'day' => (int) env('FAMILY_OTP_THROTTLE_CONTACT_UPDATE_DAY', 600),
+        ],
     ],
 
     /*
@@ -207,6 +214,40 @@ return [
         'limits' => [
             'decay_seconds' => (int) env('FAMILY_PASSWORD_CHANGE_LIMIT_DECAY_SECONDS', 900),
             'user_attempts' => (int) env('FAMILY_PASSWORD_CHANGE_LIMIT_USER_ATTEMPTS', 5),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Family mobile contact update gate and limits (docs/11 FP-ADR-079)
+    |--------------------------------------------------------------------------
+    |
+    | contact_update_enabled: off by default, independent of the other gates;
+    | read by App\Http\Middleware\EnsureContactUpdateEnabled (503 while off)
+    | and by type discovery. It SENDS SMS — to a number that is not yet in
+    | the registry — so it must stay false until SMS delivery is
+    | Production-ready.
+    |
+    | request_ttl_seconds: how long a request may wait for its codes; after
+    | it the request is closed by the system (on use, and by
+    | famboook:close-expired-contact-updates).
+    |
+    | limits (per signed-in user; per Family for starts): every start sends
+    | one or two SMS, so starts are bounded tightly. The OTP ceilings
+    | (otp, throttle) apply on top of these.
+    |
+    */
+
+    'contact_update_enabled' => (bool) env('FAMILY_CONTACT_UPDATE_ENABLED', false),
+
+    'contact_update' => [
+        'request_ttl_seconds' => (int) env('FAMILY_CONTACT_UPDATE_REQUEST_TTL_SECONDS', 1800),
+        'limits' => [
+            'start_user_hour' => (int) env('FAMILY_CONTACT_UPDATE_LIMIT_START_USER_HOUR', 3),
+            'start_user_day' => (int) env('FAMILY_CONTACT_UPDATE_LIMIT_START_USER_DAY', 6),
+            'start_family_day' => (int) env('FAMILY_CONTACT_UPDATE_LIMIT_START_FAMILY_DAY', 10),
+            'verify_user_minute' => (int) env('FAMILY_CONTACT_UPDATE_LIMIT_VERIFY_USER_MINUTE', 10),
+            'resend_user_minute' => (int) env('FAMILY_CONTACT_UPDATE_LIMIT_RESEND_USER_MINUTE', 4),
         ],
     ],
 

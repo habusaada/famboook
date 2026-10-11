@@ -185,6 +185,7 @@ class FamilyAuthCheck extends Command
         $login = config('family_auth.login_enabled') === true;
         $reset = config('family_auth.password_reset_enabled') === true;
         $change = config('family_auth.password_change_enabled') === true;
+        $contact = config('family_auth.contact_update_enabled') === true;
         $driver = (string) config('family_auth.sms.driver');
         $tweetsms = TweetsSmsSender::fromConfig((array) config('family_auth.sms.tweetsms'))->configured();
         $production = app()->environment('production');
@@ -198,6 +199,7 @@ class FamilyAuthCheck extends Command
         $this->line('  Login enabled:          '.self::yesNo($login));
         $this->line('  Password reset enabled: '.self::yesNo($reset));
         $this->line('  Password change enabled: '.self::yesNo($change));
+        $this->line('  Contact update enabled: '.self::yesNo($contact));
         $this->line('  SMS driver:             '.($driver !== '' ? $driver : '(none)'));
         $this->line('  TweetsMS configured:    '.self::yesNo($tweetsms));
         $this->line('  SESSION_DRIVER:         '.config('session.driver'));
@@ -207,10 +209,10 @@ class FamilyAuthCheck extends Command
         $this->line('  SESSION_ENCRYPT:        '.self::yesNo(config('session.encrypt') === true));
         $this->line('  CACHE_STORE:            '.config('cache.default'));
 
-        $sends = $activation || $reset;
+        $sends = $activation || $reset || $contact;
         $smsReady = ($driver === 'tweetsms' && $tweetsms) || ($driver === 'log' && ! $production);
         if ($sends && ! $smsReady) {
-            $this->warnings[] = 'Activation or password reset is enabled but no SMS can be delivered (FAMILY_SMS_DRIVER / TweetsMS configuration).';
+            $this->warnings[] = 'Activation, password reset or contact update is enabled but no SMS can be delivered (FAMILY_SMS_DRIVER / TweetsMS configuration).';
         }
         if ($production && $driver === 'log') {
             $this->warnings[] = 'FAMILY_SMS_DRIVER=log is a local development driver; it refuses to send in production.';

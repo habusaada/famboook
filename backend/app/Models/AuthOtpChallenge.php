@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An OTP challenge (docs/02 §45b, docs/04 §55b), bound to one purpose, one
- * Person and one trusted mobile. code_hash is a keyed hash (context
+ * Person and one trusted mobile — or, for CONTACT_NEW_MOBILE (FP-ADR-079),
+ * to the keyed fingerprint of a PROPOSED number and its Change Request. code_hash is a keyed hash (context
  * OTP_CODE), hidden from every serialization; the plaintext code is never
  * stored.
  *
@@ -28,6 +29,9 @@ class AuthOtpChallenge extends Model
         'person_id',
         'user_id',
         'mobile_trust_id',
+        'change_request_id',
+        'destination_fingerprint',
+        'destination_key_version',
         'code_hash',
         'expires_at',
         'attempts',
@@ -49,6 +53,7 @@ class AuthOtpChallenge extends Model
     {
         return [
             'purpose' => OtpPurpose::class,
+            'destination_key_version' => 'integer',
             'attempts' => 'integer',
             'send_count' => 'integer',
             'expires_at' => 'datetime',
@@ -100,5 +105,21 @@ class AuthOtpChallenge extends Model
     public function mobileTrust(): BelongsTo
     {
         return $this->belongsTo(PersonMobileTrust::class, 'mobile_trust_id');
+    }
+
+    /** CONTACT_UPDATE challenges (FP-ADR-079): the request they belong to. */
+    public function changeRequest(): BelongsTo
+    {
+        return $this->belongsTo(ChangeRequest::class);
+    }
+
+    /**
+     * Supersedes every open challenge of a CONTACT_UPDATE request — when it
+     * is applied, cancelled or closed. Returns the rows superseded.
+     */
+    public static function supersedeOpenForChangeRequest(int $changeRequestId): int
+    {
+        return static::query()->open()->where('change_request_id', $changeRequestId)
+            ->update(['superseded_at' => now(), 'updated_at' => now()]);
     }
 }

@@ -606,6 +606,26 @@ Family Portal activation may be enabled in Production.
   to `false` and `config:cache` — the route answers 503; no data change.
   This is the FAMILY password change only; Staff still have no
   self-service password change (§18).
+- **Mobile contact update (CONTACT_UPDATE, docs/11 FP-ADR-079).** Built,
+  NOT a Production type, and OFF by default and in the Production
+  template: `FAMILY_CONTACT_UPDATE_ENABLED=false`. It SENDS SMS — to
+  numbers not yet in the registry — so it must stay closed until SMS
+  delivery is Production-ready (the same prerequisites as activation and
+  reset). Opening it needs two explicit steps: register the type in
+  `ChangeRequestTypes::PRODUCTION` (a reviewed release), then set
+  `FAMILY_CONTACT_UPDATE_ENABLED=true` and `config:cache`. It deploys one
+  migration (OTP purposes, challenge columns, the SELF_OTP_TRANSFER trust
+  method, CONTACT_UPDATE-only actor CHECKs). The scheduler must run
+  `famboook:close-expired-contact-updates` (every five minutes). Limits:
+  `FAMILY_CONTACT_UPDATE_LIMIT_*` (starts 3 / hour, 6 / day per user,
+  10 / day per Family; verify 10 / min; resend 4 / min) plus the OTP
+  ceilings, including CONTACT_UPDATE's own SMS quota
+  `FAMILY_OTP_THROTTLE_CONTACT_UPDATE_HOUR` (100) / `_DAY` (600), below the
+  global `FAMILY_OTP_THROTTLE_GLOBAL_HOUR` (500), so activation and reset
+  always keep capacity; request window `FAMILY_CONTACT_UPDATE_REQUEST_TTL_SECONDS`
+  (1800). Rollback: set the flag to `false` and `config:cache` — the routes
+  answer 503 and the type leaves discovery; open requests close when their
+  window passes. No role or permission change.
 - **Coordinators (PWA-1H).** Deploying PWA-1H adds one permission,
   `coordinator-family.view-summary`, granted to COORDINATOR: run the
   RolePermissionSeeder and `famboook:verify-permissions` as usual (§7). No

@@ -4,12 +4,15 @@ namespace App\Support\FamilyAuth;
 
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
+use App\Enums\ChangeRequestStatus;
+use App\Enums\ChangeRequestType;
 use App\Enums\FingerprintContext;
 use App\Enums\MobileTrustDenial;
 use App\Enums\MobileTrustStatus;
 use App\Enums\OtpFailure;
 use App\Enums\OtpPurpose;
 use App\Models\AuthOtpChallenge;
+use App\Models\ChangeRequest;
 use App\Models\Person;
 use App\Models\PersonMobileTrust;
 use App\Models\User;
@@ -61,11 +64,19 @@ final class OtpChallenges
         private readonly SmsDispatcher $sms,
     ) {}
 
-    public function issue(OtpPurpose $purpose, Person $person, ?User $user = null, bool $selfVerification = false): OtpResult
+    public function issue(OtpPurpose $purpose, Person $person, ?User $user = null, bool $selfVerification = false, ?ChangeRequest $changeRequest = null): OtpResult
     {
         $this->assertOwnTransaction();
         if ($purpose === OtpPurpose::PASSWORD_RESET && $user === null) {
             throw new InvalidArgumentException('A password reset challenge belongs to an existing account.');
+        }
+        if ($purpose === OtpPurpose::CONTACT_NEW_MOBILE) {
+            throw new InvalidArgumentException('A proposed number is challenged through issueToProposedMobile().');
+        }
+        // CONTACT_OLD_MOBILE (FP-ADR-079): the head's CURRENT trusted mobile,
+        // for their own request; every other purpose has no request.
+        if ($purpose->isContactUpdate() !== ($changeRequest !== null) || ($purpose->isContactUpdate() && $user === null)) {
+            throw new InvalidArgumentException('A contact-update challenge belongs to its request and account, and only it does.');
         }
         if ($selfVerification && $purpose !== OtpPurpose::ACTIVATION) {
             // A password reset always needs an already TRUSTED mobile.
@@ -86,12 +97,12 @@ final class OtpChallenges
         $fingerprint = $selfMobile === null
             ? $trusted->trust->mobile_fingerprint
             : KeyedFingerprint::of(FingerprintContext::MOBILE, $selfMobile);
-        if (! $this->throttle->attempt($person, $fingerprint, $this->ip())) {
+        if (! $this->throttle->attempt($person, $fingerprint, $this->ip(), $purpose->isContactUpdate())) {
             return OtpResult::failed(OtpFailure::THROTTLED);
         }
 
         $code = $this->newCode();
-        [$challenge, $destination] = DB::transaction(function () use ($purpose, $person, $user, $trusted, $selfMobile, $code) {
+        [$challenge, $destination] = DB::transaction(function () use ($purpose, $person, $user, $trusted, $selfMobile, $code, $changeRequest) {
             // One issue per Person at a time; the trust is re-read under the lock.
             $locked = Person::withTrashed()->whereKey($person->getKey())->lockForUpdate()->first();
             $current = $locked ? $this->trustedMobile->for($locked) : null;
@@ -122,6 +133,7 @@ final class OtpChallenges
                 'person_id' => $person->getKey(),
                 'user_id' => $user?->getKey(),
                 'mobile_trust_id' => $current->trust->getKey(),
+                'change_request_id' => $changeRequest?->getKey(),
                 'code_hash' => $this->hash($uuid, $code),
                 'expires_at' => now()->addSeconds($this->setting('ttl_seconds')),
                 'attempts' => 0,
@@ -138,6 +150,64 @@ final class OtpChallenges
         return $challenge === null
             ? OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT)
             : $this->deliver($challenge, $destination, $code);
+    }
+
+    /**
+     * CONTACT_UPDATE (docs/11 FP-ADR-079): a code to the PROPOSED number of a
+     * SUBMITTED request — a number the Person does not have yet, so it has
+     * no trust row and never gets one from this code. The challenge holds
+     * only the number's keyed fingerprint; the destination is read from the
+     * request each time it is needed. Throttled by the same OTP ceilings
+     * (Person, destination, IP, global), so a third party's number cannot be
+     * flooded. Proving the number proves access to it — not identity, and
+     * never trust.
+     */
+    public function issueToProposedMobile(Person $person, User $user, ChangeRequest $request): OtpResult
+    {
+        $this->assertOwnTransaction();
+        $mobile = self::proposedMobile($request);
+        if ($mobile === null || (int) $request->person_id !== (int) $person->getKey()) {
+            throw new InvalidArgumentException('A proposed-number challenge needs a contact-update request for this Person.');
+        }
+        $fingerprint = KeyedFingerprint::of(FingerprintContext::MOBILE, $mobile);
+        if (! $this->throttle->attempt($person, $fingerprint, $this->ip(), contactUpdate: true)) {
+            return OtpResult::failed(OtpFailure::THROTTLED);
+        }
+
+        $code = $this->newCode();
+        $challenge = DB::transaction(function () use ($person, $user, $request, $fingerprint, $code) {
+            Person::withTrashed()->whereKey($person->getKey())->lockForUpdate()->first();
+            $locked = ChangeRequest::query()->whereKey($request->getKey())->first();
+            if ($locked === null || $locked->status !== ChangeRequestStatus::SUBMITTED || $locked->type !== ChangeRequestType::CONTACT_UPDATE) {
+                return null;
+            }
+            $this->supersede($person, OtpPurpose::CONTACT_NEW_MOBILE);
+
+            $uuid = (string) Str::uuid();
+            $challenge = (new AuthOtpChallenge)->forceFill([
+                'uuid' => $uuid,
+                'purpose' => OtpPurpose::CONTACT_NEW_MOBILE,
+                'person_id' => $person->getKey(),
+                'user_id' => $user->getKey(),
+                'mobile_trust_id' => null,
+                'change_request_id' => $request->getKey(),
+                'destination_fingerprint' => $fingerprint,
+                'destination_key_version' => KeyedFingerprint::currentVersion(),
+                'code_hash' => $this->hash($uuid, $code),
+                'expires_at' => now()->addSeconds($this->setting('ttl_seconds')),
+                'attempts' => 0,
+                'send_count' => 1,
+                'last_sent_at' => now(),
+                'ip' => $this->ip(),
+            ]);
+            $challenge->save();
+
+            return $challenge;
+        });
+
+        return $challenge === null
+            ? OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT)
+            : $this->deliver($challenge, $mobile, $code);
     }
 
     public function resend(string $challengeUuid, OtpPurpose $purpose, ?Person $person = null): OtpResult
@@ -157,8 +227,8 @@ final class OtpChallenges
             if ($this->expired($challenge)) {
                 return [OtpFailure::EXPIRED, $challenge, null];
             }
-            $trusted = $this->currentTrust($challenge);
-            if ($trusted === null) {
+            $destination = $this->destination($challenge);
+            if ($destination === null) {
                 return [OtpFailure::TRUST_NOT_CURRENT, $challenge, null];
             }
             if ($challenge->send_count >= $this->setting('max_sends')) {
@@ -167,7 +237,7 @@ final class OtpChallenges
             if (now()->lessThan($challenge->last_sent_at->copy()->addSeconds($this->setting('resend_cooldown_seconds')))) {
                 return [OtpFailure::COOLDOWN, $challenge, null];
             }
-            if (! $this->throttle->attempt($challenge->person()->withTrashed()->first(), $trusted->trust->mobile_fingerprint, $this->ip())) {
+            if (! $this->throttle->attempt($challenge->person()->withTrashed()->first(), $destination[1], $this->ip(), $challenge->purpose->isContactUpdate())) {
                 return [OtpFailure::THROTTLED, $challenge, null];
             }
 
@@ -180,7 +250,7 @@ final class OtpChallenges
                 'expires_at' => now()->addSeconds($this->setting('ttl_seconds')),
             ])->save();
 
-            return [null, $challenge, $trusted->destination];
+            return [null, $challenge, $destination[0]];
         });
 
         return $failure !== null ? OtpResult::failed($failure, $challenge) : $this->deliver($challenge, $destination, $code);
@@ -206,8 +276,9 @@ final class OtpChallenges
             if ($this->expired($challenge)) {
                 return OtpResult::failed(OtpFailure::EXPIRED, $challenge);
             }
-            $current = $this->currentTrust($challenge);
-            if ($current === null) {
+            // A proposed number has no trust: its request must still propose it.
+            $current = $challenge->purpose === OtpPurpose::CONTACT_NEW_MOBILE ? null : $this->currentTrust($challenge);
+            if ($this->destination($challenge) === null) {
                 return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT, $challenge);
             }
 
@@ -229,7 +300,7 @@ final class OtpChallenges
 
             // First self-activation: the correct code — and only it — makes
             // the pending number the Person's TRUSTED, SELF_OTP mobile.
-            if ($current->pendingVerification) {
+            if ($current !== null && $current->pendingVerification) {
                 $trust = $lockedPerson === null ? null : MobileTrusts::confirmSelfVerified($lockedPerson, $current->trust, $current->destination);
                 if ($trust === null) {
                     return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT, $challenge);
@@ -273,7 +344,7 @@ final class OtpChallenges
         if ($challenge->grant_expires_at === null || now()->greaterThanOrEqualTo($challenge->grant_expires_at)) {
             return OtpResult::failed(OtpFailure::GRANT_EXPIRED, $challenge);
         }
-        if ($this->currentTrust($challenge) === null) {
+        if ($this->destination($challenge) === null) {
             return OtpResult::failed(OtpFailure::TRUST_NOT_CURRENT, $challenge);
         }
 
@@ -350,6 +421,46 @@ final class OtpChallenges
     private function expired(AuthOtpChallenge $challenge): bool
     {
         return now()->greaterThanOrEqualTo($challenge->expires_at);
+    }
+
+    /**
+     * Where this challenge's code goes, and the fingerprint its sends are
+     * throttled by — or NULL when the challenge no longer proves anything:
+     * for a trust-bound challenge, its trust is no longer the Person's
+     * current one (currentTrust); for CONTACT_NEW_MOBILE, its request is no
+     * longer a SUBMITTED contact update proposing exactly this number.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function destination(AuthOtpChallenge $challenge): ?array
+    {
+        if ($challenge->purpose !== OtpPurpose::CONTACT_NEW_MOBILE) {
+            $current = $this->currentTrust($challenge);
+
+            return $current === null ? null : [$current->destination, $current->trust->mobile_fingerprint];
+        }
+
+        $request = $challenge->change_request_id === null ? null : ChangeRequest::query()->find($challenge->change_request_id);
+        $mobile = $request === null ? null : self::proposedMobile($request);
+        if ($mobile === null || $request->status !== ChangeRequestStatus::SUBMITTED || (int) $request->person_id !== (int) $challenge->person_id
+            || $challenge->destination_fingerprint === null || $challenge->destination_key_version === null) {
+            return null;
+        }
+        try {
+            $matches = KeyedFingerprint::matches(FingerprintContext::MOBILE, $mobile, $challenge->destination_fingerprint, $challenge->destination_key_version);
+        } catch (LogicException) {
+            return null;
+        }
+
+        return $matches ? [$mobile, $challenge->destination_fingerprint] : null;
+    }
+
+    /** The normalized proposed number of a contact-update request, or NULL. */
+    private static function proposedMobile(ChangeRequest $request): ?string
+    {
+        return $request->type === ChangeRequestType::CONTACT_UPDATE
+            ? FamilyMobile::normalize($request->submitted_data['mobile'] ?? null)
+            : null;
     }
 
     /**

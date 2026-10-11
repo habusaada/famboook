@@ -240,6 +240,19 @@ class FamilySideBoundaryTest extends TestCase
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.password-change', 'throttle:family-password-change'], $middleware);
                 $this->assertSame(['POST'], $route->methods());
             }
+            // Mobile contact update (FP-ADR-079): the Family boundary, submit
+            // permission, its own gate (off by default), SMS after the
+            // response, then a per-step per-user throttle (none on the read).
+            if (str_starts_with($route->uri(), 'api/v1/family/contact-updates')) {
+                $boundary = ['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'can:change-request.submit', 'family.contact-update', 'sms.after-response'];
+                $expected = match (true) {
+                    in_array('GET', $route->methods(), true) => $boundary,
+                    $route->uri() === 'api/v1/family/contact-updates' => [...$boundary, 'throttle:family-contact-update-start'],
+                    str_ends_with($route->uri(), '/verify') => [...$boundary, 'throttle:family-contact-update-verify'],
+                    str_ends_with($route->uri(), '/resend') => [...$boundary, 'throttle:family-contact-update-resend'],
+                };
+                $this->assertSame($expected, $middleware, $route->uri());
+            }
             // Change Requests (PWA-5e): reads behind the Family boundary only;
             // each mutation adds its change-request.* permission and a throttle.
             if (str_starts_with($route->uri(), 'api/v1/family/change-requests')) {
@@ -255,7 +268,8 @@ class FamilySideBoundaryTest extends TestCase
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
-        // relationship options (FP-ADR-076) + the password change (FU-16).
-        $this->assertSame(36, $checked);
+        // relationship options (FP-ADR-076) + the password change (FU-16) + the
+        // four contact-update routes (FP-ADR-079).
+        $this->assertSame(40, $checked);
     }
 }

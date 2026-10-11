@@ -44,6 +44,10 @@ class AuthSecurityEvent extends Model
         'delivery_reason',
         // Which own sensitive value was revealed (SelfRevealField code).
         'field',
+        // CONTACT_MOBILE_CHANGED (FP-ADR-079): the head's own number, and
+        // whether its trust moved to the new number.
+        'self',
+        'trust_transferred',
     ];
 
     /** Largest counter a metadata value may hold (far below any identifier). */

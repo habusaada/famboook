@@ -12,6 +12,10 @@ enum MobileVerificationMethod: string
     // First self-activation (FP-ADR-053): a successful OTP sent to the
     // Person's current registered mobile. Never a Staff grant method.
     case SELF_OTP = 'SELF_OTP';
+    // CONTACT_UPDATE of the head's own number (FP-ADR-079): the current
+    // password, an OTP to the old TRUSTED number and an OTP to the new one.
+    // Never a Staff grant method.
+    case SELF_OTP_TRANSFER = 'SELF_OTP_TRANSFER';
 
     /** @return list<self> the methods a Staff grant may use */
     public static function staffMethods(): array

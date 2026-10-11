@@ -753,7 +753,7 @@ Actions.
 
 | Request | Approved type | Apply target today |
 |---|---|---|
-| Contact update | CONTACT_UPDATE | `UpdatePersonAction` exists |
+| Contact update | CONTACT_UPDATE | **Built, not in Production (FP-ADR-079):** primary mobile only, OTP to the proposed number (and, for the head's own trusted number, the current password and an OTP to the old number), approved and applied by the SYSTEM through `UpdatePersonAction`; gate off by default |
 | Residence / displacement update | RESIDENCE_UPDATE | **Built (PWA-6.1):** in-place correction through `UpdateFamilyResidenceAction` (§30a); a move with history still needs `residence.change` (FU-02) |
 | Person correction | PERSON_CORRECTION | **Built, not in Production:** full name, birth date, gender, marital status through `UpdatePersonAction` (§30a). National ID stays on `CorrectNationalIdAction`; CONFIRM_ALIVE (`ConfirmPersonAliveAction`) not built |
 | Add missing family member | ADD_FAMILY_MEMBER | **Built, not in Production (FP-ADR-076):** `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person without an active membership) |
@@ -781,7 +781,8 @@ The first Change Request types, in order:
 
 Deferred: head death and head succession (FU-01), household-head change,
 member transfer, marital events (PFP-012), CONTACT_UPDATE (mobile
-re-verification), health submissions and need submissions (PFP-008).
+re-verification — since built as FP-ADR-079, not yet a Production type),
+health submissions and need submissions (PFP-008).
 
 RESIDENCE_UPDATE in V1 is a correction of the current residence. A real
 move that preserves residence history needs a future `residence.change`
@@ -3646,6 +3647,39 @@ in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
 - Activation: add `'PERSON_CORRECTION' => PersonCorrectionHandler::class` to
   `PRODUCTION` in a reviewed release (docs/12).
 
+## CONTACT_UPDATE implementation record
+
+Implemented 2026-10-11 (FP-ADR-079). Not registered in
+`ChangeRequestTypes::PRODUCTION`; gate `FAMILY_CONTACT_UPDATE_ENABLED` off
+by default. One migration; no role or permission.
+
+- Backend: `ContactUpdateHandler`; `StartContactUpdateAction`,
+  `CompleteContactUpdateAction`, `ResendContactUpdateCodeAction`,
+  `CloseContactUpdateAction`; `ContactUpdateVerification` (masked
+  destinations and timers only); `OtpChallenges::issueToProposedMobile()`
+  and the trust-less destination for CONTACT_NEW_MOBILE;
+  `MobileTrusts::transferAfterContactChange()`;
+  `ChangeRequestTransitions::system()` and the SYSTEM path in
+  `WorkflowEventRecorder`; Staff start-review / approve / apply refuse the
+  type and offer no action; the generic submission refuses it; type
+  discovery hides it while the gate is closed; `EnsureContactUpdateEnabled`
+  (before the route limiters); limiters `family-contact-update-*`;
+  `famboook:close-expired-contact-updates`.
+- API: `POST /api/v1/family/contact-updates` (member_ref, mobile,
+  current_password for the head's own number, client_reference),
+  `GET …/{uuid}`, `POST …/{uuid}/verify` (code, old_code),
+  `POST …/{uuid}/resend` (target new | old); family cancel through the
+  existing change-request cancel.
+- Frontend: `/family/requests/new/contact-update` (member, current masked
+  number, new number, password for the head, codes with resend, result
+  with the recovery explanation); Staff trust history label for
+  SELF_OTP_TRANSFER.
+- Tests: `tests/Feature/ChangeRequests/ContactUpdate/` (SQLite and
+  PostgreSQL concurrency), `frontend/tests/family-contact-update.test.tsx`.
+- Activation: register `'CONTACT_UPDATE' => ContactUpdateHandler::class` in
+  `PRODUCTION` and set `FAMILY_CONTACT_UPDATE_ENABLED=true` once SMS
+  delivery is Production-ready (docs/12).
+
 ## Authenticated password change implementation record
 
 Implemented 2026-10-11 (FP-ADR-078, closes FU-16). No migration,
@@ -4720,6 +4754,78 @@ Authenticated Family password change (approved 2026-10-11; closes FU-16).
 - no SMS, no mobile or trust change, no CONTACT_UPDATE; no Staff password
   change; no permission, role or migration (the new security event type
   fits the existing event-code CHECK).
+
+FP-ADR-079
+Mobile CONTACT_UPDATE — OTP-verified, applied by the system (approved
+2026-10-11; built, NOT a Production type; gate off by default).
+- POLICY EXCEPTION (approved): CONTACT_UPDATE of the PRIMARY mobile needs
+  no Staff review. It amends docs/03 §88 ("controlled review" for contact
+  updates) and the Family Auth rule that a change of the authentication
+  mobile is never self-approved: the proof is an OTP to the PROPOSED number
+  and, for the head's own TRUSTED number, the current password and an OTP
+  to the OLD number. alternate_mobile stays out of V1;
+- it stays a Change Request (the CLAUDE.md guardrail): SUBMITTED by the
+  family → APPROVED by SYSTEM → APPLIED by SYSTEM, two distinct events in
+  one atomic transaction (request → Family → Person locks, data rules,
+  preconditions, base fingerprint, OTP grants consumed,
+  UpdatePersonAction). A request that can no longer be verified is
+  CANCELLED by SYSTEM (expired window, locked or unusable code, changed
+  registry, a newer request for the same member). Staff see it read-only:
+  no review, approval, rejection or apply (ChangeRequestType::
+  isSystemVerified; ChangeRequestTransitions::system()). For this type
+  only, approved_by / applied_by / reviewed_by / cancelled_by may be NULL
+  (amended CHECKs);
+- the head may change their own number or any ACTIVE, living member's
+  (member_ref, this Family only). Shared numbers are allowed and never
+  looked up. The number must be 05 + 8 digits and differ from the current
+  one; it is stored normalized;
+- OTP: purpose CONTACT_NEW_MOBILE — a challenge with NO trust row, bound to
+  its request, the requesting account and the keyed fingerprint of the
+  proposed number (the number itself only in the request's data); purpose
+  CONTACT_OLD_MOBILE — the head's current TRUSTED mobile, trust-bound like
+  a reset. Same OTP rules (6 digits, 5 minutes, 5 attempts then locked, 60 s
+  cooldown, 3 sends, grant consumed once) and the same ceilings (Person,
+  destination, IP, global). OTP proves access to a number — not identity,
+  and never trust by itself;
+- a MEMBER's number: one code to the new number; no trust, link, identity
+  or account is created; a trust the member had goes STALE;
+- the HEAD's own number: the current password is required.
+  R2 — the current number is TRUSTED: codes to the old AND the new number;
+  on success the new number becomes the head's TRUSTED mobile
+  (SELF_OTP_TRANSFER, no Staff verifier) and the old trust STALE, so
+  password recovery continues on the new number. R1 — not trusted: one
+  code to the new number; the contact changes but NO trust is granted, so
+  password recovery is unavailable until Staff verify the new number (the
+  family is told so);
+- limits: starts 3 / hour and 6 / day per user and 10 / day per Family;
+  verify 10 / minute and resend 4 / minute per user; plus the OTP ceilings.
+  SMS capacity: every contact-update send (new or old number, first send
+  and resends) also counts against CONTACT_UPDATE's OWN system-wide quota
+  (`FAMILY_OTP_THROTTLE_CONTACT_UPDATE_HOUR` 100, `_DAY` 600), set below the
+  global ceiling (500 / hour), so contact updates can never use up the
+  capacity activation and password reset rely on; the global ceiling stays
+  the final system-wide safeguard for every send;
+- future concern (documented, not built — FU-17): a head may set a
+  member's number to any number they control; if that member later becomes
+  household head, first activation sends its code to that registered
+  number. A headship change should require Staff to verify the new head's
+  mobile before activation;
+  Gate `FAMILY_CONTACT_UPDATE_ENABLED` (off by default; it sends SMS to
+  numbers not yet in the registry); type discovery lists the type only
+  while it is open. Request window `FAMILY_CONTACT_UPDATE_REQUEST_TTL_SECONDS`
+  (1800); `famboook:close-expired-contact-updates` (scheduled every five
+  minutes) closes abandoned requests;
+- audit: workflow events (SUBMITTED, APPROVED / APPLIED / CANCELLED by
+  SYSTEM); PERSON_UPDATED and CHANGE_REQUEST_APPLIED activities;
+  CONTACT_MOBILE_CHANGED (SUCCESS with `self` / `trust_transferred`;
+  FAILURE / DENIED with a ContactUpdateDenial code), OTP_* with the
+  purpose, MOBILE_TRUST_STALE, MOBILE_TRUST_GRANTED (SELF_OTP_TRANSFER).
+  Never a number, code or password;
+- one migration: the two OTP purposes, nullable mobile_trust_id with
+  change_request_id and destination fingerprint columns (shape CHECK), the
+  SELF_OTP_TRANSFER method, and the CONTACT_UPDATE-only relaxations of the
+  change_requests actor CHECKs. No role or permission: it uses
+  change-request.submit / cancel.
 ```
 
 ---
@@ -4900,6 +5006,7 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | FU-14 | **Implemented 2026-10-06 (FP-ADR-065); enablement pending.** Password reset Production readiness: the PWA-1G / PWA-1I reset is kept unchanged (automatic sign-in, head eligibility, no masked mobile, no trust created); runtime `GET /api/v1/family/auth/capabilities` and a fail-closed «نسيت كلمة المرور؟» link and `/family/forgot-password` route; realistic coverage (self-OTP account journey, coordinator, Staff boundary, changed / revoked mobile, no registry mutation). No migration | `FAMILY_PASSWORD_RESET_ENABLED=true` only through the docs/08 §16a enablement checklist, as its own decision |
 | FU-15 | **Resolved 2026-10-06 (FP-ADR-066).** Staff Mobile Trust Management UI: the Staff Person profile card «توثيق رقم الجوال» (state, masked current mobile, trust history; grant with IN_PERSON / STAFF_CALLBACK / AUTHORIZED_RECORD_REVIEW, revoke with a reason code) on the existing PWA-1E API and Domain Actions. REVOKED never revived; a grant is a new row for the current `Person.mobile`; SELF_OTP never a Staff method; revoke does not deactivate the account or end sessions. Staff-side only — no Family Portal change. No migration | Done |
 | FU-16 | **Resolved 2026-10-11 (FP-ADR-078).** Authenticated Change Password: `POST /api/v1/family/account/password` (self only, `family.context`) — current password required, the activation / reset policy with the 72-byte limit, a new password different from the current one, every session ended and the completing browser signed in afresh (reset pattern), PASSWORD_CHANGED SUCCESS / FAILURE events without any secret, 5 attempts per 15 minutes per user (429), behind `password_change_enabled` (off by default, reported by capabilities); «تغيير كلمة المرور» at `/family/account/password`. No SMS, no migration, no role or permission | Done; enabling the gate is an operational decision |
+| FU-17 | **Headship change and the new head's mobile** (recorded 2026-10-11, FP-ADR-079). A household head may change a member's mobile through CONTACT_UPDATE to any number they control (approved). If that member later becomes household head, first self-activation sends its code to the registered number, which the previous head may control. Before such a member activates, Staff should verify the new head's mobile (or the activation should require a Staff-verified number) | A future decision with head succession (FU-01); not built |
 
 ---
 
@@ -4951,3 +5058,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.40 | 2026-10-11 | Approved | PERSON_CORRECTION built (full name, birth date, gender, marital status through UpdatePersonAction); not registered in Production; implementation record in §30a |
 | 1.41 | 2026-10-11 | Approved | FP-ADR-077 DEATH_REPORT: reviewer's verification method at approval (APPROVED metadata `verification_method`, read at APPLY), V1 without document upload, explicit unknown death date stored as NULL, V1 provenance through the CHANGE_REQUEST_APPLIED record (no request field on the death record); built (non-head member, RecordPersonDeathAction), not registered in Production; implementation record in §30a |
 | 1.42 | 2026-10-11 | Approved | FP-ADR-078 Authenticated Family password change (closes FU-16): current password, Family password policy, unchanged refused, all sessions ended and the browser signed in afresh, PASSWORD_CHANGED events, 5 / 15 min per user, gate `password_change_enabled` off by default; FP-ADR-067 amended (entry shown only while open); implementation record in §30a |
+| 1.43 | 2026-10-11 | Approved | FP-ADR-079 mobile CONTACT_UPDATE: approved policy exception (no Staff review), OTP to the proposed number, head R2 (current password + old and new number codes, trust transferred as SELF_OTP_TRANSFER) / R1 (no trust), SUBMITTED → APPROVED / APPLIED by SYSTEM, system close, Staff read-only, limits and gate (off by default); built, not registered in Production; implementation record in §30a |

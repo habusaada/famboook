@@ -29,6 +29,10 @@ class StartChangeRequestReviewAction
 
         return DB::transaction(function () use ($request, $staff) {
             $locked = ChangeRequestWorkflow::lock($request);
+            // FP-ADR-079: a system-verified type is never reviewed by Staff.
+            if ($locked->type->isSystemVerified()) {
+                throw ChangeRequestWorkflow::invalidTransition();
+            }
             if (ChangeRequestWorkflow::alreadyDoneBy($locked, ChangeRequestStatus::UNDER_REVIEW, WorkflowEventType::REVIEW_STARTED, $staff->getKey())) {
                 return new ChangeRequestOutcome($locked, replayed: true);
             }

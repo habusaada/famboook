@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardPdfController;
 use App\Http\Controllers\Api\V1\Family\FamilyChangeRequestController;
+use App\Http\Controllers\Api\V1\Family\FamilyContactUpdateController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
@@ -178,6 +179,20 @@ Route::prefix('family')->group(function () {
                 ->middleware(['can:change-request.resubmit', 'throttle:family-change-request-action']);
             Route::post('/change-requests/{changeRequest}/cancel', [FamilyChangeRequestController::class, 'cancel'])
                 ->middleware(['can:change-request.cancel', 'throttle:family-change-request-action']);
+
+            // Mobile CONTACT_UPDATE (docs/11 FP-ADR-079): its own OTP flow on
+            // the Change Request engine — change-request.submit, its own gate
+            // (off by default; it sends SMS), per-step throttles, SMS after
+            // the response. A request is looked up inside this Family only.
+            Route::prefix('contact-updates')->middleware(['can:change-request.submit', 'family.contact-update', 'sms.after-response'])->group(function () {
+                Route::post('/', [FamilyContactUpdateController::class, 'store'])
+                    ->middleware('throttle:family-contact-update-start');
+                Route::get('/{contactUpdate}', [FamilyContactUpdateController::class, 'show']);
+                Route::post('/{contactUpdate}/verify', [FamilyContactUpdateController::class, 'complete'])
+                    ->middleware('throttle:family-contact-update-verify');
+                Route::post('/{contactUpdate}/resend', [FamilyContactUpdateController::class, 'resend'])
+                    ->middleware('throttle:family-contact-update-resend');
+            });
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from

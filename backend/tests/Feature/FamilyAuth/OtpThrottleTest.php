@@ -65,10 +65,12 @@ class OtpThrottleTest extends TestCase
             'destination' => ['hour' => 10, 'day' => 20],
             'ip' => ['hour' => 20],
             'global' => ['hour' => 500],
+            // FP-ADR-079: contact updates' own quota, below the global ceiling.
+            'contact_update' => ['hour' => 100, 'day' => 600],
         ], $defaults);
         // Environment-overridable, not literals in code.
         $source = file_get_contents(base_path('config/family_auth.php'));
-        foreach (['PERSON_HOUR', 'PERSON_DAY', 'DESTINATION_HOUR', 'DESTINATION_DAY', 'IP_HOUR', 'GLOBAL_HOUR'] as $name) {
+        foreach (['PERSON_HOUR', 'PERSON_DAY', 'DESTINATION_HOUR', 'DESTINATION_DAY', 'IP_HOUR', 'GLOBAL_HOUR', 'CONTACT_UPDATE_HOUR', 'CONTACT_UPDATE_DAY'] as $name) {
             $this->assertStringContainsString("FAMILY_OTP_THROTTLE_{$name}", $source);
         }
     }

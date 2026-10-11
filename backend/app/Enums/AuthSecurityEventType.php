@@ -22,6 +22,11 @@ enum AuthSecurityEventType: string
     // or FAILURE / DENIED with a PasswordChangeDenial or LoginDenial code.
     // Never a password.
     case PASSWORD_CHANGED = 'PASSWORD_CHANGED';
+    // A CONTACT_UPDATE changed a Person's mobile (FP-ADR-079): person = the
+    // target, user = the requesting head; metadata `self` and
+    // `trust_transferred` (booleans). FAILURE / DENIED with a
+    // ContactUpdateDenial code. Never a number, code or password.
+    case CONTACT_MOBILE_CHANGED = 'CONTACT_MOBILE_CHANGED';
     case MOBILE_TRUST_OPENED = 'MOBILE_TRUST_OPENED';
     case MOBILE_TRUST_ASSISTED = 'MOBILE_TRUST_ASSISTED';
     case MOBILE_TRUST_GRANTED = 'MOBILE_TRUST_GRANTED';

@@ -33,10 +33,10 @@ final class OtpThrottle
      * Whether one more SMS may be sent. When it may, the attempt is counted
      * on every dimension — whether or not the delivery then succeeds.
      */
-    public function attempt(Person $person, string $mobileFingerprint, ?string $ip): bool
+    public function attempt(Person $person, string $mobileFingerprint, ?string $ip, bool $contactUpdate = false): bool
     {
         try {
-            $limits = $this->limits($person, $mobileFingerprint, $ip);
+            $limits = $this->limits($person, $mobileFingerprint, $ip, $contactUpdate);
 
             foreach ($limits as [$key, $max]) {
                 if ($max < 1 || RateLimiter::tooManyAttempts($key, $max)) {
@@ -92,9 +92,15 @@ final class OtpThrottle
     /**
      * Every ceiling that applies, as [key, max, window seconds].
      *
+     * A CONTACT_UPDATE send (docs/11 FP-ADR-079) also counts against its OWN
+     * system-wide quota (contact_update, hour and day), set below the
+     * global ceiling: contact updates can never use up the SMS capacity that
+     * activation and password reset rely on. The global ceiling stays the
+     * final system-wide safeguard for every send.
+     *
      * @return list<array{0: string, 1: int, 2: int}>
      */
-    public function limits(Person $person, string $mobileFingerprint, ?string $ip): array
+    public function limits(Person $person, string $mobileFingerprint, ?string $ip, bool $contactUpdate = false): array
     {
         $limits = [
             [self::key('person', (string) $person->getKey(), 'hour'), self::max('person.hour'), self::HOUR],
@@ -105,6 +111,10 @@ final class OtpThrottle
         ];
         if ($ip !== null && $ip !== '') {
             $limits[] = [self::key('ip', hash('sha256', $ip), 'hour'), self::max('ip.hour'), self::HOUR];
+        }
+        if ($contactUpdate) {
+            $limits[] = [self::key('contact_update', 'all', 'hour'), self::max('contact_update.hour'), self::HOUR];
+            $limits[] = [self::key('contact_update', 'all', 'day'), self::max('contact_update.day'), self::DAY];
         }
 
         return $limits;

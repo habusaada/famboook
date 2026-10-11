@@ -66,6 +66,11 @@ class FamilyChangeRequestController extends Controller
     {
         $enabled = FamilySubmissionPolicy::allows(EnsureFamilyContext::context($request));
         $available = $enabled && $request->user()->can('change-request.submit') ? $types->familySubmittable() : [];
+        // FP-ADR-079: the contact update sends SMS — offered only while its
+        // own gate is open.
+        if (config('family_auth.contact_update_enabled') !== true) {
+            $available = array_values(array_filter($available, fn (ChangeRequestType $type) => ! $type->isSystemVerified()));
+        }
 
         return response()->json([
             'data' => array_map(fn (ChangeRequestType $type) => ['type' => $type->value], $available),

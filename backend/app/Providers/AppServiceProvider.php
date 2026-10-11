@@ -15,6 +15,7 @@ use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
@@ -138,6 +139,33 @@ class AppServiceProvider extends ServiceProvider
         )
             ->by("family-password-change|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
+        // Mobile contact update (docs/11 FP-ADR-079): every start sends one or
+        // two SMS — bounded per signed-in user (hour, day) and per Family
+        // (day); verify and resend per user. The OTP ceilings (Person,
+        // destination, IP, global) apply on top.
+        RateLimiter::for('family-contact-update-start', function (Request $request) {
+            $user = $request->user()?->getAuthIdentifier();
+            // The limiter runs before family.context (middleware priority):
+            // the Family is resolved from the signed-in account the same way.
+            // Without one the request is refused right after, and counts
+            // against its own user only.
+            $family = $request->user() === null ? null : app(FamilyAccessResolver::class)->familyContext($request->user())->family?->getKey();
+            $family ??= "none-{$user}";
+            $limit = fn (string $key) => (int) config("family_auth.contact_update.limits.{$key}");
+            $tooMany = fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS);
+
+            return [
+                Limit::perHour($limit('start_user_hour'))->by("family-contact-update-start|user|{$user}|hour")->response($tooMany),
+                Limit::perDay($limit('start_user_day'))->by("family-contact-update-start|user|{$user}|day")->response($tooMany),
+                Limit::perDay($limit('start_family_day'))->by("family-contact-update-start|family|{$family}|day")->response($tooMany),
+            ];
+        });
+        foreach (['verify' => 'verify_user_minute', 'resend' => 'resend_user_minute'] as $step => $key) {
+            RateLimiter::for("family-contact-update-{$step}", fn (Request $request) => Limit::perMinute((int) config("family_auth.contact_update.limits.{$key}"))
+                ->by("family-contact-update-{$step}|user|{$request->user()?->getAuthIdentifier()}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        }
 
         // Self sensitive-value reveal (docs/11 §23a, PWA-3B.2): per signed-in
         // user — the route is authenticated — per minute and per hour.

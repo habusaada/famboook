@@ -31,16 +31,20 @@ enum FamilyAuthError: string
     // Authenticated password change (FU-16).
     case PASSWORD_CHANGE_FAILED = 'PASSWORD_CHANGE_FAILED';
     case PASSWORD_CHANGE_UNAVAILABLE = 'PASSWORD_CHANGE_UNAVAILABLE';
+    // Mobile contact update (FP-ADR-079).
+    case CONTACT_UPDATE_FAILED = 'CONTACT_UPDATE_FAILED';
+    case CONTACT_UPDATE_EXPIRED = 'CONTACT_UPDATE_EXPIRED';
+    case CONTACT_UPDATE_UNAVAILABLE = 'CONTACT_UPDATE_UNAVAILABLE';
 
     public function status(): int
     {
         return match ($this) {
             self::OTP_INVALID, self::ACTIVATION_REFUSED => 422,
-            self::OTP_EXPIRED, self::GRANT_EXPIRED => 410,
+            self::OTP_EXPIRED, self::GRANT_EXPIRED, self::CONTACT_UPDATE_EXPIRED => 410,
             self::OTP_LOCKED => 423,
             self::OTP_COOLDOWN, self::OTP_SEND_LIMIT, self::TOO_MANY_REQUESTS => 429,
-            self::ACTIVATION_FAILED, self::RESET_FAILED, self::PASSWORD_CHANGE_FAILED => 409,
-            self::ACTIVATION_UNAVAILABLE, self::FAMILY_AUTH_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE => 503,
+            self::ACTIVATION_FAILED, self::RESET_FAILED, self::PASSWORD_CHANGE_FAILED, self::CONTACT_UPDATE_FAILED => 409,
+            self::ACTIVATION_UNAVAILABLE, self::FAMILY_AUTH_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE, self::CONTACT_UPDATE_UNAVAILABLE => 503,
             self::INVALID_CREDENTIALS => 401,
         };
     }
@@ -57,11 +61,13 @@ enum FamilyAuthError: string
             self::GRANT_EXPIRED => 'انتهت مهلة إنشاء كلمة المرور. ابدأ من جديد.',
             self::ACTIVATION_FAILED => 'تعذّر إكمال التفعيل. ابدأ من جديد أو راجع الإدارة.',
             self::TOO_MANY_REQUESTS => 'محاولات كثيرة. حاول مجددًا بعد قليل.',
-            self::ACTIVATION_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE => 'الخدمة غير متاحة حاليًا.',
+            self::ACTIVATION_UNAVAILABLE, self::PASSWORD_RESET_UNAVAILABLE, self::PASSWORD_CHANGE_UNAVAILABLE, self::CONTACT_UPDATE_UNAVAILABLE => 'الخدمة غير متاحة حاليًا.',
             self::INVALID_CREDENTIALS => 'رقم الهوية أو كلمة المرور غير صحيحة.',
             self::FAMILY_AUTH_UNAVAILABLE => 'تسجيل الدخول غير متاح حاليًا.',
             self::RESET_FAILED => 'تعذّر تغيير كلمة المرور. ابدأ من جديد أو راجع الإدارة.',
             self::PASSWORD_CHANGE_FAILED => 'تعذّر تغيير كلمة المرور. حدّث الصفحة وحاول مرة أخرى.',
+            self::CONTACT_UPDATE_FAILED => 'تعذّر إكمال تحديث رقم الجوال. أُغلق الطلب؛ ابدأ طلبًا جديدًا.',
+            self::CONTACT_UPDATE_EXPIRED => 'انتهت مهلة تأكيد الطلب. ابدأ طلبًا جديدًا.',
         };
     }
 }

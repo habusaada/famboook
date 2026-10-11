@@ -24,4 +24,14 @@ enum ChangeRequestType: string
     case MARRIAGE_UPDATE = 'MARRIAGE_UPDATE';
     case DOCUMENT_UPDATE = 'DOCUMENT_UPDATE';
     case OTHER = 'OTHER';
+
+    /**
+     * Approved and applied by the SYSTEM after an OTP to the proposed value
+     * (docs/11 FP-ADR-079) — never reviewed, approved or applied by Staff;
+     * Staff see its history read-only.
+     */
+    public function isSystemVerified(): bool
+    {
+        return $this === self::CONTACT_UPDATE;
+    }
 }

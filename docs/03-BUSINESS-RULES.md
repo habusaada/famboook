@@ -2285,6 +2285,14 @@ Contact changes may be lower-risk than identity changes.
 
 V1 still routes substantive Family User contact updates through controlled review unless a later policy permits direct low-risk updates.
 
+Amended 2026-10-11 (docs/11 FP-ADR-079, approved policy exception): a
+change of the PRIMARY mobile (CONTACT_UPDATE) needs no Staff review. It is
+verified by an OTP sent to the proposed number — and, for the household
+head's own trusted number, by the current password and an OTP to the old
+number — and is then approved and applied by the system as a Change
+Request (SUBMITTED → APPROVED → APPLIED, distinct events, one transaction).
+The alternate mobile is not part of this exception.
+
 ---
 
 # 89. Risk Levels
@@ -2353,6 +2361,13 @@ Reset        National ID → OTP to the trusted mobile → new password
   and receive an OTP on it.
 - A change of the authentication mobile is separately authorized and
   verified; a Family User's request to change it is never self-approved.
+  Amended 2026-10-11 (docs/11 FP-ADR-079): the household head may change
+  their own number without Staff review only with the current password
+  and OTPs to BOTH the old trusted number and the new number — then the
+  trust moves to the new number (SELF_OTP_TRANSFER). Without a trusted old
+  number the contact changes but no trust is granted. An OTP to a new
+  number proves access to it, never identity or trust by itself; changing
+  a member's number never grants that member any access.
 - A mobile number is never an identity; shared numbers are expected.
 
 ## Multi-role

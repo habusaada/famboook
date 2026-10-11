@@ -60,7 +60,7 @@ class SubmitChangeRequestAction
 
     public function __construct(private readonly ChangeRequestTypes $types) {}
 
-    public function handle(FamilyAccessResult $context, ChangeRequestSubmission $submission): ChangeRequestOutcome
+    public function handle(FamilyAccessResult $context, ChangeRequestSubmission $submission, bool $systemVerified = false): ChangeRequestOutcome
     {
         // WHO first (the actor refusal keeps its precedence), then the family
         // submission channel (PWA-6.1b, FamilySubmissionPolicy: OFF / PILOT
@@ -78,6 +78,14 @@ class SubmitChangeRequestAction
 
         $handler = $this->types->handler($submission->type);
         if (! $handler->familySubmittable()) {
+            throw new ChangeRequestException(ChangeRequestException::TYPE_UNAVAILABLE);
+        }
+        // FP-ADR-079: a system-verified type (CONTACT_UPDATE) is created only
+        // by its own OTP flow, never through the generic submission.
+        if ($submission->type->isSystemVerified() !== $systemVerified) {
+            if ($systemVerified) {
+                throw new LogicException('Only a system-verified type is submitted through its verification flow.');
+            }
             throw new ChangeRequestException(ChangeRequestException::TYPE_UNAVAILABLE);
         }
 

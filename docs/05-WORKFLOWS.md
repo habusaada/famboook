@@ -1208,6 +1208,12 @@ IMPORTED / UNVERIFIED MOBILE
 
 A number with no valid mobile first needs an authorized contact update.
 
+Amended 2026-10-11 (docs/11 FP-ADR-079): the household head's own number
+change is authorized by the current password and OTPs to the old trusted
+and the new number; the new number is verified BEFORE it becomes the OTP
+destination, and only then does the trust move to it. Without a trusted old
+number, or for a member's number, the new number receives no trust.
+
 ## Account activation
 
 ```text
