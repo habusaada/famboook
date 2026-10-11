@@ -216,6 +216,8 @@ export const FAMILY_REQUEST_FORMS: Partial<Record<ChangeRequestType, string>> = 
   // FP-ADR-076. Offered only when the server lists the type — it is not a
   // Production type yet, so discovery never lists it there.
   ADD_FAMILY_MEMBER: "/family/requests/new/add-family-member",
+  // Offered only when the server lists the type (registered + channel open).
+  PERSON_CORRECTION: "/family/requests/new/person-correction",
 };
 
 export function familyRequestFormFor(type: ChangeRequestType): string | null {

@@ -19,6 +19,7 @@ use App\Models\WorkflowEvent;
 use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use App\Support\FamilyActivityVisibility;
 use Database\Seeders\RolePermissionSeeder;
@@ -41,14 +42,19 @@ class ChangeRequestEngineSecurityTest extends TestCase
 {
     use ChangeRequestFixtures, FamilyIdentityFixtures, RefreshDatabase;
 
-    public function test_the_production_registry_holds_residence_update_only(): void
+    public function test_the_production_registry_holds_residence_update_and_add_family_member_only(): void
     {
-        $this->assertSame(['RESIDENCE_UPDATE' => ResidenceUpdateHandler::class], ChangeRequestTypes::PRODUCTION);
+        $this->assertSame([
+            'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
+            'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
+        ], ChangeRequestTypes::PRODUCTION);
         $registry = app(ChangeRequestTypes::class);
-        $this->assertSame([ChangeRequestType::RESIDENCE_UPDATE], $registry->registered());
-        $this->assertSame([ChangeRequestType::RESIDENCE_UPDATE], $registry->familySubmittable());
+        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER];
+        $this->assertSame($production, $registry->registered());
+        $this->assertSame($production, $registry->familySubmittable());
         foreach (ChangeRequestType::cases() as $type) {
-            $this->assertSame($type === ChangeRequestType::RESIDENCE_UPDATE, $registry->has($type), $type->value);
+            // PERSON_CORRECTION is built but deliberately not registered.
+            $this->assertSame(in_array($type, $production, true), $registry->has($type), $type->value);
         }
 
         // With the real container binding, an unregistered type cannot be submitted.

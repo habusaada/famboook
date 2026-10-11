@@ -610,9 +610,10 @@ class AddFamilyMemberTest extends TestCase
         $this->actingAs($this->reviewer)->json('GET', self::FAMILY_URI.'/relationship-types')->assertForbidden();
     }
 
-    public function test_the_handler_is_not_a_production_type(): void
+    public function test_the_handler_is_a_production_type_since_f8b1b1e(): void
     {
-        $this->assertArrayNotHasKey('ADD_FAMILY_MEMBER', ChangeRequestTypes::PRODUCTION);
-        $this->assertFalse(ChangeRequestTypes::production()->has(ChangeRequestType::ADD_FAMILY_MEMBER));
+        $this->assertSame(AddFamilyMemberHandler::class, ChangeRequestTypes::PRODUCTION['ADD_FAMILY_MEMBER'] ?? null);
+        $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::ADD_FAMILY_MEMBER));
+        $this->assertFalse(ChangeRequestTypes::production()->has(ChangeRequestType::PERSON_CORRECTION));
     }
 }

@@ -755,7 +755,7 @@ Actions.
 |---|---|---|
 | Contact update | CONTACT_UPDATE | `UpdatePersonAction` exists |
 | Residence / displacement update | RESIDENCE_UPDATE | **Built (PWA-6.1):** in-place correction through `UpdateFamilyResidenceAction` (§30a); a move with history still needs `residence.change` (FU-02) |
-| Person correction | PERSON_CORRECTION | `UpdatePersonAction`, `CorrectNationalIdAction` exist; CONFIRM_ALIVE → `ConfirmPersonAliveAction` (exists) |
+| Person correction | PERSON_CORRECTION | **Built, not in Production:** full name, birth date, gender, marital status through `UpdatePersonAction` (§30a). National ID stays on `CorrectNationalIdAction`; CONFIRM_ALIVE (`ConfirmPersonAliveAction`) not built |
 | Add missing family member | ADD_FAMILY_MEMBER | **Built, not in Production (FP-ADR-076):** `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person without an active membership) |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
 | Death report | DEATH_REPORT | `RecordPersonDeathAction` exists, with a Staff route and action (FU-10, FP-ADR-061); head succession is not handled |
@@ -3621,6 +3621,31 @@ frontend change; nothing deployed or enabled.
   shutdown, configuration cache), docs/09 (pilot uses PILOT, never
   GENERAL).
 
+## PERSON_CORRECTION implementation record
+
+Implemented 2026-10-11 within FP-ADR-059 (no new decision); not registered
+in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
+
+- `PersonCorrectionHandler`: the household head names an ACTIVE member of
+  their Family by `member_ref` (FP-ADR-063; the head included) and proposes
+  full name, birth date, gender, marital status — the rules of the Staff
+  edit (`UpdatePersonRequest`). Any other key is refused (National ID,
+  mobiles, life status, ids). Only changed fields are stored; unchanged is
+  refused. Gender keeps the health rule (`HealthRecordRules`) at
+  submission, approval and APPLY. Base: the membership's active state and
+  the four fields (any change → BASE_CHANGED). One open request per member.
+  APPLY: `UpdatePersonAction` (PERSON_UPDATED activity). No reviewer
+  attestations (none approved for this type).
+- Presentation (same for Staff and family): «الفرد المعني», then one row per
+  proposed field (current vs proposed).
+- Family form `/family/requests/new/person-correction` (member picker,
+  current values, prefilled fields); offered only when type discovery lists
+  the type.
+- Tests: `tests/Feature/ChangeRequests/PersonCorrection/` (SQLite and
+  PostgreSQL concurrency), `frontend/tests/family-person-correction.test.tsx`.
+- Activation: add `'PERSON_CORRECTION' => PersonCorrectionHandler::class` to
+  `PRODUCTION` in a reviewed release (docs/12).
+
 ## ADD_FAMILY_MEMBER implementation record
 
 Implemented 2026-10-09 (FP-ADR-076). Not registered in Production; no
@@ -4795,3 +4820,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.37 | 2026-10-08 | Approved | PWA-6.1b: FP-ADR-075 controlled pilot submission gate — modes OFF / PILOT / GENERAL, server-only Family allowlist, FamilySubmissionPolicy enforced in SubmitChangeRequestAction, per-Family type discovery, legacy boolean never opens; implementation record in §30a |
 | 1.38 | 2026-10-09 | Approved | FP-ADR-076 ADD_FAMILY_MEMBER: required nine-digit National ID, no enumeration, new vs existing Person at approval / APPLY, AttachFamilyMemberAction, reviewer attestations with a typed-ID comparison, approve throttle; built but not a Production type; implementation record in §30a |
 | 1.39 | 2026-10-10 | Approved | FP-ADR-076 amended after review: existing-Person eligibility (ALIVE, active, no active membership), Staff-only status in the match summary, lock order Family → National ID → Person for every National ID writer, evidence-only approval throttle, per-key attestation codes |
+| 1.40 | 2026-10-11 | Approved | PERSON_CORRECTION built (full name, birth date, gender, marital status through UpdatePersonAction); not registered in Production; implementation record in §30a |
