@@ -119,7 +119,7 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
   PDF, mPDF, 30 mm wide).
 - Copyright footer: `SiteFooter` (`components/shared/site-footer.tsx`) —
   «© 2026 فامبوك. جميع الحقوق محفوظة.» and «تطوير المركز الفلسطيني للبيانات
-  والتنمية – PCDCD» linked to https://www.facebook.com/pcdcd.gaza (new
+  والتنمية المجتمعية – PCDCD» linked to https://www.facebook.com/pcdcd.gaza (new
   tab, `rel="noopener noreferrer"`); small text, existing tokens. On the
   Family authentication pages, the Family Portal, the Staff login, the
   Staff application and the public verification page.

@@ -23,7 +23,7 @@ export function SiteFooter({ className }: { className?: string }) {
           rel="noopener noreferrer"
           className="font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
         >
-          المركز الفلسطيني للبيانات والتنمية – PCDCD
+          المركز الفلسطيني للبيانات والتنمية المجتمعية – PCDCD
         </a>
       </p>
     </footer>

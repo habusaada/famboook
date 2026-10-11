@@ -95,7 +95,7 @@ describe("the copyright footer", () => {
     render(<SiteFooter />);
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent("© 2026 فامبوك. جميع الحقوق محفوظة.");
-    const link = within(footer).getByRole("link", { name: "المركز الفلسطيني للبيانات والتنمية – PCDCD" });
+    const link = within(footer).getByRole("link", { name: "المركز الفلسطيني للبيانات والتنمية المجتمعية – PCDCD" });
     expect(link).toHaveAttribute("href", DEVELOPER_URL);
     expect(link).toHaveAttribute("href", "https://www.facebook.com/pcdcd.gaza");
     expect(link).toHaveAttribute("target", "_blank");
