@@ -38,8 +38,8 @@ use Tests\TestCase;
 
 /**
  * DEATH_REPORT end to end through the Family and Staff APIs, with the real
- * handler registered through the test-only registry — it is NOT in
- * ChangeRequestTypes::PRODUCTION. Synthetic data only.
+ * handler registered through the test-only registry (it is also in
+ * ChangeRequestTypes::PRODUCTION). Synthetic data only.
  */
 class DeathReportTest extends TestCase
 {
@@ -405,9 +405,9 @@ class DeathReportTest extends TestCase
         $this->assertSame(LifeStatus::ALIVE, $this->member->fresh()->life_status);
     }
 
-    public function test_it_is_not_a_production_type(): void
+    public function test_it_is_a_production_type(): void
     {
-        $this->assertArrayNotHasKey('DEATH_REPORT', ChangeRequestTypes::PRODUCTION);
-        $this->assertFalse(ChangeRequestTypes::production()->has(ChangeRequestType::DEATH_REPORT));
+        $this->assertSame(DeathReportHandler::class, ChangeRequestTypes::PRODUCTION['DEATH_REPORT'] ?? null);
+        $this->assertTrue(ChangeRequestTypes::production()->has(ChangeRequestType::DEATH_REPORT));
     }
 }

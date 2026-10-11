@@ -5,6 +5,7 @@ namespace App\Support\ChangeRequests;
 use App\Enums\ChangeRequestType;
 use App\Exceptions\ChangeRequestException;
 use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
+use App\Support\ChangeRequests\Handlers\DeathReportHandler;
 use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use InvalidArgumentException;
@@ -33,6 +34,7 @@ final class ChangeRequestTypes
         'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
         'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
         'PERSON_CORRECTION' => PersonCorrectionHandler::class,
+        'DEATH_REPORT' => DeathReportHandler::class,
     ];
 
     /** @param array<string, ChangeRequestHandler> $handlers keyed by type value */

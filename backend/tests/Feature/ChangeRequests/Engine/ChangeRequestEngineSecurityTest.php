@@ -20,6 +20,7 @@ use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
+use App\Support\ChangeRequests\Handlers\DeathReportHandler;
 use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use App\Support\FamilyActivityVisibility;
@@ -49,9 +50,10 @@ class ChangeRequestEngineSecurityTest extends TestCase
             'RESIDENCE_UPDATE' => ResidenceUpdateHandler::class,
             'ADD_FAMILY_MEMBER' => AddFamilyMemberHandler::class,
             'PERSON_CORRECTION' => PersonCorrectionHandler::class,
+            'DEATH_REPORT' => DeathReportHandler::class,
         ], ChangeRequestTypes::PRODUCTION);
         $registry = app(ChangeRequestTypes::class);
-        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER, ChangeRequestType::PERSON_CORRECTION];
+        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER, ChangeRequestType::PERSON_CORRECTION, ChangeRequestType::DEATH_REPORT];
         $this->assertSame($production, $registry->registered());
         $this->assertSame($production, $registry->familySubmittable());
         foreach (ChangeRequestType::cases() as $type) {
