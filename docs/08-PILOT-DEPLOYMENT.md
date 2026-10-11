@@ -606,16 +606,20 @@ Family Portal activation may be enabled in Production.
   to `false` and `config:cache` — the route answers 503; no data change.
   This is the FAMILY password change only; Staff still have no
   self-service password change (§18).
-- **Mobile contact update (CONTACT_UPDATE, docs/11 FP-ADR-079).** Built,
-  NOT a Production type, and OFF by default and in the Production
-  template: `FAMILY_CONTACT_UPDATE_ENABLED=false`. It SENDS SMS — to
-  numbers not yet in the registry — so it must stay closed until SMS
-  delivery is Production-ready (the same prerequisites as activation and
-  reset). Opening it needs two explicit steps: register the type in
-  `ChangeRequestTypes::PRODUCTION` (a reviewed release), then set
-  `FAMILY_CONTACT_UPDATE_ENABLED=true` and `config:cache`. It deploys one
-  migration (OTP purposes, challenge columns, the SELF_OTP_TRANSFER trust
-  method, CONTACT_UPDATE-only actor CHECKs). The scheduler must run
+- **Mobile contact update (CONTACT_UPDATE, docs/11 FP-ADR-079).** **LIVE —
+  Production enabled.** Activation commit `01fa663` (registered in
+  `ChangeRequestTypes::PRODUCTION`); verified on Production 2026-10-11:
+  `FAMILY_CONTACT_UPDATE_ENABLED=true` in the Production `.env`, Family
+  Auth readiness with no warnings, TweetsMS configured and OTP delivery
+  tested, a contact update completed through the Family Portal. The code
+  default and the env templates stay `FAMILY_CONTACT_UPDATE_ENABLED=false`:
+  a new environment opens it only by an explicit `.env` change and
+  `config:cache`. It SENDS SMS — to numbers not yet in the registry — so it
+  depends on SMS delivery (the same prerequisites as activation and
+  reset). The number is verified by OTP and applied immediately by the
+  system — no Staff approval; Staff keep a read-only request history. It
+  deployed one migration (OTP purposes, challenge columns, the
+  SELF_OTP_TRANSFER trust method, CONTACT_UPDATE-only actor CHECKs). The scheduler must run
   `famboook:close-expired-contact-updates` (every five minutes). Limits:
   `FAMILY_CONTACT_UPDATE_LIMIT_*` (starts 3 / hour, 6 / day per user,
   10 / day per Family; verify 10 / min; resend 4 / min) plus the OTP

@@ -753,7 +753,7 @@ Actions.
 
 | Request | Approved type | Apply target today |
 |---|---|---|
-| Contact update | CONTACT_UPDATE | **Built, not in Production (FP-ADR-079):** primary mobile only, OTP to the proposed number (and, for the head's own trusted number, the current password and an OTP to the old number), approved and applied by the SYSTEM through `UpdatePersonAction`; gate off by default |
+| Contact update | CONTACT_UPDATE | **LIVE — Production enabled (FP-ADR-079; activation commit `01fa663`, verified 2026-10-11):** primary mobile only, OTP to the proposed number (and, for the head's own trusted number, the current password and an OTP to the old number), approved and applied by the SYSTEM through `UpdatePersonAction` immediately after verification, no Staff approval (Staff history read-only); gate `FAMILY_CONTACT_UPDATE_ENABLED` — default false, `true` on Production |
 | Residence / displacement update | RESIDENCE_UPDATE | **Built (PWA-6.1):** in-place correction through `UpdateFamilyResidenceAction` (§30a); a move with history still needs `residence.change` (FU-02) |
 | Person correction | PERSON_CORRECTION | **Built, not in Production:** full name, birth date, gender, marital status through `UpdatePersonAction` (§30a). National ID stays on `CorrectNationalIdAction`; CONFIRM_ALIVE (`ConfirmPersonAliveAction`) not built |
 | Add missing family member | ADD_FAMILY_MEMBER | **Built, not in Production (FP-ADR-076):** `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person without an active membership) |
@@ -781,7 +781,8 @@ The first Change Request types, in order:
 
 Deferred: head death and head succession (FU-01), household-head change,
 member transfer, marital events (PFP-012), CONTACT_UPDATE (mobile
-re-verification — since built as FP-ADR-079, not yet a Production type),
+re-verification — since built as FP-ADR-079 and live in Production since
+2026-10-11),
 health submissions and need submissions (PFP-008).
 
 RESIDENCE_UPDATE in V1 is a correction of the current residence. A real
@@ -3649,9 +3650,13 @@ in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
 
 ## CONTACT_UPDATE implementation record
 
-Implemented 2026-10-11 (FP-ADR-079). Not registered in
-`ChangeRequestTypes::PRODUCTION`; gate `FAMILY_CONTACT_UPDATE_ENABLED` off
-by default. One migration; no role or permission.
+Implemented 2026-10-11 (FP-ADR-079). **LIVE — Production enabled:**
+registered in `ChangeRequestTypes::PRODUCTION` by activation commit
+`01fa663`; gate `FAMILY_CONTACT_UPDATE_ENABLED` default false in code and
+env templates, `true` on Production; verified on Production 2026-10-11
+(Family Auth readiness without warnings, TweetsMS OTP delivery, a contact
+update completed through the Family Portal). One migration; no role or
+permission.
 
 - Backend: `ContactUpdateHandler`; `StartContactUpdateAction`,
   `CompleteContactUpdateAction`, `ResendContactUpdateCodeAction`,
@@ -3676,9 +3681,10 @@ by default. One migration; no role or permission.
   SELF_OTP_TRANSFER.
 - Tests: `tests/Feature/ChangeRequests/ContactUpdate/` (SQLite and
   PostgreSQL concurrency), `frontend/tests/family-contact-update.test.tsx`.
-- Activation: register `'CONTACT_UPDATE' => ContactUpdateHandler::class` in
-  `PRODUCTION` and set `FAMILY_CONTACT_UPDATE_ENABLED=true` once SMS
-  delivery is Production-ready (docs/12).
+- Activation (done): `'CONTACT_UPDATE' => ContactUpdateHandler::class` in
+  `PRODUCTION` (commit `01fa663`) and `FAMILY_CONTACT_UPDATE_ENABLED=true`
+  in the Production `.env`, with SMS delivery Production-ready. Rollback:
+  set the flag to `false` and `config:cache` (docs/08 §16b).
 
 ## Authenticated password change implementation record
 
@@ -4193,7 +4199,8 @@ residence correction), BIRTH_REPORT, ADD_FAMILY_MEMBER, PERSON_CORRECTION
 (including CONFIRM_ALIVE, applied through ConfirmPersonAliveAction —
 FP-ADR-060), DEATH_REPORT for a non-head member. Deferred:
 head death / succession, head change, transfer, marital events,
-CONTACT_UPDATE, health and need submissions. A residence move with history
+CONTACT_UPDATE (since built and live: FP-ADR-079), health and need
+submissions. A residence move with history
 needs a future residence.change action.
 
 FP-ADR-060
@@ -4757,7 +4764,8 @@ Authenticated Family password change (approved 2026-10-11; closes FU-16).
 
 FP-ADR-079
 Mobile CONTACT_UPDATE — OTP-verified, applied by the system (approved
-2026-10-11; built, NOT a Production type; gate off by default).
+2026-10-11; LIVE — Production enabled by commit `01fa663`, verified on
+Production 2026-10-11; gate default off, `true` on Production).
 - POLICY EXCEPTION (approved): CONTACT_UPDATE of the PRIMARY mobile needs
   no Staff review. It amends docs/03 §88 ("controlled review" for contact
   updates) and the Family Auth rule that a change of the authentication
@@ -5059,3 +5067,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.41 | 2026-10-11 | Approved | FP-ADR-077 DEATH_REPORT: reviewer's verification method at approval (APPROVED metadata `verification_method`, read at APPLY), V1 without document upload, explicit unknown death date stored as NULL, V1 provenance through the CHANGE_REQUEST_APPLIED record (no request field on the death record); built (non-head member, RecordPersonDeathAction), not registered in Production; implementation record in §30a |
 | 1.42 | 2026-10-11 | Approved | FP-ADR-078 Authenticated Family password change (closes FU-16): current password, Family password policy, unchanged refused, all sessions ended and the browser signed in afresh, PASSWORD_CHANGED events, 5 / 15 min per user, gate `password_change_enabled` off by default; FP-ADR-067 amended (entry shown only while open); implementation record in §30a |
 | 1.43 | 2026-10-11 | Approved | FP-ADR-079 mobile CONTACT_UPDATE: approved policy exception (no Staff review), OTP to the proposed number, head R2 (current password + old and new number codes, trust transferred as SELF_OTP_TRANSFER) / R1 (no trust), SUBMITTED → APPROVED / APPLIED by SYSTEM, system close, Staff read-only, limits and gate (off by default); built, not registered in Production; implementation record in §30a |
+| 1.44 | 2026-10-11 | Approved | CONTACT_UPDATE V1 LIVE in Production: registered in `ChangeRequestTypes::PRODUCTION` (activation commit `01fa663`), `FAMILY_CONTACT_UPDATE_ENABLED=true` on Production (default false in code and env templates), verified on Production 2026-10-11 (Family Auth readiness without warnings, TweetsMS OTP delivery, a contact update through the Family Portal); status statements updated in §14, §30a and FP-ADR-079 |
