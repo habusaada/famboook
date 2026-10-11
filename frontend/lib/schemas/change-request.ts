@@ -56,3 +56,16 @@ export const attestedApproveSchema = z.object({
   verifiedNationalId: z.string().refine((v) => v.trim().length > 0, "أدخل رقم الهوية كما في الوثيقة.").refine((v) => v.length <= 32, "الرقم طويل جدًا."),
 });
 export type AttestedApproveValues = z.infer<typeof attestedApproveSchema>;
+
+// FP-ADR-077: approving a death report needs the reviewer's verification
+// method (verified outside the system; no document upload in V1).
+export const LIFE_STATUS_VERIFICATION_METHODS = ["IN_PERSON", "STAFF_CALLBACK", "AUTHORIZED_RECORD_REVIEW"] as const;
+export const verifiedApproveSchema = z.object({
+  // An unchecked radio group is null (or ""): both read as "not chosen".
+  verificationMethod: z
+    .string()
+    .nullable()
+    .refine((v): v is (typeof LIFE_STATUS_VERIFICATION_METHODS)[number] => (LIFE_STATUS_VERIFICATION_METHODS as readonly (string | null)[]).includes(v), "اختر طريقة التحقق."),
+});
+export type VerifiedApproveInput = z.input<typeof verifiedApproveSchema>;
+export type VerifiedApproveValues = z.output<typeof verifiedApproveSchema>;

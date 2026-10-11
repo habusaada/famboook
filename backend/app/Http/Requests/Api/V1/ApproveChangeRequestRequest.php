@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\ChangeRequestAttestation;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Support\ChangeRequests\ChangeRequestApprovalEvidence;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,9 +14,10 @@ use Illuminate\Validation\Rule;
  * attestation codes and, for identity, the National ID typed from the
  * person's document — compared once with the proposal by the handler, never
  * stored, logged or returned (it is excluded from the validation flash and
- * never echoed in an error). Authorization: the route's
- * change-request.approve; whether evidence is required is decided by
- * ApproveChangeRequestAction, not here.
+ * never echoed in an error). A type that requires a life-status verification
+ * method (FP-ADR-077) sends `verification_method`, a controlled code.
+ * Authorization: the route's change-request.approve; whether evidence is
+ * required is decided by ApproveChangeRequestAction, not here.
  */
 class ApproveChangeRequestRequest extends FormRequest
 {
@@ -34,6 +36,7 @@ class ApproveChangeRequestRequest extends FormRequest
             'attestations' => ['sometimes', 'array', 'max:'.count(ChangeRequestAttestation::cases())],
             'attestations.*' => ['distinct', Rule::enum(ChangeRequestAttestation::class)],
             'verified_national_id' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'verification_method' => ['sometimes', 'nullable', Rule::enum(LifeStatusVerificationMethod::class)],
         ];
     }
 
@@ -45,6 +48,7 @@ class ApproveChangeRequestRequest extends FormRequest
             'attestations.*.enum' => 'إقرار غير معروف.',
             'attestations.*.distinct' => 'إقرار مكرر.',
             'verified_national_id.max' => 'رقم الهوية المدخل طويل جدًا.',
+            'verification_method.enum' => 'طريقة التحقق غير معروفة.',
         ];
     }
 
@@ -53,6 +57,7 @@ class ApproveChangeRequestRequest extends FormRequest
         return new ChangeRequestApprovalEvidence(
             array_map(fn (string $code) => ChangeRequestAttestation::from($code), $this->validated('attestations') ?? []),
             $this->validated('verified_national_id'),
+            LifeStatusVerificationMethod::tryFrom((string) $this->validated('verification_method')),
         );
     }
 }

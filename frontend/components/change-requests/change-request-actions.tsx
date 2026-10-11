@@ -30,6 +30,10 @@ import {
   WORKFLOW_TEXT_MAX,
   attestedApproveSchema,
   type AttestedApproveValues,
+  LIFE_STATUS_VERIFICATION_METHODS,
+  verifiedApproveSchema,
+  type VerifiedApproveInput,
+  type VerifiedApproveValues,
   rejectChangeRequestSchema,
   returnChangeRequestSchema,
   type RejectChangeRequestValues,
@@ -41,6 +45,8 @@ import {
   changeRequestActionPermissions,
   rejectionReasonLabels,
 } from "@/lib/utils/change-request";
+import { lifeStatusVerificationLabels } from "@/lib/utils/life-status";
+import type { LifeStatusVerificationMethod } from "@/lib/types/api/person";
 
 type Mutation = ReturnType<typeof useChangeRequestAction>;
 
@@ -285,6 +291,75 @@ function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: M
             إلغاء
           </Button>
           <Button type="submit" form="attested-approve-form" disabled={mutation.isPending} data-confirm="approve">
+            {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
+            {changeRequestActionLabel("approve")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ------------------------------------------------------------------ verified approval (FP-ADR-077)
+
+/**
+ * Approval for a type that requires the reviewer's life-status verification
+ * method (DEATH_REPORT): the reviewer verified the reported death outside the
+ * system (no upload in V1) and records how. The code goes into the APPROVED
+ * event and is used when the request is applied. The server decides.
+ */
+function VerifiedApproveDialog({ mutation, onDone }: { mutation: Mutation; onDone: (n: ActionNotice) => void }) {
+  const [open, setOpen] = useState(false);
+  const blank: VerifiedApproveInput = { verificationMethod: "" };
+  const form = useForm<VerifiedApproveInput, unknown, VerifiedApproveValues>({ resolver: zodResolver(verifiedApproveSchema), defaultValues: blank });
+  const { error, setError, send } = useActionSend<VerifiedApproveInput>(mutation, onDone, { verification_method: "verificationMethod" }, form.setError);
+  const errors = form.formState.errors;
+
+  function close(next: boolean) {
+    if (mutation.isPending) return;
+    setOpen(next);
+    form.reset(blank);
+    if (next) setError(null);
+  }
+
+  const submit = (values: VerifiedApproveValues) =>
+    send({ action: "approve", body: { verification_method: values.verificationMethod as LifeStatusVerificationMethod } }, () => close(false));
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" data-action="approve">
+          <ClipboardCheck className="size-4" />
+          {changeRequestActionLabel("approve")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>اعتماد الطلب</DialogTitle>
+          <DialogDescription>
+            تحقق من الوفاة خارج النظام، ثم اختر طريقة التحقق الفعلية. الاعتماد لا يغيّر بيانات السجل مباشرة؛ تُسجَّل الوفاة عند تطبيق الطلب.
+          </DialogDescription>
+        </DialogHeader>
+        <form id="verified-approve-form" onSubmit={(event) => void form.handleSubmit(submit)(event)} className="flex flex-col gap-3" noValidate data-verified-approve>
+          <fieldset className="flex flex-col gap-2" aria-describedby="verified-approve-method-error">
+            <legend className="mb-1 text-sm font-medium">طريقة التحقق</legend>
+            {LIFE_STATUS_VERIFICATION_METHODS.map((method) => (
+              <label key={method} className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg border px-3 text-sm has-[:checked]:border-primary">
+                <input type="radio" value={method} className="size-4 accent-[var(--primary)]" {...form.register("verificationMethod")} />
+                {lifeStatusVerificationLabels[method]}
+              </label>
+            ))}
+            <div id="verified-approve-method-error">
+              <FieldError message={errors.verificationMethod?.message} />
+            </div>
+          </fieldset>
+        </form>
+        <ActionError message={error} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => close(false)} disabled={mutation.isPending}>
+            إلغاء
+          </Button>
+          <Button type="submit" form="verified-approve-form" disabled={mutation.isPending} data-confirm="approve">
             {mutation.isPending && <Loader2 className="size-4 animate-spin" />}
             {changeRequestActionLabel("approve")}
           </Button>
@@ -575,7 +650,8 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
         {actions.includes("approve") && (request.approval_attestations ?? []).length > 0 && (
           <AttestedApproveDialog mutation={mutation} onDone={onNotice} attestations={request.approval_attestations} />
         )}
-        {actions.includes("approve") && (request.approval_attestations ?? []).length === 0 && (
+        {actions.includes("approve") && request.approval_requires_verification_method && <VerifiedApproveDialog mutation={mutation} onDone={onNotice} />}
+        {actions.includes("approve") && (request.approval_attestations ?? []).length === 0 && !request.approval_requires_verification_method && (
           <ConfirmActionDialog
             action="approve"
             mutation={mutation}
@@ -593,7 +669,10 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
             onDone={onNotice}
             icon={CheckCircle2}
             title={retry ? "إعادة محاولة تطبيق التعديل" : "تطبيق التعديل على سجل الأسرة"}
-            description="عند النجاح يُحدَّث سجل الأسرة الرسمي بالبيانات المعتمدة. يتحقق النظام أولًا من أن البيانات المسجلة لم تتغير منذ تقديم الطلب."
+            description={
+              "عند النجاح يُحدَّث سجل الأسرة الرسمي بالبيانات المعتمدة. يتحقق النظام أولًا من أن البيانات المسجلة لم تتغير منذ تقديم الطلب." +
+              (request.approval_verification_method ? ` طريقة التحقق المعتمدة: ${lifeStatusVerificationLabels[request.approval_verification_method]}.` : "")
+            }
             warning="هذا الإجراء يغيّر بيانات السجل الرسمية ولا يُعاد تلقائيًا عند الفشل."
             confirmLabel={changeRequestActionLabel("apply", retry)}
           />

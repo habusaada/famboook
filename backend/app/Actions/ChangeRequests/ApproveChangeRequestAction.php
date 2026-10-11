@@ -16,6 +16,7 @@ use App\Support\ChangeRequests\ChangeRequestTransitions;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\ChangeRequestWorkflow;
 use App\Support\ChangeRequests\RequiresApprovalAttestation;
+use App\Support\ChangeRequests\RequiresApprovalVerificationMethod;
 use App\Support\ChangeRequests\WorkflowEventRecorder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -54,7 +55,7 @@ class ApproveChangeRequestAction
             $target = ChangeRequestWorkflow::lockCanonical($locked);
             ChangeRequestWorkflow::verify($handler, $locked, $target);
             ChangeRequestWorkflow::assertBaseUnchanged($handler, $locked, $target);
-            $attested = self::attestations($handler, $locked, $target, $evidence);
+            $attested = self::verificationMethod($handler, $evidence) + self::attestations($handler, $locked, $target, $evidence);
 
             $locked->forceFill(['status' => ChangeRequestStatus::APPROVED, 'approved_by' => $staff->getKey(), 'approved_at' => now()])->save();
             WorkflowEventRecorder::record($locked, ChangeRequestStatus::UNDER_REVIEW, WorkflowEventType::APPROVED, WorkflowActorSide::STAFF, $staff->getKey(),
@@ -62,6 +63,29 @@ class ApproveChangeRequestAction
 
             return new ChangeRequestOutcome($locked);
         });
+    }
+
+    /**
+     * FP-ADR-077: a type that requires a life-status verification method is
+     * approved only with one, recorded as its code in the APPROVED event (the
+     * handler's apply() reads it back). Any other type takes no method.
+     *
+     * @return array<string, string> the event metadata
+     */
+    private static function verificationMethod(ChangeRequestHandler $handler, ChangeRequestApprovalEvidence $evidence): array
+    {
+        if (! $handler instanceof RequiresApprovalVerificationMethod) {
+            if ($evidence->verificationMethod !== null) {
+                throw ValidationException::withMessages(['verification_method' => 'لا يتطلب هذا النوع من الطلبات طريقة تحقق عند الاعتماد.']);
+            }
+
+            return [];
+        }
+        if ($evidence->verificationMethod === null) {
+            throw ValidationException::withMessages(['verification_method' => 'اختر طريقة التحقق قبل اعتماد الطلب.']);
+        }
+
+        return ['verification_method' => $evidence->verificationMethod->value];
     }
 
     /**

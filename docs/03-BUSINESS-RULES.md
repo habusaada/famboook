@@ -700,8 +700,10 @@ RecordPersonDeathAction
 Canonical Registry
 ```
 
-Direction recorded with FU-10 (2026-10-05); DEATH_REPORT itself is not
-implemented yet (PWA-6, docs/11 FP-ADR-059):
+Direction recorded with FU-10 (2026-10-05); DEATH_REPORT is built but not
+registered in Production (2026-10-11, docs/11 FP-ADR-059, FP-ADR-077 — the
+verification method is chosen by the approving reviewer; no document upload
+in V1; an unknown date is stored as NULL):
 
 - V1 targets an active member who is **not** the household head; head
   death and succession stay with FU-01.

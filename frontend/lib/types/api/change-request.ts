@@ -4,6 +4,8 @@
 // ChangeRequestOutcomeResource.php. Machine codes only; Arabic wording
 // lives in lib/utils/change-request.ts.
 
+import type { LifeStatusVerificationMethod } from "@/lib/types/api/person";
+
 // backend/app/Enums/ChangeRequestStatus.php (DRAFT is unused in V1).
 export type ChangeRequestStatus =
   | "DRAFT"
@@ -151,6 +153,12 @@ export interface ChangeRequestDetail {
    * for types without attestations. Codes only.
    */
   approval_attestations: ChangeRequestAttestation[];
+  /**
+   * FP-ADR-077: approving this type requires the reviewer's life-status
+   * verification method; once approved, the recorded method (a code).
+   */
+  approval_requires_verification_method: boolean;
+  approval_verification_method: LifeStatusVerificationMethod | null;
 }
 
 /** A reviewer attestation required to approve some types (FP-ADR-076). */

@@ -126,6 +126,8 @@ function detail(overrides: Partial<ChangeRequestDetail> = {}): ChangeRequestDeta
     ],
     available_actions: ["return", "approve", "reject"],
     approval_attestations: [],
+    approval_requires_verification_method: false,
+    approval_verification_method: null,
     ...overrides,
   };
 }
@@ -597,6 +599,58 @@ describe("workflow actions", () => {
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "تطبيق التعديل" }));
     expect(await screen.findByText("لم يتغير شيء: سبق تنفيذ هذا الإجراء على الطلب.")).toBeInTheDocument();
     expect(browserStorageDump()).not.toMatch(/CRQ|محافظة|انتقلنا/);
+  });
+});
+
+// ------------------------------------------------------------------ verified approval (FP-ADR-077)
+
+describe("approval with the reviewer's verification method (DEATH_REPORT)", () => {
+  const DEATH = detail({
+    type: "DEATH_REPORT",
+    presentation: {
+      rows: [
+        { label: "الفرد المعني", current: "جدّة الاختبار", proposed: "جدّة الاختبار" },
+        { label: "الحالة الحياتية", current: "على قيد الحياة", proposed: "متوفى/ة" },
+        { label: "تاريخ الوفاة", current: null, proposed: "غير معروف" },
+      ],
+    },
+    approval_requires_verification_method: true,
+  });
+
+  async function openApprove() {
+    await userEvent.click(await screen.findByRole("button", { name: "اعتماد الطلب" }));
+    return screen.findByRole("dialog");
+  }
+
+  it("shows the member and the reported death, and requires a method before sending", async () => {
+    const { post } = renderDetail(DEATH, ALL, () => outcome("APPROVED"));
+    expect((await screen.findAllByText("غير معروف")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("متوفى/ة").length).toBeGreaterThan(0);
+    const dialog = await openApprove();
+
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(3);
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+    expect(await within(dialog).findByText("اختر طريقة التحقق.")).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("sends only the chosen method code", async () => {
+    const { post } = renderDetail(DEATH, ALL, (path, body, server) => {
+      expect(path).toBe(`${DETAIL_PATH}/approve`);
+      expect(body).toEqual({ verification_method: "STAFF_CALLBACK" });
+      server.state = { ...DEATH, status: "APPROVED", available_actions: ["apply"], approval_verification_method: "STAFF_CALLBACK" };
+      return outcome("APPROVED");
+    });
+    const dialog = await openApprove();
+    await userEvent.click(within(dialog).getByRole("radio", { name: "اتصال هاتفي" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "اعتماد الطلب" }));
+
+    expect(await screen.findByText(/اعتُمد الطلب\. لم تتغير بيانات السجل بعد/)).toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(await screen.findByRole("button", { name: "تطبيق التعديل" }));
+    expect(await screen.findByText(/طريقة التحقق المعتمدة: اتصال هاتفي/)).toBeInTheDocument();
   });
 });
 

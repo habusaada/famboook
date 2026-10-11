@@ -6,6 +6,7 @@ use App\Enums\ChangeRequestApplyFailure;
 use App\Enums\ChangeRequestAttestation;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
+use App\Enums\LifeStatusVerificationMethod;
 use App\Enums\WorkflowActorSide;
 use App\Enums\WorkflowEventType;
 use App\Models\ChangeRequest;
@@ -30,7 +31,8 @@ use LogicException;
  *   resubmit it, optional on a rejection, refused elsewhere; internal_note
  *   (Staff-only) only on Staff events. Plain text, at most 2000 characters;
  * - metadata keys are allow-listed per event, each value a controlled code.
- *   Only APPROVED has keys (attestation codes, FP-ADR-076). The request
+ *   Only APPROVED has keys (attestation codes, FP-ADR-076; the reviewer's
+ *   life-status verification method, FP-ADR-077). The request
  *   payload and any registry value are never copied into an event.
  *
  * Nothing is logged; exception messages carry codes and key names only.
@@ -49,7 +51,9 @@ final class WorkflowEventRecorder
      * Allowed metadata per event type: key => either the enum its value must
      * be a case of, or the ONE enum case its value must be. Any other key is
      * refused. APPROVED carries the reviewer's attestation codes for types
-     * that require them (FP-ADR-076): each key accepts only its own code.
+     * that require them (FP-ADR-076): each key accepts only its own code;
+     * and the life-status verification method for types that require one
+     * (FP-ADR-077): any LifeStatusVerificationMethod code.
      *
      * @var array<string, array<string, class-string<\BackedEnum>|\BackedEnum>>
      */
@@ -57,6 +61,7 @@ final class WorkflowEventRecorder
         'APPROVED' => [
             'identity' => ChangeRequestAttestation::IDENTITY_VERIFIED,
             'relationship' => ChangeRequestAttestation::RELATIONSHIP_VERIFIED,
+            'verification_method' => LifeStatusVerificationMethod::class,
         ],
     ];
 

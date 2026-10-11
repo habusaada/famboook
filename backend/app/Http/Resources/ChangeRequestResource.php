@@ -8,6 +8,7 @@ use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestStaffActions;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\ChangeRequests\RequiresApprovalAttestation;
+use App\Support\ChangeRequests\RequiresApprovalVerificationMethod;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -41,6 +42,7 @@ class ChangeRequestResource extends JsonResource
         $typeAvailable = $types->has($this->type);
         $events = $this->workflowEvents;
         $lastFailure = $events->last(fn ($event) => $event->event_type === WorkflowEventType::APPLY_FAILED);
+        $approval = $events->last(fn ($event) => $event->event_type === WorkflowEventType::APPROVED);
 
         return [
             'id' => $this->uuid,
@@ -89,6 +91,11 @@ class ChangeRequestResource extends JsonResource
             'approval_attestations' => $typeAvailable && ($handler = $types->handler($this->type)) instanceof RequiresApprovalAttestation
                 ? array_map(fn (ChangeRequestAttestation $a) => $a->value, $handler->requiredAttestations())
                 : [],
+            // FP-ADR-077: approving this type requires the reviewer's
+            // life-status verification method; once approved, the recorded
+            // method (a code) for the reviewer who applies.
+            'approval_requires_verification_method' => $typeAvailable && $types->handler($this->type) instanceof RequiresApprovalVerificationMethod,
+            'approval_verification_method' => $approval?->metadata['verification_method'] ?? null,
             // UX hint only; every action is re-authorized and re-checked.
             'available_actions' => ChangeRequestStaffActions::for($this->resource, $request->user(), $typeAvailable, $lastFailure?->reason_code),
         ];

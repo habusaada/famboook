@@ -758,7 +758,7 @@ Actions.
 | Person correction | PERSON_CORRECTION | **Built, not in Production:** full name, birth date, gender, marital status through `UpdatePersonAction` (§30a). National ID stays on `CorrectNationalIdAction`; CONFIRM_ALIVE (`ConfirmPersonAliveAction`) not built |
 | Add missing family member | ADD_FAMILY_MEMBER | **Built, not in Production (FP-ADR-076):** `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person without an active membership) |
 | Birth report | BIRTH_REPORT | `AddFamilyMemberAction` exists |
-| Death report | DEATH_REPORT | `RecordPersonDeathAction` exists, with a Staff route and action (FU-10, FP-ADR-061); head succession is not handled |
+| Death report | DEATH_REPORT | **Built, not in Production (FP-ADR-077):** a non-head member's death, applied through `RecordPersonDeathAction` with the reviewer's verification method (§30a); head succession is not handled |
 
 ## First-release direction (approved 2026-10-04, FP-ADR-059)
 
@@ -3646,6 +3646,39 @@ in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
 - Activation: add `'PERSON_CORRECTION' => PersonCorrectionHandler::class` to
   `PRODUCTION` in a reviewed release (docs/12).
 
+## DEATH_REPORT implementation record
+
+Implemented 2026-10-11 (FP-ADR-059, FP-ADR-061, FP-ADR-077); not registered
+in `ChangeRequestTypes::PRODUCTION`. No migration, permission or role.
+
+- `DeathReportHandler`: the household head names an ACTIVE member of their
+  Family by `member_ref` (FP-ADR-063) — never the household head, never a
+  DECEASED Person (ALIVE or UNKNOWN, as `RecordPersonDeathAction`). Input:
+  `death_date` and `death_date_unknown` (exactly one of a date or
+  "unknown"); any other key is refused. Proposal: `death_date` only (NULL
+  when unknown). DeathDate rules (real date, not future, not before birth)
+  at submission, approval and APPLY. Base: the membership's active and head
+  state and the Person's life status, death date and birth date (any change
+  → BASE_CHANGED, or refused as a precondition). One open request per
+  member. APPLY: `RecordPersonDeathAction` with the approved verification
+  method (PERSON_DEATH_RECORDED; a current User-Person Link of the deceased
+  is ended by the action); memberships and the head flag are unchanged.
+- Approval: `RequiresApprovalVerificationMethod`; the Staff resource
+  exposes `approval_requires_verification_method` and, once approved,
+  `approval_verification_method` (code). The Staff approval dialog asks for
+  the method; the apply dialog shows it.
+- Presentation (same for Staff and family): «الفرد المعني», «تاريخ الميلاد»,
+  «الحالة الحياتية» (current → متوفى/ة), «تاريخ الوفاة» (reported date or
+  «غير معروف»).
+- Family form `/family/requests/new/death-report` (eligible members only,
+  date or «تاريخ الوفاة غير معروف»); offered only when type discovery lists
+  the type.
+- Tests: `tests/Feature/ChangeRequests/DeathReport/` (SQLite and PostgreSQL
+  concurrency), `frontend/tests/family-death-report.test.tsx`, Staff
+  approval in `frontend/tests/change-requests.test.tsx`.
+- Activation: add `'DEATH_REPORT' => DeathReportHandler::class` to
+  `PRODUCTION` in a reviewed release (docs/12).
+
 ## ADD_FAMILY_MEMBER implementation record
 
 Implemented 2026-10-09 (FP-ADR-076). Not registered in Production; no
@@ -4592,6 +4625,37 @@ ADD_FAMILY_MEMBER (approved 2026-10-09; built, NOT a Production type).
   the full value;
 - not in ChangeRequestTypes::PRODUCTION: tests register it through the
   test-only registry; activation is a separate explicit decision.
+
+FP-ADR-077
+DEATH_REPORT approval evidence (approved 2026-10-11; built, NOT a
+Production type).
+- the approving reviewer selects HOW the reported death was verified — a
+  LifeStatusVerificationMethod (IN_PERSON, STAFF_CALLBACK,
+  AUTHORIZED_RECORD_REVIEW), the same methods as the Staff death recording
+  (FP-ADR-061 D2). The family never supplies it;
+- it reuses the approval-evidence mechanism of FP-ADR-076: a handler
+  capability (RequiresApprovalVerificationMethod), an optional
+  `verification_method` on the approve body (ChangeRequestApprovalEvidence),
+  refused for any type without the capability and required for a type
+  with it; stored only as its code under the APPROVED event metadata key
+  `verification_method` (WorkflowEventRecorder allow-list). APPLY reads it
+  from the APPROVED event and passes it to RecordPersonDeathAction; a
+  missing code is an integrity fault (APPLY_FAILED), never a default;
+- V1 has NO document upload: Staff verify the evidence outside the system
+  and record the actual method. docs/05 §75 "Evidence / Verification" is
+  satisfied by that recorded method until the documents subsystem exists;
+- the family gives the date of death or explicitly selects «تاريخ الوفاة
+  غير معروف»; unknown is stored as NULL and applied as NULL — never an
+  invented date (docs/03 §29);
+- provenance (approved V1 decision, 2026-10-11): PERSON_DEATH_RECORDED
+  keeps `verification_method` as its only metadata — no additional
+  request-reference field on the death record. The request's
+  CHANGE_REQUEST_APPLIED activity, written in the same transaction, is the
+  request-to-application audit link (this satisfies docs/03 §31
+  "controlled provenance" for V1). Revisit only if a future requirement
+  demands it;
+- no permission, role or migration: approve and APPLY use the existing
+  change-request.approve / change-request.apply.
 ```
 
 ---
@@ -4821,3 +4885,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.38 | 2026-10-09 | Approved | FP-ADR-076 ADD_FAMILY_MEMBER: required nine-digit National ID, no enumeration, new vs existing Person at approval / APPLY, AttachFamilyMemberAction, reviewer attestations with a typed-ID comparison, approve throttle; built but not a Production type; implementation record in §30a |
 | 1.39 | 2026-10-10 | Approved | FP-ADR-076 amended after review: existing-Person eligibility (ALIVE, active, no active membership), Staff-only status in the match summary, lock order Family → National ID → Person for every National ID writer, evidence-only approval throttle, per-key attestation codes |
 | 1.40 | 2026-10-11 | Approved | PERSON_CORRECTION built (full name, birth date, gender, marital status through UpdatePersonAction); not registered in Production; implementation record in §30a |
+| 1.41 | 2026-10-11 | Approved | FP-ADR-077 DEATH_REPORT: reviewer's verification method at approval (APPROVED metadata `verification_method`, read at APPLY), V1 without document upload, explicit unknown death date stored as NULL, V1 provenance through the CHANGE_REQUEST_APPLIED record (no request field on the death record); built (non-head member, RecordPersonDeathAction), not registered in Production; implementation record in §30a |
