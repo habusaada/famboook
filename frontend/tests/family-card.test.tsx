@@ -89,6 +89,10 @@ describe("«بطاقة الأسرة الرقمية»", () => {
     expect(qr).toHaveAttribute("src", SVG);
     expect(screen.getByText("اعرض رمز QR عند طلب التحقق من بطاقة أسرتك.")).toBeInTheDocument();
     expect(screen.getByText(/وسيلة تحقق رقمية ضمن نظام Famboook، وليست وثيقة هوية رسمية/)).toBeInTheDocument();
+    // FB-BRAND-02: the official light logo stands alone on the card.
+    const brand = document.querySelector("[data-family-brand]");
+    expect(brand?.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
+    expect(brand).not.toHaveTextContent("بوابة الأسرة");
   });
 
   it("shows the card without a QR when the server cannot rebuild it", async () => {

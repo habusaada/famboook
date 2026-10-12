@@ -99,8 +99,8 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
     (432 × 144);
   - standalone icon: `frontend/public/brand/FamboookLogoColoredIcon.svg`
     (143.57 × 144.39);
-  - `FamboookLogoColored.svg` (the FB-BRAND-01 full logo) remains the source
-    of the PDF and Filament copies below.
+  - `FamboookLogoColored.svg` (the FB-BRAND-01 full logo) is superseded by
+    the light variant everywhere; the file is kept, unreferenced.
 - One component renders them: `BrandLogo` (`components/shared/brand-logo.tsx`,
   `variant` full / icon). Only the HEIGHT is set; the width follows. The full
   logo follows the EXISTING theme mechanism — the `.dark` class behind
@@ -108,10 +108,10 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
   dark file only under `.dark`. No theme is enabled by the brand; today the
   light file is always shown. Readable from about 28 px tall: Staff sidebar,
   mobile sheet and Family header `h-8`, public pages `h-12`.
-- The full logo stands alone on the Family authentication pages and in the
-  Family Portal header (one row: logo at the RTL start, logout at the end).
-  «بوابة الأسرة» stays only under the logo on the Family Card and the public
-  verification page; the Staff lockups keep «بوابة الطاقم». Role labels such
+- The full logo stands alone in the Family Portal everywhere — the
+  authentication pages, the header (one row: logo at the RTL start, logout
+  at the end), the Family Card and the public verification page: no
+  «بوابة الأسرة» under it. The Staff lockups keep «بوابة الطاقم». Role labels such
   as «رب الأسرة» belong to user-information areas («حسابي», «بياناتي
   الشخصية», member cards), never beside or under the logo.
 - **The logo's colours stay inside the assets.** They are never extracted
@@ -124,9 +124,11 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
   `background_color` `#F7F7FA`, inset so its silhouette survives the
   platform mask. The legacy `public/icons/*` and `public/brand/famboook-logo.svg`
   stay for one release (installed apps).
-- Copies elsewhere, byte for byte: `backend/public/brand/` (Filament logo
-  and favicon), `backend/resources/pdf/famboook-logo-full.svg` (Family Card
-  PDF, mPDF, 30 mm wide).
+- Copies elsewhere, byte for byte, of the final light logo and the icon:
+  `backend/public/brand/FamboookLogoColoredLight.svg` (Filament logo, Amber
+  theme unchanged), `backend/public/brand/FamboookLogoColoredIcon.svg`
+  (Filament favicon), `backend/resources/pdf/famboook-logo-light.svg`
+  (Family Card PDF, mPDF, 30 mm wide).
 - Copyright footer: `SiteFooter` (`components/shared/site-footer.tsx`) —
   «© 2026 فامبوك. جميع الحقوق محفوظة.» and «تطوير المركز الفلسطيني للبيانات
   والتنمية المجتمعية – PCDCD» linked to https://www.facebook.com/pcdcd.gaza (new
@@ -225,3 +227,4 @@ These become tokens in PWA-3; no raw hex in components (§4).
 | 1.1 | 2026-10-02 | §11a Family Portal visual direction (PWA-0); kingfisher / spring palette scoped to the Family Portal — the Staff teal scale of §3 is unchanged. Direction only, not implemented |
 | 1.2 | 2026-10-11 | §7a Brand assets (FB-BRAND-01): official full logo and icon, `BrandLogo`, generated favicon / PWA icons (`/icons/v2`), `SiteFooter`; the brand's colours stay inside the assets — no palette change |
 | 1.3 | 2026-10-12 | §7a FB-BRAND-02: light / dark full-logo variants through the existing `.dark` mechanism (no theme enabled); the logo alone on the Family auth pages and portal header; footer on public pages only |
+| 1.4 | 2026-10-12 | §7a FB-BRAND-02 final: the logo alone on the Family Card and public verification too; the Family Card PDF and Filament use the final light logo |

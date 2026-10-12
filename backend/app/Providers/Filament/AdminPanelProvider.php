@@ -40,9 +40,10 @@ class AdminPanelProvider extends PanelProvider
             ->domain(config('app.admin_domain'))
             ->login()
             ->brandName('Famboook — الإدارة')
-            // FB-BRAND-01: the official logo and icon (byte-for-byte copies in
-            // public/brand). The panel colours below are unchanged.
-            ->brandLogo(fn () => asset('brand/FamboookLogoColored.svg'))
+            // FB-BRAND-01 / 02: the final official light logo and the icon
+            // (byte-for-byte copies in public/brand). The panel colours below
+            // are unchanged; no dark mode is introduced.
+            ->brandLogo(fn () => asset('brand/FamboookLogoColoredLight.svg'))
             ->brandLogoHeight('2.25rem')
             ->favicon(asset('brand/FamboookLogoColoredIcon.svg'))
             ->colors([

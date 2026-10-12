@@ -106,6 +106,11 @@ describe("the public verification page", () => {
     render(<CredentialVerification token={TOKEN} />);
     await screen.findByText("بطاقة صالحة");
 
+    // FB-BRAND-02: the official light logo stands alone on the public page.
+    const brand = document.querySelector("[data-family-brand]");
+    expect(brand?.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
+    expect(brand).not.toHaveTextContent("بوابة الأسرة");
+
     // No portal or login link: the only link is the footer's external
     // developer credit (FB-BRAND-01), opened in a new tab.
     const links = screen.queryAllByRole("link");

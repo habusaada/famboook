@@ -25,7 +25,7 @@ function CardFace({ card }: { card: FamilyCardData }) {
   return (
     <section className="rounded-2xl border border-border bg-surface-1 p-5" aria-labelledby="family-card-face-title" data-family-card>
       <div className="flex items-center justify-between gap-3">
-        <FamilyBrand caption />
+        <FamilyBrand />
         <span className="text-xs font-semibold text-brand-800">{FAMILY_CARD_TITLE}</span>
       </div>
       <h2 id="family-card-face-title" className="mt-4 text-lg leading-snug font-bold text-foreground">
