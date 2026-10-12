@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ExternalLink, FileSpreadsheet, Network, UserCog } from "lucide-react";
+import { ChevronLeft, ExternalLink, FileSpreadsheet, Network, UserCog, UsersRound } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/auth-context";
 
@@ -47,6 +47,22 @@ export default function AdministrationPage() {
                 </CardTitle>
                 <CardDescription>
                   معالج من ست خطوات: العشيرة ونوع العملية، الملف، تعيين الأعمدة، مفاتيح الأسر، المراجعة — دون أي تطبيق على السجل.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
+        {can("coordinator-scope.manage") && (
+          <Link href="/administration/coordinators" className="group" data-admin-card="coordinators">
+            <Card className="transition-colors group-hover:bg-muted/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UsersRound className="size-5 text-muted-foreground" />
+                  المنسقون
+                  <ChevronLeft className="ms-auto size-4 text-muted-foreground" />
+                </CardTitle>
+                <CardDescription>
+                  تعيين أرباب الأسر منسقين وإدارة نطاقاتهم التنظيمية: العشيرة، مجموعة الفروع أو الفرع، والإلغاء.
                 </CardDescription>
               </CardHeader>
             </Card>
