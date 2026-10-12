@@ -64,11 +64,13 @@ describe("/family/login", () => {
     expect(get.mock.calls.map(([path]) => path)).toEqual([CAPABILITIES_PATH]);
   });
 
-  it("shows the official logo above the portal name and the card", () => {
+  it("shows the official logo alone above the card, and the public footer", () => {
     const { container } = renderWithClient(<FamilyLoginForm />);
 
-    expect(screen.getByRole("img", { name: "Famboook" })).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
-    expect(container.querySelector("[data-family-brand]")).toHaveTextContent("بوابة الأسرة");
+    expect(container.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
+    // FB-BRAND-02: no portal name under the logo on the authentication pages.
+    expect(container.querySelector("[data-family-brand]")).not.toHaveTextContent("بوابة الأسرة");
+    expect(container.querySelector("[data-site-footer]")).not.toBeNull();
     expect(container.querySelector("[data-family-brand] svg")).toBeNull();
   });
 

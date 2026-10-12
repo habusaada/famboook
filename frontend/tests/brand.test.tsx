@@ -48,18 +48,34 @@ describe("the official logo", () => {
         <BrandLogo variant="icon" alt="" className="h-6" />
       </>
     );
-    const full = screen.getByRole("img", { name: "Famboook" });
-    expect(full).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
-    expect([full.getAttribute("width"), full.getAttribute("height")]).toEqual(["432", "144"]);
+    const full = document.querySelector('[data-brand-logo="full"][data-brand-theme="light"]');
+    expect(full).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
+    expect(full).toHaveAttribute("alt", "Famboook");
+    expect([full?.getAttribute("width"), full?.getAttribute("height")]).toEqual(["432", "144"]);
     expect(full).toHaveClass("h-7", "w-auto");
     const icon = document.querySelector('[data-brand-logo="icon"]');
     expect(icon).toHaveAttribute("src", "/brand/FamboookLogoColoredIcon.svg");
     expect(icon).toHaveAttribute("alt", "");
   });
 
+  it("follows the existing theme mechanism: light by default, dark only under .dark", () => {
+    render(<BrandLogo className="h-8" />);
+    const light = document.querySelector('[data-brand-theme="light"]');
+    const dark = document.querySelector('[data-brand-theme="dark"]');
+    // Tailwind's dark: variant is the .dark class of globals.css — never set by
+    // the app today, so the light variant is the one displayed.
+    expect(light).toHaveClass("block", "dark:hidden");
+    expect(dark).toHaveAttribute("src", "/brand/FamboookLogoColoredDark.svg");
+    expect(dark).toHaveClass("hidden", "dark:block");
+    expect(dark).toHaveAttribute("alt", "Famboook");
+    expect(document.documentElement).not.toHaveClass("dark");
+    expect(read("app/globals.css").toString()).toContain("@custom-variant dark (&:is(.dark *));");
+  });
+
   it("keeps the declared ratios equal to the artwork's viewBox", () => {
     for (const [variant, path] of [
-      ["full", "public/brand/FamboookLogoColored.svg"],
+      ["full", "public/brand/FamboookLogoColoredLight.svg"],
+      ["full", "public/brand/FamboookLogoColoredDark.svg"],
       ["icon", "public/brand/FamboookLogoColoredIcon.svg"],
     ] as const) {
       const [, , w, h] = /viewBox="([^"]+)"/.exec(read(path).toString())![1].split(/\s+/).map(Number);
@@ -68,11 +84,11 @@ describe("the official logo", () => {
     }
   });
 
-  it("brands the Staff login and the Staff sidebar and mobile sheet with the official logo", async () => {
+  it("brands the Staff login and the Staff sidebar and mobile sheet with the official logo, footer on the login only", async () => {
     vi.spyOn(apiClient, "get").mockRejectedValue(new ApiError(401, { message: "x" }));
     renderWithClient(<LoginView />);
     const lockup = document.querySelector("[data-brand-lockup]") as HTMLElement;
-    expect(within(lockup).getByRole("img", { name: "Famboook" })).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
+    expect(lockup.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
     expect(lockup).toHaveTextContent("بوابة الطاقم");
     expect(lockup.querySelector("svg")).toBeNull();
     expect(document.querySelector("[data-site-footer]")).not.toBeNull();
@@ -84,9 +100,11 @@ describe("the official logo", () => {
         </AppShell>
       </AuthContext.Provider>
     );
-    const logos = document.querySelectorAll('img[src="/brand/FamboookLogoColored.svg"]');
+    const logos = document.querySelectorAll('img[src="/brand/FamboookLogoColoredLight.svg"]');
     expect(logos.length).toBeGreaterThanOrEqual(2);
-    expect(document.querySelectorAll("[data-site-footer]")).toHaveLength(2);
+    // FB-BRAND-02: the footer stays on the public login only — never inside
+    // the authenticated Staff application.
+    expect(document.querySelectorAll("[data-site-footer]")).toHaveLength(1);
   });
 });
 

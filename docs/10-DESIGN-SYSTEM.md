@@ -89,24 +89,34 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
   8 px (panels, nested groups), `rounded-widget` 12 px (dashboard widgets).
   No pill-shaped containers.
 
-## 7a. Brand assets (FB-BRAND-01)
+## 7a. Brand assets (FB-BRAND-01, FB-BRAND-02)
 
-- The official identity is two files, used **untouched** (never redrawn,
-  recoloured, cropped, distorted or mirrored in RTL):
-  `frontend/public/brand/FamboookLogoColored.svg` (full logo, viewBox
-  432 × 144.39, about 3 : 1) and
-  `frontend/public/brand/FamboookLogoColoredIcon.svg` (standalone icon,
-  143.57 × 144.39). Transparent backgrounds.
+- The official identity, used **untouched** (never redrawn, recoloured,
+  cropped, distorted or mirrored in RTL), transparent backgrounds:
+  - full logo, light surfaces: `frontend/public/brand/FamboookLogoColoredLight.svg`
+    (viewBox 432 × 144, 3 : 1);
+  - full logo, dark surfaces: `frontend/public/brand/FamboookLogoColoredDark.svg`
+    (432 × 144);
+  - standalone icon: `frontend/public/brand/FamboookLogoColoredIcon.svg`
+    (143.57 × 144.39);
+  - `FamboookLogoColored.svg` (the FB-BRAND-01 full logo) remains the source
+    of the PDF and Filament copies below.
 - One component renders them: `BrandLogo` (`components/shared/brand-logo.tsx`,
   `variant` full / icon). Only the HEIGHT is set; the width follows. The full
-  logo is readable from about 28 px tall: Staff sidebar and mobile sheet
-  `h-8`, Staff and Family public pages `h-12`, Family header `h-7`
-  (`FamilyBrand` keeps «بوابة الأسرة»; the Staff lockups keep «بوابة الطاقم»).
+  logo follows the EXISTING theme mechanism — the `.dark` class behind
+  Tailwind's `dark:` variant (`globals.css`): the light file by default, the
+  dark file only under `.dark`. No theme is enabled by the brand; today the
+  light file is always shown. Readable from about 28 px tall: Staff sidebar,
+  mobile sheet and Family header `h-8`, public pages `h-12`.
+- The full logo stands alone on the Family authentication pages and in the
+  Family Portal header (one row: logo at the RTL start, logout at the end).
+  «بوابة الأسرة» stays only under the logo on the Family Card and the public
+  verification page; the Staff lockups keep «بوابة الطاقم». Role labels such
+  as «رب الأسرة» belong to user-information areas («حسابي», «بياناتي
+  الشخصية», member cards), never beside or under the logo.
 - **The logo's colours stay inside the assets.** They are never extracted
   into the application palette: tokens, Tailwind, `globals.css`, the
   Filament colours and every UI colour are unchanged by the brand.
-- The wordmark is near-black: the full logo is for light surfaces. A dark
-  variant is required before any dark theme ships.
 - Icons generated from the official icon (no artwork edits): `app/icon.svg`
   (byte copy), `app/favicon.ico` (16 / 32 / 48), `app/apple-icon.png` (180),
   and `public/icons/v2/` (192, 512, maskable 192 / 512, Apple 180, SVG).
@@ -120,9 +130,11 @@ Body line-height 1.6 for Arabic. Numbers use `tabular-nums`.
 - Copyright footer: `SiteFooter` (`components/shared/site-footer.tsx`) —
   «© 2026 فامبوك. جميع الحقوق محفوظة.» and «تطوير المركز الفلسطيني للبيانات
   والتنمية المجتمعية – PCDCD» linked to https://www.facebook.com/pcdcd.gaza (new
-  tab, `rel="noopener noreferrer"`); small text, existing tokens. On the
-  Family authentication pages, the Family Portal, the Staff login, the
-  Staff application and the public verification page.
+  tab, `rel="noopener noreferrer"`); small text, existing tokens. On PUBLIC
+  pages only (FB-BRAND-02): the Family authentication pages (login,
+  activation, password recovery), the Staff login and the public
+  verification page — never inside the authenticated Family Portal or Staff
+  application.
 
 ## 8. Icons
 
@@ -212,3 +224,4 @@ These become tokens in PWA-3; no raw hex in components (§4).
 | 1.0 | 2026-09-27 | Foundations (surfaces, elevation, radius, type, motion) and Dashboard components; applied to the Operational Dashboard only |
 | 1.1 | 2026-10-02 | §11a Family Portal visual direction (PWA-0); kingfisher / spring palette scoped to the Family Portal — the Staff teal scale of §3 is unchanged. Direction only, not implemented |
 | 1.2 | 2026-10-11 | §7a Brand assets (FB-BRAND-01): official full logo and icon, `BrandLogo`, generated favicon / PWA icons (`/icons/v2`), `SiteFooter`; the brand's colours stay inside the assets — no palette change |
+| 1.3 | 2026-10-12 | §7a FB-BRAND-02: light / dark full-logo variants through the existing `.dark` mechanism (no theme enabled); the logo alone on the Family auth pages and portal header; footer on public pages only |

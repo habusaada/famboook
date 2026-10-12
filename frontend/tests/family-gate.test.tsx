@@ -47,14 +47,20 @@ describe("FamilyGate", () => {
 
     const { container } = renderPortal();
 
-    const logo = await screen.findByRole("img", { name: "Famboook" });
-    // FB-BRAND-01: the official full logo, intrinsic 432 × 144 — only the
-    // height is styled, so the ratio is kept.
-    expect(logo).toHaveAttribute("src", "/brand/FamboookLogoColored.svg");
+    await screen.findAllByRole("img", { name: "Famboook" });
+    // FB-BRAND-01 / 02: the official full logo (light variant shown; the dark
+    // one only under the theme's .dark class), intrinsic 432 × 144 — only
+    // the height is styled, so the ratio is kept.
+    const logo = container.querySelector('[data-brand-theme="light"]');
+    expect(logo).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
     expect(logo).toHaveAttribute("width", "432");
     expect(logo).toHaveAttribute("height", "144");
+    // FB-BRAND-02: the logo stands alone in the header, beside the logout.
     const brand = container.querySelector("[data-family-brand]");
-    expect(brand).toHaveTextContent("بوابة الأسرة");
+    expect(brand).not.toHaveTextContent("بوابة الأسرة");
+    expect(brand?.closest("header")).toHaveTextContent("تسجيل الخروج");
+    // No copyright footer inside the authenticated portal.
+    expect(container.querySelector("[data-site-footer]")).toBeNull();
     expect(brand?.textContent).not.toContain("Famboook");
     expect(brand?.querySelector("svg")).toBeNull();
   });

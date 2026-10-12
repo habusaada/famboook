@@ -1,6 +1,5 @@
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppTopbar } from "@/components/layout/app-topbar";
-import { SiteFooter } from "@/components/shared/site-footer";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +9,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AppTopbar />
         <main className="flex-1 overflow-x-hidden px-4 py-4 md:px-6 md:py-5 xl:px-8">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
-          <SiteFooter className="mt-10 pb-2" />
         </main>
       </div>
     </div>

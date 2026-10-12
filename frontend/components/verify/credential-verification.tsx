@@ -96,7 +96,7 @@ export function CredentialVerification({ token }: { token: string }) {
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-md flex-col gap-5 px-4 py-8">
       <header className="flex flex-col items-center gap-3 text-center">
-        <FamilyBrand />
+        <FamilyBrand caption />
         <h1 className="text-xl font-bold text-foreground">التحقق من بطاقة الأسرة الرقمية</h1>
       </header>
 
