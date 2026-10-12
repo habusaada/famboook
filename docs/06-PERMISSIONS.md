@@ -1142,6 +1142,8 @@ FAMILY SIDE — auth:sanctum + family.side + coordinator.space
 GET  /api/v1/family/coordinator/context
 GET  /api/v1/family/coordinator/families              + coordinator-family.view-summary
 GET  /api/v1/family/coordinator/families/{code}       + coordinator-family.view-summary
+GET  /api/v1/family/coordinator/families/{code}/members                    + coordinator-family.view-summary + coordinator-member.view   (CO-01C)
+POST /api/v1/family/coordinator/families/{code}/members/{memberRef}/reveal + coordinator-family.view-summary + coordinator-member.view + coordinator-member.view-sensitive   (CO-01C)
 
 STAFF SIDE — auth:sanctum + staff.side
 GET  /api/v1/people/{person}/coordinator              coordinator-scope.view
@@ -1154,6 +1156,8 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
 | Permission | Purpose | Holders |
 |---|---|---|
 | `coordinator-family.view-summary` | Read SUMMARIES of the families in the Coordinator's effective scope | COORDINATOR only (**approved and seeded in PWA-1H**) |
+| `coordinator-member.view` | Read the details and the members directory (basic fields, National ID and mobile MASKED) of a family in the effective scope | COORDINATOR only (**approved and seeded in CO-01C, AUTH-ADR-092**) |
+| `coordinator-member.view-sensitive` | Reveal ONE full National ID or primary mobile of ONE member of a family in the effective scope, audited per request | COORDINATOR only (**approved and seeded in CO-01C, AUTH-ADR-092**) |
 
 - **`coordinator.space`** fails closed: it admits only an account that the
   coordinator resolver accepts right now — own Family context, COORDINATOR,
@@ -1180,7 +1184,25 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
   COORDINATOR, FAMILY_USER, REPORTS_VIEWER, DATA_ENTRY or SOCIAL_WORKER. A
   family-side account — a Coordinator included — cannot reach these routes
   (`staff.side`) whatever it holds, so no Coordinator manages another.
-- COORDINATOR holds exactly `coordinator-space.access` and
+- **Amended 2026-10-12 (CO-01C, AUTH-ADR-092) — approved exception to the
+  summary-only rule above, which is kept as the PWA-1H history.** With
+  `coordinator-member.view` a Coordinator also reads, for a family in
+  scope, the family details (adding the REGISTERED member count and,
+  separately, the DECLARED household size) and the members directory:
+  full name, relationship, sex, age, marital status, life status, and the
+  National ID and mobile MASKED only. With
+  `coordinator-member.view-sensitive` it may reveal ONE full National ID
+  or primary mobile of ONE member per request — never in bulk — and every
+  attempt past the permission gates is a
+  `COORDINATOR_MEMBER_SENSITIVE_REVEALED` security event
+  (actor, family, target person, field, outcome; never the value). The
+  member is named only by an opaque reference resolved among the ACTIVE
+  memberships of a family found inside the scope; out of scope = 404.
+  Still never residence, health, disability, assessments, needs,
+  assistance, notes, documents, account, OTP or authentication data.
+- PWA-1H (as amended by CO-01C above, which adds `coordinator-member.view`
+  and `coordinator-member.view-sensitive`, still never `family.*` or
+  `person.*`): COORDINATOR holds exactly `coordinator-space.access` and
   `coordinator-family.view-summary`. It never receives `family.*`,
   `person.*`, `change-request.review`, `export.*`, `report.*`, Filament,
   user or role administration, imports, or `person-mobile-trust.assist`
@@ -4420,6 +4442,9 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-092
+Coordinator members directory (2026-10-12, CO-01C, Option B): an APPROVED EXCEPTION to the PWA-1H summary-only Coordinator policy (AUTH-ADR-070), which otherwise stands and is kept as history. Two new permissions, seeded to COORDINATOR only: `coordinator-member.view` — the extended details of a Family in the effective scope (code, Clan / Branch Group / Branch, head, REGISTERED member count and, separately, the DECLARED household size) and its members directory (full name, relationship, sex, age, marital status, life status; National ID and mobile MASKED) — and `coordinator-member.view-sensitive` — an explicit reveal of ONE full value (National ID or primary mobile) of ONE member per request, never in bulk. COORDINATOR still receives no `family.*` or `person.*` permission; Staff role mappings, REVIEWER and the approval workflows are unchanged; `coordinator-family.view-summary` keeps its meaning and is still required on both new routes. Routes (family side, behind `coordinator.space`, re-resolved on every request): `GET /api/v1/family/coordinator/families/{code}/members` (+ `coordinator-member.view`, throttle `coordinator-member-directory`) and `POST /api/v1/family/coordinator/families/{code}/members/{memberRef}/reveal` (+ `coordinator-member.view-sensitive`, throttle `coordinator-member-reveal`). The Family is found only inside `CoordinatorScopes::families()`; the member only by an opaque keyed reference (own fingerprint context `COORDINATOR_MEMBER_REF`) among that Family's ACTIVE memberships; out of scope and nonexistent are the same 404. Every reveal attempt that passes the permission gates records one `COORDINATOR_MEMBER_SENSITIVE_REVEALED` security event — SUCCESS before the value is returned, DENIED with a reason code otherwise — with actor, Family (new nullable `auth_security_events.family_id`, docs/04 DB-ADR-060), target Person, field code and time; never the value, a mask or the reference. Responses are `no-store, private`. Never exposed: birth date, alternate mobile, residence, health, disability, assessments, needs, assistance, case notes, documents, account, OTP or authentication data.
+
 ### AUTH-ADR-091
 Family Change Request API (2026-10-08, PWA-5e, docs/11 FP-ADR-073): no permission or role added. Reads (history, detail, type discovery) need the Family boundary only — `family.side`, `family-portal.access`, `family.context` — and see the context Family's requests (Family-subject, FU-04); submit, resubmit and cancel additionally need `change-request.submit`, `.resubmit`, `.cancel` (FAMILY_USER). Staff, coordinator-only and mixed accounts are refused by `family.side`; a FAMILY_USER + COORDINATOR acts only for their own Family; a coordinator scope never opens another Family's requests. Per-user throttles `family-change-request-submit` and `family-change-request-action`. The Domain Actions re-check side, permission and ownership (AUTH-ADR-088).
 
@@ -4880,6 +4905,7 @@ Date: 2026-09-24
 | 1.2.59 | 2026-10-09 | Approved | ADD_FAMILY_MEMBER note (FP-ADR-076): attested approval within change-request.approve, typed-ID comparison, masked ID only with view-masked, approve throttle; no permission added |
 | 1.2.61 | 2026-10-11 | Approved | FU-16 (docs/11 FP-ADR-078): §22b `POST /api/v1/family/account/password` — self only, current password, Family password policy, all sessions ended and the browser signed in afresh, own gate (off by default; `FAMILY_PASSWORD_CHANGE_ENABLED=true`) and per-user throttle; AUTH-ADR-082 amended. No permission seeded |
 | 1.2.60 | 2026-10-10 | Approved | ADD_FAMILY_MEMBER note amended: Staff-only status in the match summary; only evidence-bearing approvals are throttled; no permission added |
+| 1.2.62 | 2026-10-12 | Approved | CO-01C (AUTH-ADR-092): §22b Coordinator members directory — `coordinator-member.view` and `coordinator-member.view-sensitive` seeded to COORDINATOR only (approved exception to the PWA-1H summary-only rule); masked directory and audited one-field reveal routes; no Staff, REVIEWER or workflow change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

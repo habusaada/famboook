@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorMemberController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyAccountController;
 use App\Http\Controllers\Api\V1\Family\FamilyActivationController;
@@ -206,6 +207,20 @@ Route::prefix('family')->group(function () {
                 Route::get('/families', [CoordinatorFamilyController::class, 'index']);
                 Route::get('/families/{familyCode}', [CoordinatorFamilyController::class, 'show'])
                     ->where('familyCode', '[A-Za-z0-9_\-]{1,50}');
+
+                // CO-01C (docs/06 AUTH-ADR-092): the members directory of ONE
+                // Family in scope — basic fields, identifiers MASKED — and the
+                // audited one-field reveal. Plain path strings, resolved only
+                // inside the scoped query; out of scope = 404.
+                Route::middleware('can:coordinator-member.view')->group(function () {
+                    Route::get('/families/{familyCode}/members', [CoordinatorMemberController::class, 'index'])
+                        ->where('familyCode', '[A-Za-z0-9_\-]{1,50}')
+                        ->middleware('throttle:coordinator-member-directory');
+                    Route::post('/families/{familyCode}/members/{memberRef}/reveal', [CoordinatorMemberController::class, 'reveal'])
+                        ->where('familyCode', '[A-Za-z0-9_\-]{1,50}')
+                        ->where('memberRef', '[A-Za-z0-9]{1,128}')
+                        ->middleware(['can:coordinator-member.view-sensitive', 'throttle:coordinator-member-reveal']);
+                });
             });
         });
     });

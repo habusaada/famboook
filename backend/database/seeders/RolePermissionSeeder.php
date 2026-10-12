@@ -289,6 +289,12 @@ class RolePermissionSeeder extends Seeder
         // §22b PWA-1H: Coordinator Space family SUMMARIES inside the scope
         // (approved 2026-10-03, AUTH-ADR-070). Summary projection only.
         'coordinator-family.view-summary',
+
+        // §22b CO-01C: the scoped members directory (approved 2026-10-12,
+        // AUTH-ADR-092). Basic member fields with masked identifiers; the
+        // full National ID / mobile is a separate, audited reveal.
+        'coordinator-member.view',
+        'coordinator-member.view-sensitive',
     ];
 
     /**
@@ -711,8 +717,12 @@ class RolePermissionSeeder extends Seeder
             // otherwise accept it. Never grant, never revoke. It stays withheld
             // in PWA-1H: it belongs to a future assisted-trust workflow.
             'coordinator-space.access',
-            // §22b PWA-1H: summaries of the Families in the scope, nothing more.
+            // §22b PWA-1H: summaries of the Families in the scope.
             'coordinator-family.view-summary',
+            // §22b CO-01C (AUTH-ADR-092): the members directory of a Family in
+            // scope, and the audited one-field reveal. Never family.* or person.*.
+            'coordinator-member.view',
+            'coordinator-member.view-sensitive',
         ],
     ];
 

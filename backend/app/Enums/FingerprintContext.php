@@ -22,4 +22,8 @@ enum FingerprintContext: string
     // so a stale request never overwrites newer data. Never returned to a
     // client.
     case CHANGE_REQUEST_BASE = 'famboook.change-request.base.v1:';
+    // The Coordinator Space opaque member reference (CO-01C, AUTH-ADR-092):
+    // a membership of a Family in the Coordinator's scope. Its own domain, so
+    // it never equals the household member_ref. Never stored.
+    case COORDINATOR_MEMBER_REF = 'famboook.coordinator.member-ref.v1:';
 }

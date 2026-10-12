@@ -5,6 +5,7 @@ namespace App\Support\FamilyAuth;
 use App\Enums\AuthSecurityEventOutcome;
 use App\Enums\AuthSecurityEventType;
 use App\Models\AuthSecurityEvent;
+use App\Models\Family;
 use App\Models\Person;
 use App\Models\PersonMobileTrust;
 use App\Models\User;
@@ -41,6 +42,7 @@ final class AuthSecurityLog
         ?string $otpChallengeUuid = null,
         ?string $loginKey = null,
         array $metadata = [],
+        ?Family $family = null,
     ): AuthSecurityEvent {
         if ($loginKey !== null && preg_match('/\A[0-9a-f]{64}\z/', $loginKey) !== 1) {
             throw new InvalidArgumentException('A security event accepts an identifier only as a keyed fingerprint.');
@@ -62,6 +64,7 @@ final class AuthSecurityLog
             'actor_user_id' => $actor instanceof User ? $actor->getKey() : $actor,
             'user_person_link_id' => $link?->getKey(),
             'mobile_trust_id' => $trust?->getKey(),
+            'family_id' => $family?->getKey(),
             'otp_challenge_uuid' => $otpChallengeUuid,
             'login_key' => $loginKey,
             'ip' => $request?->ip(),

@@ -53,4 +53,10 @@ enum AuthSecurityEventType: string
     // their household (PWA-3B.4); person = the target Person; metadata: the
     // field code only, never the value or the member reference.
     case HOUSEHOLD_MEMBER_SENSITIVE_REVEALED = 'HOUSEHOLD_MEMBER_SENSITIVE_REVEALED';
+    // A Coordinator revealed (SUCCESS) or was refused (DENIED) one sensitive
+    // value of a member of a Family in scope (CO-01C, AUTH-ADR-092): actor =
+    // the Coordinator, family = the Family resolved in scope, person = the
+    // target Person; metadata: the field code only — never the value, a
+    // mask or the member reference.
+    case COORDINATOR_MEMBER_SENSITIVE_REVEALED = 'COORDINATOR_MEMBER_SENSITIVE_REVEALED';
 }

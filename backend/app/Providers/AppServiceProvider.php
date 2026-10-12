@@ -190,6 +190,21 @@ class AppServiceProvider extends ServiceProvider
             ['minute', 'hour'],
         ));
 
+        // Coordinator Space members directory and reveal (CO-01C,
+        // AUTH-ADR-092): per signed-in Coordinator — never per Family or
+        // member reference, so another code never resets the count.
+        RateLimiter::for('coordinator-member-directory', fn (Request $request) => Limit::perMinute((int) config('family_auth.coordinator_directory.limits.user_minute'))
+            ->by("coordinator-member-directory|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        RateLimiter::for('coordinator-member-reveal', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('family_auth.coordinator_reveal.limits.user_hour'))
+                : Limit::perMinute((int) config('family_auth.coordinator_reveal.limits.user_minute')))
+                ->by("coordinator-member-reveal|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
+            ['minute', 'hour'],
+        ));
+
         // Public Digital Family Card verification (docs/11 §19, FP-ADR-070):
         // per client IP — the browser posts directly to the API, so this is the
         // real client — per minute and per hour. Generic 429, no-store.

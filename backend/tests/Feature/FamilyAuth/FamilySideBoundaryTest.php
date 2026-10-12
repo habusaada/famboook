@@ -269,7 +269,8 @@ class FamilySideBoundaryTest extends TestCase
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
         // relationship options (FP-ADR-076) + the password change (FU-16) + the
-        // four contact-update routes (FP-ADR-079).
-        $this->assertSame(40, $checked);
+        // four contact-update routes (FP-ADR-079) + the Coordinator members
+        // directory and reveal (CO-01C, AUTH-ADR-092).
+        $this->assertSame(42, $checked);
     }
 }

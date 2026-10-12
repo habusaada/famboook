@@ -2371,6 +2371,7 @@ Append-only authentication and security audit.
 event_type, outcome, reason_code
 person_id, user_id, actor_user_id
 link and mobile trust references
+family_id           the Family an audited access concerned (CO-01C), else NULL
 otp_challenge_uuid  plain reference value, no foreign key
 login_key           fingerprint only
 ip, user_agent_hash

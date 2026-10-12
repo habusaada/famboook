@@ -62,6 +62,8 @@ class AuthSecurityEvent extends Model
         'actor_user_id',
         'user_person_link_id',
         'mobile_trust_id',
+        // The Family an audited access concerned (CO-01C), else NULL.
+        'family_id',
         'otp_challenge_uuid',
         'login_key',
         'ip',
@@ -119,6 +121,11 @@ class AuthSecurityEvent extends Model
     public function userPersonLink(): BelongsTo
     {
         return $this->belongsTo(UserPersonLink::class);
+    }
+
+    public function family(): BelongsTo
+    {
+        return $this->belongsTo(Family::class);
     }
 
     public function mobileTrust(): BelongsTo

@@ -332,4 +332,18 @@ return [
         ],
     ],
 
+    // Coordinator Space members directory (CO-01C, AUTH-ADR-092): per
+    // signed-in Coordinator. The reveal has its own, tighter buckets.
+    'coordinator_directory' => [
+        'limits' => [
+            'user_minute' => (int) env('COORDINATOR_DIRECTORY_LIMIT_USER_MINUTE', 60),
+        ],
+    ],
+    'coordinator_reveal' => [
+        'limits' => [
+            'user_minute' => (int) env('COORDINATOR_REVEAL_LIMIT_USER_MINUTE', 10),
+            'user_hour' => (int) env('COORDINATOR_REVEAL_LIMIT_USER_HOUR', 60),
+        ],
+    ],
+
 ];

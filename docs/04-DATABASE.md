@@ -2314,6 +2314,7 @@ UNIQUE (person_id, purpose)
 event_type, outcome, reason_code    VARCHAR
 person_id, user_id, actor_user_id   BIGINT NULL
 user_person_link_id, mobile_trust_id   BIGINT NULL
+family_id          BIGINT NULL      FK families.id (restrict) — CO-01C, DB-ADR-060
 otp_challenge_uuid   UUID NULL   plain reference value — NO foreign key
 login_key          CHAR(64) NULL    fingerprint only
 ip                 INET NULL
@@ -2324,6 +2325,12 @@ created_at         TIMESTAMP NOT NULL      (no updated_at: append-only)
 
 Indexes on `(person_id, created_at)`, `(user_id, created_at)`,
 `(event_type, created_at)` and `login_key`.
+
+`family_id` (2026-10-12, CO-01C) is the Family an audited access
+concerned — today the Coordinator member reveal, set only when the Family
+was resolved inside the Coordinator's scope — with its own
+`(family_id, created_at)` index. NULL for every earlier event and every
+event that concerns no Family. It is a reference, never a value.
 
 `otp_challenge_uuid` carries no foreign key on purpose: challenges are
 purged after 90 days while events are retained 24 months, so a foreign key
@@ -4061,6 +4068,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-060
+CO-01C Coordinator members directory (2026-10-12, docs/06 AUTH-ADR-092) adds one additive migration, `2026_10_19_090000_add_family_id_to_auth_security_events`: a nullable `family_id` foreign key to `families` (restrict, like every key of the table) and an index `(family_id, created_at)`. Existing rows keep NULL; no backfill; no existing column, index or CHECK constraint changes, and the table stays append-only (no updated_at, immutable model). The new event type `COORDINATOR_MEMBER_SENSITIVE_REVEALED` (37 characters) fits `string(40)` and `chk_auth_security_event_codes`; the metadata key `field` is already allow-listed. The Coordinator member reference is a keyed HMAC recomputed per request and never stored. The revealed value is never stored.
+
 ### DB-ADR-059
 PWA-5b Change Request engine (2026-10-07) adds **no migration**. The PWA-5a schema carries every engine invariant: `apply_failure_count` / `last_apply_failed_at` and the APPLY_FAILED event's `reason_code` (a ChangeRequestApplyFailure code that `chk_workflow_event_reason_code` accepts) record refused and failed applies; `chk_change_request_rejected_after_approval` still guards APPROVED → REJECTED; the open-conflict key is computed by the type handler under the Family row lock and not stored; the client_reference replay compares against the stored proposal (no extra copy). Test-only handlers use the existing OTHER code — no fake value is added to `chk_change_request_type`.
 
@@ -4366,6 +4376,7 @@ Date: 2026-09-24
 | 1.2.40 | 2026-10-07 | Approved | PWA-5a: `change_requests` and `workflow_events` implemented (§33, §37 annotated; §36 type table superseded by the code registry) with PostgreSQL CHECKs, the CRQ code sequence and the append-only trigger; safe down() (DB-ADR-058) |
 | 1.2.41 | 2026-10-07 | Approved | PWA-5b: no migration — the PWA-5a schema carries the engine (failure counters and codes, AE-4 CHECK, uncommitted conflict keys, replay against the stored proposal) (DB-ADR-059) |
 | 1.2.42 | 2026-10-08 | Approved | PWA-6.1a: §99 RESIDENCE_UPDATE mapping corrected to ResidenceUpdateHandler → UpdateFamilyResidenceAction (no schema change) |
+| 1.2.43 | 2026-10-12 | Approved | CO-01C (DB-ADR-060): nullable `auth_security_events.family_id` FK (restrict) and `(family_id, created_at)` index for the audited Coordinator member reveal; additive, no backfill |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

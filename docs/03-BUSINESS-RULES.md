@@ -2583,6 +2583,21 @@ workflow).
 - **The own household is unchanged.** The Family context remains the
   account's own household only; Coordinator Space is a separate mode and
   its families never become part of the household.
+- **Members directory — amended 2026-10-12 (CO-01C, docs/06 AUTH-ADR-092,
+  approved exception to the summary-only rule above, kept as history).**
+  For a family in scope a Coordinator holding `coordinator-member.view`
+  reads the family details — code, Clan, Branch Group, Branch, head, the
+  REGISTERED member count (active memberships) and, separately, the
+  DECLARED household size; the two counts are never reconciled — and its
+  ACTIVE members: full name, relationship, sex, age (none when DECEASED or
+  unknown; the birth date is not shown), marital status, life status, and
+  the National ID and mobile MASKED. A full National ID or primary mobile
+  is revealed only one field of one member at a time with
+  `coordinator-member.view-sensitive`; every attempt is audited without
+  the value. Scope is re-checked on every request; a family or member
+  outside it does not exist for the Coordinator. Health, disability,
+  needs, assistance, assessments, notes, documents and account data stay
+  closed. The Coordinator still modifies nothing.
 - **Administration** (role and scopes) is a Staff act of SUPER_ADMIN and
   ADMINISTRATOR (`coordinator-scope.manage`). Granting the role requires an
   eligible family-side head; an assignment requires the role and an active
@@ -5066,6 +5081,7 @@ Date: 2026-09-24
 | 1.2.53 | 2026-10-08 | Approved | PWA-6.1: RESIDENCE_UPDATE rules recorded under "Submissions" (in-place correction, changed fields only, one open per Family, base protection) |
 | 1.2.54 | 2026-10-09 | Approved | §19: ADD_FAMILY_MEMBER (and future BIRTH_REPORT) family submissions require a nine-digit National ID (docs/11 FP-ADR-076); legacy and Staff rules unchanged |
 | 1.2.55 | 2026-10-10 | Approved | §19: existing-Person eligibility for ADD_FAMILY_MEMBER attachment (ALIVE, active, no active membership; docs/11 FP-ADR-076) |
+| 1.2.56 | 2026-10-12 | Approved | CO-01C (docs/06 AUTH-ADR-092): §89b Coordinator members directory — approved exception to summary-only data: masked directory of families in scope, registered vs declared counts kept distinct, audited one-field reveal of National ID or mobile |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

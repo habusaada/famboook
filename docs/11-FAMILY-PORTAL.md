@@ -407,6 +407,14 @@ made by an authorized administrator.
 
 - View a limited dashboard for the authorized scope.
 - See the families in scope with deliberately limited data.
+- **Amended 2026-10-12 (CO-01C, docs/06 AUTH-ADR-092, approved
+  exception):** see a family in scope in detail — code, hierarchy, head,
+  registered member count and, separately, the declared household size —
+  and its members directory (full name, relationship, sex, age, marital
+  status, life status; National ID and mobile masked), with an explicit,
+  audited reveal of one National ID or mobile of one member at a time.
+  Still never health, disability, needs, assistance, assessments, notes
+  or account data.
 - See a family's Profile Review summary status and Staff Family
   Verification status, where authorized — never section contents or
   missing-item details (exact visibility decided before PWA-9).
@@ -3799,6 +3807,46 @@ or role change.
   database UNIQUE on National ID (legacy duplicates are not remediated).
   The equivalent lookup scans stored IDs (adequate at pilot scale).
 
+## CO-01C Coordinator members directory implementation record
+
+Implemented 2026-10-12 (docs/06 AUTH-ADR-092, docs/04 DB-ADR-060). Local
+implementation; not deployed.
+
+- Permissions `coordinator-member.view` and
+  `coordinator-member.view-sensitive`, COORDINATOR only; no Staff, REVIEWER
+  or workflow change; `coordinator-family.view-summary` unchanged and
+  still required.
+- `GET /api/v1/family/coordinator/families/{code}/members`: the family
+  details, the ACTIVE members (one row per membership, the household
+  order, a soft-deleted Person as a placeholder) and `can_reveal` (UX
+  only). Age is computed on the server in whole years (none when DECEASED
+  or unknown); the birth date is not returned. National ID and mobile are
+  masked by `NationalIdMask` / `MobileMask`.
+- `POST …/members/{memberRef}/reveal` with `field` = `NATIONAL_ID` |
+  `MOBILE` only; identifiers, scope and values are prohibited in the body
+  and the query string. `CoordinatorMemberSensitiveReveal` resolves the
+  Family in scope, then the member by `CoordinatorMemberReference` (own
+  HMAC context, ACTIVE memberships of that Family only), then the
+  available Person; one generic 404 `MEMBER_NOT_FOUND` for every refusal.
+- Audit: `COORDINATOR_MEMBER_SENSITIVE_REVEALED` — SUCCESS before the value
+  leaves, DENIED with `FAMILY_NOT_IN_SCOPE` / `MEMBER_NOT_FOUND` /
+  `MEMBER_UNAVAILABLE`; actor and user = the Coordinator, `family_id` only
+  when resolved in scope, `person_id` only when resolved, metadata
+  `field`. A request refused by a permission gate, validation or the
+  throttle reaches no lookup and records nothing.
+- Throttles per Coordinator: `coordinator-member-directory`
+  (`COORDINATOR_DIRECTORY_LIMIT_USER_MINUTE`, default 60) and
+  `coordinator-member-reveal` (`COORDINATOR_REVEAL_LIMIT_USER_MINUTE` /
+  `_HOUR`, defaults 10 / 60). Every answer is `no-store, private`.
+- Frontend: the Coordinator family page `/family/coordinator/families/{code}`
+  keeps the Coordinator Space marker and adds the details and the
+  directory — name search, client pagination, cards on mobile and a
+  table on desktop — with a separate reveal control for the National ID
+  and for the mobile. A revealed value lives only in component state:
+  never cached, persisted or shared between rows.
+- Deployment: the migration plus the RolePermissionSeeder (run on every
+  release, docs/08), then `famboook:verify-permissions`.
+
 ---
 
 # 31. Amendment Register
@@ -3827,6 +3875,7 @@ also annotated at its original location.
 | A-17 | docs/11 §9–§11, docs/02 §45a, docs/03, docs/05: Profile Completion and Family Verification, VERIFIED after the family submits | Family Profile Review by the head, separate from Staff verification | **Amended (FP-ADR-057).** Profile Review (CONFIRMED, never VERIFIED) is distinct from Account Verification and Staff Family Verification |
 | A-18 | docs/06 §38 (Family self National ID "MASKED by default"; other members' mobile / National ID HIDDEN; Person Code FULL), §121 (adult member sensitive fields HIDDEN), §123 (health hidden), §124–§125 (needs / assistance pending); docs/11 FP-ADR-056 allow-list, §9 HEAD, §15, §23 | Full Data Visibility (§23a, 2026-10-05) | **Amended (FP-ADR-062).** For the Family Portal: own and members' National ID / mobiles masked with reveal through dedicated endpoints; structured health facts, recorded needs and received assistance visible; person_code INTERNAL_ONLY; internal Staff, audit, security and targeting data stay hidden |
 | A-19 | docs/11 §18, FP-ADR-017, docs/02 §45a, docs/03 «Card and QR», docs/05 §53a: the **Digital Household Head Card** belongs to the eligible household-head identity; loss of head eligibility invalidates it; ISSUED / REISSUED states; "FH-…" holder ID | (2026-10-07, FP-ADR-070) The **Digital Family Card**: subject = the Family; the current head is shown live; a head change changes nothing; ACTIVE → REVOKED with REISSUED as a reason; card number FC-XXXX-XXXX-XX | **Superseded in part.** Minimal content, opaque non-derived public number, live-status QR, possession ≠ identity, enumeration protection and audited lifecycle are unchanged |
+| A-20 | docs/06 §22b, docs/03 §89b, docs/11 §8 (PWA-1H, AUTH-ADR-070): a Coordinator reads family SUMMARIES only — never a National ID, a mobile or member data | Option B approved 2026-10-12 (CO-01C) | **Amended (AUTH-ADR-092).** With two new COORDINATOR-only permissions a Coordinator reads the members directory of a family in scope (basic fields, identifiers masked) and reveals one National ID or mobile of one member at a time, audited. The summary rule stays as history; health, needs, assistance, notes and account data stay closed |
 
 ---
 
@@ -5077,3 +5126,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.43 | 2026-10-11 | Approved | FP-ADR-079 mobile CONTACT_UPDATE: approved policy exception (no Staff review), OTP to the proposed number, head R2 (current password + old and new number codes, trust transferred as SELF_OTP_TRANSFER) / R1 (no trust), SUBMITTED → APPROVED / APPLIED by SYSTEM, system close, Staff read-only, limits and gate (off by default); built, not registered in Production; implementation record in §30a |
 | 1.44 | 2026-10-11 | Approved | CONTACT_UPDATE V1 LIVE in Production: registered in `ChangeRequestTypes::PRODUCTION` (activation commit `01fa663`), `FAMILY_CONTACT_UPDATE_ENABLED=true` on Production (default false in code and env templates), verified on Production 2026-10-11 (Family Auth readiness without warnings, TweetsMS OTP delivery, a contact update through the Family Portal); status statements updated in §14, §30a and FP-ADR-079 |
 | 1.45 | 2026-10-11 | Approved | FB-BRAND-01 official Famboook identity: `FamilyBrand` and the Staff lockups use the official full logo (`BrandLogo`, docs/10 §7a); the installable app's icons regenerated from the official icon at `/icons/v2` (manifest `icons` only — id, start_url, scope, display and colours unchanged; legacy icons kept one release; no service-worker change: it never caches icons); site favicon `app/icon.svg` / `favicon.ico` / `apple-icon.png`; the Family Card PDF logo; the shared copyright footer `SiteFooter`. No colour, workflow or API change |
+| 1.46 | 2026-10-12 | Approved | CO-01C Coordinator members directory (docs/06 AUTH-ADR-092, docs/04 DB-ADR-060): §8 amended, amendment A-20, implementation record — masked directory of families in scope and audited one-field reveal; local only, not deployed |

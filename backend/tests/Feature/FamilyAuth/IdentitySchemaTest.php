@@ -292,7 +292,8 @@ class IdentitySchemaTest extends TestCase
         sort($columns);
 
         $this->assertSame([
-            'actor_user_id', 'created_at', 'event_type', 'id', 'ip', 'login_key', 'metadata', 'mobile_trust_id',
+            // family_id (CO-01C, DB-ADR-060): a Family reference, never a value.
+            'actor_user_id', 'created_at', 'event_type', 'family_id', 'id', 'ip', 'login_key', 'metadata', 'mobile_trust_id',
             'otp_challenge_uuid', 'outcome', 'person_id', 'reason_code', 'user_agent_hash', 'user_id',
             'user_person_link_id', 'uuid',
         ], $columns);

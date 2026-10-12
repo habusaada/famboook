@@ -17,6 +17,8 @@ export const REVEAL_LABELS: Record<SelfRevealField, string> = {
 
 export const REVEAL_ERROR = "تعذّر إظهار القيمة. حاول مجددًا.";
 export const REVEAL_TOO_MANY = "طلبات إظهار كثيرة. حاول مجددًا بعد قليل.";
+export const REVEAL_FORBIDDEN = "لا تملك صلاحية إظهار هذه القيمة.";
+export const REVEAL_UNAVAILABLE = "هذه القيمة غير متاحة.";
 
 type State =
   | { status: "hidden" }
@@ -38,10 +40,19 @@ export function SensitiveValue({
   field,
   masked,
   reveal,
+  subject,
+  scope = "household",
 }: {
   field: SelfRevealField;
   masked: string;
   reveal: () => Promise<string | null>;
+  /** Appended to the control's accessible name when several rows share a field. */
+  subject?: string;
+  /**
+   * "coordinator" (CO-01C): a 403 / 404 concerns another Family in Coordinator
+   * Space, never the user's own household context — it is shown here instead.
+   */
+  scope?: "household" | "coordinator";
 }) {
   const [state, setState] = useState<State>({ status: "hidden" });
   // Incremented on every request and every hide: a late answer for an older
@@ -55,10 +66,12 @@ export function SensitiveValue({
       mounted.current = false;
     };
   }, []);
-  // A 401 / 403 belongs to the session/access flow, as for every family request.
-  useFamilyAccessFailure(state.status === "failed" ? state.error : null);
+  // A 401 / 403 belongs to the session/access flow, as for every family
+  // request — in Coordinator Space only a 401 (the session itself) does.
+  const failedStatus = state.status === "failed" && state.error instanceof ApiError ? state.error.status : null;
+  useFamilyAccessFailure(state.status === "failed" && (scope === "household" || failedStatus === 401) ? state.error : null);
 
-  const label = REVEAL_LABELS[field];
+  const label = subject ? `${REVEAL_LABELS[field]} — ${subject}` : REVEAL_LABELS[field];
   const shown = state.status === "shown";
   const loading = state.status === "loading";
 
@@ -81,11 +94,15 @@ export function SensitiveValue({
   }
 
   const failure =
-    state.status === "failed" && !(state.error instanceof ApiError && (state.error.status === 401 || state.error.status === 403))
-      ? state.error instanceof ApiError && state.error.status === 429
+    state.status !== "failed" || failedStatus === 401 || (failedStatus === 403 && scope === "household")
+      ? null
+      : failedStatus === 429
         ? REVEAL_TOO_MANY
-        : REVEAL_ERROR
-      : null;
+        : failedStatus === 403
+          ? REVEAL_FORBIDDEN
+          : failedStatus === 404 && scope === "coordinator"
+            ? REVEAL_UNAVAILABLE
+            : REVEAL_ERROR;
 
   return (
     <span className="flex flex-col items-end gap-1">

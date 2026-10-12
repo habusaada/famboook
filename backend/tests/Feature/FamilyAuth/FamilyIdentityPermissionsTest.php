@@ -94,18 +94,24 @@ class FamilyIdentityPermissionsTest extends TestCase
         $this->assertSame(['family-portal.access'], $this->held('FAMILY_USER'));
     }
 
-    public function test_coordinator_holds_only_the_space_and_family_summaries(): void
+    public function test_coordinator_holds_only_the_space_summaries_and_members_directory(): void
     {
         // The whole role, not just the PWA-1 names: nothing else at all
-        // (PWA-1H added the scoped family summaries, AUTH-ADR-070).
+        // (PWA-1H added the scoped family summaries, AUTH-ADR-070; CO-01C the
+        // members directory and its audited reveal, AUTH-ADR-092).
         $this->assertEqualsCanonicalizing(
-            ['coordinator-space.access', 'coordinator-family.view-summary'],
+            ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive'],
             Role::findByName('COORDINATOR', 'web')->permissions->pluck('name')->all(),
         );
-        // No other role holds the summaries — no Staff role either.
+        // No other role holds them — no Staff role either.
         foreach (RolePermissionSeeder::ROLES as $role) {
-            $this->assertSame($role === 'COORDINATOR', Role::findByName($role, 'web')->hasPermissionTo('coordinator-family.view-summary'), $role);
+            foreach (['coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive'] as $permission) {
+                $this->assertSame($role === 'COORDINATOR', Role::findByName($role, 'web')->hasPermissionTo($permission), "{$role} {$permission}");
+            }
         }
+        // Never a family.* or person.* permission (AUTH-ADR-092).
+        $names = Role::findByName('COORDINATOR', 'web')->permissions->pluck('name');
+        $this->assertSame([], $names->filter(fn (string $n) => str_starts_with($n, 'family.') || str_starts_with($n, 'person.'))->values()->all());
     }
 
     public function test_coordinator_assist_is_deliberately_deferred_until_scope_enforcement(): void
