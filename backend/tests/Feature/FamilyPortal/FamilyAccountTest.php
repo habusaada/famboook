@@ -219,7 +219,7 @@ class FamilyAccountTest extends TestCase
     {
         $head = $this->activatedHead('123456789');
         $head['person']->forceFill(['mobile' => self::MOBILE])->save();
-        $other = $this->activatedHead('222222222');
+        $other = $this->activatedHead('222222220');
         $this->trustedMobile($other['person'], '0569999888');
 
         $spoofed = $this->fetch($head['user'], self::URI.'?person='.$other['person']->person_code
@@ -262,7 +262,7 @@ class FamilyAccountTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->activatedHead('222222222')['user'];
+        $mixed = $this->activatedHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 

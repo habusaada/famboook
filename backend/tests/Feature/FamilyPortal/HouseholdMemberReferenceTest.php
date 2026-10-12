@@ -153,8 +153,8 @@ class HouseholdMemberReferenceTest extends TestCase
 
     public function test_a_reference_of_another_household_never_resolves(): void
     {
-        $mine = $this->activatedHead('111111111');
-        $other = $this->activatedHead('222222222');
+        $mine = $this->activatedHead('111111110');
+        $other = $this->activatedHead('222222220');
         $otherMember = $this->member($other);
         $context = $this->context($mine['user']);
 

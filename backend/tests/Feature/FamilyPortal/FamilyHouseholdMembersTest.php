@@ -307,8 +307,8 @@ class FamilyHouseholdMembersTest extends TestCase
 
     public function test_spoofed_identifiers_never_switch_the_household(): void
     {
-        $mine = $this->householdHead('111111111');
-        $other = $this->householdHead('222222222', person: ['full_name' => 'رب أسرة أخرى']);
+        $mine = $this->householdHead('111111110');
+        $other = $this->householdHead('222222220', person: ['full_name' => 'رب أسرة أخرى']);
         $this->member($other['family'], 'فرد من أسرة أخرى', 'SON');
         $expected = $this->fetch($mine['user'])->assertOk()->json();
 
@@ -373,7 +373,7 @@ class FamilyHouseholdMembersTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->householdHead('222222222')['user'];
+        $mixed = $this->householdHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 
@@ -446,9 +446,9 @@ class FamilyHouseholdMembersTest extends TestCase
 
     public function test_the_query_count_does_not_grow_with_the_household(): void
     {
-        $small = $this->householdHead('111111111');
+        $small = $this->householdHead('111111110');
         $this->member($small['family'], 'فرد', 'SON');
-        $large = $this->householdHead('222222222');
+        $large = $this->householdHead('222222220');
         foreach (range(1, 20) as $i) {
             $this->member($large['family'], 'فرد '.$i, $i % 2 ? 'SON' : 'DAUGHTER');
         }

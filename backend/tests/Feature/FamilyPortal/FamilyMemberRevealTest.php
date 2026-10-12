@@ -72,10 +72,16 @@ class FamilyMemberRevealTest extends TestCase
         $head = $this->activatedHead($nationalId, $roles);
         $head['person']->forceFill(['mobile' => '0597766554', 'alternate_mobile' => '0568877665'])->save();
         $spouse = $this->member($head, [
-            'national_id' => self::SPOUSE_NID, 'mobile' => self::SPOUSE_MOBILE, 'alternate_mobile' => self::SPOUSE_ALTERNATE,
+            // The first household's spouse keeps SPOUSE_NID; another household
+            // in the same test gets a unique value (CO-01D.4).
+            'national_id' => Person::withTrashed()->where('national_id', self::SPOUSE_NID)->exists() ? fake()->unique()->numerify('74#######') : self::SPOUSE_NID,
+            'mobile' => self::SPOUSE_MOBILE, 'alternate_mobile' => self::SPOUSE_ALTERNATE,
             'alternate_mobile_owner_relation' => 'أخ',
         ]);
-        $child = $this->member($head, ['national_id' => '406655443', 'mobile' => null, 'alternate_mobile' => null, 'birth_date' => '2015-05-05']);
+        $child = $this->member($head, [
+            'national_id' => Person::withTrashed()->where('national_id', '406655443')->exists() ? fake()->unique()->numerify('74#######') : '406655443',
+            'mobile' => null, 'alternate_mobile' => null, 'birth_date' => '2015-05-05',
+        ]);
 
         return [...$head, 'spouse' => $spouse, 'child' => $child];
     }
@@ -204,8 +210,8 @@ class FamilyMemberRevealTest extends TestCase
 
     public function test_every_unavailable_target_gets_the_identical_404_and_no_event(): void
     {
-        $h = $this->household('111111111');
-        $other = $this->household('222222222');
+        $h = $this->household('111111110');
+        $other = $this->household('222222220');
         $ended = $this->member($h, ['national_id' => '305544332']);
         $endedRef = $this->ref($ended);
         $ended->forceFill(['is_active' => false, 'ended_at' => now()->toDateString(), 'end_reason' => 'synthetic'])->save();
@@ -229,7 +235,7 @@ class FamilyMemberRevealTest extends TestCase
             $response = $this->reveal($h['user'], $ref, ['field' => 'NATIONAL_ID'])->assertNotFound()->assertExactJson(self::UNAVAILABLE);
             $this->assertNoStorePrivate($response);
             $bodies[$label] = $response->getContent();
-            foreach (['111111111', '222222222', self::SPOUSE_NID, '305544332', '304433221'] as $secret) {
+            foreach (['111111110', '222222220', self::SPOUSE_NID, '305544332', '304433221'] as $secret) {
                 $this->assertStringNotContainsString($secret, $response->getContent(), $label);
             }
         }
@@ -268,7 +274,7 @@ class FamilyMemberRevealTest extends TestCase
             'family code' => [['field' => 'NATIONAL_ID', 'family_code' => 'FAM-000002'], 'family_code'],
             'user id' => [['field' => 'NATIONAL_ID', 'user_id' => 1], 'user_id'],
             'membership id' => [['field' => 'NATIONAL_ID', 'membership_id' => 1], 'membership_id'],
-            'a national id' => [['field' => 'NATIONAL_ID', 'national_id' => '222222222'], 'national_id'],
+            'a national id' => [['field' => 'NATIONAL_ID', 'national_id' => '222222220'], 'national_id'],
             'a mobile' => [['field' => 'NATIONAL_ID', 'mobile' => '0599999999'], 'mobile'],
             'a value' => [['field' => 'NATIONAL_ID', 'value' => 'x'], 'value'],
             'a target' => [['field' => 'NATIONAL_ID', 'target' => 'x'], 'target'],
@@ -291,8 +297,8 @@ class FamilyMemberRevealTest extends TestCase
 
     public function test_target_identifiers_in_the_query_string_are_refused_too(): void
     {
-        $h = $this->household('111111111');
-        $other = $this->household('222222222');
+        $h = $this->household('111111110');
+        $other = $this->household('222222220');
 
         foreach (['family_id' => $other['family']->id, 'family_code' => $other['family']->family_code, 'person_id' => $other['spouse']->person_id, 'membership_id' => $other['spouse']->id] as $key => $value) {
             $this->reveal($h['user'], $this->ref($h['spouse']), ['field' => 'NATIONAL_ID'], http_build_query([$key => $value]))
@@ -321,13 +327,13 @@ class FamilyMemberRevealTest extends TestCase
 
     public function test_staff_coordinator_only_and_mixed_accounts_are_refused_by_family_side(): void
     {
-        $h = $this->household('111111111');
+        $h = $this->household('111111110');
         $ref = $this->ref($h['spouse']);
         $accounts = ['coordinator only' => $this->familyUser(['COORDINATOR']), 'role-less' => User::factory()->create()];
         foreach (StaffRoles::ALL as $role) {
             $accounts[$role] = tap(User::factory()->create(), fn (User $u) => $u->assignRole($role));
         }
-        $mixed = $this->household('222222222')['user'];
+        $mixed = $this->household('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 
@@ -353,8 +359,8 @@ class FamilyMemberRevealTest extends TestCase
     public function test_the_minute_ceiling_is_per_user_and_changing_the_member_does_not_reset_it(): void
     {
         config(['family_auth.member_reveal.limits.user_minute' => 3]);
-        $h = $this->household('111111111');
-        $other = $this->household('222222222');
+        $h = $this->household('111111110');
+        $other = $this->household('222222220');
 
         $this->reveal($h['user'], $this->ref($h['spouse']), ['field' => 'NATIONAL_ID'])->assertOk();
         $this->reveal($h['user'], $this->ref($h['child']), ['field' => 'NATIONAL_ID'])->assertOk();

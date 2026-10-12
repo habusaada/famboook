@@ -20,6 +20,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -28,6 +29,7 @@ use Tests\TestCase;
  */
 class AttachFamilyMemberActionTest extends TestCase
 {
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -88,6 +90,8 @@ class AttachFamilyMemberActionTest extends TestCase
 
     public function test_equivalent_matches_are_conservative_and_never_rewrite(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $exact = Person::factory()->create(['national_id' => '401234567']);
         $dashed = Person::factory()->create(['national_id' => '401-234-567']);
         $arabic = Person::factory()->create(['national_id' => '٤٠١٢٣٤٥٦٧']);

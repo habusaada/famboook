@@ -42,7 +42,7 @@ class PublicIdentifierTest extends TestCase
         return app(RegisterFamilyAction::class)->handle([
             'registration_date' => '2026-09-20',
             'registration_source' => 'MANUAL_ENTRY',
-            'household_head' => ['full_name' => $name, 'gender' => 'MALE', 'birth_date' => '1980-01-01'],
+            'household_head' => ['full_name' => $name, 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE', 'birth_date' => '1980-01-01'],
             'clan_code' => 'AL_BREEM',
             'residence' => ['governorate' => 'محافظة تجريبية', 'city' => 'مدينة تجريبية'],
         ], null);
@@ -52,6 +52,7 @@ class PublicIdentifierTest extends TestCase
     {
         return app(AddFamilyMemberAction::class)->handle($family, [
             'full_name' => $name,
+            'national_id' => fake()->unique()->numerify('74#######'),
             'gender' => 'FEMALE',
             'birth_date' => '2005-01-01',
             'relationship_type_id' => RelationshipType::where('code', 'DAUGHTER')->value('id'),

@@ -455,7 +455,7 @@ person_code VARCHAR UNIQUE NOT NULL
 
 full_name VARCHAR NOT NULL
 
-national_id VARCHAR NULL
+national_id VARCHAR NOT NULL UNIQUE   (DB-ADR-061, 2026-10-12; originally NULL, non-unique)
 
 gender VARCHAR NULL
 
@@ -517,7 +517,7 @@ These application rules are intentionally not all encoded as rigid database cons
 Initially:
 
 ```text
-INDEX national_id
+INDEX national_id   (replaced by UNIQUE uq_persons_national_id, DB-ADR-061)
 ```
 
 An unconditional unique constraint should not be introduced until:
@@ -541,7 +541,7 @@ Initial candidates:
 
 ```text
 INDEX person_code
-INDEX national_id
+INDEX national_id   (replaced by UNIQUE uq_persons_national_id, DB-ADR-061)
 INDEX mobile
 INDEX birth_date
 INDEX life_status
@@ -707,6 +707,8 @@ measurement on 100,000 synthetic names: a selective search went from
 or text every name contains) still scan. The exact National ID lookup uses the
 existing `persons.national_id` B-tree index. National ID stays non-UNIQUE;
 creation serializes per value with `pg_advisory_xact_lock(hashtext(…))`.
+(Since DB-ADR-061 the lookup uses the unique index `uq_persons_national_id`,
+and the advisory lock is keyed on the canonical value.)
 
 Pilot Readiness Slice C (docs/03 §93b) adds **no schema change**. Ending a
 membership is an UPDATE (`is_active = false`, `ended_at`, `end_reason`,
@@ -2192,7 +2194,8 @@ documents                §44–§46
 
 - No `users.family_id` (§55).
 - `persons.national_id` is indexed but not unique and stored as entered
-  (PDD-001). It receives **no** UNIQUE constraint. Authentication uses the
+  (PDD-001). It receives **no** UNIQUE constraint. (Superseded 2026-10-12
+  by DB-ADR-061: NOT NULL, canonical nine digits, UNIQUE over every row.) Authentication uses the
   separate `family_auth_identities` key (§55b); no backfill is needed
   because identities are created only at activation.
 - Opaque identifiers (public holder ID, verification credential) must be
@@ -4068,6 +4071,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-061
+National ID uniqueness (2026-10-12, CO-01D.4; Production audit before the change: 3310 Persons, all canonical, 0 missing, 0 invalid, 0 duplicates). Migration `2026_10_20_090000_enforce_unique_person_national_id`, PostgreSQL only: `persons.national_id` SET NOT NULL; `chk_person_national_id_format` CHECK (`^[0-9]{9}$` and not nine identical digits); `uq_persons_national_id` UNIQUE (national_id) over EVERY row — no `deleted_at` predicate, so a soft-deleted Person keeps their value; the plain `persons_national_id_index` is dropped (the unique index replaces it). A direct UNIQUE on the column is sufficient because the CHECK admits only the canonical form: an equivalently formatted value (Arabic digits, spaces, dashes) cannot be stored, so it cannot bypass uniqueness — no generated canonical column is needed. Safety: one transaction; `SET LOCAL lock_timeout = '5s'` then `LOCK TABLE persons IN ACCESS EXCLUSIVE MODE` (no lock upgrade, fails fast behind a long transaction); a pre-flight counts missing, non-canonical / placeholder and duplicate values (soft-deleted included) and refuses — counts only, never a value — so the migration NEVER changes a Person. `down()` restores the previous schema exactly (nullable, no CHECK, no UNIQUE, plain index) without touching rows. Application: `RegistryNationalId` (strict nine-digit normalization, canonical storage, required for every new Person) in `CreatePersonAction`, `RegisterFamilyAction` and `CorrectNationalIdAction`; `NationalIdGuard` refuses a soft-deleted holder without describing it; a unique violation on `uq_persons_national_id` is mapped to the existing duplicate error without the driver message (which carries the value) and without references. SQLite (test suite) has no constraints, as for every CHECK; the application enforces the same rule there.
+
 ### DB-ADR-060
 CO-01C Coordinator members directory (2026-10-12, docs/06 AUTH-ADR-092) adds one additive migration, `2026_10_19_090000_add_family_id_to_auth_security_events`: a nullable `family_id` foreign key to `families` (restrict, like every key of the table) and an index `(family_id, created_at)`. Existing rows keep NULL; no backfill; no existing column, index or CHECK constraint changes, and the table stays append-only (no updated_at, immutable model). The new event type `COORDINATOR_MEMBER_SENSITIVE_REVEALED` (37 characters) fits `string(40)` and `chk_auth_security_event_codes`; the metadata key `field` is already allow-listed. The Coordinator member reference is a keyed HMAC recomputed per request and never stored. The revealed value is never stored.
 
@@ -4377,6 +4383,7 @@ Date: 2026-09-24
 | 1.2.41 | 2026-10-07 | Approved | PWA-5b: no migration — the PWA-5a schema carries the engine (failure counters and codes, AE-4 CHECK, uncommitted conflict keys, replay against the stored proposal) (DB-ADR-059) |
 | 1.2.42 | 2026-10-08 | Approved | PWA-6.1a: §99 RESIDENCE_UPDATE mapping corrected to ResidenceUpdateHandler → UpdateFamilyResidenceAction (no schema change) |
 | 1.2.43 | 2026-10-12 | Approved | CO-01C (DB-ADR-060): nullable `auth_security_events.family_id` FK (restrict) and `(family_id, created_at)` index for the audited Coordinator member reveal; additive, no backfill |
+| 1.2.44 | 2026-10-12 | Approved | CO-01D.4 (DB-ADR-061): `persons.national_id` NOT NULL, canonical nine-digit CHECK and UNIQUE over every row (soft-deleted included); pre-flight refuses dirty data, lock_timeout 5s, exact rollback; no Person changed |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

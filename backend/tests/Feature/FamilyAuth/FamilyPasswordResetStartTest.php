@@ -189,7 +189,7 @@ class FamilyPasswordResetStartTest extends TestCase
         match ($case) {
             'unknown' => $id = self::UNKNOWN_ID,
             'not-activated' => (function () use (&$id) {
-                [$other] = $this->eligibleHead($id = '444444444');
+                [$other] = $this->eligibleHead($id = '444444440');
                 $this->trustedMobile($other, '0597777777');
             })(),
             'identity-suspended' => $identity->forceFill(['status' => 'SUSPENDED'])->save(),
@@ -200,7 +200,7 @@ class FamilyPasswordResetStartTest extends TestCase
             'link-ended' => $link->forceFill(['status' => UserPersonLinkStatus::ENDED, 'ended_at' => now(), 'end_reason' => 'ADMINISTRATIVE'])->save(),
             'deceased' => $person->forceFill(['life_status' => LifeStatus::DECEASED, 'death_date' => now()->toDateString()])->save(),
             'person-inactive' => $person->forceFill(['is_active' => false])->save(),
-            'id-changed' => $person->forceFill(['national_id' => '222222222'])->saveQuietly(),
+            'id-changed' => $person->forceFill(['national_id' => '222222220'])->saveQuietly(),
             'non-head' => $membership->forceFill(['is_household_head' => false])->save(),
             'family-inactive' => $family->forceFill(['status' => collect(FamilyStatus::cases())->first(fn ($s) => $s !== FamilyStatus::ACTIVE)])->save(),
             'family-deleted' => $family->delete(),
@@ -465,9 +465,9 @@ class FamilyPasswordResetStartTest extends TestCase
     {
         // A real activation flow for another Person (activation has no decoy
         // since FP-ADR-054).
-        [$other] = $this->eligibleHead('444444444');
+        [$other] = $this->eligibleHead('444444440');
         $this->trustedMobile($other, '0597777777');
-        $reference = $this->startActivationChallenge('444444444');
+        $reference = $this->startActivationChallenge('444444440');
         $code = $this->sms->lastCode();
 
         $this->assertRefused($this->verify($reference, $code), 422, 'OTP_INVALID');

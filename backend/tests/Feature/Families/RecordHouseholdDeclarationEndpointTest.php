@@ -282,9 +282,9 @@ class RecordHouseholdDeclarationEndpointTest extends TestCase
 
     public function test_family_side_coordinator_and_mixed_accounts_never_reach_it(): void
     {
-        $familyUser = $this->activatedHead('111111111');
-        $coordinator = $this->coordinator('222222222');
-        $mixed = $this->activatedHead('333333333')['user'];
+        $familyUser = $this->activatedHead('111111110');
+        $coordinator = $this->coordinator('222222220');
+        $mixed = $this->activatedHead('333333330')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         foreach ([$familyUser['user'], $coordinator, $mixed] as $user) {
             // Even holding the permission directly, even for their own Family.

@@ -417,8 +417,8 @@ class IdentitySchemaTest extends TestCase
     {
         // Persons with a mobile and a National ID exist; nothing is derived.
         Person::factory()->count(3)->create(['mobile' => '0591234567']);
-        // persons.national_id received no UNIQUE constraint (docs/11 §30a).
-        Person::factory()->count(2)->create(['national_id' => '123456789']);
+        // (Since CO-01D.4 persons.national_id IS unique — docs/04 DB-ADR-061,
+        // NationalIdUniquenessPostgresTest — superseding the earlier rule here.)
 
         foreach (['user_person_links', 'family_auth_identities', 'person_mobile_trusts', 'auth_otp_challenges',
             'auth_security_events', 'coordinator_scope_assignments'] as $table) {

@@ -22,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\Support\LegacyNationalIds;
 use Tests\Support\SyntheticXlsx;
 use Tests\TestCase;
 
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 class DryRunTest extends TestCase
 {
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     private const BASE = '/api/v1/imports/initial-families';
@@ -199,6 +201,8 @@ class DryRunTest extends TestCase
 
     public function test_a_head_without_national_id_is_created_and_never_matched_by_name(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         Person::factory()->create(['full_name' => 'اسم فريد للغاية', 'national_id' => null]);
         $id = $this->batch([2 => $this->row(['id' => null, 'name' => 'اسم فريد مختلف'])]);
 
@@ -349,6 +353,8 @@ class DryRunTest extends TestCase
 
     public function test_a_spouse_name_without_national_id_is_never_created_or_matched(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         Person::factory()->create(['full_name' => 'زوجة بلا هوية', 'national_id' => null]);
         $id = $this->batch([2 => $this->row(['id' => 910000131], [[null, 'زوجة بلا هوية']])]);
 

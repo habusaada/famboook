@@ -45,6 +45,7 @@ class FamilyResidenceDisplacementTest extends TestCase
             'registration_source' => 'PAPER_FORM',
             'household_head' => [
                 'full_name' => 'سامي عادل التجريبي',
+                'national_id' => fake()->unique()->numerify('74#######'),
                 'gender' => 'MALE',
                 'birth_date' => '1985-06-01',
                 'mobile' => '0590000001',

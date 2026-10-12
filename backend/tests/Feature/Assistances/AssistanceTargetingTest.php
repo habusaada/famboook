@@ -307,7 +307,7 @@ class AssistanceTargetingTest extends TestCase
 
     public function test_preview_exposes_only_minimal_indicators(): void
     {
-        $family = $this->family(2, ['national_id' => '9990003331', 'mobile' => '0799993331', 'displacement' => 'DISPLACED']);
+        $family = $this->family(2, ['national_id' => '999000333', 'mobile' => '0799993331', 'displacement' => 'DISPLACED']);
         $member = $this->addMember($family, ['birth_date' => '2026-01-01']);
         $this->healthRecord($member, 'CHRONIC_DISEASE', ['condition_name' => 'مرض سري اختباري', 'details' => 'تفاصيل سرية اختبارية']);
         $this->healthRecord($this->addMember($family), 'PREGNANCY', ['details' => 'ملاحظة حمل سرية']);
@@ -327,7 +327,7 @@ class AssistanceTargetingTest extends TestCase
             ->assertJsonPath('data.0.indicators.children_under_two', 1);
 
         $raw = $response->getContent();
-        foreach (['9990003331', '0799993331', 'national_id', 'mobile', 'مرض سري اختباري', 'تفاصيل سرية اختبارية',
+        foreach (['999000333', '0799993331', 'national_id', 'mobile', 'مرض سري اختباري', 'تفاصيل سرية اختبارية',
             'ملاحظة حمل سرية', 'وصف احتياج سري', 'عنوان احتياج', 'ملاحظة تقييم سرية', 'person_code', 'family_id',
             'birth_date', '"id":'] as $secret) {
             $this->assertStringNotContainsString($secret, $raw, $secret);

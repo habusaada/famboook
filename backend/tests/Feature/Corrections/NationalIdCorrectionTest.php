@@ -24,11 +24,11 @@ class NationalIdCorrectionTest extends TestCase
     use BuildsRegistryFixtures;
     use RefreshDatabase;
 
-    private const OLD = 'SYN-400111222';
+    private const OLD = '400111222';
 
-    private const NEW = 'SYN-400333444';
+    private const NEW = '400333444';
 
-    private const TAKEN = 'SYN-400555666';
+    private const TAKEN = '400555666';
 
     /** @var array{family_code: string, person_code: string} */
     private array $family;
@@ -117,10 +117,8 @@ class NationalIdCorrectionTest extends TestCase
             $this->assertNoFullId($response);
         }
 
-        // Not recorded → null (only visible to masked-view holders).
-        $withoutId = $this->family('رب بلا هوية');
-        $this->actingAs($this->user('ADMINISTRATOR'))->getJson("/api/v1/people/{$withoutId['person_code']}")
-            ->assertOk()->assertJsonPath('data.national_id_masked', null);
+        // CO-01D.4: a Person can no longer be registered without a National
+        // ID; the masking of a legacy NULL is covered by the mask helper test.
     }
 
     public function test_no_api_response_prefills_or_leaks_the_full_national_id(): void
@@ -167,7 +165,7 @@ class NationalIdCorrectionTest extends TestCase
             ['national_id' => null, 'national_id_confirmation' => null],
             ['national_id' => '   ', 'national_id_confirmation' => '   '],
             ['national_id' => self::NEW],
-            ['national_id' => self::NEW, 'national_id_confirmation' => 'SYN-400333445'],
+            ['national_id' => self::NEW, 'national_id_confirmation' => '400333445'],
             ['national_id' => str_repeat('9', 51), 'national_id_confirmation' => str_repeat('9', 51)],
         ] as $body) {
             $this->assertNoFullId(
@@ -225,7 +223,7 @@ class NationalIdCorrectionTest extends TestCase
     {
         $admin = $this->user('ADMINISTRATOR');
         for ($i = 0; $i < 30; $i++) {
-            $value = "SYN-RATE-{$i}";
+            $value = sprintf('4009%05d', $i);
             $this->actingAs($admin)->putJson("/api/v1/people/{$this->family['person_code']}/national-id", [
                 'national_id' => $value, 'national_id_confirmation' => $value,
             ])->assertOk();

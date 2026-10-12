@@ -30,6 +30,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionProperty;
 use Tests\Support\FakeSmsSender;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -41,6 +42,7 @@ use Tests\TestCase;
 class FamilyActivationStartTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private const START = '/api/v1/family/auth/activation/start';
 
@@ -221,6 +223,8 @@ class FamilyActivationStartTest extends TestCase
 
     private function arrangeDenial(string $case): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         if ($case === 'unknown') {
             return;
         }
@@ -387,7 +391,7 @@ class FamilyActivationStartTest extends TestCase
         $this->assertRefused($this->start($id), 429, 'TOO_MANY_REQUESTS');
 
         // Another identifier is unaffected; the hour passes and it reopens.
-        $this->assertRefused($this->start('111111111'), 422, 'ACTIVATION_REFUSED');
+        $this->assertRefused($this->start('111111110'), 422, 'ACTIVATION_REFUSED');
         $this->travel(3601)->seconds();
         $this->assertNotSame(429, $this->start($id)->status());
     }
@@ -453,7 +457,7 @@ class FamilyActivationStartTest extends TestCase
         Sleep::assertSleptTimes(5);
 
         config(['family_auth.activation.min_response_ms' => 0]);
-        $this->start('111111111');
+        $this->start('111111110');
         Sleep::assertSleptTimes(5);
     }
 

@@ -79,6 +79,7 @@ class ClanStructureTest extends TestCase
             'registration_source' => 'MANUAL_ENTRY',
             'household_head' => [
                 'full_name' => 'رب أسرة تجريبي',
+                'national_id' => fake()->unique()->numerify('74#######'),
                 'gender' => 'MALE',
                 'birth_date' => '1980-01-01',
             ],

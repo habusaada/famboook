@@ -259,12 +259,12 @@ class CoordinatorMembersDirectoryTest extends TestCase
         $ref = $this->refOf($this->member($family, ['national_id' => self::NID]));
         $user = match ($case) {
             'staff' => tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN')),
-            'family-user' => $this->activatedHead('111111111')['user'],
+            'family-user' => $this->activatedHead('111111110')['user'],
             'coordinator-only' => $this->familyUser(['COORDINATOR']),
             'no-assignment' => $this->coordinator(),
             'no-role' => $this->coordinator(roles: ['FAMILY_USER']),
             'ineligible' => (function () {
-                $head = $this->activatedHead('111111111', ['FAMILY_USER', 'COORDINATOR']);
+                $head = $this->activatedHead('111111110', ['FAMILY_USER', 'COORDINATOR']);
                 $head['family']->delete();
 
                 return $head['user'];
@@ -298,7 +298,7 @@ class CoordinatorMembersDirectoryTest extends TestCase
         $unbranched = $this->familyIn($clanA);
 
         // Several branches: their union, nothing else.
-        $branches = $this->coordinator('111111111');
+        $branches = $this->coordinator('111111110');
         $this->assign($branches, $b1);
         $this->assign($branches, $b2);
         $this->directory($branches, $f1->family_code)->assertOk();
@@ -308,7 +308,7 @@ class CoordinatorMembersDirectoryTest extends TestCase
         $this->directory($branches, $unbranched->family_code)->assertNotFound();
 
         // A whole Clan: every Family of that Clan (unbranched included), none of another.
-        $clanScope = $this->coordinator('222222222');
+        $clanScope = $this->coordinator('222222220');
         $this->assign($clanScope, $clanA);
         foreach ([$f1, $f2, $f3, $unbranched] as $family) {
             $this->directory($clanScope, $family->family_code)->assertOk();
@@ -502,7 +502,7 @@ class CoordinatorMembersDirectoryTest extends TestCase
 
     public function test_existing_security_events_keep_a_null_family(): void
     {
-        $this->activatedHead('333333333');
+        $this->activatedHead('333333330');
         $other = AuthSecurityEvent::query()->create(['event_type' => AuthSecurityEventType::LOGIN_SUCCEEDED, 'outcome' => 'SUCCESS']);
 
         $this->assertNull($other->fresh()->family_id);

@@ -21,6 +21,18 @@ class NationalIdAuditTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // The audit exists for LEGACY data the CO-01D.4 constraints now forbid
+        // (missing, non-canonical, duplicate). On PostgreSQL the legacy schema
+        // is restored inside this test's transaction, which RefreshDatabase
+        // rolls back — the constraints are back for the next test.
+        if (DB::getDriverName() === 'pgsql') {
+            (require database_path('migrations/2026_10_20_090000_enforce_unique_person_national_id.php'))->down();
+        }
+    }
+
     /** Runs the audit; returns [exit code, output]. */
     private function audit(array $options = []): array
     {

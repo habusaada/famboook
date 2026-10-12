@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Spatie\Permission\Models\Role;
+use Tests\Support\LegacyNationalIds;
 use Tests\Support\SyntheticXlsx;
 use Tests\TestCase;
 
@@ -31,6 +32,7 @@ use Tests\TestCase;
  */
 class ReconciliationTest extends TestCase
 {
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     private const BASE = '/api/v1/imports/initial-families';
@@ -247,6 +249,8 @@ class ReconciliationTest extends TestCase
 
     public function test_17_ambiguous_evidence_requires_review(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         // Existing Person with a different birth date (material identity mismatch).
         Person::factory()->create(['national_id' => '900000001', 'full_name' => 'رب أسرة تجريبي', 'gender' => 'MALE', 'birth_date' => '1975-05-05']);
         // Registry holds the ID only in another format (digits with separators).

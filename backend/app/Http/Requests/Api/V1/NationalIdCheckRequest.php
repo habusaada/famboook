@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Support\RegistryNationalId;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -23,7 +24,8 @@ class NationalIdCheckRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'national_id' => ['required', 'string', 'max:50'],
+            // CO-01D.4: the same nine-digit rule as creation; checked canonically.
+            'national_id' => ['required', 'string', 'max:50', RegistryNationalId::rule()],
         ];
     }
 

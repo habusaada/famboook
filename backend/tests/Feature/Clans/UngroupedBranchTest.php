@@ -93,7 +93,7 @@ class UngroupedBranchTest extends TestCase
         return $this->actingAs($this->admin('DATA_ENTRY'))->postJson('/api/v1/families', [
             'registration_date' => '2026-09-01',
             'registration_source' => 'MANUAL_ENTRY',
-            'household_head' => ['full_name' => 'رب أسرة تجريبي', 'gender' => 'MALE'],
+            'household_head' => ['full_name' => 'رب أسرة تجريبي', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE'],
             'residence' => ['city' => 'مدينة تجريبية'],
             ...$lineage,
         ]);

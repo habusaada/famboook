@@ -249,7 +249,7 @@ class FamilyHouseholdHealthTest extends TestCase
     public function test_another_household_is_never_included(): void
     {
         $head = $this->activatedHead('123456789');
-        $other = $this->activatedHead('222222222');
+        $other = $this->activatedHead('222222220');
         $this->chronic($other['person'], 'مرض أسرة أخرى');
         $otherSon = $this->member($other['family'], 'ابن أسرة أخرى');
         $this->disability($otherSon->person, 'MOTOR');
@@ -333,7 +333,7 @@ class FamilyHouseholdHealthTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->activatedHead('222222222');
+        $mixed = $this->activatedHead('222222220');
         $this->chronic($mixed['person'], 'مرض حساب مختلط');
         $mixed['user']->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed['user'];

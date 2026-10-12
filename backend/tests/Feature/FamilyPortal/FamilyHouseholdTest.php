@@ -157,8 +157,8 @@ class FamilyHouseholdTest extends TestCase
 
     public function test_spoofed_identifiers_never_switch_the_family(): void
     {
-        $mine = $this->activatedHead('111111111');
-        $other = $this->activatedHead('222222222');
+        $mine = $this->activatedHead('111111110');
+        $other = $this->activatedHead('222222220');
         $this->addMembers($other['family'], 6);
         FamilyHouseholdDeclaration::factory()->create(['family_id' => $other['family']->id, 'declared_household_size' => 12]);
         $expected = $this->fetch($mine['user'])->assertOk()->json();
@@ -181,8 +181,8 @@ class FamilyHouseholdTest extends TestCase
 
     public function test_each_head_only_ever_sees_their_own_household(): void
     {
-        $a = $this->activatedHead('111111111');
-        $b = $this->activatedHead('222222222');
+        $a = $this->activatedHead('111111110');
+        $b = $this->activatedHead('222222220');
         $this->addMembers($b['family'], 3);
 
         $this->fetch($a['user'])->assertOk()
@@ -256,7 +256,7 @@ class FamilyHouseholdTest extends TestCase
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
         // An eligible head that also holds a Staff role.
-        $mixed = $this->activatedHead('222222222')['user'];
+        $mixed = $this->activatedHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 
@@ -329,9 +329,9 @@ class FamilyHouseholdTest extends TestCase
 
     public function test_the_query_count_does_not_grow_with_the_household(): void
     {
-        $small = $this->activatedHead('111111111');
+        $small = $this->activatedHead('111111110');
         $this->addMembers($small['family'], 1);
-        $large = $this->activatedHead('222222222');
+        $large = $this->activatedHead('222222220');
         $this->addMembers($large['family'], 15);
         FamilyHouseholdDeclaration::factory()->create(['family_id' => $large['family']->id]);
 

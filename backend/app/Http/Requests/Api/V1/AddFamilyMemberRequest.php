@@ -5,6 +5,7 @@ namespace App\Http\Requests\Api\V1;
 use App\Enums\Gender;
 use App\Enums\MaritalStatus;
 use App\Models\RelationshipType;
+use App\Support\RegistryNationalId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +20,8 @@ class AddFamilyMemberRequest extends FormRequest
     {
         return [
             'full_name' => ['required', 'string', 'max:255'],
-            'national_id' => ['nullable', 'string', 'max:50'],
+            // CO-01D.4: required, nine digits (stored canonically by the action).
+            'national_id' => ['required', 'string', 'max:50', RegistryNationalId::rule()],
             'gender' => ['required', Rule::enum(Gender::class)],
             // Optional; defaults to UNKNOWN (never inferred).
             'marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
@@ -41,6 +43,15 @@ class AddFamilyMemberRequest extends FormRequest
                     }
                 },
             ],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'national_id.required' => RegistryNationalId::MESSAGE,
+            'national_id.string' => RegistryNationalId::MESSAGE,
         ];
     }
 }

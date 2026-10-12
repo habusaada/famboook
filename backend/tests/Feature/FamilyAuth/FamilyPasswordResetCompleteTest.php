@@ -253,9 +253,9 @@ class FamilyPasswordResetCompleteTest extends TestCase
     public function test_a_verified_activation_challenge_cannot_reset_a_password(): void
     {
         // Another Person activates: their verified ACTIVATION grant is real and open.
-        [$other] = $this->eligibleHead('444444444');
+        [$other] = $this->eligibleHead('444444440');
         $this->trustedMobile($other, '0597777777');
-        $activation = $this->startActivationChallenge('444444444');
+        $activation = $this->startActivationChallenge('444444440');
         $this->postJson(self::ACTIVATION.'/verify', ['challenge' => $activation, 'code' => $this->sms->lastCode()])->assertOk();
 
         $this->assertRefused($this->complete($activation), 422, 'OTP_INVALID');
@@ -389,7 +389,7 @@ class FamilyPasswordResetCompleteTest extends TestCase
         // Two other devices of this account, and somebody else's session.
         $this->sessionRowFor($this->user);
         $this->sessionRowFor($this->user);
-        $other = $this->activatedHead('555555555');
+        $other = $this->activatedHead('555555550');
         $this->sessionRowFor($other['user']);
         $old = DB::table('sessions')->where('user_id', $this->user->id)->pluck('id')->all();
         $this->assertCount(2, $old);

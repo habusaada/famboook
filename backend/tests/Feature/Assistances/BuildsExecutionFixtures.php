@@ -46,7 +46,9 @@ trait BuildsExecutionFixtures
             'gender' => 'MALE',
             'marital_status' => 'MARRIED',
             'birth_date' => '1975-01-01',
-            'national_id' => '800000001',
+            // The first household keeps the well-known 800000001; later ones a
+            // unique synthetic value (CO-01D.4: National IDs are unique).
+            'national_id' => Person::withTrashed()->where('national_id', '800000001')->exists() ? fake()->unique()->numerify('74#######') : '800000001',
             'mobile' => '0590000001',
             ...$head,
         ]);

@@ -16,6 +16,7 @@ use App\Http\Resources\PersonResource;
 use App\Http\Resources\PersonSummaryResource;
 use App\Models\Person;
 use App\Support\NationalIdGuard;
+use App\Support\RegistryNationalId;
 use App\Support\RegistrySearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,10 +59,13 @@ class PersonController extends Controller
      */
     public function nationalIdCheck(NationalIdCheckRequest $request): JsonResponse
     {
-        $matches = NationalIdGuard::matches($request->validated('national_id'));
+        $nationalId = (string) RegistryNationalId::canonical($request->validated('national_id'));
+        $matches = NationalIdGuard::matches($nationalId);
 
         return response()->json(['data' => [
-            'exists' => $matches->isNotEmpty(),
+            // A soft-deleted holder still owns the value (CO-01D.4); it is
+            // counted, never described.
+            'exists' => $matches->isNotEmpty() || NationalIdGuard::heldByDeleted($nationalId),
             'matches' => NationalIdGuard::describe($matches, $request),
         ]]);
     }

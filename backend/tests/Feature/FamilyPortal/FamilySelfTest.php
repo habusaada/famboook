@@ -158,20 +158,20 @@ class FamilySelfTest extends TestCase
 
     public function test_the_returned_person_is_the_family_context_person_whatever_the_request_says(): void
     {
-        $mine = $this->completeHead('111111111');
-        $other = $this->completeHead('222222222');
+        $mine = $this->completeHead('111111110');
+        $other = $this->completeHead('222222220');
         $other['person']->forceFill(['full_name' => 'رب أسرة أخرى'])->save();
         $expected = $this->fetch($mine['user'])->assertOk()->json();
 
         $query = http_build_query([
             'person_id' => $other['person']->id, 'person_code' => $other['person']->person_code, 'family_id' => $other['family']->id,
-            'family_code' => $other['family']->family_code, 'membership_id' => $other['membership']->id, 'national_id' => '222222222',
+            'family_code' => $other['family']->family_code, 'membership_id' => $other['membership']->id, 'national_id' => '222222220',
             'user_id' => $other['user']->id,
         ]);
         $spoofed = $this->fetch($mine['user'], self::URI.'?'.$query)->assertOk();
 
         $this->assertSame($expected, $spoofed->json());
-        $this->assertSame('*****1111', $spoofed->json('data.national_id_masked'));
+        $this->assertSame('*****1110', $spoofed->json('data.national_id_masked'));
         $this->assertStringNotContainsString('رب أسرة أخرى', $spoofed->getContent());
     }
 
@@ -218,7 +218,7 @@ class FamilySelfTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->completeHead('222222222')['user'];
+        $mixed = $this->completeHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 

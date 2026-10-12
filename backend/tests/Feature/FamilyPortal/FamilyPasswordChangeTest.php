@@ -127,7 +127,7 @@ class FamilyPasswordChangeTest extends TestCase
         config(['session.driver' => 'database']);
         $this->sessionRowFor($this->user);
         $this->sessionRowFor($this->user);
-        $other = $this->activatedHead('555555555');
+        $other = $this->activatedHead('555555550');
         $this->sessionRowFor($other['user']);
         $old = DB::table('sessions')->where('user_id', $this->user->id)->pluck('id')->all();
         $this->assertCount(2, $old);
@@ -239,7 +239,7 @@ class FamilyPasswordChangeTest extends TestCase
         $this->assertCount(5, $this->changeEvents());
 
         // Another user has their own bucket; this one is still signed in and can log in.
-        $other = $this->activatedHead('555555555');
+        $other = $this->activatedHead('555555550');
         $this->change(['current_password' => 'wrong'], self::BROWSER, $other['user'])->assertUnprocessable();
         $this->getJson('/api/v1/family/account', self::BROWSER)->assertOk();
 
@@ -305,9 +305,9 @@ class FamilyPasswordChangeTest extends TestCase
 
     public function test_no_identifier_in_the_body_can_choose_another_account(): void
     {
-        $other = $this->activatedHead('555555555');
+        $other = $this->activatedHead('555555550');
 
-        $this->change(['user_id' => $other['user']->id, 'national_id' => '555555555'])->assertOk();
+        $this->change(['user_id' => $other['user']->id, 'national_id' => '555555550'])->assertOk();
 
         $this->assertTrue(Hash::check(self::NEW_PASSWORD, $this->user->fresh()->password));
         $this->assertTrue(Hash::check(self::OLD_PASSWORD, $other['user']->fresh()->password));

@@ -29,6 +29,7 @@ use PDO;
 use PDOException;
 use Spatie\Permission\Models\Role;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 use Throwable;
 
@@ -56,6 +57,7 @@ use Throwable;
 class AddFamilyMemberDeadlockTest extends TestCase
 {
     use DatabaseTruncation, FamilyIdentityFixtures;
+    use LegacyNationalIds;
 
     /** @var list<string> reference data created by migrations */
     protected $exceptTables = ['clans', 'relationship_types'];
@@ -186,6 +188,8 @@ class AddFamilyMemberDeadlockTest extends TestCase
 
     public function test_apply_and_a_staff_national_id_correction_of_the_matched_person_never_deadlock(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $person = Person::factory()->create(['national_id' => '401-234-567', 'life_status' => LifeStatus::ALIVE, 'is_active' => true]);
         $request = $this->approved();
 

@@ -35,7 +35,7 @@ class RegisterFamilyTest extends TestCase
             'notes' => 'ملاحظة اختبار',
             'household_head' => [
                 'full_name' => 'محمد أحمد الشريف',
-                'national_id' => '1234567890',
+                'national_id' => '912340001',
                 'gender' => 'MALE',
                 'birth_date' => '1982-03-14',
                 'mobile' => '0790000000',
@@ -57,7 +57,7 @@ class RegisterFamilyTest extends TestCase
         $response = $this->actingAs($user)->postJson('/api/v1/families', $this->validPayload())->assertCreated();
         // The action hands the resource a Family with the declaration relation loaded (empty).
         $second = $this->validPayload();
-        $second['household_head']['national_id'] = null; // a different household
+        $second['household_head']['national_id'] = '912340002'; // a different household
         $registered = app(RegisterFamilyAction::class)->handle($second, $user->id);
         $this->assertTrue($registered->relationLoaded('currentHouseholdDeclaration'));
 

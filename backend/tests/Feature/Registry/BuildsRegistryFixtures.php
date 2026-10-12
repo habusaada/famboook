@@ -14,6 +14,17 @@ trait BuildsRegistryFixtures
 {
     protected User $staff;
 
+    private static int $syntheticNationalIdSeq = 0;
+
+    /**
+     * A unique, valid, synthetic National ID (CO-01D.4: every new Person has
+     * one): "73" + a seven-digit counter — a prefix no test hard-codes.
+     */
+    protected function syntheticNationalId(): string
+    {
+        return '73'.str_pad((string) ++self::$syntheticNationalIdSeq, 7, '0', STR_PAD_LEFT);
+    }
+
     protected function setUpRegistry(): void
     {
         $this->seed(RolePermissionSeeder::class);
@@ -47,6 +58,7 @@ trait BuildsRegistryFixtures
             'clan_code' => 'AL_BREEM',
             'household_head' => [
                 'full_name' => 'رب أسرة تجريبي',
+                'national_id' => $this->syntheticNationalId(),
                 'gender' => 'MALE',
                 'birth_date' => '1980-01-15',
                 ...$head,
@@ -58,7 +70,7 @@ trait BuildsRegistryFixtures
     /** @return array{family_code: string, person_code: string} */
     protected function family(string $headName, ?string $nationalId = null): array
     {
-        $response = $this->register(['full_name' => $headName, 'national_id' => $nationalId])->assertCreated();
+        $response = $this->register(['full_name' => $headName, ...($nationalId === null ? [] : ['national_id' => $nationalId])])->assertCreated();
 
         return [
             'family_code' => $response->json('data.family_code'),
@@ -71,6 +83,7 @@ trait BuildsRegistryFixtures
     {
         return $this->actingAs($as ?? $this->staff)->postJson("/api/v1/families/{$familyCode}/members", [
             'full_name' => 'فرد تجريبي',
+            'national_id' => $this->syntheticNationalId(),
             'gender' => 'FEMALE',
             'birth_date' => '2010-05-05',
             'relationship_type_id' => RelationshipType::where('code', 'DAUGHTER')->value('id'),

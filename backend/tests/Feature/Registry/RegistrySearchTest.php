@@ -26,7 +26,7 @@ class RegistrySearchTest extends TestCase
     /** 17 synthetic families: one distinctive, sixteen generic. */
     private function manyFamilies(): array
     {
-        $target = $this->family('سلمى عبدالله القديرة', 'SYN-NID-0001');
+        $target = $this->family('سلمى عبدالله القديرة', '912340099');
         for ($i = 1; $i <= 16; $i++) {
             $this->family("رب أسرة رقم {$i}");
         }
@@ -106,7 +106,7 @@ class RegistrySearchTest extends TestCase
         $this->actingAs($this->user('FAMILY_USER'))->getJson('/api/v1/families')->assertForbidden();
 
         $response = $this->actingAs($this->user('REPORTS_VIEWER'))->getJson('/api/v1/families?search=القديرة')->assertOk();
-        $this->assertNoLeak($response, ['SYN-NID-0001']);
+        $this->assertNoLeak($response, ['912340099']);
     }
 
     // -------------------------------------------------------------- people
@@ -145,7 +145,7 @@ class RegistrySearchTest extends TestCase
 
     public function test_people_registry_requires_person_view_and_gates_family_context(): void
     {
-        $this->family('سلمى عبدالله القديرة', 'SYN-NID-0001');
+        $this->family('سلمى عبدالله القديرة', '912340099');
         Auth::forgetGuards();
         $this->getJson('/api/v1/people')->assertUnauthorized();
         $this->actingAs($this->user('FAMILY_USER'))->getJson('/api/v1/people')->assertForbidden();
@@ -155,6 +155,6 @@ class RegistrySearchTest extends TestCase
             ['person_code', 'full_name', 'gender', 'birth_date', 'life_status', 'family'],
             array_keys($response->json('data.0')),
         );
-        $this->assertNoLeak($response, ['SYN-NID-0001', 'mobile']);
+        $this->assertNoLeak($response, ['912340099', 'mobile']);
     }
 }

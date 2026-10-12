@@ -16,7 +16,9 @@ class PersonFactory extends Factory
         return [
             'person_code' => 'PER-'.fake()->unique()->numerify('######'),
             'full_name' => fake()->name(),
-            'national_id' => null,
+            // CO-01D.4: every Person has a unique nine-digit National ID.
+            // Synthetic: 97 + seven digits — a prefix no test hard-codes, never a placeholder.
+            'national_id' => fake()->unique()->numerify('97#######'),
             'gender' => fake()->randomElement(Gender::cases())->value,
             'birth_date' => fake()->date(max: '-1 years'),
             'life_status' => LifeStatus::ALIVE->value,

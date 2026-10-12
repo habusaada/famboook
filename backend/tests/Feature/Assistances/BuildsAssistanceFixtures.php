@@ -71,7 +71,12 @@ trait BuildsAssistanceFixtures
                 'full_name' => ($options['name'] ?? 'فرد تجريبي').' '.$i,
                 'birth_date' => '1990-01-01',
                 'gender' => 'FEMALE',
-                'national_id' => $options['national_id'] ?? null,
+                // CO-01D.4: every Person has a unique nine-digit National ID;
+                // an explicit null simulates LEGACY data (LegacyNationalIds).
+                // A given value goes to the first member only (National IDs are
+                // unique); a null stays null for every member (legacy data).
+                'national_id' => array_key_exists('national_id', $options) && ($i === 0 || $options['national_id'] === null)
+                    ? $options['national_id'] : fake()->unique()->numerify('74#######'),
                 'mobile' => $options['mobile'] ?? null,
             ]);
             FamilyMembership::factory()->create([

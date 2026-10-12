@@ -63,7 +63,7 @@ trait CoordinatorFixtures
     }
 
     /** An activated, eligible household head who also holds COORDINATOR. */
-    protected function coordinator(string $nationalId = '111111111', ?array $roles = null): User
+    protected function coordinator(string $nationalId = '111111110', ?array $roles = null): User
     {
         $head = $this->activatedHead($nationalId, $roles ?? ['FAMILY_USER', 'COORDINATOR']);
 

@@ -28,7 +28,7 @@ class AssessmentApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const NATIONAL_ID = '9990007771';
+    private const NATIONAL_ID = '999000777';
 
     private const HEALTH_DETAILS = 'تفاصيل صحية اختبارية سرية';
 

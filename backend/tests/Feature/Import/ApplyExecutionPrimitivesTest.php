@@ -41,6 +41,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\LegacyNationalIds;
 use Tests\Support\SyntheticXlsx;
 use Tests\TestCase;
 
@@ -53,6 +54,7 @@ use Tests\TestCase;
  */
 class ApplyExecutionPrimitivesTest extends TestCase
 {
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     private const BASE = '/api/v1/imports/initial-families';
@@ -270,7 +272,7 @@ class ApplyExecutionPrimitivesTest extends TestCase
     {
         $family = app(RegisterFamilyAction::class)->handle([
             'registration_date' => '2026-09-01', 'registration_source' => 'MANUAL_ENTRY', 'clan_code' => 'AL_BREEM',
-            'household_head' => ['full_name' => 'رب أسرة', 'gender' => 'MALE'],
+            'household_head' => ['full_name' => 'رب أسرة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE'],
             'residence' => ['city' => 'مدينة', 'displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => 'تُهمَل', 'original_residence_text' => 'أصلية'],
         ], $this->admin->id);
 
@@ -364,6 +366,8 @@ class ApplyExecutionPrimitivesTest extends TestCase
 
     public function test_an_external_change_to_a_batch_decision_input_is_not_masked(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $batch = $this->batch([2 => $this->row(['id' => 920000301])]);
         $planner = app(ImportApplyPlanner::class);
         $approved = $planner->plan($batch);
@@ -451,7 +455,7 @@ class ApplyExecutionPrimitivesTest extends TestCase
     {
         app(RegisterFamilyAction::class)->handle([
             'registration_date' => '2026-09-01', 'registration_source' => 'IMPORT', 'clan_code' => 'AL_BREEM',
-            'household_head' => ['full_name' => 'رب أسرة', 'gender' => 'MALE'], 'residence' => ['city' => 'مدينة'],
+            'household_head' => ['full_name' => 'رب أسرة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE'], 'residence' => ['city' => 'مدينة'],
         ], null);
 
         $this->assertSame(0, FamilyActivity::where('event_type', FamilyActivityType::FAMILY_IMPORTED)->count());

@@ -6,6 +6,7 @@ use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
 use App\Models\Family;
 use App\Support\NationalIdGuard;
+use App\Support\RegistryNationalId;
 use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
 
@@ -60,12 +61,15 @@ class RegisterFamilyAction
      */
     public function handle(array $data, ?int $actingUserId): Family
     {
-        return DB::transaction(function () use ($data, $actingUserId) {
+        // CO-01D.4: the head's National ID is required, canonical nine digits.
+        $headNationalId = RegistryNationalId::required($data['household_head']['national_id'] ?? null, 'household_head.national_id');
+
+        return DB::transaction(function () use ($data, $actingUserId, $headNationalId) {
             // Clan/Branch are validated before anything is written.
             $this->families->lineage($data);
             // Never a second Person with the same National ID (docs/03 §21);
             // checked before the Family id is reserved so codes never skip.
-            NationalIdGuard::assertAvailable($data['household_head']['national_id'] ?? null, 'household_head.national_id');
+            NationalIdGuard::assertAvailable($headNationalId, 'household_head.national_id');
             // The household head carries the canonical HEAD relationship type
             // (docs/02 §15); a missing or inactive seed fails here, before any
             // registry write (MissingRelationshipTypeException).
@@ -78,7 +82,7 @@ class RegisterFamilyAction
             $head = $data['household_head'];
             $person = $this->persons->handle([
                 'full_name' => $head['full_name'],
-                'national_id' => $head['national_id'] ?? null,
+                'national_id' => $headNationalId,
                 'gender' => $head['gender'],
                 'marital_status' => $head['marital_status'] ?? MaritalStatus::UNKNOWN->value,
                 'birth_date' => $head['birth_date'] ?? null,

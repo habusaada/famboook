@@ -22,6 +22,7 @@ use ReflectionMethod;
 use ReflectionNamedType;
 use Spatie\Permission\Models\Role;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -32,6 +33,7 @@ use Tests\TestCase;
 class FamilyAccessResolverTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private FamilyAccessResolver $resolver;
 
@@ -172,14 +174,14 @@ class FamilyAccessResolverTest extends TestCase
     public function test_an_account_that_is_not_family_side_is_denied(): void
     {
         // No FAMILY_USER at all.
-        $none = $this->activatedHead('111111111', []);
+        $none = $this->activatedHead('111111110', []);
         // COORDINATOR without FAMILY_USER.
-        $coordinatorOnly = $this->activatedHead('222222222', ['COORDINATOR']);
+        $coordinatorOnly = $this->activatedHead('222222220', ['COORDINATOR']);
         // A Staff role mixed with FAMILY_USER, in both role orders.
-        $mixed = $this->activatedHead('333333333', ['DATA_ENTRY', 'FAMILY_USER']);
-        $mixedOther = $this->activatedHead('444444444', ['FAMILY_USER', 'SUPER_ADMIN']);
+        $mixed = $this->activatedHead('333333330', ['DATA_ENTRY', 'FAMILY_USER']);
+        $mixedOther = $this->activatedHead('444444440', ['FAMILY_USER', 'SUPER_ADMIN']);
         // A Staff account.
-        $staff = $this->activatedHead('555555555', ['ADMINISTRATOR']);
+        $staff = $this->activatedHead('555555550', ['ADMINISTRATOR']);
 
         foreach ([$none, $coordinatorOnly, $mixed, $mixedOther, $staff] as $account) {
             $this->assertIdentityDenied(FamilyAccessDenial::NOT_FAMILY_SIDE, $account['user']);
@@ -234,21 +236,23 @@ class FamilyAccessResolverTest extends TestCase
 
     public function test_a_user_without_an_active_auth_identity_is_denied(): void
     {
-        $a = $this->activatedHead('111111111');
+        $a = $this->activatedHead('111111110');
         DB::table('family_auth_identities')->where('id', $a['identity']->id)->delete();
         $this->assertIdentityDenied(FamilyAccessDenial::NO_AUTH_IDENTITY, $a['user']);
 
-        $b = $this->activatedHead('222222222');
+        $b = $this->activatedHead('222222220');
         $b['identity']->forceFill(['status' => AuthIdentityStatus::SUPERSEDED->value, 'superseded_at' => now(), 'supersede_reason' => 'KEY_ROTATION'])->save();
         $this->assertIdentityDenied(FamilyAccessDenial::NO_AUTH_IDENTITY, $b['user']);
 
-        $c = $this->activatedHead('333333333');
+        $c = $this->activatedHead('333333330');
         $c['identity']->forceFill(['status' => AuthIdentityStatus::SUSPENDED->value])->save();
         $this->assertIdentityDenied(FamilyAccessDenial::AUTH_IDENTITY_SUSPENDED, $c['user']);
     }
 
     public function test_a_stored_national_id_that_is_not_nine_digits_is_denied(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         foreach ([null, '', '12345678', '1234567890', '12345678X', 'ABC'] as $i => $stored) {
             $a = $this->activatedHead('10000000'.$i);
             DB::table('persons')->where('id', $a['person']->id)->update(['national_id' => $stored]);
@@ -270,6 +274,8 @@ class FamilyAccessResolverTest extends TestCase
 
     public function test_a_formatted_but_equal_national_id_still_matches(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $a = $this->activatedHead('123456789');
         DB::table('persons')->where('id', $a['person']->id)->update(['national_id' => ' ١٢٣-٤٥٦-٧٨٩ ']);
 
@@ -345,7 +351,7 @@ class FamilyAccessResolverTest extends TestCase
         $this->assertNull($this->resolver->headEligibility($person));
 
         // Not a head.
-        $member = Person::factory()->create(['national_id' => '222222222']);
+        $member = Person::factory()->create(['national_id' => '222222220']);
         FamilyMembership::factory()->create(['person_id' => $member->id, 'is_household_head' => false]);
         $this->assertSame(FamilyAccessDenial::NOT_HOUSEHOLD_HEAD, $this->resolver->headEligibility($member));
 
@@ -353,21 +359,21 @@ class FamilyAccessResolverTest extends TestCase
         $this->assertSame(FamilyAccessDenial::NO_ACTIVE_MEMBERSHIP, $this->resolver->headEligibility(Person::factory()->create()));
 
         // Person-level reasons.
-        [$deceased] = $this->eligibleHead('333333333', ['life_status' => LifeStatus::DECEASED->value]);
+        [$deceased] = $this->eligibleHead('333333330', ['life_status' => LifeStatus::DECEASED->value]);
         $this->assertSame(FamilyAccessDenial::PERSON_NOT_ALIVE, $this->resolver->headEligibility($deceased));
-        [$unknown] = $this->eligibleHead('444444444', ['life_status' => LifeStatus::UNKNOWN->value]);
+        [$unknown] = $this->eligibleHead('444444440', ['life_status' => LifeStatus::UNKNOWN->value]);
         $this->assertSame(FamilyAccessDenial::PERSON_NOT_ALIVE, $this->resolver->headEligibility($unknown));
-        [$inactive] = $this->eligibleHead('555555555', ['is_active' => false]);
+        [$inactive] = $this->eligibleHead('555555550', ['is_active' => false]);
         $this->assertSame(FamilyAccessDenial::PERSON_INACTIVE, $this->resolver->headEligibility($inactive));
-        [$deleted] = $this->eligibleHead('666666666');
+        [$deleted] = $this->eligibleHead('666666660');
         $deleted->delete();
         $this->assertSame(FamilyAccessDenial::PERSON_DELETED, $this->resolver->headEligibility($deleted));
 
         // Family-level reasons.
-        [$a, $inactiveFamily] = $this->eligibleHead('777777777');
+        [$a, $inactiveFamily] = $this->eligibleHead('777777770');
         $inactiveFamily->forceFill(['status' => FamilyStatus::INACTIVE->value])->save();
         $this->assertSame(FamilyAccessDenial::FAMILY_NOT_ACTIVE, $this->resolver->headEligibility($a));
-        [$b, $deletedFamily] = $this->eligibleHead('888888888');
+        [$b, $deletedFamily] = $this->eligibleHead('888888880');
         $deletedFamily->delete();
         $this->assertSame(FamilyAccessDenial::FAMILY_DELETED, $this->resolver->headEligibility($b));
     }

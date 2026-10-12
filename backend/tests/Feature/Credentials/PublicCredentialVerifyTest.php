@@ -52,7 +52,11 @@ class PublicCredentialVerifyTest extends TestCase
         FamilyMembership::factory()->create([
             'family_id' => $family->id, 'is_household_head' => true,
             'person_id' => Person::factory()->create([
-                'full_name' => $headName, 'national_id' => '987654321', 'mobile' => '0591234567', 'birth_date' => '1980-01-15',
+                // The first head keeps 987654321 (the leak checks); later heads a
+                // unique value (CO-01D.4).
+                'full_name' => $headName,
+                'national_id' => Person::withTrashed()->where('national_id', '987654321')->exists() ? fake()->unique()->numerify('74#######') : '987654321',
+                'mobile' => '0591234567', 'birth_date' => '1980-01-15',
             ])->id,
         ]);
 

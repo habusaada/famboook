@@ -8,6 +8,7 @@ use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
 use App\Models\Person;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -17,6 +18,7 @@ use Tests\TestCase;
 class AssistanceAndDataQualityReportTest extends TestCase
 {
     use BuildsReportFixtures;
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -130,22 +132,25 @@ class AssistanceAndDataQualityReportTest extends TestCase
 
     public function test_completeness_and_consistency_counts_and_drill_down(): void
     {
-        $assigned = $this->inBranch($this->family(1), 'ABU_TEIMA');
-        $unassigned = $this->family(1, ['name' => 'رب بلا فرع']);
+        // LEGACY data: the fixtures' members have no National ID (pre CO-01D.4),
+        // which this data-quality report must still find.
+        $this->allowLegacyNationalIds();
+        $assigned = $this->inBranch($this->family(1, ['national_id' => null]), 'ABU_TEIMA');
+        $unassigned = $this->family(1, ['national_id' => null, 'name' => 'رب بلا فرع']);
         // Person-level gaps (current population only).
         $noId = $this->addMember($assigned, ['national_id' => null, 'full_name' => 'فرد بلا هوية']);
         $withId = $this->addMember($assigned, ['national_id' => '860000001', 'birth_date' => null, 'mobile' => '0590000099', 'marital_status' => 'SINGLE']);
         $this->addMember($assigned, ['national_id' => '860000002', 'gender' => null, 'mobile' => '0590000098', 'marital_status' => 'MARRIED']);
         $this->addMember($assigned, ['national_id' => null, 'life_status' => 'DECEASED', 'death_date' => '2026-01-01']);  // not current
         // Family-level gaps.
-        $displacedNoLocation = $this->family(1, ['displacement' => 'DISPLACED']);
-        $noResidence = $this->family(1);
+        $displacedNoLocation = $this->family(1, ['national_id' => null, 'displacement' => 'DISPLACED']);
+        $noResidence = $this->family(1, ['national_id' => null]);
         FamilyResidence::where('family_id', $noResidence->id)->delete();
-        $noHead = $this->family(1);
+        $noHead = $this->family(1, ['national_id' => null]);
         FamilyMembership::where('family_id', $noHead->id)->update(['is_household_head' => false]);
-        $deceasedHead = $this->family(1);
+        $deceasedHead = $this->family(1, ['national_id' => null]);
         Person::whereKey($deceasedHead->memberships()->first()->person_id)->update(['life_status' => 'DECEASED', 'death_date' => '2026-01-01']);
-        $this->inOtherClan($this->family(1));
+        $this->inOtherClan($this->family(1, ['national_id' => null]));
 
         $issues = collect($this->report('data-quality')->assertOk()->json('data.issues'))->keyBy('code');
 

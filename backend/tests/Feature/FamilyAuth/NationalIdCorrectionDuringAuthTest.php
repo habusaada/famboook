@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
 use Tests\Support\FakeSmsSender;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\TestCase;
@@ -118,23 +119,26 @@ class NationalIdCorrectionDuringAuthTest extends TestCase
         $this->login(self::NEW_ID, self::NEW_PASSWORD)->assertOk();
     }
 
-    public function test_an_in_flight_reset_dies_when_the_correction_suspends_the_identity(): void
+    public function test_an_invalid_correction_is_refused_and_an_in_flight_reset_is_unaffected(): void
     {
         $reference = $this->startReset(self::OLD_ID);
         $code = $this->sms->lastCode();
         $this->sessionRowFor($this->account['user']);
 
-        // A value that is not nine digits: the identity is SUSPENDED and the
-        // account's sessions are revoked.
-        $this->correct('12345678');
+        // CO-01D.4: a value that is not nine digits is refused outright; the
+        // identity, the sessions and the reset are untouched.
+        try {
+            $this->correct('12345678');
+            $this->fail('An invalid National ID was accepted.');
+        } catch (ValidationException) {
+            // Refused before any lock or write.
+        }
 
-        $this->assertSame('SUSPENDED', $this->account['identity']->fresh()->status->value);
-        $this->assertDatabaseMissing('sessions', ['user_id' => $this->account['user']->id]);
-        $this->postJson(self::RESET.'/verify', ['challenge' => $reference, 'code' => $code]);
-        $this->complete($reference)->assertStatus(409)->assertJsonPath('code', 'RESET_FAILED');
-
-        $this->assertTrue(Hash::check(self::OLD_PASSWORD, $this->account['user']->fresh()->password));
-        $this->login(self::OLD_ID, self::OLD_PASSWORD)->assertStatus(401);
+        $this->assertSame('ACTIVE', $this->account['identity']->fresh()->status->value);
+        $this->assertDatabaseHas('sessions', ['user_id' => $this->account['user']->id]);
+        $this->postJson(self::RESET.'/verify', ['challenge' => $reference, 'code' => $code])->assertOk();
+        $this->complete($reference)->assertOk();
+        $this->assertTrue(Hash::check(self::NEW_PASSWORD, $this->account['user']->fresh()->password));
     }
 
     public function test_the_registry_national_id_is_never_a_login_or_reset_fallback(): void

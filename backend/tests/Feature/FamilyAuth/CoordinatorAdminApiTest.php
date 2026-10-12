@@ -35,7 +35,7 @@ class CoordinatorAdminApiTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->useFamilyAuthKey();
         $this->admin = $this->staff('ADMINISTRATOR', 'مسؤول المنسقين');
-        $head = $this->activatedHead('111111111');
+        $head = $this->activatedHead('111111110');
         $this->person = $head['person'];
         $this->account = $head['user'];
     }
@@ -111,7 +111,7 @@ class CoordinatorAdminApiTest extends TestCase
 
         $body = $this->show()->assertOk()->getContent();
 
-        foreach (['"user_id"', '"clan_id"', '"branch_id"', '"assigned_by_id"', '111111111', 'national', 'mobile', 'email'] as $forbidden) {
+        foreach (['"user_id"', '"clan_id"', '"branch_id"', '"assigned_by_id"', '111111110', 'national', 'mobile', 'email'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $body);
         }
         $this->assertSame(
@@ -122,7 +122,7 @@ class CoordinatorAdminApiTest extends TestCase
 
     public function test_refusals_are_explained_to_staff(): void
     {
-        [$neverActivated] = $this->eligibleHead('999999999');
+        [$neverActivated] = $this->eligibleHead('999999990');
         $this->actingAs($this->admin)->postJson("/api/v1/people/{$neverActivated->person_code}/coordinator")
             ->assertStatus(422)->assertJsonPath('code', 'NO_FAMILY_ACCOUNT');
 
@@ -183,7 +183,7 @@ class CoordinatorAdminApiTest extends TestCase
 
     public function test_a_family_side_account_never_reaches_it_even_with_the_permission(): void
     {
-        $coordinator = $this->coordinator('222222222');
+        $coordinator = $this->coordinator('222222220');
         $coordinator->givePermissionTo(['coordinator-scope.view', 'coordinator-scope.manage']);
 
         $this->show($coordinator)->assertForbidden()->assertExactJson(['message' => EnsureStaffSideAccount::MESSAGE]);

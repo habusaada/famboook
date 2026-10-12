@@ -277,6 +277,7 @@ class FamilyApiTest extends TestCase
 
         (new AddFamilyMemberAction)->handle($family, [
             'full_name' => 'يوسف خالد النجار',
+            'national_id' => fake()->unique()->numerify('74#######'),
             'gender' => 'MALE',
             'birth_date' => '2015-05-01',
             'relationship_type_id' => $sonId,

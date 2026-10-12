@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use Tests\TestCase;
 class FamilyAuthIdentitiesTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private FamilyAuthIdentities $identities;
 
@@ -36,6 +38,8 @@ class FamilyAuthIdentitiesTest extends TestCase
 
     public function test_create_stores_a_fingerprint_never_the_national_id(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $user = $this->familyUser();
         $person = Person::factory()->create(['national_id' => ' ١٢٣-٤٥٦-٧٨٩ ']);
 
@@ -51,6 +55,8 @@ class FamilyAuthIdentitiesTest extends TestCase
 
     public function test_create_refuses_an_invalid_national_id_a_second_identity_and_a_taken_key(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $user = $this->familyUser();
         foreach ([null, '12345678', '12345678X'] as $stored) {
             $person = Person::factory()->create(['national_id' => $stored]);
@@ -102,6 +108,8 @@ class FamilyAuthIdentitiesTest extends TestCase
 
     public function test_is_consistent_follows_the_current_stored_national_id(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $a = $this->activatedHead('123456789');
 
         $this->assertTrue($this->identities->isConsistent($a['identity'], $a['person']));

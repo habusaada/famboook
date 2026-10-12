@@ -1136,6 +1136,49 @@ PWA-5a migrations, drop the tables, or truncate anything.
 
 ---
 
+# 16c. National ID uniqueness release (CO-01D.4)
+
+Migration `2026_10_20_090000_enforce_unique_person_national_id` (docs/04
+DB-ADR-061) adds NOT NULL, a nine-digit format CHECK and a UNIQUE
+constraint to `persons.national_id`. It never changes a Person: it refuses
+to run while any stored value is missing, non-canonical, a placeholder or
+a duplicate (soft-deleted Persons included).
+
+**Gates (all before the deployment):**
+
+1. A verified backup (§12) taken immediately before.
+2. `php artisan famboook:national-id-audit` on Production — read-only, no
+   `--references` — exits 0 and prints `L … can be applied safely: YES`
+   with 0 missing, 0 invalid and 0 non-canonical. (Audited 2026-10-12: 3310
+   Persons, all canonical.) Any other result: STOP; resolve through the
+   approved correction flow first — never by editing rows.
+3. Staff are told that a National ID is now required for every new Person,
+   newborns included (registration and add-member answer 422 without one).
+
+**Runbook:**
+
+```bash
+# 0. backup, then confirm it (§12)
+# 1. audit — must exit 0
+php artisan famboook:national-id-audit
+# 2. maintenance window: no writes while the constraint is added
+php artisan down
+php artisan migrate --force
+#    a refusal ("Cannot enforce National ID uniqueness: …") or a lock
+#    timeout (SQLSTATE 55P03) changed nothing: php artisan up, investigate
+# 3. verify the constraints
+psql -c "SELECT conname FROM pg_constraint WHERE conrelid = 'persons'::regclass AND conname IN ('chk_person_national_id_format', 'uq_persons_national_id')"
+php artisan up
+```
+
+The migration holds `ACCESS EXCLUSIVE` on `persons` for milliseconds at
+this size (one transaction, `lock_timeout` 5s). **Rollback:** `php artisan
+migrate:rollback --step=1` restores the previous schema exactly and touches
+no row; the application code still requires a nine-digit National ID for
+new Persons until it is rolled back too.
+
+---
+
 # 17. Post-deployment smoke test
 
 Use synthetic data only, before any real entry. The smoke Family cannot be
@@ -1296,6 +1339,7 @@ Never do this once real data has been entered.
 | 1.1.23 | 2026-10-08 | Approved | §16b: Change Request release PWA-5b … PWA-6.1a — content since PWA-5a (no migration, no seeder change, one `.env` key), release gates, deployment with the switch off, read-only smoke checks, feature shutdown, rollback before / after real requests; env template carries the switch |
 | 1.1.24 | 2026-10-08 | Approved | §16b: PWA-6.1b submission modes OFF / PILOT / GENERAL with a Family allowlist (replaces the boolean), allowlist format, opening the pilot in PILOT, changing the allowlist, feature shutdown to OFF, configuration-cache rule, famboook:change-requests-check |
 | 1.1.25 | 2026-10-09 | Approved | §16b: ADD_FAMILY_MEMBER activation steps (code registration, reviewer briefing, PILOT check) — not performed; new optional limits CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR |
+| 1.1.26 | 2026-10-12 | Approved | §16c National ID uniqueness release (CO-01D.4, docs/04 DB-ADR-061): audit gate, maintenance-window migration with lock_timeout, verification and exact rollback |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

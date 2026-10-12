@@ -31,7 +31,7 @@ class AssessmentRegistryApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const NATIONAL_ID = '9990008881';
+    private const NATIONAL_ID = '999000888';
 
     private const MOBILE = '0599000999';
 

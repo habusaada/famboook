@@ -170,7 +170,7 @@ class FamilySelfRevealTest extends TestCase
             'family code' => [['field' => 'NATIONAL_ID', 'family_code' => 'FAM-000002'], 'family_code'],
             'user id' => [['field' => 'NATIONAL_ID', 'user_id' => 1], 'user_id'],
             'membership id' => [['field' => 'NATIONAL_ID', 'membership_id' => 1], 'membership_id'],
-            'a national id' => [['field' => 'NATIONAL_ID', 'national_id' => '222222222'], 'national_id'],
+            'a national id' => [['field' => 'NATIONAL_ID', 'national_id' => '222222220'], 'national_id'],
         ];
     }
 
@@ -190,13 +190,13 @@ class FamilySelfRevealTest extends TestCase
 
     public function test_spoofed_query_parameters_cannot_retarget_the_reveal(): void
     {
-        $mine = $this->ownHead('111111111');
-        $other = $this->ownHead('222222222');
+        $mine = $this->ownHead('111111110');
+        $other = $this->ownHead('222222220');
         $query = http_build_query(['person_id' => $other['person']->id, 'person_code' => $other['person']->person_code, 'family_code' => $other['family']->family_code]);
 
         $this->reveal($mine['user'], ['field' => 'NATIONAL_ID'], self::URI.'?'.$query)->assertUnprocessable();
         $this->reveal($mine['user'], ['field' => 'NATIONAL_ID'], self::URI.'?other='.$other['person']->id)
-            ->assertOk()->assertExactJson(['data' => ['field' => 'NATIONAL_ID', 'value' => '111111111']]);
+            ->assertOk()->assertExactJson(['data' => ['field' => 'NATIONAL_ID', 'value' => '111111110']]);
     }
 
     public function test_the_route_has_no_target_parameter_and_the_whole_boundary(): void
@@ -216,11 +216,11 @@ class FamilySelfRevealTest extends TestCase
         $assigned = $this->familyIn($clan, $this->branch($clan), members: 2);
         $this->assign($head['user'], $clan);
         $assignedHead = FamilyMembership::where('family_id', $assigned->id)->where('is_household_head', true)->sole()->person;
-        $assignedHead->forceFill(['national_id' => '555555555', 'mobile' => '0599999999'])->save();
+        $assignedHead->forceFill(['national_id' => '555555550', 'mobile' => '0599999999'])->save();
 
         foreach (['NATIONAL_ID' => self::NATIONAL_ID, 'MOBILE' => self::MOBILE] as $field => $own) {
             $response = $this->reveal($head['user'], ['field' => $field])->assertOk()->assertJsonPath('data.value', $own);
-            $this->assertStringNotContainsString('555555555', $response->getContent());
+            $this->assertStringNotContainsString('555555550', $response->getContent());
             $this->assertStringNotContainsString('0599999999', $response->getContent());
         }
     }
@@ -242,13 +242,13 @@ class FamilySelfRevealTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->ownHead('222222222')['user'];
+        $mixed = $this->ownHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed;
 
         foreach ($accounts as $label => $user) {
             $response = $this->reveal($user, ['field' => 'NATIONAL_ID'])->assertForbidden()->assertExactJson(['message' => EnsureFamilySideAccount::MESSAGE]);
-            $this->assertStringNotContainsString('222222222', $response->getContent(), $label);
+            $this->assertStringNotContainsString('222222220', $response->getContent(), $label);
         }
         $this->assertCount(0, $this->events());
     }
@@ -319,7 +319,7 @@ class FamilySelfRevealTest extends TestCase
     {
         config(['family_auth.self_reveal.limits.user_minute' => 3]);
         $head = $this->ownHead();
-        $other = $this->ownHead('222222222');
+        $other = $this->ownHead('222222220');
 
         foreach (['NATIONAL_ID', 'MOBILE', 'ALTERNATE_MOBILE'] as $field) {
             $this->reveal($head['user'], ['field' => $field])->assertOk();
@@ -330,6 +330,6 @@ class FamilySelfRevealTest extends TestCase
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertCount(3, $this->events());
         // The ceiling is per user: another household head is not affected.
-        $this->reveal($other['user'], ['field' => 'NATIONAL_ID'])->assertOk()->assertJsonPath('data.value', '222222222');
+        $this->reveal($other['user'], ['field' => 'NATIONAL_ID'])->assertOk()->assertJsonPath('data.value', '222222220');
     }
 }

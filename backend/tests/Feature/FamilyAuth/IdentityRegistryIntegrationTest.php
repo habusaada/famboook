@@ -22,7 +22,9 @@ use App\Support\FamilyAuth\FamilyAuthIdentities;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -33,6 +35,7 @@ use Tests\TestCase;
 class IdentityRegistryIntegrationTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private FamilyAccessResolver $resolver;
 
@@ -105,10 +108,11 @@ class IdentityRegistryIntegrationTest extends TestCase
         $a = $this->activatedHead('123456789');
         $this->sessionRowFor($a['user']);
 
-        // A different stored value, the same nine digits, the same key.
+        // The same nine digits in another formatting: CO-01D.4 stores the
+        // canonical value, so this is the current value — nothing changes.
         $this->correct($a['person'], '123-456-789');
 
-        $this->assertSame('123-456-789', $a['person']->fresh()->national_id);
+        $this->assertSame('123456789', $a['person']->fresh()->national_id);
         $this->assertSame(1, FamilyAuthIdentity::count());
         $this->assertSame(AuthIdentityStatus::ACTIVE, $a['identity']->fresh()->status);
         $this->assertTrue($this->identities->findByNationalIdInput('123456789')->is($a['identity']));
@@ -128,31 +132,40 @@ class IdentityRegistryIntegrationTest extends TestCase
         $this->assertSame(0, FamilyActivity::count());
     }
 
-    public function test_a_value_that_is_not_nine_digits_suspends_the_identity_and_ends_sessions(): void
+    public function test_a_value_that_is_not_nine_digits_is_refused_and_the_identity_is_untouched(): void
     {
         $a = $this->activatedHead('123456789');
         $this->sessionRowFor($a['user']);
 
-        $this->correct($a['person'], 'SYN-400333444');
+        // CO-01D.4: a correction can no longer store an invalid National ID,
+        // so it can no longer suspend an identity.
+        try {
+            $this->correct($a['person'], 'SYN-400333444');
+            $this->fail('An invalid National ID was accepted.');
+        } catch (ValidationException) {
+            // Refused before any lock or write.
+        }
 
-        $identity = $a['identity']->fresh();
-        $this->assertSame(AuthIdentityStatus::SUSPENDED, $identity->status);
-        $this->assertNull($identity->supersede_reason);
-        $this->assertSame(1, FamilyAuthIdentity::count());
-        $this->assertNull($this->identities->findByNationalIdInput('123456789'));
-        $this->assertSame(0, DB::table('sessions')->where('user_id', $a['user']->id)->count());
-        // The link and the account are untouched; the identity alone is invalid.
+        $this->assertSame('123456789', $a['person']->fresh()->national_id);
+        $this->assertSame(AuthIdentityStatus::ACTIVE, $a['identity']->fresh()->status);
+        $this->assertTrue($this->identities->findByNationalIdInput('123456789')->is($a['identity']));
+        $this->assertSame(1, DB::table('sessions')->where('user_id', $a['user']->id)->count());
         $this->assertSame(UserPersonLinkStatus::ACTIVE, $a['link']->fresh()->status);
-        $this->assertTrue($a['user']->fresh()->is_active);
-        $this->assertSame(FamilyAccessDenial::AUTH_IDENTITY_SUSPENDED, $this->resolver->identity($a['user']->fresh())->denial);
-        $this->assertSame(['SESSIONS_REVOKED', 'LOGIN_IDENTIFIER_ROTATED'], $this->events());
-        $this->assertSame('FAILURE', AuthSecurityEvent::where('event_type', 'LOGIN_IDENTIFIER_ROTATED')->sole()->outcome->value);
+        $this->assertSame([], $this->events());
     }
 
     public function test_a_later_valid_correction_restores_a_suspended_identity(): void
     {
         $a = $this->activatedHead('123456789');
-        $this->correct($a['person'], 'SYN-400333444');
+        // A LEGACY suspended identity (an invalid value recorded before
+        // CO-01D.4): built directly, as no flow can produce it any more.
+        if (DB::getDriverName() === 'pgsql') {
+            (require database_path('migrations/2026_10_20_090000_enforce_unique_person_national_id.php'))->down();
+        }
+        DB::table('persons')->where('id', $a['person']->id)->update(['national_id' => 'SYN-400333444']);
+        $this->identities->syncAfterNationalIdCorrection($a['person']->fresh(), $this->admin->id);
+        $this->assertSame(AuthIdentityStatus::SUSPENDED, $a['identity']->fresh()->status);
+        $this->assertSame(FamilyAccessDenial::AUTH_IDENTITY_SUSPENDED, $this->resolver->identity($a['user']->fresh())->denial);
 
         $this->correct($a['person']->fresh(), '987654321');
 
@@ -166,6 +179,8 @@ class IdentityRegistryIntegrationTest extends TestCase
 
     public function test_a_login_key_collision_rolls_the_whole_correction_back(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $a = $this->activatedHead('123456789');
         $b = $this->activatedHead('987654321');
         // The registry stores B's National ID in another format, so the exact
@@ -197,6 +212,8 @@ class IdentityRegistryIntegrationTest extends TestCase
 
     public function test_the_collision_is_an_explicit_failure_through_the_api(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $a = $this->activatedHead('123456789');
         $b = $this->activatedHead('987654321');
         DB::table('persons')->where('id', $b['person']->id)->update(['national_id' => '987-654-321']);

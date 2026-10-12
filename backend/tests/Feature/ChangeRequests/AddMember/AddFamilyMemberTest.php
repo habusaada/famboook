@@ -33,6 +33,7 @@ use Illuminate\Testing\TestResponse;
 use RuntimeException;
 use Spatie\Permission\Models\Role;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -44,6 +45,7 @@ use Tests\TestCase;
 class AddFamilyMemberTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private const FAMILY_URI = '/api/v1/family/change-requests';
 
@@ -139,6 +141,8 @@ class AddFamilyMemberTest extends TestCase
     /** A registry Person created row by row (synthetic), optionally an active member of a Family. */
     private function person(?string $nationalId, ?Family $activeIn = null, array $attributes = []): Person
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $person = Person::factory()->create(['national_id' => $nationalId, 'full_name' => 'شخص مسجّل سابقًا', ...$attributes]);
         if ($activeIn !== null) {
             FamilyMembership::factory()->create(['family_id' => $activeIn->id, 'person_id' => $person->id, 'is_household_head' => false, 'is_active' => true]);

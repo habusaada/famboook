@@ -30,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -39,6 +40,7 @@ use Tests\TestCase;
 class UserPersonLinkLifecycleTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private FamilyAccessResolver $resolver;
 
@@ -144,12 +146,14 @@ class UserPersonLinkLifecycleTest extends TestCase
 
     public function test_establish_refuses_a_person_who_is_not_an_eligible_household_head(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $user = $this->familyUser();
-        [$deceased] = $this->eligibleHead('111111111', ['life_status' => LifeStatus::DECEASED->value]);
-        [$unknown] = $this->eligibleHead('222222222', ['life_status' => LifeStatus::UNKNOWN->value]);
-        $notHead = Person::factory()->create(['national_id' => '333333333']);
+        [$deceased] = $this->eligibleHead('111111110', ['life_status' => LifeStatus::DECEASED->value]);
+        [$unknown] = $this->eligibleHead('222222220', ['life_status' => LifeStatus::UNKNOWN->value]);
+        $notHead = Person::factory()->create(['national_id' => '333333330']);
         [$badId] = $this->eligibleHead('12345678');
-        [$noId] = $this->eligibleHead('444444444');
+        [$noId] = $this->eligibleHead('444444440');
         DB::table('persons')->where('id', $noId->id)->update(['national_id' => null]);
 
         foreach ([$deceased, $unknown, $notHead] as $person) {
@@ -190,6 +194,8 @@ class UserPersonLinkLifecycleTest extends TestCase
 
     public function test_a_failed_establish_leaves_nothing_behind(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         // Another account already holds this login key (a duplicate Person
         // record): the link is created first, then the identity fails — and
         // the caller's transaction takes the link down with it.

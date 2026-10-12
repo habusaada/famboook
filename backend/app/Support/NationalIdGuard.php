@@ -44,7 +44,11 @@ final class NationalIdGuard
     /**
      * Inside the caller's transaction: serialize on this National ID, then
      * refuse if another Person already holds it. Blank values are allowed
-     * (a missing National ID stays NULL).
+     * here (the creation and correction actions require a value themselves,
+     * CO-01D.4).
+     *
+     * A SOFT-DELETED Person keeps their National ID (CO-01D.4): it is refused
+     * too, but without any reference — a deleted record is never described.
      */
     public static function assertAvailable(?string $nationalId, string $field, ?int $exceptPersonId = null): void
     {
@@ -58,6 +62,18 @@ final class NationalIdGuard
         if ($matches->isNotEmpty()) {
             throw new DuplicateNationalIdException($field, $matches);
         }
+        if (self::heldByDeleted($nationalId, $exceptPersonId)) {
+            throw new DuplicateNationalIdException($field, new Collection);
+        }
+    }
+
+    /** Whether a soft-deleted Person (other than $exceptPersonId) holds exactly this value. */
+    public static function heldByDeleted(#[\SensitiveParameter] string $nationalId, ?int $exceptPersonId = null): bool
+    {
+        return Person::onlyTrashed()
+            ->where('national_id', $nationalId)
+            ->when($exceptPersonId, fn ($q) => $q->whereKeyNot($exceptPersonId))
+            ->exists();
     }
 
     /**

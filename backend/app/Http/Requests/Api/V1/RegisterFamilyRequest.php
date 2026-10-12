@@ -7,6 +7,7 @@ use App\Enums\Gender;
 use App\Enums\MaritalStatus;
 use App\Enums\RegistrationSource;
 use App\Support\FamilyLineage;
+use App\Support\RegistryNationalId;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,7 +30,8 @@ class RegisterFamilyRequest extends FormRequest
 
             'household_head' => ['required', 'array'],
             'household_head.full_name' => ['required', 'string', 'max:255'],
-            'household_head.national_id' => ['nullable', 'string', 'max:50'],
+            // CO-01D.4: required, nine digits (stored canonically by the action).
+            'household_head.national_id' => ['required', 'string', 'max:50', RegistryNationalId::rule()],
             'household_head.gender' => ['required', Rule::enum(Gender::class)],
             // Optional; defaults to UNKNOWN (never inferred).
             'household_head.marital_status' => ['sometimes', Rule::enum(MaritalStatus::class)],
@@ -72,6 +74,10 @@ class RegisterFamilyRequest extends FormRequest
 
     public function messages(): array
     {
-        return FamilyLineage::messages();
+        return [
+            ...FamilyLineage::messages(),
+            'household_head.national_id.required' => RegistryNationalId::MESSAGE,
+            'household_head.national_id.string' => RegistryNationalId::MESSAGE,
+        ];
     }
 }

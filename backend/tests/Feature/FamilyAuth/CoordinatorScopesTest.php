@@ -95,7 +95,7 @@ class CoordinatorScopesTest extends TestCase
     #[DataProvider('lostEligibility')]
     public function test_losing_the_own_family_context_ends_coordinator_access_at_once(string $case): void
     {
-        $head = $this->activatedHead('111111111', ['FAMILY_USER', 'COORDINATOR']);
+        $head = $this->activatedHead('111111110', ['FAMILY_USER', 'COORDINATOR']);
         $user = $head['user'];
         $clan = $this->clan();
         $this->assign($user, $clan);
@@ -147,16 +147,16 @@ class CoordinatorScopesTest extends TestCase
         $f4 = $this->familyIn($clan);
         $other = $this->familyIn($this->clan('OTHER_CLAN'));
 
-        $byBranch = $this->coordinator('111111111');
+        $byBranch = $this->coordinator('111111110');
         $this->assign($byBranch, $inGroupA);
         $this->assertSame([$f1->family_code], $this->visible($byBranch));
 
-        $byGroup = $this->coordinator('222222222');
+        $byGroup = $this->coordinator('222222220');
         $this->assign($byGroup, $groupA);
         $this->assertEqualsCanonicalizing([$f1->family_code, $f2->family_code], $this->visible($byGroup));
 
         // A whole Clan: grouped, ungrouped and unbranched families — no other Clan.
-        $byClan = $this->coordinator('333333333');
+        $byClan = $this->coordinator('333333330');
         $this->assign($byClan, $clan);
         $visible = $this->visible($byClan);
         foreach ([$f1, $f2, $f3, $f4] as $family) {
@@ -193,11 +193,11 @@ class CoordinatorScopesTest extends TestCase
         $group = $this->group($clan);
         $unbranched = $this->familyIn($clan);
 
-        $byGroup = $this->coordinator('111111111');
+        $byGroup = $this->coordinator('111111110');
         $this->assign($byGroup, $group);
         $this->assertNotContains($unbranched->family_code, $this->visible($byGroup));
 
-        $byClan = $this->coordinator('222222222');
+        $byClan = $this->coordinator('222222220');
         $this->assign($byClan, $clan);
         $this->assertContains($unbranched->family_code, $this->visible($byClan));
     }
@@ -259,9 +259,9 @@ class CoordinatorScopesTest extends TestCase
         $groupB = $this->group($clan);
         $branch = $this->branch($clan, $groupA);
         $family = $this->familyIn($clan, $branch);
-        $byA = $this->coordinator('111111111');
+        $byA = $this->coordinator('111111110');
         $this->assign($byA, $groupA);
-        $byB = $this->coordinator('222222222');
+        $byB = $this->coordinator('222222220');
         $this->assign($byB, $groupB);
         $this->assertSame([$family->family_code], $this->visible($byA));
         $this->assertSame([], $this->visible($byB));

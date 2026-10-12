@@ -32,7 +32,7 @@ class OptionalResidenceLocationTest extends TestCase
             'registration_date' => '2026-09-01',
             'registration_source' => 'PAPER_FORM',
             'clan_code' => 'AL_BREEM',
-            'household_head' => ['full_name' => 'رب أسرة نازحة', 'gender' => 'MALE'],
+            'household_head' => ['full_name' => 'رب أسرة نازحة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE'],
             'residence' => $residence,
         ]);
     }

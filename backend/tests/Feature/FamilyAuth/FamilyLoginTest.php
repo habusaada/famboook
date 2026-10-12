@@ -154,7 +154,7 @@ class FamilyLoginTest extends TestCase
 
     public function test_another_family_session_in_the_same_browser_is_replaced(): void
     {
-        $other = $this->activatedHead('555555555');
+        $other = $this->activatedHead('555555550');
         $this->actingAs($other['user'], 'web');
 
         $this->login()->assertOk()->assertJsonPath('user.display_name', $this->head['person']->full_name);
@@ -234,7 +234,7 @@ class FamilyLoginTest extends TestCase
             'life-unknown' => $person->forceFill(['life_status' => LifeStatus::UNKNOWN])->save(),
             'person-inactive' => $person->forceFill(['is_active' => false])->save(),
             'person-deleted' => $person->delete(),
-            'id-changed' => $person->forceFill(['national_id' => '222222222'])->saveQuietly(),
+            'id-changed' => $person->forceFill(['national_id' => '222222220'])->saveQuietly(),
             'non-head' => $membership->forceFill(['is_household_head' => false])->save(),
             'no-membership' => $membership->forceFill(['is_active' => false])->save(),
             'family-inactive' => $family->forceFill(['status' => collect(FamilyStatus::cases())->first(fn ($s) => $s !== FamilyStatus::ACTIVE)])->save(),
@@ -410,7 +410,7 @@ class FamilyLoginTest extends TestCase
         $this->assertSame('THROTTLED', $this->lastFailureReason());
 
         // Another identifier from the same address, and this one from another address, are not.
-        $this->assertInvalid($this->login('111111111', 'x'));
+        $this->assertInvalid($this->login('111111110', 'x'));
         if ($id === self::NATIONAL_ID) {
             $this->login($id, self::PASSWORD, ip: '10.0.0.9')->assertOk();
         }
@@ -526,10 +526,10 @@ class FamilyLoginTest extends TestCase
     public function test_the_registry_national_id_is_not_the_login_lookup(): void
     {
         // A Person carries the number in the registry but was never activated.
-        [$person] = $this->eligibleHead('444444444');
+        [$person] = $this->eligibleHead('444444440');
         $this->trustedMobile($person);
 
-        $this->assertInvalid($this->login('444444444'));
+        $this->assertInvalid($this->login('444444440'));
         $this->assertSame('UNKNOWN_IDENTIFIER', $this->lastFailureReason());
     }
 }

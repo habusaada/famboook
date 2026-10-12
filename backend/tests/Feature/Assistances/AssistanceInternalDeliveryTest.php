@@ -9,6 +9,7 @@ use App\Models\AssistanceBeneficiary;
 use App\Models\AssistanceDelivery;
 use App\Models\FamilyActivity;
 use App\Models\FamilyMembership;
+use App\Models\Person;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -53,18 +54,23 @@ class AssistanceInternalDeliveryTest extends TestCase
     /** A family with one member per interesting relationship/marital case. */
     private function fullHousehold(array $head = []): array
     {
+        // The first household keeps the well-known member IDs the assertions
+        // use; a second one in the same test gets unique values (CO-01D.4).
+        $first = ! Person::withTrashed()->where('national_id', '800000011')->exists();
+        $id = fn (string $value): string => $first ? $value : fake()->unique()->numerify('74#######');
+
         return $this->household($head, [
-            'son' => ['SON', ['full_name' => 'ابن أعزب', 'gender' => 'MALE', 'national_id' => '800000011', 'marital_status' => 'SINGLE']],
-            'daughter' => ['DAUGHTER', ['full_name' => 'ابنة عزباء', 'national_id' => '800000012', 'marital_status' => 'SINGLE']],
-            'married' => ['SON', ['full_name' => 'ابن متزوج', 'gender' => 'MALE', 'national_id' => '800000013', 'marital_status' => 'MARRIED']],
-            'divorced' => ['DAUGHTER', ['full_name' => 'ابنة مطلقة', 'national_id' => '800000014', 'marital_status' => 'DIVORCED']],
-            'widowed' => ['DAUGHTER', ['full_name' => 'ابنة أرملة', 'national_id' => '800000015', 'marital_status' => 'WIDOWED']],
-            'unknown' => ['SON', ['full_name' => 'ابن حالة غير معروفة', 'gender' => 'MALE', 'national_id' => '800000016', 'marital_status' => 'UNKNOWN']],
-            'spouse' => ['SPOUSE', ['full_name' => 'زوجة', 'national_id' => '800000017', 'marital_status' => 'MARRIED']],
-            'father' => ['FATHER', ['full_name' => 'أب', 'gender' => 'MALE', 'national_id' => '800000018', 'marital_status' => 'SINGLE']],
-            'mother' => ['MOTHER', ['full_name' => 'أم', 'national_id' => '800000019', 'marital_status' => 'SINGLE']],
-            'other' => ['OTHER', ['full_name' => 'قريب', 'gender' => 'MALE', 'national_id' => '800000020', 'marital_status' => 'SINGLE']],
-            'former' => ['SON', ['full_name' => 'ابن سابق', 'gender' => 'MALE', 'national_id' => '800000021', 'marital_status' => 'SINGLE', '_inactive' => true]],
+            'son' => ['SON', ['full_name' => 'ابن أعزب', 'gender' => 'MALE', 'national_id' => $id('800000011'), 'marital_status' => 'SINGLE']],
+            'daughter' => ['DAUGHTER', ['full_name' => 'ابنة عزباء', 'national_id' => $id('800000012'), 'marital_status' => 'SINGLE']],
+            'married' => ['SON', ['full_name' => 'ابن متزوج', 'gender' => 'MALE', 'national_id' => $id('800000013'), 'marital_status' => 'MARRIED']],
+            'divorced' => ['DAUGHTER', ['full_name' => 'ابنة مطلقة', 'national_id' => $id('800000014'), 'marital_status' => 'DIVORCED']],
+            'widowed' => ['DAUGHTER', ['full_name' => 'ابنة أرملة', 'national_id' => $id('800000015'), 'marital_status' => 'WIDOWED']],
+            'unknown' => ['SON', ['full_name' => 'ابن حالة غير معروفة', 'gender' => 'MALE', 'national_id' => $id('800000016'), 'marital_status' => 'UNKNOWN']],
+            'spouse' => ['SPOUSE', ['full_name' => 'زوجة', 'national_id' => $id('800000017'), 'marital_status' => 'MARRIED']],
+            'father' => ['FATHER', ['full_name' => 'أب', 'gender' => 'MALE', 'national_id' => $id('800000018'), 'marital_status' => 'SINGLE']],
+            'mother' => ['MOTHER', ['full_name' => 'أم', 'national_id' => $id('800000019'), 'marital_status' => 'SINGLE']],
+            'other' => ['OTHER', ['full_name' => 'قريب', 'gender' => 'MALE', 'national_id' => $id('800000020'), 'marital_status' => 'SINGLE']],
+            'former' => ['SON', ['full_name' => 'ابن سابق', 'gender' => 'MALE', 'national_id' => $id('800000021'), 'marital_status' => 'SINGLE', '_inactive' => true]],
         ]);
     }
 
@@ -126,12 +132,13 @@ class AssistanceInternalDeliveryTest extends TestCase
 
     public function test_national_id_is_normalized(): void
     {
-        $h = $this->household(['national_id' => '800-000 001']);
+        // CO-01D.4: stored values are canonical; the TYPED side is normalized.
+        $h = $this->household(['national_id' => '800000091']);
         $b = $this->approvedBeneficiary($this->assistance, $h['family']);
 
-        // Arabic-Indic digits and separators are normalized on both sides.
-        $this->verify($b, $this->personal('٨٠٠٠٠٠٠٠١'))->assertOk();
-        $this->verify($b, $this->personal(' 800 000 001 '))->assertOk();
+        // Arabic-Indic digits and separators in the typed value are normalized.
+        $this->verify($b, $this->personal('٨٠٠٠٠٠٠٩١'))->assertOk();
+        $this->verify($b, $this->personal(' 800 000 091 '))->assertOk();
     }
 
     public function test_personal_rejects_wrong_unknown_and_other_member_ids(): void

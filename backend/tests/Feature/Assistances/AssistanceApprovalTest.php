@@ -251,14 +251,14 @@ class AssistanceApprovalTest extends TestCase
         ['family' => $family, 'head' => $head] = $this->household();
 
         $this->actingAs($admin)->postJson("/api/v1/families/{$family->family_code}/members", [
-            'full_name' => 'ابنة جديدة', 'gender' => 'FEMALE', 'birth_date' => '2004-01-01',
+            'full_name' => 'ابنة جديدة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'FEMALE', 'birth_date' => '2004-01-01',
             'relationship_type_id' => \App\Models\RelationshipType::where('code', 'DAUGHTER')->value('id'),
             'marital_status' => 'SINGLE',
         ])->assertCreated();
         $this->assertSame('SINGLE', Person::where('full_name', 'ابنة جديدة')->first()->marital_status->value);
 
         $this->actingAs($admin)->postJson("/api/v1/families/{$family->family_code}/members", [
-            'full_name' => 'ابن بلا حالة', 'gender' => 'MALE', 'birth_date' => '2006-01-01',
+            'full_name' => 'ابن بلا حالة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE', 'birth_date' => '2006-01-01',
             'relationship_type_id' => \App\Models\RelationshipType::where('code', 'SON')->value('id'),
         ])->assertCreated();
         // Never inferred: UNKNOWN when not given.

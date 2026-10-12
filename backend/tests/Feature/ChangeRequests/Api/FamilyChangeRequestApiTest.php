@@ -114,7 +114,7 @@ class FamilyChangeRequestApiTest extends TestCase
             'staff' => $this->staff('SUPER_ADMIN'),
             'coordinator only' => $this->familyUser(['COORDINATOR']),
         ];
-        $mixed = $this->activatedHead('222222222')['user'];
+        $mixed = $this->activatedHead('222222220')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         $accounts['mixed'] = $mixed;
         foreach ($accounts as $label => $user) {

@@ -243,7 +243,7 @@ class ResidenceUpdateTest extends TestCase
     public function test_another_familys_request_is_not_found(): void
     {
         $request = $this->submitted();
-        $stranger = $this->activatedHead('222222222')['user'];
+        $stranger = $this->activatedHead('222222220')['user'];
 
         $this->family('GET', "/{$request->uuid}", as: $stranger)->assertNotFound()->assertJsonPath('code', 'CHANGE_REQUEST_NOT_FOUND');
         $this->family('POST', "/{$request->uuid}/cancel", as: $stranger)->assertNotFound();
@@ -289,12 +289,12 @@ class ResidenceUpdateTest extends TestCase
         $family = $this->context->family;
 
         FamilyMembership::query()->where('family_id', $family->id)->update(['is_household_head' => false]);
-        $person = Person::factory()->create(['national_id' => '333333333']);
+        $person = Person::factory()->create(['national_id' => '333333330']);
         FamilyMembership::factory()->create(['family_id' => $family->id, 'person_id' => $person->id, 'is_household_head' => true]);
         $user = $this->familyUser();
         UserPersonLink::factory()->create(['user_id' => $user->id, 'person_id' => $person->id]);
         FamilyAuthIdentity::factory()->create([
-            'user_id' => $user->id, 'login_key' => KeyedFingerprint::of(FingerprintContext::LOGIN_ID, '333333333'),
+            'user_id' => $user->id, 'login_key' => KeyedFingerprint::of(FingerprintContext::LOGIN_ID, '333333330'),
             'key_version' => 1, 'status' => AuthIdentityStatus::ACTIVE->value,
         ]);
 

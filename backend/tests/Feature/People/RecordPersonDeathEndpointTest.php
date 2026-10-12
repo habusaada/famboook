@@ -259,9 +259,9 @@ class RecordPersonDeathEndpointTest extends TestCase
     public function test_family_side_coordinator_and_mixed_accounts_never_reach_it(): void
     {
         [, $member] = $this->member();
-        $familyUser = $this->activatedHead('111111111')['user'];
-        $coordinator = $this->coordinator('222222222');
-        $mixed = $this->activatedHead('333333333')['user'];
+        $familyUser = $this->activatedHead('111111110')['user'];
+        $coordinator = $this->coordinator('222222220');
+        $mixed = $this->activatedHead('333333330')['user'];
         $mixed->assignRole('ADMINISTRATOR');
         foreach ([$familyUser, $coordinator, $mixed] as $user) {
             // Even holding the permission directly.

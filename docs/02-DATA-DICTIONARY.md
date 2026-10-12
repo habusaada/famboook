@@ -515,6 +515,11 @@ Search normalization may use separate processing.
 
 National identity number when available.
 
+**Amended 2026-10-12 (CO-01D.4, docs/04 DB-ADR-061):** required for every
+new Person; exactly nine ASCII digits stored canonically (never a
+placeholder of nine identical digits); globally unique, soft-deleted Persons
+included.
+
 Data type conceptually:
 
 ```text
@@ -2190,7 +2195,10 @@ Family Users type their National ID to authenticate, not an email.
 Resolved 2026-10-02 (PWA-1B): the typed value is normalized to exactly
 nine ASCII digits and matched through `family_auth_identities` (§45b).
 `persons.national_id` stays a registry field with **no** UNIQUE
-constraint; PDD-001 (registry-wide normalization) stays open.
+constraint; PDD-001 (registry-wide normalization) stays open. (Superseded
+2026-10-12 by CO-01D.4: the registry field is now canonical and globally
+unique — docs/04 DB-ADR-061. Authentication still uses
+`family_auth_identities`, never `persons.national_id`.)
 
 ### Trusted mobile
 

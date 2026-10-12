@@ -22,7 +22,7 @@ class AddFamilyMemberTest extends TestCase
     {
         return [
             'full_name' => 'أحمد محمد الشريف',
-            'national_id' => null,
+            'national_id' => fake()->unique()->numerify('74#######'),
             'gender' => 'MALE',
             'birth_date' => '2008-01-10',
             'mobile' => null,

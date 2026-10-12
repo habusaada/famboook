@@ -3,12 +3,16 @@
 namespace App\Actions;
 
 use App\Enums\FamilyActivityType;
+use App\Exceptions\DuplicateNationalIdException;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
 use App\Support\FamilyActivityLog;
 use App\Support\FamilyAuth\FamilyAuthIdentities;
 use App\Support\NationalIdGuard;
+use App\Support\RegistryNationalId;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,8 +24,11 @@ use Illuminate\Validation\ValidationException;
  * The replacement is always an explicit, non-blank value: this never
  * clears a National ID (there is no supported "clear" action in V1). The
  * exact duplicate rule (docs/03 §21, §93a) applies through NationalIdGuard,
- * so a value held by another Person is refused and nothing changes. The
- * value is stored as entered — no normalization (PDD-001 stays open).
+ * so a value held by another Person is refused and nothing changes. Since
+ * CO-01D.4 the replacement must be a valid National ID and is stored in its
+ * canonical nine-digit form (RegistryNationalId); PostgreSQL's
+ * uq_persons_national_id is the final guard (a lost race is the same
+ * duplicate error, without disclosing who holds the value).
  *
  * NATIONAL_ID_CORRECTED is recorded on the Person's current Family with no
  * metadata: never the old or new value.
@@ -45,14 +52,14 @@ class CorrectNationalIdAction
 {
     public function handle(Person $person, string $nationalId, ?int $actingUserId): Person
     {
+        $nationalId = RegistryNationalId::required($nationalId, 'national_id');
+
         return DB::transaction(function () use ($person, $nationalId, $actingUserId) {
             $familyId = self::activeFamilyId($person->id);
             if ($familyId !== null) {
                 Family::withTrashed()->whereKey($familyId)->lock('for key share')->first();
             }
-            if (trim($nationalId) !== '') {
-                NationalIdGuard::lock($nationalId);
-            }
+            NationalIdGuard::lock($nationalId);
 
             /** @var Person $person */
             $person = Person::query()->whereKey($person->id)->lockForUpdate()->firstOrFail();
@@ -70,7 +77,15 @@ class CorrectNationalIdAction
 
             $person->national_id = $nationalId;
             $person->updated_by = $actingUserId;
-            $person->save();
+            try {
+                $person->save();
+            } catch (UniqueConstraintViolationException $e) {
+                // Not chained: the driver message carries the value.
+                if (RegistryNationalId::isDuplicate($e)) {
+                    throw new DuplicateNationalIdException('national_id', new Collection);
+                }
+                throw $e;
+            }
 
             // Throws (and rolls the correction back) on a login-key collision.
             app(FamilyAuthIdentities::class)->syncAfterNationalIdCorrection($person, $actingUserId);

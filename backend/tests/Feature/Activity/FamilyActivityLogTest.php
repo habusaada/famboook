@@ -34,7 +34,8 @@ class FamilyActivityLogTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const NATIONAL_ID = '9990001112';
+    // CO-01D.4: a valid nine-digit synthetic value.
+    private const NATIONAL_ID = '999000111';
 
     private const MOBILE = '0799990001';
 

@@ -32,7 +32,7 @@ class OptionalBirthDateTest extends TestCase
         // Omitted entirely, too.
         $member = $this->addMember($familyCode, ['full_name' => 'فرد بلا تاريخ', 'birth_date' => null])->assertCreated();
         $member->assertJsonPath('data.birth_date', null);
-        $payloadWithoutDob = ['full_name' => 'فرد آخر بلا تاريخ', 'gender' => 'MALE', 'relationship_type_id' => \App\Models\RelationshipType::where('code', 'SON')->value('id')];
+        $payloadWithoutDob = ['full_name' => 'فرد آخر بلا تاريخ', 'national_id' => $this->syntheticNationalId(), 'gender' => 'MALE', 'relationship_type_id' => \App\Models\RelationshipType::where('code', 'SON')->value('id')];
         $this->actingAs($this->staff)->postJson("/api/v1/families/{$familyCode}/members", $payloadWithoutDob)->assertCreated();
 
         $this->assertSame(3, Person::whereNull('birth_date')->count());

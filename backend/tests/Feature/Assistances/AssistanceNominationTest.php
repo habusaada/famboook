@@ -136,7 +136,7 @@ class AssistanceNominationTest extends TestCase
 
     public function test_candidate_search_returns_safe_fields_only(): void
     {
-        $family = $this->family(2, ['name' => 'عائلة البحث', 'national_id' => '9990004441', 'mobile' => '0799994441']);
+        $family = $this->family(2, ['name' => 'عائلة البحث', 'national_id' => '999000444', 'mobile' => '0799994441']);
         $this->manual(['family_code' => $family->family_code])->assertCreated();
 
         $response = $this->actingAs($this->user)
@@ -151,12 +151,12 @@ class AssistanceNominationTest extends TestCase
             ->assertJsonCount(1, 'data');
 
         $raw = $response->getContent();
-        foreach (['9990004441', '0799994441', 'national_id', 'mobile', 'birth_date'] as $secret) {
+        foreach (['999000444', '0799994441', 'national_id', 'mobile', 'birth_date'] as $secret) {
             $this->assertStringNotContainsString($secret, $raw);
         }
         // National IDs are not searchable in V1-A.
         $this->actingAs($this->user)
-            ->getJson("/api/v1/assistances/{$this->assistance->uuid}/nominee-candidates?search=9990004441")
+            ->getJson("/api/v1/assistances/{$this->assistance->uuid}/nominee-candidates?search=999000444")
             ->assertJsonCount(0, 'data');
     }
 
@@ -492,7 +492,7 @@ class AssistanceNominationTest extends TestCase
 
     public function test_nominee_responses_contain_no_sensitive_data(): void
     {
-        $family = $this->family(2, ['national_id' => '9990006661', 'mobile' => '0799996661']);
+        $family = $this->family(2, ['national_id' => '999000666', 'mobile' => '0799996661']);
         $person = $this->addMember($family);
         $this->healthRecord($person, 'CHRONIC_DISEASE', ['condition_name' => 'مرض سري', 'details' => 'تفاصيل صحية سرية']);
         $this->assessment($family, 'HEALTH', 'CRITICAL', '2026-09-01', notes: 'ملاحظة تقييم سرية');
@@ -501,7 +501,7 @@ class AssistanceNominationTest extends TestCase
         $this->manual(['family_code' => $family->family_code])->assertCreated();
 
         $raw = $this->nominees()->assertOk()->getContent();
-        foreach (['9990006661', '0799996661', 'national_id', 'mobile', 'مرض سري', 'تفاصيل صحية سرية', 'ملاحظة تقييم سرية',
+        foreach (['999000666', '0799996661', 'national_id', 'mobile', 'مرض سري', 'تفاصيل صحية سرية', 'ملاحظة تقييم سرية',
             'وصف احتياج سري', 'targeting_criteria', 'family_id', 'person_id', 'source_need_id', 'email', 'description'] as $secret) {
             $this->assertStringNotContainsString($secret, $raw, $secret);
         }

@@ -156,7 +156,7 @@ class CoordinatorFamiliesTest extends TestCase
     {
         $clan = $this->clan();
         $family = $this->familyIn($clan);
-        $head = $this->activatedHead('111111111');
+        $head = $this->activatedHead('111111110');
         $this->assign($head['user'], $clan);
 
         $this->fetch($head['user'], self::LIST)->assertForbidden();
@@ -167,7 +167,7 @@ class CoordinatorFamiliesTest extends TestCase
     public function test_a_coordinator_keeps_its_own_household_context_unchanged(): void
     {
         $clan = $this->clan('OTHER_CLAN');
-        $head = $this->activatedHead('111111111', ['FAMILY_USER', 'COORDINATOR']);
+        $head = $this->activatedHead('111111110', ['FAMILY_USER', 'COORDINATOR']);
         $this->assign($head['user'], $clan);
         $this->familyIn($clan);
 
@@ -211,12 +211,12 @@ class CoordinatorFamiliesTest extends TestCase
         $family = $this->familyIn($clan);
         $user = match ($case) {
             'staff' => tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN')),
-            'family-user' => $this->activatedHead('111111111')['user'],
+            'family-user' => $this->activatedHead('111111110')['user'],
             'coordinator-only' => $this->familyUser(['COORDINATOR']),
             'no-assignment' => $this->coordinator(),
             'no-role' => $this->coordinator(roles: ['FAMILY_USER']),
             'ineligible' => (function () {
-                $head = $this->activatedHead('111111111', ['FAMILY_USER', 'COORDINATOR']);
+                $head = $this->activatedHead('111111110', ['FAMILY_USER', 'COORDINATOR']);
                 $head['family']->delete();
 
                 return $head['user'];

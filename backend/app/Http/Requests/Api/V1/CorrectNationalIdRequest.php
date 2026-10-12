@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Support\RegistryNationalId;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -21,7 +22,7 @@ class CorrectNationalIdRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'national_id' => ['required', 'string', 'max:50', 'confirmed'],
+            'national_id' => ['required', 'string', 'max:50', 'confirmed', RegistryNationalId::rule()],
         ];
     }
 

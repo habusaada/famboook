@@ -23,6 +23,7 @@ use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\FakeSmsSender;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -36,6 +37,7 @@ use Tests\TestCase;
 class SelfOtpActivationTest extends TestCase
 {
     use FamilyIdentityFixtures, RefreshDatabase;
+    use LegacyNationalIds;
 
     private const BASE = '/api/v1/family/auth/activation';
 
@@ -370,6 +372,8 @@ class SelfOtpActivationTest extends TestCase
 
     private function arrangeRefusal(string $case): string
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $membership = $this->person->activeMembership()->first();
         match ($case) {
             'unknown' => null,

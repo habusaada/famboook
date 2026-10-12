@@ -39,6 +39,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Tests\Support\LegacyNationalIds;
 use Tests\Support\SyntheticXlsx;
 use Tests\TestCase;
 
@@ -50,6 +51,7 @@ use Tests\TestCase;
  */
 class ApplyImportRowTest extends TestCase
 {
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     private const BASE = '/api/v1/imports/initial-families';
@@ -440,6 +442,8 @@ class ApplyImportRowTest extends TestCase
 
     public function test_a_reused_spouse_whose_national_id_changed_after_planning_is_refused(): void
     {
+        // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
+        $this->allowLegacyNationalIds();
         $batch = $this->batch([2 => $this->row(['id' => 930000171], [[930000172, 'زوجة']])]);
         $spouse = Person::factory()->create(['national_id' => '930000172', 'gender' => 'FEMALE']);
         $plan = $this->approve($batch);

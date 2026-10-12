@@ -13,6 +13,9 @@
  *   gate <national_id>                    hold the National ID advisory lock
  *   correct <person_id> <national_id>     CorrectNationalIdAction
  *   add-member <family_id> <national_id>  AddFamilyMemberAction (Staff path)
+ *   hold-insert <national_id>             a RAW Person insert that bypasses the
+ *                                         application guard (CO-01D.4): inserted,
+ *                                         READY, then committed after the delay
  *
  * Synchronization (no guessed boot times): after printing READY each actor
  * waits for one line on STDIN — "<milliseconds>" — then waits that long and
@@ -79,6 +82,19 @@ try {
                 'full_name' => 'تسجيل موظف متزامن', 'national_id' => $nationalId, 'gender' => 'MALE',
                 'relationship_type_id' => RelationshipType::where('code', 'SON')->value('id'),
             ], null);
+            break;
+
+        case 'hold-insert':
+            [, , $nationalId] = $argv;
+            DB::transaction(function () use ($nationalId, $out, $wait) {
+                DB::table('persons')->insert([
+                    'person_code' => 'PER-RAW'.random_int(100000, 999999), 'full_name' => 'إدخال مباشر متزامن',
+                    'national_id' => $nationalId, 'life_status' => 'ALIVE', 'marital_status' => 'UNKNOWN', 'is_active' => true,
+                    'created_at' => now(), 'updated_at' => now(),
+                ]);
+                $out('READY');
+                $wait();
+            });
             break;
 
         default:

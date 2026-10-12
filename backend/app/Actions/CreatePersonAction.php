@@ -5,10 +5,14 @@ namespace App\Actions;
 use App\Enums\Gender;
 use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
+use App\Exceptions\DuplicateNationalIdException;
 use App\Models\Person;
 use App\Support\BusinessIdentifier;
 use App\Support\DeathDate;
 use App\Support\NationalIdGuard;
+use App\Support\RegistryNationalId;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,9 +23,13 @@ use Illuminate\Validation\ValidationException;
  * import Apply.
  *
  * - person_code from the reserved id (BusinessIdentifier, PER-000001).
- * - National ID: NULL allowed (unknown, docs/03 §19 — never a fake value);
- *   otherwise NationalIdGuard refuses any existing Person with that exact
- *   value (no second Person, no attach, no merge).
+ * - National ID REQUIRED for every new Person, newborns included (CO-01D.4,
+ *   amending docs/03 §19): normalized and stored as exactly nine digits
+ *   (RegistryNationalId), never a placeholder. NationalIdGuard refuses a
+ *   value any Person holds — soft-deleted Persons keep theirs — and
+ *   PostgreSQL's uq_persons_national_id is the final guard: a lost race is
+ *   the same duplicate error, without disclosing who holds the value
+ *   (no second Person, no attach, no merge).
  * - life_status is EXPLICIT (no default): ALIVE and UNKNOWN never carry a
  *   death date; DECEASED may carry one (DeathDate rules) or NULL when the
  *   date is unknown — never invented. A Person known to be deceased when
@@ -75,9 +83,11 @@ class CreatePersonAction
             throw ValidationException::withMessages(['death_date' => 'لا يُسجَّل تاريخ وفاة إلا لشخص متوفى.']);
         }
 
-        return DB::transaction(function () use ($data, $actingUserId, $nationalIdField, $life, $fullName, $gender, $marital, $birthDate, $deathDate) {
+        $nationalId = RegistryNationalId::required($data['national_id'] ?? null, $nationalIdField);
+
+        return DB::transaction(function () use ($data, $actingUserId, $nationalIdField, $nationalId, $life, $fullName, $gender, $marital, $birthDate, $deathDate) {
             // Never a second Person with the same National ID (docs/03 §21).
-            NationalIdGuard::assertAvailable($data['national_id'] ?? null, $nationalIdField);
+            NationalIdGuard::assertAvailable($nationalId, $nationalIdField);
 
             $personId = BusinessIdentifier::nextId('persons');
 
@@ -85,24 +95,33 @@ class CreatePersonAction
             // create() would silently drop the id reserved above; the INSERT
             // would then draw a second sequence value and the public code
             // would no longer match the row id (and codes would skip).
-            return Person::forceCreate([
-                'id' => $personId,
-                'person_code' => BusinessIdentifier::format('PER', $personId),
-                'full_name' => $fullName,
-                'national_id' => $data['national_id'] ?? null,
-                'gender' => $gender,
-                'marital_status' => $marital,
-                // NULL = unknown; never a placeholder (docs/03 §26).
-                'birth_date' => $birthDate,
-                'life_status' => $life->value,
-                'death_date' => $deathDate,
-                'mobile' => $data['mobile'] ?? null,
-                'alternate_mobile' => $data['alternate_mobile'] ?? null,
-                'alternate_mobile_owner_relation' => $data['alternate_mobile_owner_relation'] ?? null,
-                'is_active' => true,
-                'created_by' => $actingUserId,
-                'updated_by' => $actingUserId,
-            ]);
+            try {
+                return Person::forceCreate([
+                    'id' => $personId,
+                    'person_code' => BusinessIdentifier::format('PER', $personId),
+                    'full_name' => $fullName,
+                    'national_id' => $nationalId,
+                    'gender' => $gender,
+                    'marital_status' => $marital,
+                    // NULL = unknown; never a placeholder (docs/03 §26).
+                    'birth_date' => $birthDate,
+                    'life_status' => $life->value,
+                    'death_date' => $deathDate,
+                    'mobile' => $data['mobile'] ?? null,
+                    'alternate_mobile' => $data['alternate_mobile'] ?? null,
+                    'alternate_mobile_owner_relation' => $data['alternate_mobile_owner_relation'] ?? null,
+                    'is_active' => true,
+                    'created_by' => $actingUserId,
+                    'updated_by' => $actingUserId,
+                ]);
+            } catch (UniqueConstraintViolationException $e) {
+                // The database guard won a race the advisory lock did not
+                // cover. Not chained: the driver message carries the value.
+                if (RegistryNationalId::isDuplicate($e)) {
+                    throw new DuplicateNationalIdException($nationalIdField, new Collection);
+                }
+                throw $e;
+            }
         });
     }
 }

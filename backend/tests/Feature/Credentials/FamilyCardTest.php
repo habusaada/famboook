@@ -100,7 +100,7 @@ class FamilyCardTest extends TestCase
     {
         $withCard = $this->activatedHead('123456789');
         $this->ensure($withCard['user'])->assertOk();
-        $without = $this->activatedHead('222222222');
+        $without = $this->activatedHead('222222220');
         config(['credentials.family_card_issuance_enabled' => false]);
 
         $this->ensure($withCard['user'])->assertOk();
@@ -123,7 +123,7 @@ class FamilyCardTest extends TestCase
     public function test_only_the_context_family_is_used_whatever_the_request_says(): void
     {
         $head = $this->activatedHead('123456789');
-        $other = $this->activatedHead('222222222');
+        $other = $this->activatedHead('222222220');
 
         $this->ensure($head['user'], self::URI.'?family='.$other['family']->family_code)->assertOk()
             ->assertJsonPath('data.family_code', $head['family']->family_code);
@@ -161,7 +161,7 @@ class FamilyCardTest extends TestCase
         foreach (StaffRoles::ALL as $role) {
             $accounts[$role] = tap(User::factory()->create(), fn (User $u) => $u->assignRole($role));
         }
-        $mixed = $this->activatedHead('222222222');
+        $mixed = $this->activatedHead('222222220');
         $mixed['user']->assignRole('ADMINISTRATOR');
         $accounts['mixed'] = $mixed['user'];
 

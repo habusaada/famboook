@@ -214,13 +214,22 @@ class IdentitySchemaConstraintsTest extends TestCase
         $this->refuses('coordinator_scope_assignments', $base(['revoked_at' => now(), 'revoked_by' => $admin]), 'chk_coordinator_scope_revoked');
     }
 
-    public function test_persons_national_id_has_no_unique_index(): void
+    public function test_persons_national_id_is_unique_canonical_and_required(): void
     {
+        // CO-01D.4 (docs/04 DB-ADR-061) replaced the former "no unique index"
+        // rule: one unique index over every row, soft-deleted included.
         $unique = DB::select(
             "select indexname from pg_indexes where schemaname = current_schema() and tablename = 'persons' "
             ."and indexdef ilike '%unique%' and indexdef ilike '%national_id%'"
         );
 
-        $this->assertSame([], $unique);
+        $this->assertSame(['uq_persons_national_id'], array_column($unique, 'indexname'));
+        $this->assertStringNotContainsStringIgnoringCase('where', DB::scalar(
+            "select indexdef from pg_indexes where indexname = 'uq_persons_national_id'"
+        ));
+        $this->assertSame(1, (int) DB::scalar("select count(*) from pg_constraint where conname = 'chk_person_national_id_format'"));
+        $this->assertSame('NO', DB::scalar(
+            "select is_nullable from information_schema.columns where table_name = 'persons' and column_name = 'national_id'"
+        ));
     }
 }

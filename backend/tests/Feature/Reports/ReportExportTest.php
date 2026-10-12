@@ -4,6 +4,7 @@ namespace Tests\Feature\Reports;
 
 use App\Models\Assistance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\LegacyNationalIds;
 use Tests\TestCase;
 
 /**
@@ -14,6 +15,7 @@ use Tests\TestCase;
 class ReportExportTest extends TestCase
 {
     use BuildsReportFixtures;
+    use LegacyNationalIds;
     use RefreshDatabase;
 
     private const SECRETS = [
@@ -36,7 +38,10 @@ class ReportExportTest extends TestCase
         $this->need($h['family'], ['title' => 'حاجة مغلقة', 'status' => 'CLOSED']);
         \App\Models\FamilyNeed::where('title', 'حاجة مغلقة')->update(['closure_reason' => 'سبب إغلاق سري']);
         $this->assessment($h['family'], 'SHELTER', 'HIGH', '2026-09-01', notes: 'ملاحظة تقييم سرية');
-        $this->family(2); // unassigned family
+        // Unassigned family whose members have no National ID: LEGACY data
+        // the data-quality report must still find (CO-01D.4 forbids new ones).
+        $this->allowLegacyNationalIds();
+        $this->family(2, ['national_id' => null]);
 
         $this->external = $this->openAssistanceOf('EXTERNAL', ['title' => 'كشف تصدير تجريبي']);
         $this->actingAs($this->user)->putJson("/api/v1/assistances/{$this->external->uuid}/export-configuration", ['fields' => [

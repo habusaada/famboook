@@ -42,7 +42,7 @@ class CreationFoundationTest extends TestCase
 
     private function person(array $data): Person
     {
-        return app(CreatePersonAction::class)->handle(['full_name' => 'شخص تجريبي', 'gender' => 'MALE', ...$data], null);
+        return app(CreatePersonAction::class)->handle(['full_name' => 'شخص تجريبي', 'gender' => 'MALE', 'national_id' => fake()->unique()->numerify('74#######'), ...$data], null);
     }
 
     private function familyData(array $data = []): array
@@ -103,11 +103,19 @@ class CreationFoundationTest extends TestCase
         ];
     }
 
-    public function test_a_duplicate_national_id_is_refused_and_a_null_id_is_allowed(): void
+    public function test_a_duplicate_national_id_is_refused_and_a_missing_id_is_refused(): void
     {
         $this->person(['life_status' => 'ALIVE', 'national_id' => '900000102']);
-        $this->person(['life_status' => 'ALIVE', 'national_id' => null]);
-        $this->person(['life_status' => 'UNKNOWN', 'national_id' => null]);
+        // CO-01D.4: every new Person needs a valid nine-digit National ID.
+        foreach ([null, '', '   ', '90000010', 'X00000102', '111111111'] as $invalid) {
+            try {
+                $this->person(['life_status' => 'UNKNOWN', 'national_id' => $invalid]);
+                $this->fail('A missing or invalid National ID was accepted.');
+            } catch (ValidationException $e) {
+                $this->assertArrayHasKey('national_id', $e->errors());
+            }
+        }
+        $this->assertSame(1, Person::count());
 
         $this->expectException(DuplicateNationalIdException::class);
         $this->person(['life_status' => 'DECEASED', 'national_id' => '900000102']);
@@ -231,11 +239,11 @@ class CreationFoundationTest extends TestCase
         $user = $this->staff();
         $family = app(RegisterFamilyAction::class)->handle([
             'registration_date' => '2026-09-01', 'registration_source' => 'MANUAL_ENTRY', 'clan_code' => 'AL_BREEM',
-            'household_head' => ['full_name' => 'رب أسرة', 'gender' => 'MALE'], 'residence' => [],
+            'household_head' => ['full_name' => 'رب أسرة', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'MALE'], 'residence' => [],
         ], $user->id);
 
         $this->actingAs($user)->postJson("/api/v1/families/{$family->family_code}/members", [
-            'full_name' => 'فرد', 'gender' => 'FEMALE', 'relationship_type_id' => RelationshipType::where('code', 'SPOUSE')->value('id'),
+            'full_name' => 'فرد', 'national_id' => fake()->unique()->numerify('74#######'), 'gender' => 'FEMALE', 'relationship_type_id' => RelationshipType::where('code', 'SPOUSE')->value('id'),
             'life_status' => 'UNKNOWN', 'death_date' => '2020-01-01',
         ])->assertCreated();
 

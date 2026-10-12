@@ -412,6 +412,14 @@ If National ID is unknown, the system must not create fake values such as:
 
 The value should remain NULL or otherwise explicitly unknown according to the approved model.
 
+**Amended 2026-10-12 (CO-01D.4, docs/04 DB-ADR-061) — superseded for NEW
+Persons.** Every newly created Person — newborns included, in every flow
+(Staff registration, Staff add-member, import Apply, Change Request APPLY) —
+must have a National ID of exactly nine digits that is not a placeholder.
+A Person whose National ID is unknown cannot be created until it is known.
+The rule against fake values above still holds. The paragraphs below are
+kept as history: the family-submission exception is now the general rule.
+
 **Exception for family submissions (docs/11 FP-ADR-076):** an
 ADD_FAMILY_MEMBER request (and BIRTH_REPORT when built) REQUIRES the
 National ID — nine ASCII digits, never a placeholder. This changes nothing
@@ -436,11 +444,29 @@ Normalization must never alter the underlying meaning.
 
 Exact normalization rules remain a pending implementation decision.
 
+**Decided 2026-10-12 for the registry (CO-01D.4; closes PDD-001 for
+`persons.national_id`).** Input is normalized with the strict nine-digit
+rule — Arabic-Indic and Persian digits become ASCII digits; spaces,
+invisible marks, dashes, dots, slashes and underscores are dropped — and
+the result must be exactly nine digits. The canonical value is what is
+STORED. Anything else is refused, never guessed or corrected. Existing
+records are never rewritten: the uniqueness migration refuses to run until
+the read-only audit (`famboook:national-id-audit`) finds every stored value
+canonical.
+
 ---
 
 # 21. National ID Duplicate Handling
 
 An identical or suspicious National ID match must trigger duplicate review according to approved duplicate rules.
+
+**Amended 2026-10-12 (CO-01D.4).** A National ID is GLOBALLY UNIQUE across
+every Person, soft-deleted Persons included: a deleted Person keeps
+ownership of their National ID. An equivalently formatted value is the
+same value. PostgreSQL enforces it (docs/04 DB-ADR-061); the application
+refuses first and maps a lost race to the same duplicate error without
+describing who holds the value. A soft-deleted holder is refused without
+any reference to the deleted record.
 
 The system must not automatically merge Person records.
 
@@ -2737,7 +2763,9 @@ assigned (Head Succession, docs/11 FU-01 — a rollout gate).
 - The login input is accepted only if, after the strict normalization, it
   is exactly nine ASCII digits. No check-digit rule applies.
 - Registry Identity and Authentication Identity are separate.
-  `persons.national_id` is not a credential and is not made unique.
+  `persons.national_id` is not a credential. (It was "not made unique"
+  until CO-01D.4: since 2026-10-12 it is globally unique, docs/04
+  DB-ADR-061 — still never a credential.)
 - A National ID correction (§93b) of a Person who has a family-side
   account supersedes the authentication identity in the same transaction.
   The old National ID stops authenticating at commit; a corrected value
@@ -2952,6 +2980,13 @@ not merged (§23: no automatic merge). The National ID value is never echoed.
 Matching is exact on the stored value (request whitespace trimmed only; PDD-001
 normalization stays open) — no partial, prefix or fuzzy match. A missing
 National ID is never a duplicate and may remain NULL (§19).
+
+**Amended 2026-10-12 (CO-01D.4).** Values are normalized and stored as nine
+digits, so matching on the stored value is matching on the canonical value;
+a missing or invalid National ID is refused for every new Person (§19, §20);
+a soft-deleted Person keeps their value (§21); the pre-check validates the
+same nine-digit rule and answers `exists` for a soft-deleted holder without
+describing it.
 
 Staff entering data get the same answer early through an exact pre-check
 (`POST /api/v1/people/national-id-check`, AUTH-ADR-058), which is not a
@@ -5082,6 +5117,7 @@ Date: 2026-09-24
 | 1.2.54 | 2026-10-09 | Approved | §19: ADD_FAMILY_MEMBER (and future BIRTH_REPORT) family submissions require a nine-digit National ID (docs/11 FP-ADR-076); legacy and Staff rules unchanged |
 | 1.2.55 | 2026-10-10 | Approved | §19: existing-Person eligibility for ADD_FAMILY_MEMBER attachment (ALIVE, active, no active membership; docs/11 FP-ADR-076) |
 | 1.2.56 | 2026-10-12 | Approved | CO-01C (docs/06 AUTH-ADR-092): §89b Coordinator members directory — approved exception to summary-only data: masked directory of families in scope, registered vs declared counts kept distinct, audited one-field reveal of National ID or mobile |
+| 1.2.57 | 2026-10-12 | Approved | CO-01D.4 (docs/04 DB-ADR-061): §19 National ID required for every new Person, newborns included; §20 strict nine-digit normalization stored canonically; §21 global uniqueness, soft-deleted Persons keep their value; §89b and §93a amended accordingly |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

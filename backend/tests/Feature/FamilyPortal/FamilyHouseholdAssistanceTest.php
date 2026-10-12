@@ -344,7 +344,7 @@ class FamilyHouseholdAssistanceTest extends TestCase
     public function test_another_family_is_never_included_whatever_the_request_says(): void
     {
         $head = $this->activatedHead('123456789');
-        $other = $this->activatedHead('222222222');
+        $other = $this->activatedHead('222222220');
         $this->deliver($this->beneficiary($this->assistance(['title' => 'مساعدة أسرة أخرى']), $other['family']), $other['person']);
 
         $response = $this->fetch($head['user'], self::URI.'?family='.$other['family']->family_code.'&person_id='.$other['person']->id)
@@ -439,7 +439,7 @@ class FamilyHouseholdAssistanceTest extends TestCase
         $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
         $staff->givePermissionTo('family-portal.access');
         $accounts['staff with the permission'] = $staff;
-        $mixed = $this->activatedHead('222222222');
+        $mixed = $this->activatedHead('222222220');
         $this->deliver($this->beneficiary($this->assistance(['title' => 'مساعدة حساب مختلط']), $mixed['family']), $mixed['person']);
         $mixed['user']->assignRole('ADMINISTRATOR');
         $accounts['mixed staff and family'] = $mixed['user'];
