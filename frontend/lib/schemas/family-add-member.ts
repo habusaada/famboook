@@ -1,26 +1,21 @@
 import { z } from "zod";
+import { cleanDigits, isPlaceholderNationalId } from "@/lib/utils/national-id";
 
 // The household head's ADD_FAMILY_MEMBER form (docs/11 FP-ADR-076). Laravel
 // (AddFamilyMemberHandler) is the validation authority; these rules only
 // spare a round trip. The National ID is REQUIRED — never a placeholder —
-// and is sent as nine ASCII digits.
+// and is sent as nine ASCII digits. Normalization is the shared registry
+// helper (lib/utils/national-id.ts); the messages stay this form's own.
 
-const ARABIC_DIGITS: Record<string, string> = {
-  "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4", "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
-  "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4", "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
-};
-
-/** Arabic-Indic / Persian digits → ASCII; spaces and - . / _ removed (as FamilyInput::clean). */
-export function cleanDigits(value: string): string {
-  return value.replace(/[٠-٩۰-۹]/g, (d) => ARABIC_DIGITS[d] ?? d).replace(/[\s\-./_‎‏؜​-‍‪-‮⁦-⁩﻿]/g, "");
-}
+// Kept exported here for existing callers.
+export { cleanDigits };
 
 const nationalId = z
   .string()
   .transform(cleanDigits)
   .refine((v) => v.length > 0, "رقم الهوية مطلوب.")
   .refine((v) => v === "" || /^[0-9]{9}$/.test(v), "رقم الهوية يجب أن يتكون من 9 أرقام.")
-  .refine((v) => !/^([0-9])\1{8}$/.test(v), "أدخل رقم الهوية الحقيقي كما في الوثيقة.");
+  .refine((v) => !isPlaceholderNationalId(v), "أدخل رقم الهوية الحقيقي كما في الوثيقة.");
 
 const mobile = z
   .string()

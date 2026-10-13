@@ -3589,6 +3589,16 @@ death date without DECEASED        FLAGGED
   detected inside the batch and against existing Persons; the canonical
   write always goes through `NationalIdGuard`. A missing head National ID
   is allowed by the schema but FLAGGED.
+  **Amended 2026-10-13 (CO-01D.4 / CO-01D.5, docs/04 DB-ADR-061):** since
+  CO-01D.4 `persons.national_id` is mandatory at database level (NOT NULL,
+  nine-digit canonical format, globally unique), so a missing head National
+  ID is no longer allowed by the schema. Since CO-01D.5 the Dry Run BLOCKS
+  such a row (`HEAD_WITHOUT_NATIONAL_ID`, see §96b), so Apply cannot start
+  with it. Note: despite "read as strings" above, a National ID typed as a
+  NUMBER in an Excel cell is read as that number, so a leading zero is lost
+  (e.g. 012345678 becomes 12345678) and the row then blocks as
+  `HEAD_NATIONAL_ID_INVALID`; National ID columns should be formatted as
+  text in source workbooks.
 - **Flag, never resolve silently:** the same ID on several rows; the same
   wife ID more than once; a head ID equal to a wife ID; an ID already in
   Famboook; a wife appearing elsewhere as a household head; duplicate
@@ -3657,6 +3667,11 @@ through its allow-list only.
 One canonical path creates every Person (staff registration, adding a
 member, future Apply): person code, National ID guard (exact value; NULL
 allowed, never a fake value), and an **explicit** life status:
+
+(Amended 2026-10-12 by CO-01D.4, docs/04 DB-ADR-061: the National ID is
+REQUIRED for every new Person — nine digits after normalization, never a
+placeholder, stored canonically, globally unique; NULL is no longer
+allowed. See §19–§21.)
 
 ```text
 ALIVE     no death date
@@ -3746,6 +3761,14 @@ code when omitted or blocked; warnings are non-blocking evidence.
   (warning `HOUSEHOLD_HEAD_DECEASED`, the Family stays executable); a
   missing ID is allowed (warning, never matched by name); a soft-deleted,
   ambiguous, linked or identity-mismatched match BLOCKS.
+  **Amended 2026-10-13 (CO-01D.5, docs/04 DB-ADR-061):** the Dry Run now
+  applies the same National ID rule Apply enforces through
+  CreatePersonAction — a head WITHOUT an ID BLOCKS
+  (`HEAD_WITHOUT_NATIONAL_ID`, formerly a warning; still never matched by
+  name) and a head ID that does not normalize to nine digits, or is a
+  placeholder, BLOCKS (`HEAD_NATIONAL_ID_INVALID`). A valid ID keeps its
+  source spelling in the plan (stable fingerprints); the canonical form is
+  stored at Apply.
 - **FAMILY / HEAD_MEMBERSHIP**: CREATE; Clan from the batch, Branch from the
   resolved key (NO_BRANCH → none), ACTIVE, source IMPORT, registration date
   = execution date.
@@ -3760,7 +3783,17 @@ code when omitted or blocked; warnings are non-blocking evidence.
   `HISTORICAL_RELATIONSHIP_NO_ACTIVE_HOUSEHOLD` elsewhere (all heads
   deceased → no membership at all); otherwise CREATE. A slot with a name but
   no ID is OMITTED (`SPOUSE_WITHOUT_NATIONAL_ID`) — never created or matched
-  by name.
+  by name. **Amended 2026-10-13 (CO-01D.5, DB-ADR-061):** a spouse that
+  would be CREATED with an ID that does not normalize to nine digits, or is
+  a placeholder, BLOCKS (`SPOUSE_NATIONAL_ID_INVALID`); the OMIT of a spouse
+  without an ID is unchanged.
+- **CO-01D.5 — Apply safety (unchanged mechanics).** A blocked row makes the
+  plan non-executable, so Apply refuses to start (`APPLY_PLAN_BLOCKED`); a
+  Dry Run approved before this change no longer matches the re-computed plan
+  (`APPLY_PLAN_CHANGED`); a started batch whose plan changes is refused at
+  its next chunk before any row runs (`APPLY_PLAN_CHANGED` /
+  `APPLY_PLAN_NOT_APPROVED`). The reconciler, the review statuses, the
+  approval and the runner are unchanged.
 - **HOUSEHOLD_DECLARATION**: CREATE with the declared values as stated
   (source IMPORT, no declaration date) — never recalculated, no child
   Persons; no values → OMIT. **RESIDENCE**: CREATE with
@@ -5118,6 +5151,7 @@ Date: 2026-09-24
 | 1.2.55 | 2026-10-10 | Approved | §19: existing-Person eligibility for ADD_FAMILY_MEMBER attachment (ALIVE, active, no active membership; docs/11 FP-ADR-076) |
 | 1.2.56 | 2026-10-12 | Approved | CO-01C (docs/06 AUTH-ADR-092): §89b Coordinator members directory — approved exception to summary-only data: masked directory of families in scope, registered vs declared counts kept distinct, audited one-field reveal of National ID or mobile |
 | 1.2.57 | 2026-10-12 | Approved | CO-01D.4 (docs/04 DB-ADR-061): §19 National ID required for every new Person, newborns included; §20 strict nine-digit normalization stored canonically; §21 global uniqueness, soft-deleted Persons keep their value; §89b and §93a amended accordingly |
+| 1.2.58 | 2026-10-13 | Approved | CO-01D.5 (docs/04 DB-ADR-061): §96b Import Dry Run aligned with the National ID rule — `HEAD_WITHOUT_NATIONAL_ID` blocks (was a warning), new blocks `HEAD_NATIONAL_ID_INVALID` and `SPOUSE_NATIONAL_ID_INVALID`; spouse without ID still OMIT; CREATE values stay raw; §96b Person creation note amended |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

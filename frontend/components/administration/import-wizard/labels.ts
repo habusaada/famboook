@@ -207,7 +207,6 @@ export const PLAN_REASON_LABELS: Record<string, string> = {
   // non-blocking evidence
   HOUSEHOLD_HEAD_DECEASED: "رب الأسرة متوفى — تبقى الأسرة ويبقى ربّها كما في المصدر",
   HEAD_PERSON_REUSED: "رب الأسرة موجود في السجل — يُستخدم دون تعديل",
-  HEAD_WITHOUT_NATIONAL_ID: "رب أسرة بلا رقم هوية — لا مطابقة بالاسم",
   INDEPENDENT_HOUSEHOLD_HEAD: "الزوج/الزوجة رب أسرة مستقلة — بلا عضوية في هذه الأسرة",
   HISTORICAL_RELATIONSHIP_NO_ACTIVE_HOUSEHOLD: "علاقة سابقة (رب أسرة متوفى) — بلا عضوية نشطة",
   PERSON_ALREADY_HAS_ACTIVE_MEMBERSHIP: "الشخص عضو نشط في أسرة أخرى — بلا عضوية جديدة",
@@ -216,6 +215,10 @@ export const PLAN_REASON_LABELS: Record<string, string> = {
   NO_ORIGINAL_RESIDENCE: "لا توجد إقامة أصلية في المصدر",
   // blocking
   ROW_REJECTED: "الصف مرفوض بنيويًا",
+  // CO-01D.5 (DB-ADR-061): every new Person needs a valid nine-digit National ID.
+  HEAD_WITHOUT_NATIONAL_ID: "رب أسرة بلا رقم هوية — يمنع التطبيق؛ رقم الهوية مطلوب لكل شخص جديد",
+  HEAD_NATIONAL_ID_INVALID: "رقم هوية رب الأسرة غير صالح — يجب أن يتكون من 9 أرقام وألا يكون رقمًا وهميًا",
+  SPOUSE_NATIONAL_ID_INVALID: "رقم هوية الزوج/الزوجة غير صالح — يجب أن يتكون من 9 أرقام وألا يكون رقمًا وهميًا",
   HEAD_ID_DUPLICATED_IN_FILE: "رقم هوية رب الأسرة مكرر في الملف",
   HEAD_MULTIPLE_PERSONS: "رقم الهوية مسجل لأكثر من شخص",
   HEAD_DELETED_PERSON: "رقم الهوية يطابق شخصًا محذوفًا",
@@ -295,6 +298,7 @@ export const APPLY_ERROR_LABELS: Record<string, string> = {
   SPOUSE_PERSON_NOW_LINKED: "الزوج/الزوجة أصبح عضوًا في أسرة أخرى",
   CROSS_ROW_PERSON_NOT_MATERIALIZED: "شخص مرتبط بصف آخر لم يُنشأ بعد",
   NATIONAL_ID_TAKEN: "رقم الهوية مستخدم لشخص آخر في السجل",
+  PERSON_VALUES_INVALID: "بيانات الشخص غير مقبولة في السجل (مثل رقم هوية غير صالح)",
   PERSON_IDENTITY_CHANGED: "تغيّرت بيانات هوية شخص موجود منذ المعاينة",
   BRANCH_NOT_SELECTABLE: "الفرع المستهدف غير متاح",
   RELATIONSHIP_TYPE_UNAVAILABLE: "نوع الصلة غير متاح في السجل المرجعي",

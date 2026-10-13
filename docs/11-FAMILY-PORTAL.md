@@ -3847,6 +3847,30 @@ implementation; not deployed.
 - Deployment: the migration plus the RolePermissionSeeder (run on every
   release, docs/08), then `famboook:verify-permissions`.
 
+## CO-01D.5 National ID alignment implementation record
+
+Implemented 2026-10-13 (docs/04 DB-ADR-061, docs/03 §19–§21 and §96b).
+Local implementation; not deployed.
+
+- **Shared rule (Phase A).** `frontend/lib/utils/national-id.ts` mirrors
+  `RegistryNationalId`: the same characters removed as `FamilyInput::clean`,
+  exactly nine digits, never a placeholder, sent in canonical form. The
+  Family Portal ADD_FAMILY_MEMBER schema reuses its normalization without
+  any change to its messages or workflow; the Staff registration and
+  add-member forms now require the ID; the Staff correction dialog applies
+  the same rule.
+- **Duplicate pre-check.** `exists` is authoritative: a value held by a
+  record that is not described (a soft-deleted Person) is reported with the
+  generic duplicate message only — never anything about that record.
+- **Import Dry Run (Phase B).** The planner blocks a head without an ID
+  (`HEAD_WITHOUT_NATIONAL_ID`), an invalid or placeholder head ID
+  (`HEAD_NATIONAL_ID_INVALID`) and a spouse that would be created with an
+  invalid ID (`SPOUSE_NATIONAL_ID_INVALID`), so the Dry Run and Apply agree;
+  a spouse without an ID stays OMIT. CREATE values stay raw. The Import
+  Wizard labels these reasons and the Apply errors `PERSON_VALUES_INVALID`
+  and `NATIONAL_ID_TAKEN`. Reconciler, review statuses, approval and runner
+  unchanged.
+
 ---
 
 # 31. Amendment Register
@@ -5127,3 +5151,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.44 | 2026-10-11 | Approved | CONTACT_UPDATE V1 LIVE in Production: registered in `ChangeRequestTypes::PRODUCTION` (activation commit `01fa663`), `FAMILY_CONTACT_UPDATE_ENABLED=true` on Production (default false in code and env templates), verified on Production 2026-10-11 (Family Auth readiness without warnings, TweetsMS OTP delivery, a contact update through the Family Portal); status statements updated in §14, §30a and FP-ADR-079 |
 | 1.45 | 2026-10-11 | Approved | FB-BRAND-01 official Famboook identity: `FamilyBrand` and the Staff lockups use the official full logo (`BrandLogo`, docs/10 §7a); the installable app's icons regenerated from the official icon at `/icons/v2` (manifest `icons` only — id, start_url, scope, display and colours unchanged; legacy icons kept one release; no service-worker change: it never caches icons); site favicon `app/icon.svg` / `favicon.ico` / `apple-icon.png`; the Family Card PDF logo; the shared copyright footer `SiteFooter`. No colour, workflow or API change |
 | 1.46 | 2026-10-12 | Approved | CO-01C Coordinator members directory (docs/06 AUTH-ADR-092, docs/04 DB-ADR-060): §8 amended, amendment A-20, implementation record — masked directory of families in scope and audited one-field reveal; local only, not deployed |
+| 1.47 | 2026-10-13 | Approved | CO-01D.5 National ID alignment (docs/04 DB-ADR-061): shared client rule, Staff forms require the ID, pre-check honours `exists` without describing soft-deleted holders; Import Dry Run blocks missing / invalid head IDs and invalid spouse IDs; local only, not deployed |

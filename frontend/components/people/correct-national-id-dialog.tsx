@@ -25,14 +25,19 @@ import { NationalIdDuplicateNotice } from "@/components/shared/national-id-dupli
 import { duplicateMatches, useCorrectNationalId } from "@/lib/api/people";
 import { useGuardedSave } from "@/lib/hooks/use-guarded-save";
 import type { PersonDetail } from "@/lib/types/api/person";
+import { NATIONAL_ID_MESSAGE, canonicalNationalId, isValidNationalId } from "@/lib/utils/national-id";
 
 // UX validation only; Laravel's CorrectNationalIdRequest is authoritative.
+// CO-01D.5: the same nine-digit rule as RegistryNationalId; both values are
+// compared — and sent — in canonical form, so "٤٠١…" and "401…" agree.
+const sameNationalId = (a: string, b: string) => (canonicalNationalId(a) ?? a) === (canonicalNationalId(b) ?? b);
+
 const schema = z
   .object({
-    nationalId: z.string().trim().min(1, "رقم الهوية البديل مطلوب").max(50, "رقم الهوية طويل جدًا"),
+    nationalId: z.string().trim().min(1, "رقم الهوية البديل مطلوب").refine(isValidNationalId, NATIONAL_ID_MESSAGE),
     confirmation: z.string().trim(),
   })
-  .refine((v) => v.nationalId === v.confirmation, {
+  .refine((v) => sameNationalId(v.nationalId, v.confirmation), {
     path: ["confirmation"],
     message: "تأكيد رقم الهوية غير مطابق",
   });
@@ -117,8 +122,8 @@ export function CorrectNationalIdDialog({ person }: { person: PersonDetail }) {
           onSubmit={(e) => {
             e.preventDefault();
             flow.submit(handleSubmit, (values) => ({
-              national_id: values.nationalId.trim(),
-              national_id_confirmation: values.confirmation.trim(),
+              national_id: canonicalNationalId(values.nationalId) ?? values.nationalId.trim(),
+              national_id_confirmation: canonicalNationalId(values.confirmation) ?? values.confirmation.trim(),
             }));
           }}
           className="flex flex-col gap-4"
@@ -130,7 +135,7 @@ export function CorrectNationalIdDialog({ person }: { person: PersonDetail }) {
               dir="ltr"
               className="text-end"
               autoComplete="off"
-              inputMode="text"
+              inputMode="numeric"
               {...register("nationalId")}
             />
             <FieldError message={errors.nationalId?.message} />

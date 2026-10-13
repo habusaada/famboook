@@ -37,6 +37,7 @@ import { IconBox } from "@/components/shared/icon-box";
 import { PageHeader } from "@/components/shared/page-layout";
 import { useRegisterFamily } from "@/lib/api/families";
 import { checkNationalId, duplicateMatches } from "@/lib/api/people";
+import { NATIONAL_ID_MESSAGE, canonicalNationalId } from "@/lib/utils/national-id";
 import { ApiError } from "@/lib/api/client";
 import type { NationalIdMatch } from "@/lib/types/api/person";
 import {
@@ -169,11 +170,17 @@ function Segmented({
 
 // ------------------------------------------------------------------ National ID check
 
-type IdentityState = "idle" | "checking" | "clear" | "duplicate" | "unavailable";
+type IdentityState = "idle" | "checking" | "clear" | "duplicate" | "taken" | "invalid" | "unavailable";
 
 /**
  * The existing exact National ID pre-check (POST, AUTH-ADR-058), with its
  * status made visible. The server still refuses a duplicate on submit.
+ *
+ * CO-01D.5: the value is checked in canonical form (the same nine-digit rule
+ * as RegistryNationalId) and only when valid; an invalid value is reported
+ * as such, never as "could not verify". `exists` is authoritative: a value
+ * taken by a record that is not described (a soft-deleted Person) is
+ * "taken" — the generic duplicate message, nothing about that record.
  */
 function useIdentityCheck() {
   const [state, setState] = useState<IdentityState>("idle");
@@ -181,23 +188,27 @@ function useIdentityCheck() {
   const last = useRef("");
 
   const check = useCallback(async (value: string | undefined) => {
-    const nationalId = value?.trim() ?? "";
-    last.current = nationalId;
-    if (!nationalId) {
+    const typed = value?.trim() ?? "";
+    last.current = typed;
+    setMatches([]);
+    if (!typed) {
       setState("idle");
-      setMatches([]);
+      return;
+    }
+    const nationalId = canonicalNationalId(typed);
+    if (nationalId === null) {
+      setState("invalid");
       return;
     }
     setState("checking");
     try {
       const found = await checkNationalId(nationalId);
-      if (last.current !== nationalId) return;
-      setMatches(found);
-      setState(found.length > 0 ? "duplicate" : "clear");
-    } catch {
-      if (last.current !== nationalId) return;
-      setMatches([]);
-      setState("unavailable");
+      if (last.current !== typed) return;
+      setMatches(found.matches);
+      setState(found.matches.length > 0 ? "duplicate" : found.exists ? "taken" : "clear");
+    } catch (error) {
+      if (last.current !== typed) return;
+      setState(error instanceof ApiError && error.status === 422 ? "invalid" : "unavailable");
     }
   }, []);
 
@@ -223,6 +234,8 @@ function IdentityStatus({ state }: { state: IdentityState }) {
   const map = {
     checking: { icon: Loader2, text: "جارٍ التحقق من عدم تسجيل الهوية مسبقًا…", tone: "text-muted-foreground", spin: true },
     clear: { icon: CheckCircle2, text: "لا يوجد شخص مسجّل بهذه الهوية.", tone: "text-success", spin: false },
+    taken: { icon: AlertCircle, text: DUPLICATE_NATIONAL_ID_MESSAGE, tone: "text-danger", spin: false },
+    invalid: { icon: AlertCircle, text: NATIONAL_ID_MESSAGE, tone: "text-danger", spin: false },
     unavailable: { icon: CircleHelp, text: "تعذّر التحقق الآن؛ سيتحقق الخادم من التكرار عند الحفظ.", tone: "text-muted-foreground", spin: false },
   } as const;
   const s = map[state];
@@ -269,6 +282,7 @@ function RegisterFamilyForm() {
       registrationDate: todayIso(),
       registrationSource: "MANUAL_ENTRY",
       headMaritalStatus: "UNKNOWN",
+      headNationalId: "",
       clanCode: "",
       branchCode: "",
     },
@@ -469,7 +483,7 @@ function RegisterFamilyForm() {
 
             {/* Identity: visually distinct, LTR, numeric keypad, exact duplicate pre-check on blur. */}
             <Field className="rounded-lg border border-stroke-subtle bg-surface-2/70 p-3 sm:row-span-2 xl:row-span-1">
-              <FieldLabel htmlFor="headNationalId" hint="(اختياري)">
+              <FieldLabel htmlFor="headNationalId" required>
                 رقم الهوية الوطنية
               </FieldLabel>
               <Input
@@ -482,7 +496,7 @@ function RegisterFamilyForm() {
                   onChange: () => identity.clear(),
                   onBlur: (event) => void identity.check(event.target.value),
                 })}
-                {...errorProps("headNationalId")}
+                {...errorProps("headNationalId", true)}
               />
               <IdentityStatus state={identity.state} />
               <FieldError id="headNationalId-error" message={errors.headNationalId?.message} />

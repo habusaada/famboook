@@ -18,6 +18,7 @@ use App\Support\Import\InitialFamilyWorkbook;
 use App\Support\Import\SourceValues;
 use App\Support\NationalIdFingerprint;
 use App\Support\NationalIdMask;
+use App\Support\RegistryNationalId;
 use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -289,6 +290,11 @@ final class ImportApplyPlanner
         $life = SourceValues::map(SourceValues::LIFE_STATUS, $n['life_status_source'] ?? null);
 
         if ($id !== null) {
+            // CO-01D.5 (docs/04 DB-ADR-061): the same nine-digit rule Apply
+            // enforces (CreatePersonAction) — refused here, at the Dry Run.
+            if (RegistryNationalId::canonical($id) === null) {
+                return $block('HEAD_NATIONAL_ID_INVALID');
+            }
             if (count($headRows[$id]) > 1) {
                 return $block('HEAD_ID_DUPLICATED_IN_FILE');
             }
@@ -320,8 +326,10 @@ final class ImportApplyPlanner
                 return new ImportApplyEffectPlan(E::HEAD_PERSON, I::REUSE, existingId: (int) $p->id, existingCode: $p->person_code, values: ['identity' => NationalIdFingerprint::of($id)]);
             }
         } else {
-            // Allowed (docs/03 §19), but never deduplicated by name.
-            $warnings[] = 'HEAD_WITHOUT_NATIONAL_ID';
+            // CO-01D.5 (docs/04 DB-ADR-061): every new Person needs a National
+            // ID, so a head without one blocks Apply (formerly a warning). Still
+            // never deduplicated by name.
+            return $block('HEAD_WITHOUT_NATIONAL_ID');
         }
 
         // CREATE: only approved source values; a deceased head starts DECEASED.
@@ -485,6 +493,9 @@ final class ImportApplyPlanner
             $name = $ownerName ?? collect($names)->first(fn ($v) => $v !== null);
             $gender = $derived[$ownerRow] ?? ($known[0] ?? null);
             $ownerPlan = match (true) {
+                // CO-01D.5 (DB-ADR-061): a spouse is CREATED only with a valid ID
+                // (a spouse WITHOUT an ID stays OMIT and never reaches here).
+                RegistryNationalId::canonical($sid) === null => new ImportApplyEffectPlan(E::spousePerson($ownerSlot), I::BLOCK, 'SPOUSE_NATIONAL_ID_INVALID'),
                 $name === null => new ImportApplyEffectPlan(E::spousePerson($ownerSlot), I::BLOCK, 'SPOUSE_WITHOUT_NAME'),
                 $gender === null => new ImportApplyEffectPlan(E::spousePerson($ownerSlot), I::BLOCK, 'SPOUSE_GENDER_UNDERIVABLE'),
                 default => new ImportApplyEffectPlan(E::spousePerson($ownerSlot), I::CREATE, values: [

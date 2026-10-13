@@ -22,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Support\LegacyNationalIds;
 use Tests\Support\SyntheticXlsx;
 use Tests\TestCase;
@@ -199,17 +200,56 @@ class DryRunTest extends TestCase
         $this->assertSame('اسم في السجل', $person->fresh()->full_name);
     }
 
-    public function test_a_head_without_national_id_is_created_and_never_matched_by_name(): void
+    public function test_a_head_without_national_id_blocks_and_is_never_matched_by_name(): void
     {
         // Legacy registry data (pre CO-01D.4): see Tests\Support\LegacyNationalIds.
         $this->allowLegacyNationalIds();
         Person::factory()->create(['full_name' => 'اسم فريد للغاية', 'national_id' => null]);
         $id = $this->batch([2 => $this->row(['id' => null, 'name' => 'اسم فريد مختلف'])]);
 
+        // CO-01D.5 (DB-ADR-061): formerly a warning; Apply would refuse the
+        // Person, so the Dry Run blocks the row instead.
         $plan = $this->rowPlan($id, 2);
-        $this->assertSame(['CREATE', null], [$plan->effect(E::HEAD_PERSON)->intent->value, $plan->effect(E::HEAD_PERSON)->values['national_id']]);
-        $this->assertContains('HEAD_WITHOUT_NATIONAL_ID', $plan->warnings);
-        $this->assertTrue($plan->executable());
+        $this->assertSame(['BLOCK', 'HEAD_WITHOUT_NATIONAL_ID'], [$plan->effect(E::HEAD_PERSON)->intent->value, $plan->effect(E::HEAD_PERSON)->reason]);
+        $this->assertNotContains('HEAD_WITHOUT_NATIONAL_ID', $plan->warnings);
+        $this->assertSame('BLOCK', $plan->effect(E::HEAD_MEMBERSHIP)->intent->value);
+        $this->assertFalse($plan->executable());
+        // Never matched by name, nothing written.
+        $this->assertSame(1, Person::count());
+    }
+
+    /** @return array<string, array{0: string}> */
+    public static function invalidHeadIds(): array
+    {
+        return [
+            'eight digits' => ['91000016'],
+            'ten digits' => ['9100001611'],
+            'letters' => ['A91000016'],
+            'placeholder zeros' => ['000000000'],
+            'placeholder nines' => ['999999999'],
+        ];
+    }
+
+    #[DataProvider('invalidHeadIds')]
+    public function test_an_invalid_or_placeholder_head_id_blocks(string $nationalId): void
+    {
+        $id = $this->batch([2 => $this->row(['id' => $nationalId])]);
+
+        $plan = $this->rowPlan($id, 2);
+        $this->assertSame(['BLOCK', 'HEAD_NATIONAL_ID_INVALID'], [$plan->effect(E::HEAD_PERSON)->intent->value, $plan->effect(E::HEAD_PERSON)->reason]);
+        $this->assertFalse($plan->executable());
+        $this->assertContains('HEAD_NATIONAL_ID_INVALID', $plan->blockReasons());
+        $this->assertSame(0, Person::count());
+    }
+
+    public function test_a_valid_but_formatted_head_id_is_created_with_its_raw_value(): void
+    {
+        // The value is NOT canonicalized in the plan (stable fingerprints);
+        // CreatePersonAction stores the canonical form at Apply.
+        $id = $this->batch([2 => $this->row(['id' => '910-000-161'])]);
+
+        $head = $this->rowPlan($id, 2)->effect(E::HEAD_PERSON);
+        $this->assertSame(['CREATE', '910-000-161'], [$head->intent->value, $head->values['national_id']]);
     }
 
     public function test_a_soft_deleted_head_blocks_and_is_refused_before_planning(): void
@@ -363,6 +403,29 @@ class DryRunTest extends TestCase
         $this->assertContains('SPOUSE_WITHOUT_NATIONAL_ID', $plan->warnings);
         $this->assertTrue($plan->executable());
         $this->assertSame(1, $this->plan($id)['counts']['spouse_slots']);
+    }
+
+    /** @return array<string, array{0: string}> */
+    public static function invalidSpouseIds(): array
+    {
+        return [
+            'five digits' => ['12345'],
+            'letters' => ['B91000017'],
+            'placeholder' => ['000000000'],
+        ];
+    }
+
+    #[DataProvider('invalidSpouseIds')]
+    public function test_a_spouse_with_an_invalid_id_is_never_created(string $nationalId): void
+    {
+        $id = $this->batch([2 => $this->row(['id' => 910000171], [[$nationalId, 'زوجة بهوية غير صالحة']])]);
+
+        $plan = $this->rowPlan($id, 2);
+        $this->assertSame(['BLOCK', 'SPOUSE_NATIONAL_ID_INVALID'], [$plan->intentOf(E::SPOUSE_1_PERSON)->value, $plan->effect(E::SPOUSE_1_PERSON)->reason]);
+        $this->assertFalse($plan->executable());
+        // The head itself is unaffected.
+        $this->assertSame('CREATE', $plan->intentOf(E::HEAD_PERSON)->value);
+        $this->assertSame(0, Person::count());
     }
 
     // ================================================== household

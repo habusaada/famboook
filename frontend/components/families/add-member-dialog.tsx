@@ -336,15 +336,13 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="member-nationalId">
-              رقم الهوية الوطنية{" "}
-              <span className="text-xs font-normal text-muted-foreground">
-                (اختياري)
-              </span>
-            </Label>
+            {/* CO-01D.5: required for every new Person, newborns included. */}
+            <Label htmlFor="member-nationalId">رقم الهوية الوطنية</Label>
             <Input
               id="member-nationalId"
               dir="ltr"
+              inputMode="numeric"
+              autoComplete="off"
               className="text-end"
               {...register("nationalId", {
                 onChange: () => duplicate.clear(),
@@ -353,6 +351,11 @@ export function AddMemberDialog({ familyCode }: { familyCode: string }) {
             />
             {errors.nationalId && duplicate.matches.length === 0 && (
               <p className="text-xs text-destructive">{errors.nationalId.message}</p>
+            )}
+            {!errors.nationalId && duplicate.taken && (
+              <p className="text-xs text-destructive" role="alert" data-national-id-taken>
+                {DUPLICATE_NATIONAL_ID_MESSAGE}
+              </p>
             )}
             <NationalIdDuplicateNotice matches={duplicate.matches} />
           </div>

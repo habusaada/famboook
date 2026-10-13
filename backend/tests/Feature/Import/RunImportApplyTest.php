@@ -353,6 +353,53 @@ class RunImportApplyTest extends TestCase
         $this->assertSame(['2026-09-20'], Family::pluck('registration_date')->map(fn ($d) => $d->toDateString())->unique()->values()->all());
     }
 
+    public function test_a_plan_blocked_by_the_national_id_rule_cannot_start(): void
+    {
+        // CO-01D.5 (DB-ADR-061): a missing, invalid or placeholder head ID and
+        // an invalid spouse ID block the plan, so Apply never starts.
+        foreach ([
+            'missing head ID' => $this->row(['id' => null, 'key' => 'د']),
+            'invalid head ID' => $this->row(['id' => '94000060', 'key' => 'هـ']),
+            'placeholder head ID' => $this->row(['id' => '000000000', 'key' => 'و']),
+            'invalid spouse ID' => $this->row(['id' => 940000605, 'key' => 'ز'], [['12345', 'زوجة']]),
+        ] as $case => $row) {
+            $batch = $this->batch([2 => $row]);
+            $before = $this->registry();
+
+            $this->expectCode('APPLY_PLAN_BLOCKED', fn () => app(StartImportApplyAction::class)->handle($batch, $this->admin, $this->dryRun($batch)));
+
+            $fresh = $batch->fresh();
+            $this->assertSame(['READY_FOR_REVIEW', null, null], [$fresh->status->value, $fresh->apply_started_at, $fresh->apply_plan_fingerprint], $case);
+            $this->assertSame($before, $this->registry(), $case);
+        }
+    }
+
+    public function test_a_plan_that_changes_after_start_is_refused_during_a_chunk_without_writes(): void
+    {
+        $batch = $this->batch([
+            2 => $this->row(['id' => 940000611]),
+            3 => $this->row(['id' => 940000612, 'key' => 'ب']),
+        ]);
+        $this->start($batch);
+        $before = $this->registry();
+
+        // As if the rules changed under the approved plan: row 3's head ID no
+        // longer satisfies the National ID rule, so the plan now BLOCKS it and
+        // its fingerprint differs from the approved one.
+        $row = ImportRow::where('import_batch_id', $batch->id)->where('row_number', 3)->firstOrFail();
+        $row->normalized_payload = ['national_id' => '94000061'] + $row->normalized_payload;
+        $row->save();
+
+        $this->chunk($batch);
+
+        $fresh = $batch->fresh();
+        $this->assertContains($fresh->apply_error_code, ['APPLY_PLAN_CHANGED', 'APPLY_PLAN_NOT_APPROVED']);
+        // Nothing committed: the batch returns to review, approval cleared.
+        $this->assertSame(['READY_FOR_REVIEW', null], [$fresh->status->value, $fresh->apply_plan_fingerprint]);
+        $this->assertSame($before, $this->registry());
+        $this->assertSame([], $this->applied($batch));
+    }
+
     public function test_resume_is_refused_when_the_plan_changed_or_provenance_is_impossible(): void
     {
         $batch = $this->fiveRows();

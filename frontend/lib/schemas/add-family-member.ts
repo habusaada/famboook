@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { AddFamilyMemberPayload } from "@/lib/types/api/family";
+import { NATIONAL_ID_MESSAGE, canonicalNationalId, isValidNationalId } from "@/lib/utils/national-id";
 
 // UX validation only — light on purpose (Laravel's 422 response is
 // authoritative). Mirrors AddFamilyMemberRequest's shape exactly.
@@ -8,7 +9,9 @@ export const addFamilyMemberSchema = z.object({
     message: "صلة القرابة مطلوبة",
   }),
   fullName: z.string().min(2, "الاسم الكامل مطلوب"),
-  nationalId: z.string().optional(),
+  // CO-01D.4/5: required, nine digits after normalization, never a
+  // placeholder (RegistryNationalId); sent in canonical form.
+  nationalId: z.string().refine(isValidNationalId, NATIONAL_ID_MESSAGE),
   gender: z.enum(["MALE", "FEMALE"]),
   maritalStatus: z.enum(["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "UNKNOWN"]),
   // Optional: empty = unknown (NULL), never a placeholder date.
@@ -24,7 +27,7 @@ export function toAddFamilyMemberPayload(
 ): AddFamilyMemberPayload {
   return {
     full_name: values.fullName,
-    national_id: values.nationalId || null,
+    national_id: canonicalNationalId(values.nationalId) ?? values.nationalId,
     gender: values.gender,
     marital_status: values.maritalStatus,
     birth_date: values.birthDate || null,

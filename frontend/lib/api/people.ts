@@ -131,13 +131,18 @@ export function usePeople(params: { search?: string; page?: number }) {
 /**
  * Exact National ID duplicate pre-check (AUTH-ADR-058). POST, so the value
  * never appears in a URL; the response never contains a National ID.
+ *
+ * `exists` is authoritative: since CO-01D.4 a value held only by a
+ * soft-deleted Person answers `exists: true` with NO matches — it is taken,
+ * and the deleted record is never described.
  */
-export async function checkNationalId(nationalId: string): Promise<NationalIdMatch[]> {
+export async function checkNationalId(nationalId: string): Promise<{ exists: boolean; matches: NationalIdMatch[] }> {
   const response = await apiClient.post<{ data: { exists: boolean; matches: NationalIdMatch[] } }>(
     "/api/v1/people/national-id-check",
     { national_id: nationalId }
   );
-  return response.data.matches;
+  const matches = response.data.matches ?? [];
+  return { exists: response.data.exists || matches.length > 0, matches };
 }
 
 /** The existing record(s) of a refused creation (422 with `duplicate`), if any. */

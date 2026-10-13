@@ -5,6 +5,7 @@ import { ExternalLink, UserX } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { checkNationalId, duplicateMatches } from "@/lib/api/people";
 import type { NationalIdMatch } from "@/lib/types/api/person";
+import { canonicalNationalId } from "@/lib/utils/national-id";
 
 export const DUPLICATE_NATIONAL_ID_MESSAGE = "يوجد شخص مسجل مسبقًا بهذه الهوية.";
 
@@ -13,21 +14,27 @@ export const DUPLICATE_NATIONAL_ID_MESSAGE = "يوجد شخص مسجل مسبق�
  * `check` runs the POST pre-check when the field is left; `fromError` picks
  * up the server's refusal on submit (the server always enforces the rule).
  * The National ID itself is never shown back.
+ *
+ * CO-01D.5: only a valid value is checked, in canonical form (the form's own
+ * validation reports an invalid one). `exists` is authoritative: `taken` is
+ * a value held by a record that is not described (a soft-deleted Person) —
+ * show the generic duplicate message only, never anything about it.
  */
 export function useNationalIdDuplicate() {
   const [matches, setMatches] = useState<NationalIdMatch[]>([]);
+  const [taken, setTaken] = useState(false);
 
   const check = useCallback(async (value: string | undefined) => {
-    const nationalId = value?.trim() ?? "";
-    if (!nationalId) {
-      setMatches([]);
-      return;
-    }
+    setMatches([]);
+    setTaken(false);
+    const nationalId = canonicalNationalId(value);
+    if (nationalId === null) return;
     try {
-      setMatches(await checkNationalId(nationalId));
+      const found = await checkNationalId(nationalId);
+      setMatches(found.matches);
+      setTaken(found.exists && found.matches.length === 0);
     } catch {
       // Not decisive: the creation request is checked on the server anyway.
-      setMatches([]);
     }
   }, []);
 
@@ -36,10 +43,16 @@ export function useNationalIdDuplicate() {
     const found = duplicateMatches(error);
     if (found === null) return false;
     setMatches(found);
+    setTaken(false);
     return true;
   }, []);
 
-  return { matches, check, fromError, clear: () => setMatches([]) };
+  const clear = useCallback(() => {
+    setMatches([]);
+    setTaken(false);
+  }, []);
+
+  return { matches, taken, check, fromError, clear };
 }
 
 /** The warning with safe references (codes, name, family) to inspect. */

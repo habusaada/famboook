@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFamilyPayload } from "@/lib/types/api/family";
+import { NATIONAL_ID_MESSAGE, canonicalNationalId, isValidNationalId } from "@/lib/utils/national-id";
 
 // UX validation only — kept light on purpose (docs/02-DATA-DICTIONARY.md
 // §68: Zod supplements but never replaces Laravel's authoritative
@@ -20,7 +21,9 @@ export const familyRegistrationSchema = z.object({
   branchCode: z.string().optional(),
 
   headFullName: z.string().min(2, "اسم رب الأسرة مطلوب"),
-  headNationalId: z.string().optional(),
+  // CO-01D.4/5: required, nine digits after normalization, never a
+  // placeholder (RegistryNationalId); sent in canonical form.
+  headNationalId: z.string().refine(isValidNationalId, NATIONAL_ID_MESSAGE),
   headGender: z.enum(["MALE", "FEMALE"]),
   headMaritalStatus: z.enum(["SINGLE", "MARRIED", "DIVORCED", "WIDOWED", "UNKNOWN"]),
   // Optional: empty = unknown (NULL), never a placeholder date.
@@ -61,7 +64,7 @@ export function toRegisterFamilyPayload(
     branch_code: values.branchCode || null,
     household_head: {
       full_name: values.headFullName,
-      national_id: values.headNationalId || null,
+      national_id: canonicalNationalId(values.headNationalId) ?? values.headNationalId,
       gender: values.headGender,
       marital_status: values.headMaritalStatus,
       birth_date: values.headBirthDate || null,
