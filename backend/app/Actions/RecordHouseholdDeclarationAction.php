@@ -61,7 +61,7 @@ class RecordHouseholdDeclarationAction
             'declared_living_sons' => self::COUNT_RULES,
             'declared_living_daughters' => self::COUNT_RULES,
             'declared_at' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'source' => ['required', Rule::enum(RegistrationSource::class)],
+            'source' => ['required', Rule::enum(RegistrationSource::class)->only(RegistrationSource::selectable())],
             'notes' => ['nullable', 'string'],
         ])->validate();
 

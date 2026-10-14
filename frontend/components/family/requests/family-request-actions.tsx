@@ -25,13 +25,27 @@ import type { ChangeRequestOutcome } from "@/lib/types/api/change-request";
 
 export type FamilyActionNotice = { tone: "success" | "info"; message: string };
 
-const SUCCESS: Record<FamilyChangeRequestAction, string> = {
-  resubmit: "أُرسل الاستكمال إلى فريق المراجعة.",
-  cancel: "أُلغي الطلب. لم يتغير سجل أسرتك.",
+/**
+ * The wording that names whose record a request is about. The defaults are
+ * the Family Portal's; Coordinator Space (CO-02.6b) passes its own.
+ */
+export type RequestActionCopy = {
+  resubmitDone: string;
+  cancelDone: string;
+  cancelDescription: string;
+  /** A safe message for a failed action; the Family Portal's by default. */
+  errorMessage?: (error: unknown) => string;
 };
 
-function noticeFor(action: FamilyChangeRequestAction, outcome: ChangeRequestOutcome): FamilyActionNotice {
-  return outcome.replayed ? { tone: "info", message: "لم يتغير شيء: سبق تنفيذ هذا الإجراء على الطلب." } : { tone: "success", message: SUCCESS[action] };
+const FAMILY_COPY: RequestActionCopy = {
+  resubmitDone: "أُرسل الاستكمال إلى فريق المراجعة.",
+  cancelDone: "أُلغي الطلب. لم يتغير سجل أسرتك.",
+  cancelDescription: "يوقف الإلغاء مراجعة هذا الطلب نهائيًا، ولا يغيّر شيئًا في سجل أسرتك. يمكنك تقديم طلب جديد لاحقًا عند الحاجة.",
+};
+
+function noticeFor(action: FamilyChangeRequestAction, outcome: ChangeRequestOutcome, copy: RequestActionCopy): FamilyActionNotice {
+  if (outcome.replayed) return { tone: "info", message: "لم يتغير شيء: سبق تنفيذ هذا الإجراء على الطلب." };
+  return { tone: "success", message: action === "resubmit" ? copy.resubmitDone : copy.cancelDone };
 }
 
 type Mutation = ReturnType<typeof useFamilyChangeRequestMutation>;
@@ -41,9 +55,10 @@ type Mutation = ReturnType<typeof useFamilyChangeRequestMutation>;
  * open with a safe message; the request and the history are re-read in the
  * background (onSettled), so after a 409 the page shows the current state.
  */
-function useSend(mutation: Mutation, onDone: (notice: FamilyActionNotice) => void, onFieldError?: (message: string) => void) {
+function useSend(mutation: Mutation, onDone: (notice: FamilyActionNotice) => void, copy: RequestActionCopy, onFieldError?: (message: string) => void) {
   const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
+  const errorMessage = copy.errorMessage ?? familyChangeRequestErrorMessage;
 
   function send(input: FamilyChangeRequestMutation, close: () => void) {
     if (sending.current) return;
@@ -55,12 +70,12 @@ function useSend(mutation: Mutation, onDone: (notice: FamilyActionNotice) => voi
       },
       onSuccess: (outcome) => {
         close();
-        onDone(noticeFor(input.action, outcome));
+        onDone(noticeFor(input.action, outcome, copy));
       },
       onError: (e) => {
         const field = e instanceof ApiError && e.status === 422 ? e.validationErrors?.response?.[0] : undefined;
         if (field && onFieldError) onFieldError(field);
-        setError(familyChangeRequestErrorMessage(e));
+        setError(errorMessage(e));
       },
     });
   }
@@ -80,13 +95,13 @@ function ActionError({ message }: { message: string | null }) {
 }
 
 /** «إرسال الاستكمال»: the reply to a clarification. The proposal itself never changes. */
-export function ResubmitDialog({ mutation, onDone }: { mutation: Mutation; onDone: (n: FamilyActionNotice) => void }) {
+export function ResubmitDialog({ mutation, onDone, copy = FAMILY_COPY }: { mutation: Mutation; onDone: (n: FamilyActionNotice) => void; copy?: RequestActionCopy }) {
   const [open, setOpen] = useState(false);
   const form = useForm<ResubmitFamilyChangeRequestValues>({
     resolver: zodResolver(resubmitFamilyChangeRequestSchema),
     defaultValues: { response: "" },
   });
-  const { error, setError, send } = useSend(mutation, onDone, (message) => form.setError("response", { type: "server", message }));
+  const { error, setError, send } = useSend(mutation, onDone, copy, (message) => form.setError("response", { type: "server", message }));
   const response = useWatch({ control: form.control, name: "response" });
 
   const submit = form.handleSubmit((values) =>
@@ -149,9 +164,9 @@ export function ResubmitDialog({ mutation, onDone }: { mutation: Mutation; onDon
 }
 
 /** «إلغاء الطلب»: confirmation only. Cancelling never touches the registry. */
-export function CancelDialog({ mutation, onDone }: { mutation: Mutation; onDone: (n: FamilyActionNotice) => void }) {
+export function CancelDialog({ mutation, onDone, copy = FAMILY_COPY }: { mutation: Mutation; onDone: (n: FamilyActionNotice) => void; copy?: RequestActionCopy }) {
   const [open, setOpen] = useState(false);
-  const { error, setError, send } = useSend(mutation, onDone);
+  const { error, setError, send } = useSend(mutation, onDone, copy);
 
   return (
     <Dialog
@@ -171,7 +186,7 @@ export function CancelDialog({ mutation, onDone }: { mutation: Mutation; onDone:
       <DialogContent>
         <DialogHeader>
           <DialogTitle>إلغاء الطلب؟</DialogTitle>
-          <DialogDescription>يوقف الإلغاء مراجعة هذا الطلب نهائيًا، ولا يغيّر شيئًا في سجل أسرتك. يمكنك تقديم طلب جديد لاحقًا عند الحاجة.</DialogDescription>
+          <DialogDescription>{copy.cancelDescription}</DialogDescription>
         </DialogHeader>
         <ActionError message={error} />
         <DialogFooter>

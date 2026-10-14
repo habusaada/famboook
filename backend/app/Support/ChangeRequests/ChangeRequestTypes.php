@@ -8,6 +8,7 @@ use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
 use App\Support\ChangeRequests\Handlers\ContactUpdateHandler;
 use App\Support\ChangeRequests\Handlers\DeathReportHandler;
 use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
+use App\Support\ChangeRequests\Handlers\RegisterFamilyHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use InvalidArgumentException;
 use LogicException;
@@ -38,6 +39,9 @@ final class ChangeRequestTypes
         'DEATH_REPORT' => DeathReportHandler::class,
         // FP-ADR-079: families reach it only while FAMILY_CONTACT_UPDATE_ENABLED is on.
         'CONTACT_UPDATE' => ContactUpdateHandler::class,
+        // CO-02.5 (FAMILY_ADD): never family-submittable; Coordinators reach it
+        // only while CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE is open.
+        'REGISTER_FAMILY' => RegisterFamilyHandler::class,
     ];
 
     /** @param array<string, ChangeRequestHandler> $handlers keyed by type value */

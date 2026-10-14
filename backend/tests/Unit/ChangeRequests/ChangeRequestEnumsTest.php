@@ -52,7 +52,9 @@ class ChangeRequestEnumsTest extends TestCase
     {
         $this->assertSame(
             ['CONTACT_UPDATE', 'RESIDENCE_UPDATE', 'PERSON_CORRECTION', 'ADD_FAMILY_MEMBER', 'MEMBERSHIP_CHANGE', 'HOUSEHOLD_HEAD_CHANGE',
-                'BIRTH_REPORT', 'DEATH_REPORT', 'MARRIAGE_UPDATE', 'DOCUMENT_UPDATE', 'OTHER'],
+                'BIRTH_REPORT', 'DEATH_REPORT', 'MARRIAGE_UPDATE', 'DOCUMENT_UPDATE', 'OTHER',
+                // CO-02 (docs/04 DB-ADR-062): the approved Coordinator FAMILY_ADD proposal.
+                'REGISTER_FAMILY'],
             $this->values(ChangeRequestType::class),
         );
         // PFP-008 proposals are not approved and must not exist as codes.
@@ -71,7 +73,7 @@ class ChangeRequestEnumsTest extends TestCase
             ['SUBMITTED', 'REVIEW_STARTED', 'RETURNED', 'RESUBMITTED', 'APPROVED', 'REJECTED', 'APPLIED', 'APPLY_FAILED', 'CANCELLED'],
             $this->values(WorkflowEventType::class),
         );
-        $this->assertSame(['FAMILY', 'STAFF', 'SYSTEM'], $this->values(WorkflowActorSide::class));
+        $this->assertSame(['FAMILY', 'STAFF', 'SYSTEM', 'COORDINATOR'], $this->values(WorkflowActorSide::class));
     }
 
     public function test_the_change_request_base_fingerprint_has_its_own_domain(): void

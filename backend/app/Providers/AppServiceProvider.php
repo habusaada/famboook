@@ -193,6 +193,11 @@ class AppServiceProvider extends ServiceProvider
         // Coordinator Space members directory and reveal (CO-01C,
         // AUTH-ADR-092): per signed-in Coordinator — never per Family or
         // member reference, so another code never resets the count.
+        // Coordinator Space reads (CO-02.7b): the context, the Families list and
+        // a Family summary — per signed-in user, like the members directory.
+        RateLimiter::for('coordinator-read', fn (Request $request) => Limit::perMinute((int) config('family_auth.coordinator_read.limits.user_minute'))
+            ->by("coordinator-read|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
         RateLimiter::for('coordinator-member-directory', fn (Request $request) => Limit::perMinute((int) config('family_auth.coordinator_directory.limits.user_minute'))
             ->by("coordinator-member-directory|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
@@ -248,6 +253,25 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('family-change-request-action', fn (Request $request) => Limit::perMinute((int) config('change_requests.family_limits.action_user_minute'))
             ->by("family-change-request-action|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
+        // Coordinator requests (CO-02.4, docs/06 AUTH-ADR-093): per signed-in
+        // user. Submissions per minute and per hour (each is reviewed by a
+        // person); resubmit / cancel per minute; reads (types, list, detail)
+        // per minute. Keys are separate from the household's own limits.
+        RateLimiter::for('coordinator-request-submit', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('change_requests.coordinator_limits.submit_user_hour'))
+                : Limit::perMinute((int) config('change_requests.coordinator_limits.submit_user_minute')))
+                ->by("coordinator-request-submit|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)),
+            ['minute', 'hour'],
+        ));
+        RateLimiter::for('coordinator-request-action', fn (Request $request) => Limit::perMinute((int) config('change_requests.coordinator_limits.action_user_minute'))
+            ->by("coordinator-request-action|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        RateLimiter::for('coordinator-request-read', fn (Request $request) => Limit::perMinute((int) config('change_requests.coordinator_limits.read_user_minute'))
+            ->by("coordinator-request-read|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
 
         // «بطاقة الأسرة الرقمية» PDF (PWA-8.3): per signed-in user — rendering

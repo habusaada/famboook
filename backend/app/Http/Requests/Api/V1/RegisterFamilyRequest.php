@@ -24,7 +24,8 @@ class RegisterFamilyRequest extends FormRequest
             'registration_date' => ['required', 'date'],
             // Clan required, Branch optional (docs/03 §7a).
             ...FamilyLineage::rules(partial: false),
-            'registration_source' => ['required', Rule::enum(RegistrationSource::class)],
+            // COORDINATOR_REQUEST is set only by the APPLY of a REGISTER_FAMILY request (CO-02).
+            'registration_source' => ['required', Rule::enum(RegistrationSource::class)->only(RegistrationSource::selectable())],
             'paper_form_no' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
 

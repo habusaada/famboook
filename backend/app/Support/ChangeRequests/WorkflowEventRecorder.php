@@ -7,6 +7,7 @@ use App\Enums\ChangeRequestAttestation;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\LifeStatusVerificationMethod;
+use App\Enums\SubmissionChannel;
 use App\Enums\WorkflowActorSide;
 use App\Enums\WorkflowEventType;
 use App\Models\ChangeRequest;
@@ -25,6 +26,9 @@ use LogicException;
  * It refuses — never repairs — an event that does not fit:
  * - the transition must be in ChangeRequestTransitions, with the event and
  *   actor side it defines, and must match the request's current status;
+ *   COORDINATOR events use the coordinator table and only on a
+ *   COORDINATOR-channel request; FAMILY events only on a FAMILY-channel
+ *   request (CO-02.3b);
  * - a rejection carries a reason the transition accepts; a failed apply
  *   carries its ChangeRequestApplyFailure code; nothing else carries one;
  * - public_message (family-visible) is required to return a request and to
@@ -117,7 +121,17 @@ final class WorkflowEventRecorder
                     throw new LogicException('Only a system-verified request type has SYSTEM transitions.');
                 }
                 $transition = ChangeRequestTransitions::assertSystemAllowed($from, $to);
+            } elseif ($actorSide === WorkflowActorSide::COORDINATOR) {
+                // CO-02.3b: a Coordinator acts only on a COORDINATOR-channel request.
+                if ($request->submission_channel !== SubmissionChannel::COORDINATOR || $reason !== null) {
+                    throw new LogicException('Coordinator events belong to coordinator-channel requests only.');
+                }
+                $transition = ChangeRequestTransitions::assertCoordinatorAllowed($from, $to);
             } else {
+                // CO-02.3b: the household acts only on a FAMILY-channel request.
+                if ($actorSide === WorkflowActorSide::FAMILY && $request->submission_channel !== SubmissionChannel::FAMILY) {
+                    throw new LogicException('Family events belong to family-channel requests only.');
+                }
                 $transition = ChangeRequestTransitions::assertAllowed($from, $to, $reason);
             }
             if ($transition->event !== $event || $transition->actorSide !== $actorSide) {
@@ -126,7 +140,7 @@ final class WorkflowEventRecorder
         }
 
         if ($actorSide !== WorkflowActorSide::SYSTEM && $actorUserId === null) {
-            throw new InvalidArgumentException('A family or Staff event needs its acting user.');
+            throw new InvalidArgumentException('A family, Coordinator or Staff event needs its acting user.');
         }
 
         $publicMessage = self::cleanText($publicMessage, 'public_message');

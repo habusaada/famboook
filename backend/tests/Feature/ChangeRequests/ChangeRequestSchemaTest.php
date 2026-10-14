@@ -108,6 +108,8 @@ class ChangeRequestSchemaTest extends TestCase
             'client_reference', 'submitted_at', 'reviewed_by', 'reviewed_at', 'approved_by', 'approved_at', 'rejected_by',
             'rejected_at', 'rejection_reason_code', 'rejection_reason', 'applied_by', 'applied_at', 'cancelled_by', 'cancelled_at',
             'apply_failure_count', 'last_apply_failed_at', 'created_at', 'updated_at',
+            // CO-02.3a (DB-ADR-062), appended by ALTER TABLE.
+            'submission_channel', 'proposed_clan_id', 'proposed_branch_id', 'created_family_id',
         ], Schema::getColumnListing('change_requests'));
 
         $this->assertSame('jsonb', DB::selectOne(

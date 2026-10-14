@@ -332,6 +332,14 @@ return [
         ],
     ],
 
+    // Coordinator Space reads — the context, the Families list and one
+    // Family's summary (CO-02.7b): per signed-in Coordinator.
+    'coordinator_read' => [
+        'limits' => [
+            'user_minute' => (int) env('COORDINATOR_READ_LIMIT_USER_MINUTE', 60),
+        ],
+    ],
+
     // Coordinator Space members directory (CO-01C, AUTH-ADR-092): per
     // signed-in Coordinator. The reveal has its own, tighter buckets.
     'coordinator_directory' => [

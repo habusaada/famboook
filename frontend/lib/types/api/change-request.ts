@@ -31,7 +31,9 @@ export type ChangeRequestType =
   | "DEATH_REPORT"
   | "MARRIAGE_UPDATE"
   | "DOCUMENT_UPDATE"
-  | "OTHER";
+  | "OTHER"
+  // CO-02 (docs/04 DB-ADR-062): a Coordinator's proposal of a NEW Family (FAMILY_ADD).
+  | "REGISTER_FAMILY";
 
 // backend/app/Enums/WorkflowEventType.php
 export type WorkflowEventType =
@@ -45,7 +47,8 @@ export type WorkflowEventType =
   | "APPLY_FAILED"
   | "CANCELLED";
 
-export type WorkflowActorSide = "FAMILY" | "STAFF" | "SYSTEM";
+// CO-02: COORDINATOR — a Coordinator acting on their own request.
+export type WorkflowActorSide = "FAMILY" | "STAFF" | "SYSTEM" | "COORDINATOR";
 
 // backend/app/Enums/ChangeRequestRejectionReason.php
 export type ChangeRequestRejectionReason =
@@ -70,6 +73,15 @@ export interface ChangeRequestFamily {
   household_head_name: string | null;
 }
 
+// CO-02: who submitted — the household (Family Portal) or a Coordinator.
+export type SubmissionChannel = "FAMILY" | "COORDINATOR";
+
+/** A proposed Family's placement (REGISTER_FAMILY): public codes and names only. */
+export interface ChangeRequestPlacement {
+  clan: { code: string; name: string | null };
+  branch: { code: string; name: string | null } | null;
+}
+
 /** A row of GET /api/v1/change-requests — never the proposal or a message. */
 export interface ChangeRequestSummary {
   /** Public UUID (the database id is never exposed). */
@@ -79,7 +91,12 @@ export interface ChangeRequestSummary {
   /** Whether a handler for this type is registered (the Production registry is empty until PWA-6). */
   type_available: boolean;
   status: ChangeRequestStatus;
-  family: ChangeRequestFamily;
+  submission_channel: SubmissionChannel;
+  /** NULL for a proposed Family (REGISTER_FAMILY): see placement and created_family_code. */
+  family: ChangeRequestFamily | null;
+  placement: ChangeRequestPlacement | null;
+  /** The Family a REGISTER_FAMILY request created, once APPLIED. */
+  created_family_code: string | null;
   submitted_by: { name: string | null };
   submitted_at: string | null;
   reviewed_at: string | null;
@@ -115,7 +132,11 @@ export interface ChangeRequestDetail {
   type_available: boolean;
   payload_version: number;
   status: ChangeRequestStatus;
-  family: ChangeRequestFamily;
+  submission_channel: SubmissionChannel;
+  /** NULL for a proposed Family (REGISTER_FAMILY): see placement and created_family_code. */
+  family: ChangeRequestFamily | null;
+  placement: ChangeRequestPlacement | null;
+  created_family_code: string | null;
   target_person: { person_code: string; full_name: string } | null;
   submitted_by: { name: string | null };
   submitted_at: string | null;
@@ -177,6 +198,10 @@ export interface ChangeRequestFilters {
   status?: ChangeRequestStatus;
   type?: ChangeRequestType;
   family?: string;
+  /** CO-02.7b: FAMILY or COORDINATOR. */
+  channel?: SubmissionChannel;
+  /** CO-02.7b: part of the submitter's name (at least two characters). */
+  submitter?: string;
   request_code?: string;
   submitted_from?: string;
   submitted_to?: string;

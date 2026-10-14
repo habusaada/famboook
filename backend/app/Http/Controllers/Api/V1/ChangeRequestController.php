@@ -54,7 +54,13 @@ class ChangeRequestController extends Controller
                 ->limit(1)])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
-            ->when($filters['family'] ?? null, fn ($q, $code) => $q->whereHas('family', fn ($f) => $f->where('family_code', $code)))
+            // The Family it is about — or, for an applied proposal (CO-02.5), the Family it created.
+            ->when($filters['family'] ?? null, fn ($q, $code) => $q->where(fn ($w) => $w
+                ->whereHas('family', fn ($f) => $f->where('family_code', $code))
+                ->orWhereHas('createdFamily', fn ($f) => $f->where('family_code', $code))))
+            ->when($filters['channel'] ?? null, fn ($q, $channel) => $q->where('submission_channel', $channel))
+            ->when($filters['submitter'] ?? null, fn ($q, $name) => $q->whereHas('submitterPerson',
+                fn ($p) => $p->where('full_name', 'like', '%'.addcslashes(trim($name), '%_\\').'%')))
             ->when($filters['request_code'] ?? null, fn ($q, $code) => $q->where('request_code', $code))
             ->when($filters['submitted_from'] ?? null, fn ($q, $date) => $q->where('submitted_at', '>=', $date.' 00:00:00'))
             ->when($filters['submitted_to'] ?? null, fn ($q, $date) => $q->where('submitted_at', '<=', $date.' 23:59:59'))

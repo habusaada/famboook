@@ -23,7 +23,9 @@ use Illuminate\Support\Facades\DB;
  * optional except for OTHER (which says nothing on its own); the Staff-only
  * note is optional and stays on the event. Records CHANGE_REQUEST_REJECTED.
  *
- * Normally from UNDER_REVIEW. From APPROVED only as NO_LONGER_APPLICABLE
+ * Normally from UNDER_REVIEW; also from RETURNED_FOR_CLARIFICATION (CO-02.7b:
+ * a clarification that never comes no longer blocks the request), any
+ * controlled reason. From APPROVED only as NO_LONGER_APPLICABLE
  * and only after a recorded REFUSED apply (AE-4): the latest APPLY_FAILED
  * event must carry a refusal code (base changed, precondition failed, not
  * applicable) — an unexpected system failure is retried, not rejected. It is
@@ -68,9 +70,12 @@ class RejectChangeRequestAction
             ])->save();
             WorkflowEventRecorder::record($locked, $from, WorkflowEventType::REJECTED, WorkflowActorSide::STAFF, $staff->getKey(),
                 reason: $reason, publicMessage: $message, internalNote: $internalNote);
-            FamilyActivityLog::record($locked->family_id, FamilyActivityType::CHANGE_REQUEST_REJECTED, $locked, $staff->getKey(), [
-                'request_type' => $locked->type->value,
-            ]);
+            // CO-02.3b: a rejected proposal for a NEW Family has no Family to log on.
+            if ($locked->family_id !== null) {
+                FamilyActivityLog::record($locked->family_id, FamilyActivityType::CHANGE_REQUEST_REJECTED, $locked, $staff->getKey(), [
+                    'request_type' => $locked->type->value,
+                ]);
+            }
 
             return new ChangeRequestOutcome($locked);
         });

@@ -24,6 +24,11 @@ enum ChangeRequestType: string
     case MARRIAGE_UPDATE = 'MARRIAGE_UPDATE';
     case DOCUMENT_UPDATE = 'DOCUMENT_UPDATE';
     case OTHER = 'OTHER';
+    // CO-02 (docs/04 DB-ADR-062): a Coordinator's proposal of a NEW Family —
+    // product name FAMILY_ADD. Its family_id is NULL until the Staff APPLY
+    // creates the Family. Not registered in ChangeRequestTypes and never
+    // accepted by the family submission route.
+    case REGISTER_FAMILY = 'REGISTER_FAMILY';
 
     /**
      * Approved and applied by the SYSTEM after an OTP to the proposed value

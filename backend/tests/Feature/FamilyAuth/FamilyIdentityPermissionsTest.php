@@ -98,14 +98,16 @@ class FamilyIdentityPermissionsTest extends TestCase
     {
         // The whole role, not just the PWA-1 names: nothing else at all
         // (PWA-1H added the scoped family summaries, AUTH-ADR-070; CO-01C the
-        // members directory and its audited reveal, AUTH-ADR-092).
+        // members directory and its audited reveal, AUTH-ADR-092; CO-02.3b its
+        // own requests, AUTH-ADR-093).
+        $requests = ['coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel'];
         $this->assertEqualsCanonicalizing(
-            ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive'],
+            ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive', ...$requests],
             Role::findByName('COORDINATOR', 'web')->permissions->pluck('name')->all(),
         );
         // No other role holds them — no Staff role either.
         foreach (RolePermissionSeeder::ROLES as $role) {
-            foreach (['coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive'] as $permission) {
+            foreach (['coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive', ...$requests] as $permission) {
                 $this->assertSame($role === 'COORDINATOR', Role::findByName($role, 'web')->hasPermissionTo($permission), "{$role} {$permission}");
             }
         }

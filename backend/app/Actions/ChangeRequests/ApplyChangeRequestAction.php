@@ -20,6 +20,7 @@ use App\Support\FamilyActivityLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Throwable;
 
 /**
@@ -49,6 +50,13 @@ use Throwable;
  *
  * Call it outside any surrounding transaction: an enclosing rollback would
  * also undo the failure record.
+ *
+ * CO-02.3b: a request for a NEW Family (no family_id) locks its proposed
+ * placement, is re-validated by its ProposesNewFamily handler, and its
+ * applyProposal() creates the Family through the canonical Domain Actions;
+ * created_family_id is written with APPLIED in the same row update, and
+ * the CHANGE_REQUEST_APPLIED activity goes to the created Family. A failure
+ * rolls the Family back with everything else.
  */
 class ApplyChangeRequestAction
 {
@@ -75,15 +83,34 @@ class ApplyChangeRequestAction
                 $handler = $this->types->handler($locked->type);
                 $attempted = true;
 
-                $target = ChangeRequestWorkflow::lockCanonical($locked);
-                ChangeRequestWorkflow::verify($handler, $locked, $target);
-                ChangeRequestWorkflow::assertBaseUnchanged($handler, $locked, $target);
+                $applied = ['status' => ChangeRequestStatus::APPLIED, 'applied_by' => $staff->getKey(), 'applied_at' => now()];
+                if ($locked->family_id === null) {
+                    // CO-02.3b: a proposed Family is created here, and only here.
+                    ChangeRequestWorkflow::lockPlacement($locked);
+                    ChangeRequestWorkflow::verifyProposal($handler, $locked);
+                    $created = ChangeRequestWorkflow::proposalHandler($handler)->applyProposal($locked, $staff->getKey());
+                    if (! $created->exists || $created->trashed()) {
+                        throw new LogicException('A proposed Family must be created by its APPLY.');
+                    }
+                    // CO-02.5: exactly the reviewed placement, or nothing at all.
+                    if ((int) $created->clan_id !== (int) $locked->proposed_clan_id
+                        || ($created->branch_id === null ? null : (int) $created->branch_id) !== ($locked->proposed_branch_id === null ? null : (int) $locked->proposed_branch_id)) {
+                        throw new LogicException('A proposed Family must be created in its proposed Clan and Branch.');
+                    }
+                    // Recorded with APPLIED in the same row update (chk_change_request_created_family).
+                    $applied['created_family_id'] = $created->getKey();
+                    $activityFamilyId = (int) $created->getKey();
+                } else {
+                    $target = ChangeRequestWorkflow::lockCanonical($locked);
+                    ChangeRequestWorkflow::verify($handler, $locked, $target);
+                    ChangeRequestWorkflow::assertBaseUnchanged($handler, $locked, $target);
+                    $handler->apply($locked, $target, $staff->getKey());
+                    $activityFamilyId = (int) $locked->family_id;
+                }
 
-                $handler->apply($locked, $target, $staff->getKey());
-
-                $locked->forceFill(['status' => ChangeRequestStatus::APPLIED, 'applied_by' => $staff->getKey(), 'applied_at' => now()])->save();
+                $locked->forceFill($applied)->save();
                 WorkflowEventRecorder::record($locked, ChangeRequestStatus::APPROVED, WorkflowEventType::APPLIED, WorkflowActorSide::STAFF, $staff->getKey());
-                FamilyActivityLog::record($locked->family_id, FamilyActivityType::CHANGE_REQUEST_APPLIED, $locked, $staff->getKey(), [
+                FamilyActivityLog::record($activityFamilyId, FamilyActivityType::CHANGE_REQUEST_APPLIED, $locked, $staff->getKey(), [
                     'request_type' => $locked->type->value,
                 ]);
 

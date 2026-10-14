@@ -2,9 +2,11 @@ import type { StatusTone } from "@/components/shared/status-badge";
 import type {
   ChangeRequestAction,
   ChangeRequestApplyFailure,
+  ChangeRequestPlacement,
   ChangeRequestRejectionReason,
   ChangeRequestStatus,
   ChangeRequestType,
+  SubmissionChannel,
   WorkflowActorSide,
   WorkflowEventType,
 } from "@/lib/types/api/change-request";
@@ -62,6 +64,8 @@ export const changeRequestTypeLabels: Record<ChangeRequestType, string> = {
   MARRIAGE_UPDATE: "تحديث الحالة الزوجية",
   DOCUMENT_UPDATE: "تحديث وثيقة",
   OTHER: "طلب آخر",
+  // CO-02: a Coordinator's proposal of a NEW Family (FAMILY_ADD).
+  REGISTER_FAMILY: "تسجيل أسرة جديدة",
 };
 
 export const workflowEventLabels: Record<WorkflowEventType, string> = {
@@ -88,10 +92,45 @@ export const workflowEventTones: Record<WorkflowEventType, StatusTone> = {
   CANCELLED: "neutral",
 };
 
+/**
+ * Whom Staff address in a request's family-visible messages (CO-02): the
+ * household for its own requests, the Coordinator for theirs. A missing
+ * channel (an older response) is the household.
+ */
+export function counterpart(channel: SubmissionChannel | undefined): { noun: string; to: string; possessive: string } {
+  return channel === "COORDINATOR"
+    ? { noun: "المنسّق", to: "للمنسّق", possessive: "المنسّق" }
+    : { noun: "الأسرة", to: "للأسرة", possessive: "الأسرة" };
+}
+
+export const submissionChannelLabels: Record<SubmissionChannel, string> = {
+  FAMILY: "الأسرة",
+  COORDINATOR: "منسّق",
+};
+
+/** «العائلة · الفرع» of a proposed Family, or «العائلة · دون فرع». */
+export function placementLabel(placement: ChangeRequestPlacement | null): string {
+  if (!placement) return "—";
+  const clan = placement.clan.name ?? placement.clan.code;
+  const branch = placement.branch ? (placement.branch.name ?? placement.branch.code) : "دون فرع";
+  return `${clan} · ${branch}`;
+}
+
+/** The timeline wording of an event, by who acted (a Coordinator's own acts read as theirs). */
+export function workflowEventLabel(event: { event_type: WorkflowEventType; actor_side: WorkflowActorSide }): string {
+  if (event.actor_side === "COORDINATOR") {
+    if (event.event_type === "SUBMITTED") return "قدّم المنسّق الطلب";
+    if (event.event_type === "RESUBMITTED") return "ردّ المنسّق وأعاد تقديم الطلب";
+    if (event.event_type === "CANCELLED") return "ألغى المنسّق الطلب";
+  }
+  return workflowEventLabels[event.event_type] ?? "حدث";
+}
+
 export const actorSideLabels: Record<WorkflowActorSide, string> = {
   FAMILY: "الأسرة",
   STAFF: "الموظفون",
   SYSTEM: "النظام",
+  COORDINATOR: "المنسّق",
 };
 
 export const rejectionReasonLabels: Record<ChangeRequestRejectionReason, string> = {

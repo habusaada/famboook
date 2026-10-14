@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ChevronLeft, ClipboardPen, Loader2, Lock, Search, SearchX, X } from "lucide-react";
@@ -23,14 +24,54 @@ import type {
   ChangeRequestStatus,
   ChangeRequestSummary,
   ChangeRequestType,
+  SubmissionChannel,
 } from "@/lib/types/api/change-request";
 import {
   CHANGE_REQUEST_FILTER_STATUSES,
   changeRequestStatusLabels,
   changeRequestTypeLabels,
   changeRequestsNoun,
+  placementLabel,
+  submissionChannelLabels,
 } from "@/lib/utils/change-request";
 import { cn } from "@/lib/utils";
+
+/**
+ * Where a request is (CO-02.7a): its Family — or, for a proposed Family
+ * (REGISTER_FAMILY, family = null), the created Family's code once APPLIED
+ * and otherwise the proposed placement. Never dereferences a null Family.
+ */
+function subjectCode(r: ChangeRequestSummary): string | null {
+  return r.family?.family_code ?? r.created_family_code ?? null;
+}
+
+function Subject({ r }: { r: ChangeRequestSummary }) {
+  const code = subjectCode(r);
+  if (r.family) {
+    return (
+      <div className="flex min-w-0 flex-col">
+        <Code className="text-brand-800">{r.family.family_code}</Code>
+        <span className="truncate text-xs text-muted-foreground">{r.family.household_head_name ?? "رب الأسرة غير محدد"}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-w-0 flex-col" data-proposed-family>
+      {code ? <Code className="text-brand-800">{code}</Code> : <span className="text-xs font-medium text-foreground">أسرة مقترحة</span>}
+      <span className="truncate text-xs text-muted-foreground">{placementLabel(r.placement)}</span>
+    </div>
+  );
+}
+
+/** «عبر منسّق» for a Coordinator's request; nothing for the household's own. */
+function ChannelTag({ r }: { r: ChangeRequestSummary }) {
+  if (r.submission_channel !== "COORDINATOR") return null;
+  return (
+    <span className="w-fit rounded-md border border-brand-100 bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-800" data-channel="COORDINATOR">
+      عبر منسّق
+    </span>
+  );
+}
 
 const ALL = "ALL";
 const fmt = (n: number) => n.toLocaleString("ar");
@@ -91,12 +132,21 @@ export function ChangeRequestsQueue() {
   const type = registry.param("type");
   const from = registry.param("from");
   const to = registry.param("to");
+  const channel = registry.param("channel");
+  const submitter = registry.param("submitter").trim();
+  const [submitterDraft, setSubmitterDraft] = useState(submitter);
+  const applySubmitter = () => {
+    const value = submitterDraft.trim();
+    registry.setFilter("submitter", value.length >= 2 ? value.slice(0, 100) : "");
+  };
 
   const search = searchFilter(registry.q);
   const filters: ChangeRequestFilters = {
     ...search,
     ...(CHANGE_REQUEST_FILTER_STATUSES.includes(status as ChangeRequestStatus) ? { status: status as ChangeRequestStatus } : {}),
     ...(type in changeRequestTypeLabels ? { type: type as ChangeRequestType } : {}),
+    ...(channel in submissionChannelLabels ? { channel: channel as SubmissionChannel } : {}),
+    ...(submitter.length >= 2 ? { submitter: submitter.slice(0, 100) } : {}),
     ...(DATE.test(from) ? { submitted_from: from } : {}),
     ...(DATE.test(to) && (!DATE.test(from) || to >= from) ? { submitted_to: to } : {}),
     page: registry.page,
@@ -106,7 +156,7 @@ export function ChangeRequestsQueue() {
 
   const { data, isLoading, isFetching, isError, error, refetch } = useChangeRequestQueue(filters);
   const rows = data?.data ?? [];
-  const hasFilters = Boolean(registry.text.trim() || status || type || from || to);
+  const hasFilters = Boolean(registry.text.trim() || status || type || from || to || channel || submitter);
   const open = (id: string) => router.push(`/change-requests/${id}`);
 
   const header = (
@@ -171,6 +221,16 @@ export function ChangeRequestsQueue() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={channel || ALL} onValueChange={(value) => registry.setFilter("channel", value === ALL ? "" : value)}>
+                <SelectTrigger className="h-11! w-full bg-surface-2 sm:w-44" aria-label="جهة التقديم" data-filter-channel>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>كل الجهات</SelectItem>
+                  <SelectItem value="FAMILY">الأسرة</SelectItem>
+                  <SelectItem value="COORDINATOR">عبر منسّق</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -186,8 +246,42 @@ export function ChangeRequestsQueue() {
               </Label>
               <Input id="queue-to" type="date" dir="ltr" value={to} min={from || undefined} onChange={(e) => registry.setFilter("to", e.target.value)} className="h-10 bg-surface-2 sm:w-44" />
             </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="queue-submitter" className="text-xs text-muted-foreground">
+                مقدّم الطلب
+              </Label>
+              <Input
+                id="queue-submitter"
+                type="search"
+                value={submitterDraft}
+                maxLength={100}
+                placeholder="جزء من الاسم"
+                onChange={(e) => setSubmitterDraft(e.target.value)}
+                onBlur={applySubmitter}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applySubmitter();
+                  }
+                }}
+                aria-describedby="queue-submitter-hint"
+                className="h-10 bg-surface-2 sm:w-52"
+                data-filter-submitter
+              />
+              <span id="queue-submitter-hint" className="sr-only">
+                اكتب حرفين على الأقل ثم اضغط Enter.
+              </span>
+            </div>
             {hasFilters && (
-              <Button variant="ghost" onClick={registry.reset} className="h-10 text-muted-foreground sm:ms-auto" data-queue-reset>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSubmitterDraft("");
+                  registry.reset();
+                }}
+                className="h-10 text-muted-foreground sm:ms-auto"
+                data-queue-reset
+              >
                 <X className="size-4" />
                 إعادة الضبط
               </Button>
@@ -284,13 +378,11 @@ export function ChangeRequestsQueue() {
                               <Code>{r.request_code}</Code>
                             </Link>
                             <span className="truncate text-xs text-muted-foreground">{changeRequestTypeLabels[r.type] ?? "طلب تحديث"}</span>
+                            <ChannelTag r={r} />
                           </div>
                         </TableCell>
                         <TableCell className="max-w-52">
-                          <div className="flex min-w-0 flex-col">
-                            <Code className="text-brand-800">{r.family.family_code}</Code>
-                            <span className="truncate text-xs text-muted-foreground">{r.family.household_head_name ?? "رب الأسرة غير محدد"}</span>
-                          </div>
+                          <Subject r={r} />
                         </TableCell>
                         <TableCell className="max-w-48 truncate">{r.submitted_by.name ?? "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{day(r.submitted_at)}</TableCell>
@@ -319,17 +411,18 @@ export function ChangeRequestsQueue() {
                     <Link
                       href={`/change-requests/${r.id}`}
                       className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:px-5"
-                      aria-label={`فتح الطلب ${r.request_code} — ${r.family.family_code}`}
+                      aria-label={`فتح الطلب ${r.request_code} — ${subjectCode(r) ?? `أسرة مقترحة (${placementLabel(r.placement)})`}`}
                     >
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                         <div className="flex items-start justify-between gap-2">
                           <span className="min-w-0 font-semibold text-foreground">{changeRequestTypeLabels[r.type] ?? "طلب تحديث"}</span>
                           <ChangeRequestStatusTag status={r.status} />
                         </div>
+                        <ChannelTag r={r} />
                         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                           <Code>{r.request_code}</Code>
                           <span aria-hidden>·</span>
-                          <Code className="text-brand-800">{r.family.family_code}</Code>
+                          {subjectCode(r) ? <Code className="text-brand-800">{subjectCode(r)}</Code> : <span data-proposed-family>أسرة مقترحة · {placementLabel(r.placement)}</span>}
                           <span aria-hidden>·</span>
                           <span>{day(r.submitted_at)}</span>
                         </span>

@@ -62,7 +62,7 @@ export function useCoordinatorFamiliesQuery(search: string, page: number) {
 }
 
 /** One summary, or null when the Family is not available to this Coordinator. */
-export function useCoordinatorFamilyQuery(code: string) {
+export function useCoordinatorFamilyQuery(code: string, enabled = true) {
   return useQuery({
     queryKey: [...COORDINATOR_QUERY_KEY, "family", code],
     queryFn: async (): Promise<CoordinatorFamily | null> => {
@@ -73,6 +73,7 @@ export function useCoordinatorFamilyQuery(code: string) {
         throw error;
       }
     },
+    enabled: enabled && code !== "",
     retry: false,
   });
 }

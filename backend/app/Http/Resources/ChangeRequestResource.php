@@ -51,10 +51,10 @@ class ChangeRequestResource extends JsonResource
             'type_available' => $typeAvailable,
             'payload_version' => $this->payload_version,
             'status' => $this->status,
-            'family' => [
-                'family_code' => $this->family->family_code,
-                'household_head_name' => $this->family->householdHeadMembership?->person?->full_name,
-            ],
+            'submission_channel' => $this->submission_channel,
+            'family' => ChangeRequestSummaryResource::familySummary($this->resource),
+            'placement' => ChangeRequestSummaryResource::placement($this->resource),
+            'created_family_code' => $this->createdFamily?->family_code,
             'target_person' => $this->person ? [
                 'person_code' => $this->person->person_code,
                 'full_name' => $this->person->full_name,

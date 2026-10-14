@@ -9,6 +9,7 @@ import type {
   ChangeRequestRejectionReason,
   ChangeRequestStatus,
   ChangeRequestType,
+  SubmissionChannel,
   WorkflowActorSide,
   WorkflowEventType,
 } from "@/lib/types/api/change-request";
@@ -26,6 +27,10 @@ export type FamilyChangeRequestSummary = {
   type: ChangeRequestType;
   type_available: boolean;
   status: ChangeRequestStatus;
+  /** CO-02: FAMILY, or COORDINATOR for a Coordinator's request about this Family. */
+  submission_channel?: SubmissionChannel;
+  /** CO-02.7b (D8): the submitting Coordinator's display name; null for the household's own requests. */
+  coordinator?: { name: string | null } | null;
   submitted_at: string | null;
   approved_at: string | null;
   rejected_at: string | null;
@@ -55,6 +60,9 @@ export type FamilyChangeRequest = {
   type: ChangeRequestType;
   type_available: boolean;
   status: ChangeRequestStatus;
+  submission_channel?: SubmissionChannel;
+  /** CO-02.7b (D8): the submitting Coordinator's display name; null for the household's own requests. */
+  coordinator?: { name: string | null } | null;
   submitted_at: string | null;
   reason: string | null;
   /** The handler's FAMILY presentation, or null without a registered handler. */

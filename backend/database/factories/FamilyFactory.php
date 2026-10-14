@@ -20,7 +20,7 @@ class FamilyFactory extends Factory
             'clan_id' => fn () => Clan::where('code', Clan::AL_BREEM)->value('id'),
             'status' => FamilyStatus::ACTIVE->value,
             'registration_date' => fake()->date(),
-            'registration_source' => fake()->randomElement(RegistrationSource::cases())->value,
+            'registration_source' => fake()->randomElement(RegistrationSource::selectable())->value,
             'paper_form_no' => null,
             'notes' => null,
         ];

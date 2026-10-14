@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { useForm, useWatch, type Path, type UseFormSetError, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Search, Undo2, XCircle } from "lucide-react";
@@ -43,6 +43,7 @@ import type { ChangeRequestAction, ChangeRequestAttestation, ChangeRequestDetail
 import {
   changeRequestActionLabel,
   changeRequestActionPermissions,
+  counterpart,
   rejectionReasonLabels,
 } from "@/lib/utils/change-request";
 import { lifeStatusVerificationLabels } from "@/lib/utils/life-status";
@@ -60,10 +61,26 @@ const SUCCESS: Record<ChangeRequestAction, string> = {
 
 export type ActionNotice = { tone: "success" | "info"; message: string };
 
-function noticeFor(action: ChangeRequestAction, outcome: ChangeRequestOutcome): ActionNotice {
+/**
+ * Who the request's messages go to and what APPLY does (CO-02.7a): the
+ * household for its own requests (the default — unchanged wording), the
+ * Coordinator for theirs; a proposed Family (REGISTER_FAMILY) is CREATED by
+ * APPLY rather than updated. Wording only — nothing here decides an action.
+ */
+type Wording = { who: ReturnType<typeof counterpart>; proposal: boolean; branchless: boolean };
+
+const WordingContext = createContext<Wording>({ who: counterpart("FAMILY"), proposal: false, branchless: false });
+
+function successMessage(action: ChangeRequestAction, wording: Wording): string {
+  if (action === "return") return `أُعيد الطلب إلى ${wording.who.noun} لاستكمال المعلومات.`;
+  if (action === "apply" && wording.proposal) return "سُجّلت الأسرة في السجل.";
+  return SUCCESS[action];
+}
+
+function noticeFor(action: ChangeRequestAction, outcome: ChangeRequestOutcome, wording: Wording): ActionNotice {
   return outcome.replayed
     ? { tone: "info", message: "لم يتغير شيء: سبق تنفيذ هذا الإجراء على الطلب." }
-    : { tone: "success", message: SUCCESS[action] };
+    : { tone: "success", message: successMessage(action, wording) };
 }
 
 /**
@@ -79,6 +96,7 @@ function useActionSend<TValues extends FieldValues>(
 ) {
   const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
+  const wording = useContext(WordingContext);
 
   function send(input: ChangeRequestActionInput, close: () => void) {
     if (sending.current) return;
@@ -90,7 +108,7 @@ function useActionSend<TValues extends FieldValues>(
       },
       onSuccess: (outcome) => {
         close();
-        onDone(noticeFor(input.action, outcome));
+        onDone(noticeFor(input.action, outcome, wording));
       },
       onError: (e) => {
         if (e instanceof ApiError && e.status === 422 && setFieldError) {
@@ -199,6 +217,25 @@ const ATTESTATION_TEXT: Record<ChangeRequestAttestation, string> = {
 };
 
 /**
+ * The same two attestation codes for a proposed Family (REGISTER_FAMILY,
+ * docs/adr/CO-02 §16, §21): identity — the proposed head's official
+ * document; relationship and placement — that the person is genuinely the
+ * head of this household and that it belongs to the proposed Clan and Branch
+ * (Clan membership only for a Family without a Branch). Nothing about
+ * social, health or assistance information is attested.
+ */
+function proposalAttestationText(branchless: boolean): Record<ChangeRequestAttestation, string> {
+  return {
+    IDENTITY_VERIFIED: "تحققتُ من هوية رب الأسرة المقترح من وثيقة رسمية (بطاقة الهوية).",
+    RELATIONSHIP_VERIFIED: branchless
+      ? "تحققتُ من أن الشخص المقترح هو رب هذه الأسرة فعلًا، ومن انتماء الأسرة إلى العائلة المقترحة (دون فرع)."
+      : "تحققتُ من أن الشخص المقترح هو رب هذه الأسرة فعلًا، ومن انتماء الأسرة إلى العائلة والفرع المقترحين.",
+  };
+}
+
+const PROPOSAL_ATTESTATION_SCOPE = "لا يشمل هذا الإقرار أي معلومات اجتماعية أو صحية أو معلومات مساعدات.";
+
+/**
  * Approval for a type that requires reviewer attestations: both checkboxes
  * and the National ID typed from the document. The typed value is sent once
  * for comparison with the proposal and is never stored or shown back: on
@@ -209,6 +246,8 @@ const ATTESTATION_TEXT: Record<ChangeRequestAttestation, string> = {
  */
 function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: Mutation; onDone: (n: ActionNotice) => void; attestations: ChangeRequestAttestation[] }) {
   const [open, setOpen] = useState(false);
+  const { proposal, branchless } = useContext(WordingContext);
+  const texts = proposal ? proposalAttestationText(branchless) : ATTESTATION_TEXT;
   const blank: AttestedApproveValues = { identity: false, relationship: false, verifiedNationalId: "" };
   const form = useForm<AttestedApproveValues>({ resolver: zodResolver(attestedApproveSchema), defaultValues: blank });
   const { error, setError, send } = useActionSend<AttestedApproveValues>(
@@ -250,7 +289,7 @@ function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: M
             <div className="flex flex-col gap-1">
               <label className="flex items-start gap-2 text-sm text-foreground">
                 <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" aria-invalid={Boolean(errors.identity)} {...form.register("identity")} />
-                {ATTESTATION_TEXT.IDENTITY_VERIFIED}
+                {texts.IDENTITY_VERIFIED}
               </label>
               <FieldError message={errors.identity?.message} />
             </div>
@@ -259,10 +298,15 @@ function AttestedApproveDialog({ mutation, onDone, attestations }: { mutation: M
             <div className="flex flex-col gap-1">
               <label className="flex items-start gap-2 text-sm text-foreground">
                 <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" aria-invalid={Boolean(errors.relationship)} {...form.register("relationship")} />
-                {ATTESTATION_TEXT.RELATIONSHIP_VERIFIED}
+                {texts.RELATIONSHIP_VERIFIED}
               </label>
               <FieldError message={errors.relationship?.message} />
             </div>
+          )}
+          {proposal && (
+            <p className="text-xs text-muted-foreground" data-attestation-scope>
+              {PROPOSAL_ATTESTATION_SCOPE}
+            </p>
           )}
           {attestations.includes("IDENTITY_VERIFIED") && (
             <div className="flex flex-col gap-1.5">
@@ -373,6 +417,7 @@ function VerifiedApproveDialog({ mutation, onDone }: { mutation: Mutation; onDon
 
 function ReturnDialog({ mutation, onDone, canWriteNote }: { mutation: Mutation; onDone: (n: ActionNotice) => void; canWriteNote: boolean }) {
   const [open, setOpen] = useState(false);
+  const { who } = useContext(WordingContext);
   const form = useForm<ReturnChangeRequestValues>({
     resolver: zodResolver(returnChangeRequestSchema),
     defaultValues: { publicMessage: "", internalNote: "" },
@@ -420,13 +465,17 @@ function ReturnDialog({ mutation, onDone, canWriteNote }: { mutation: Mutation; 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>إرجاع الطلب للاستكمال</DialogTitle>
-          <DialogDescription>اطلب من الأسرة المعلومات الناقصة. لا تتغير البيانات المطلوبة ولا سجل الأسرة.</DialogDescription>
+          <DialogDescription>
+            {who.noun === "الأسرة"
+              ? "اطلب من الأسرة المعلومات الناقصة. لا تتغير البيانات المطلوبة ولا سجل الأسرة."
+              : "اطلب من المنسّق المعلومات الناقصة. لا تتغير البيانات المطلوبة ولا السجل."}
+          </DialogDescription>
         </DialogHeader>
         <form id="return-change-request" onSubmit={submit} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="return-public-message">رسالة الاستيضاح للأسرة</FieldLabel>
+            <FieldLabel htmlFor="return-public-message">رسالة الاستيضاح {who.to}</FieldLabel>
             <p className="text-xs text-muted-foreground" id="return-public-hint">
-              تظهر هذه الرسالة للأسرة كما هي.
+              تظهر هذه الرسالة {who.to} كما هي.
             </p>
             <Textarea
               id="return-public-message"
@@ -436,7 +485,7 @@ function ReturnDialog({ mutation, onDone, canWriteNote }: { mutation: Mutation; 
               {...form.register("publicMessage")}
             />
             <div className="flex items-center justify-between">
-              <FieldError message={form.formState.errors.publicMessage?.message} />
+              <FieldError message={form.formState.errors.publicMessage?.message?.replace("للأسرة", who.to)} />
               <Counter value={publicMessage} />
             </div>
           </div>
@@ -446,7 +495,7 @@ function ReturnDialog({ mutation, onDone, canWriteNote }: { mutation: Mutation; 
                 ملاحظة داخلية
               </FieldLabel>
               <p className="text-xs text-muted-foreground" id="return-internal-hint">
-                للموظفين فقط — لا تظهر للأسرة.
+                للموظفين فقط — لا تظهر {who.to}.
               </p>
               <Textarea id="return-internal-note" rows={3} aria-describedby="return-internal-hint" {...form.register("internalNote")} />
               <div className="flex items-center justify-between">
@@ -486,6 +535,7 @@ function RejectDialog({
   approved: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { who } = useContext(WordingContext);
   const reasons = approved ? (["NO_LONGER_APPLICABLE"] as const) : REJECTION_REASONS;
   const form = useForm<RejectChangeRequestValues>({
     resolver: zodResolver(rejectChangeRequestSchema),
@@ -538,7 +588,7 @@ function RejectDialog({
           <DialogDescription>
             {approved
               ? "تعذّر تطبيق هذا الطلب المعتمد لأنه لم يعد قابلًا للتنفيذ. يُرفض بهذا السبب وحده."
-              : "الرفض نهائي. يمكن للأسرة تقديم طلب جديد إذا لزم."}
+              : `الرفض نهائي. يمكن ${who.to} تقديم طلب جديد إذا لزم.`}
           </DialogDescription>
         </DialogHeader>
         <form id="reject-change-request" onSubmit={submit} className="flex flex-col gap-4" noValidate>
@@ -560,14 +610,14 @@ function RejectDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <FieldLabel htmlFor="reject-public-message" optional={reason !== "OTHER"}>
-              رسالة الرفض للأسرة
+              رسالة الرفض {who.to}
             </FieldLabel>
             <p className="text-xs text-muted-foreground" id="reject-public-hint">
-              تظهر هذه الرسالة للأسرة كما هي{reason === "OTHER" ? "، وهي مطلوبة عند اختيار «سبب آخر»" : ""}.
+              تظهر هذه الرسالة {who.to} كما هي{reason === "OTHER" ? "، وهي مطلوبة عند اختيار «سبب آخر»" : ""}.
             </p>
             <Textarea id="reject-public-message" rows={3} aria-describedby="reject-public-hint" {...form.register("publicMessage")} />
             <div className="flex items-center justify-between">
-              <FieldError message={form.formState.errors.publicMessage?.message} />
+              <FieldError message={form.formState.errors.publicMessage?.message?.replace("للأسرة", who.to)} />
               <Counter value={publicMessage} />
             </div>
           </div>
@@ -577,7 +627,7 @@ function RejectDialog({
                 ملاحظة داخلية
               </FieldLabel>
               <p className="text-xs text-muted-foreground" id="reject-internal-hint">
-                للموظفين فقط — لا تظهر للأسرة.
+                للموظفين فقط — لا تظهر {who.to}.
               </p>
               <Textarea id="reject-internal-note" rows={3} aria-describedby="reject-internal-hint" {...form.register("internalNote")} />
               <FieldError message={form.formState.errors.internalNote?.message} />
@@ -609,7 +659,11 @@ function RejectDialog({
  */
 export function ChangeRequestActions({ request, onNotice }: { request: ChangeRequestDetail; onNotice: (n: ActionNotice | null) => void }) {
   const { can } = useAuth();
-  const mutation = useChangeRequestAction(request.id, request.family.family_code);
+  const mutation = useChangeRequestAction(request.id, request.family?.family_code ?? null);
+  // A proposed Family (REGISTER_FAMILY, family = null): APPLY creates it.
+  const proposal = request.family === null;
+  const branchless = proposal && request.placement !== null && request.placement.branch === null;
+  const wording: Wording = { who: counterpart(request.submission_channel), proposal, branchless };
   const [startError, setStartError] = useState<string | null>(null);
   const startSending = useRef(false);
   const actions = request.available_actions.filter((action) => can(changeRequestActionPermissions[action]));
@@ -619,6 +673,18 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
   if (actions.length === 0) {
     return <p className="text-sm text-muted-foreground" data-no-actions>لا توجد إجراءات متاحة لك على هذا الطلب في حالته الحالية.</p>;
   }
+
+  const applyTitle = proposal
+    ? retry
+      ? "إعادة محاولة تسجيل الأسرة"
+      : "تسجيل الأسرة في السجل"
+    : retry
+      ? "إعادة محاولة تطبيق التعديل"
+      : "تطبيق التعديل على سجل الأسرة";
+  const applyDescription = proposal
+    ? `عند النجاح تُنشأ الأسرة ورب الأسرة وسكنها الأصلي في ${branchless ? "العائلة المقترحة (دون فرع)" : "العائلة والفرع المقترحين"} بالضبط. يتحقق النظام أولًا من أن رقم هوية رب الأسرة ما زال غير مسجّل وأن المكان المقترح ما زال فعّالًا.`
+    : "عند النجاح يُحدَّث سجل الأسرة الرسمي بالبيانات المعتمدة. يتحقق النظام أولًا من أن البيانات المسجلة لم تتغير منذ تقديم الطلب." +
+      (request.approval_verification_method ? ` طريقة التحقق المعتمدة: ${lifeStatusVerificationLabels[request.approval_verification_method]}.` : "");
 
   function startReview() {
     if (startSending.current) return;
@@ -631,13 +697,14 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
         onSettled: () => {
           startSending.current = false;
         },
-        onSuccess: (outcome) => onNotice(noticeFor("start_review", outcome)),
+        onSuccess: (outcome) => onNotice(noticeFor("start_review", outcome, wording)),
         onError: (e) => setStartError(changeRequestErrorMessage(e)),
       }
     );
   }
 
   return (
+    <WordingContext.Provider value={wording}>
     <div className="flex flex-col gap-3" data-actions>
       <div className="flex flex-wrap items-center gap-2">
         {actions.includes("start_review") && (
@@ -668,11 +735,8 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
             mutation={mutation}
             onDone={onNotice}
             icon={CheckCircle2}
-            title={retry ? "إعادة محاولة تطبيق التعديل" : "تطبيق التعديل على سجل الأسرة"}
-            description={
-              "عند النجاح يُحدَّث سجل الأسرة الرسمي بالبيانات المعتمدة. يتحقق النظام أولًا من أن البيانات المسجلة لم تتغير منذ تقديم الطلب." +
-              (request.approval_verification_method ? ` طريقة التحقق المعتمدة: ${lifeStatusVerificationLabels[request.approval_verification_method]}.` : "")
-            }
+            title={applyTitle}
+            description={applyDescription}
             warning="هذا الإجراء يغيّر بيانات السجل الرسمية ولا يُعاد تلقائيًا عند الفشل."
             confirmLabel={changeRequestActionLabel("apply", retry)}
           />
@@ -683,5 +747,6 @@ export function ChangeRequestActions({ request, onNotice }: { request: ChangeReq
       </div>
       <ActionError message={startError} />
     </div>
+    </WordingContext.Provider>
   );
 }

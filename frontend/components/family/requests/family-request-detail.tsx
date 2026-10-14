@@ -174,6 +174,11 @@ export function FamilyRequestDetail({ id }: { id: string }) {
           {familyRequestStatusDescriptions[request.status]}
         </p>
         {request.submitted_at && <p className="mt-1 text-xs text-muted-foreground tabular-nums">قُدّم في {formatDateTime(request.submitted_at)}</p>}
+        {request.coordinator && (
+          <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-sm text-foreground" data-family-request-coordinator>
+            قدّم هذا الطلب المنسّق <bdi className="font-medium">{request.coordinator.name ?? "—"}</bdi> لأسرتك. يتابعه المنسّق مع فريق المراجعة؛ يمكنك متابعة حالته هنا.
+          </p>
+        )}
       </Section>
 
       {(canResubmit || canCancel) && (

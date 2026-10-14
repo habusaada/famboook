@@ -38,6 +38,10 @@ class FamilyChangeRequestResource extends JsonResource
             'type' => $this->type,
             'type_available' => $typeAvailable,
             'status' => $this->status,
+            // CO-02.3b: FAMILY, or COORDINATOR for a Coordinator's request about this Family.
+            'submission_channel' => $this->submission_channel,
+            // CO-02.7b (D8): the submitting Coordinator's display name; NULL for the household's own.
+            'coordinator' => FamilyChangeRequestSummaryResource::coordinatorOf($this->resource),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'reason' => $this->reason,
             'presentation' => $typeAvailable

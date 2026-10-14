@@ -22,7 +22,9 @@ use App\Support\ChangeRequests\ChangeRequestApprovalEvidence;
 use App\Support\ChangeRequests\ChangeRequestHandler;
 use App\Support\ChangeRequests\ChangeRequestPresentation;
 use App\Support\ChangeRequests\ChangeRequestPresentationContext;
+use App\Support\ChangeRequests\ChangeRequestSubmissionContext;
 use App\Support\ChangeRequests\ChangeRequestTarget;
+use App\Support\ChangeRequests\CoordinatorSubmittable;
 use App\Support\ChangeRequests\RequiresApprovalAttestation;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\FamilyAuth\FamilyMobile;
@@ -66,8 +68,12 @@ use Illuminate\Validation\ValidationException;
  *   status and active flag), so a registry change while the request waits
  *   blocks approval and APPLY.
  * - One open request per Family and National ID.
+ * - CO-02.3b (PERSON_ADD): a Coordinator may submit it for a Family in their
+ *   scope (CoordinatorSubmittable). Same input, proposal, open-conflict key
+ *   (whichever channel submitted the other request), attestations and
+ *   approve / APPLY path; nothing depends on who submitted it.
  */
-final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresApprovalAttestation
+final class AddFamilyMemberHandler implements ChangeRequestHandler, CoordinatorSubmittable, RequiresApprovalAttestation
 {
     public const FIELDS = ['full_name', 'national_id', 'gender', 'relationship', 'birth_date', 'marital_status', 'mobile'];
 
@@ -138,6 +144,12 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, RequiresAppr
     public function resolveTarget(FamilyAccessResult $context, array $validated): ChangeRequestTarget
     {
         // Always the context Family: no Family, Person or membership id is read.
+        return ChangeRequestTarget::family($context->family);
+    }
+
+    public function resolveCoordinatorTarget(ChangeRequestSubmissionContext $context, array $validated): ChangeRequestTarget
+    {
+        // The scope-checked Family: no Family, Person or membership id is read.
         return ChangeRequestTarget::family($context->family);
     }
 

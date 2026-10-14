@@ -3,6 +3,7 @@
 namespace App\Support\ChangeRequests;
 
 use App\Enums\ChangeRequestStatus;
+use App\Enums\SubmissionChannel;
 use App\Models\ChangeRequest;
 use App\Models\User;
 
@@ -18,6 +19,10 @@ final class FamilyChangeRequestActions
     /** @return list<string> */
     public static function for(ChangeRequest $request, User $user): array
     {
+        // CO-02.3b (D7): a Coordinator's request about the Family is shown, never answered or cancelled here.
+        if ($request->submission_channel !== SubmissionChannel::FAMILY) {
+            return [];
+        }
         $actions = [];
         foreach (['resubmit' => ChangeRequestStatus::RESUBMITTED, 'cancel' => ChangeRequestStatus::CANCELLED] as $action => $to) {
             $transition = ChangeRequestTransitions::find($request->status, $to);

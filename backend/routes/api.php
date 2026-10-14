@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorChangeRequestController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorMemberController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
@@ -199,14 +200,18 @@ Route::prefix('family')->group(function () {
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
         // the coordinator.space boundary, never from the client.
         Route::prefix('coordinator')->middleware('coordinator.space')->group(function () {
-            Route::get('/context', [CoordinatorSpaceController::class, 'context']);
+            Route::get('/context', [CoordinatorSpaceController::class, 'context'])
+                ->middleware('throttle:coordinator-read');
 
             // Family SUMMARIES inside the scope. No route-model binding: the
             // code is looked up inside the authorized query only.
             Route::middleware('can:coordinator-family.view-summary')->group(function () {
-                Route::get('/families', [CoordinatorFamilyController::class, 'index']);
+                // CO-02.7b: per-user read throttle.
+                Route::get('/families', [CoordinatorFamilyController::class, 'index'])
+                    ->middleware('throttle:coordinator-read');
                 Route::get('/families/{familyCode}', [CoordinatorFamilyController::class, 'show'])
-                    ->where('familyCode', '[A-Za-z0-9_\-]{1,50}');
+                    ->where('familyCode', '[A-Za-z0-9_\-]{1,50}')
+                    ->middleware('throttle:coordinator-read');
 
                 // CO-01C (docs/06 AUTH-ADR-092): the members directory of ONE
                 // Family in scope — basic fields, identifiers MASKED — and the
@@ -221,7 +226,40 @@ Route::prefix('family')->group(function () {
                         ->where('memberRef', '[A-Za-z0-9]{1,128}')
                         ->middleware(['can:coordinator-member.view-sensitive', 'throttle:coordinator-member-reveal']);
                 });
+
+                // CO-02.4: PERSON_ADD for ONE Family in scope (it must be
+                // visible to the Coordinator, hence inside this group).
+                Route::post('/families/{familyCode}/requests', [CoordinatorChangeRequestController::class, 'store'])
+                    ->where('familyCode', '[A-Za-z0-9_\-]{1,50}')
+                    ->middleware(['can:coordinator-request.submit', 'throttle:coordinator-request-submit']);
             });
+
+            // CO-02.4 (docs/06 AUTH-ADR-093): the Coordinator's OWN requests in
+            // the current scope (CoordinatorScopes::requests) and PERSON_ADD
+            // for a Family in scope. Each route needs its coordinator-request.*
+            // permission — never change-request.* — and a per-user throttle (the
+            // submission route sits in the family-summary group above).
+            // Plain path strings, resolved only inside the scoped queries; out
+            // of scope = 404. /requests/types before /requests/{uuid}.
+            Route::get('/requests/types', [CoordinatorChangeRequestController::class, 'types'])
+                ->middleware(['can:coordinator-request.view', 'throttle:coordinator-request-read']);
+            // CO-02.6a: the form reference data — submitting needs it, so it
+            // needs coordinator-request.submit. Before /requests/{uuid}.
+            Route::get('/requests/relationship-types', [CoordinatorChangeRequestController::class, 'relationshipTypes'])
+                ->middleware(['can:coordinator-request.submit', 'throttle:coordinator-request-read']);
+            Route::get('/requests/placements', [CoordinatorChangeRequestController::class, 'placements'])
+                ->middleware(['can:coordinator-request.submit', 'throttle:coordinator-request-read']);
+            Route::get('/requests', [CoordinatorChangeRequestController::class, 'index'])
+                ->middleware(['can:coordinator-request.view', 'throttle:coordinator-request-read']);
+            // CO-02.5: FAMILY_ADD — a NEW Family placed in the scope (no Family yet).
+            Route::post('/requests', [CoordinatorChangeRequestController::class, 'storeProposal'])
+                ->middleware(['can:coordinator-request.submit', 'throttle:coordinator-request-submit']);
+            Route::get('/requests/{changeRequest}', [CoordinatorChangeRequestController::class, 'show'])
+                ->middleware(['can:coordinator-request.view', 'throttle:coordinator-request-read']);
+            Route::post('/requests/{changeRequest}/resubmit', [CoordinatorChangeRequestController::class, 'resubmit'])
+                ->middleware(['can:coordinator-request.resubmit', 'throttle:coordinator-request-action']);
+            Route::post('/requests/{changeRequest}/cancel', [CoordinatorChangeRequestController::class, 'cancel'])
+                ->middleware(['can:coordinator-request.cancel', 'throttle:coordinator-request-action']);
         });
     });
 });

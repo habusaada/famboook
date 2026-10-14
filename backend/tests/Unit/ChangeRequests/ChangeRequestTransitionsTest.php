@@ -28,6 +28,8 @@ class ChangeRequestTransitionsTest extends TestCase
         'UNDER_REVIEW|CANCELLED' => [E::CANCELLED, WorkflowActorSide::FAMILY, 'change-request.cancel'],
         'RETURNED_FOR_CLARIFICATION|RESUBMITTED' => [E::RESUBMITTED, WorkflowActorSide::FAMILY, 'change-request.resubmit'],
         'RETURNED_FOR_CLARIFICATION|CANCELLED' => [E::CANCELLED, WorkflowActorSide::FAMILY, 'change-request.cancel'],
+        // CO-02.7b (approved): Staff close a request whose clarification never comes.
+        'RETURNED_FOR_CLARIFICATION|REJECTED' => [E::REJECTED, WorkflowActorSide::STAFF, 'change-request.reject'],
         'RESUBMITTED|UNDER_REVIEW' => [E::REVIEW_STARTED, WorkflowActorSide::STAFF, 'change-request.review'],
         'RESUBMITTED|CANCELLED' => [E::CANCELLED, WorkflowActorSide::FAMILY, 'change-request.cancel'],
         'APPROVED|APPLIED' => [E::APPLIED, WorkflowActorSide::STAFF, 'change-request.apply'],

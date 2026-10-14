@@ -16,7 +16,6 @@ use App\Http\Resources\ChangeRequestOutcomeResource;
 use App\Http\Resources\FamilyChangeRequestResource;
 use App\Http\Resources\FamilyChangeRequestSummaryResource;
 use App\Models\ChangeRequest;
-use App\Models\RelationshipType;
 use App\Support\ChangeRequests\ChangeRequestOutcome;
 use App\Support\ChangeRequests\ChangeRequestSubmission;
 use App\Support\ChangeRequests\ChangeRequestTypes;
@@ -43,6 +42,8 @@ class FamilyChangeRequestController extends Controller
         $filters = $request->validated();
 
         $requests = $this->familyRequests(EnsureFamilyContext::context($request))
+            // CO-02.7b: the submitting Coordinator's name, in one query.
+            ->with('submitterPerson:id,full_name')
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('type', $type))
             ->orderByDesc('submitted_at')
@@ -85,14 +86,8 @@ class FamilyChangeRequestController extends Controller
      */
     public function relationshipTypes(): JsonResponse
     {
-        $types = RelationshipType::query()
-            ->where('is_active', true)
-            ->where('code', '!=', RelationshipTypes::HEAD)
-            ->orderBy('sort_order')
-            ->get(['code', 'name']);
-
         return response()->json([
-            'data' => $types->map(fn (RelationshipType $type) => ['code' => $type->code, 'name' => $type->name])->values(),
+            'data' => RelationshipTypes::memberOptions(),
         ])->header('Cache-Control', 'no-store, private');
     }
 
@@ -100,7 +95,7 @@ class FamilyChangeRequestController extends Controller
     {
         $found = $this->find(EnsureFamilyContext::context($request), $changeRequest);
 
-        return (new FamilyChangeRequestResource($found->load('workflowEvents')))
+        return (new FamilyChangeRequestResource($found->load(['workflowEvents', 'submitterPerson:id,full_name'])))
             ->response()
             ->header('Cache-Control', 'no-store, private');
     }

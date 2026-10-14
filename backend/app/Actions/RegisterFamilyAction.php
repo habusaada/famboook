@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\LifeStatus;
 use App\Enums\MaritalStatus;
+use App\Enums\RegistrationSource;
 use App\Models\Family;
 use App\Support\NationalIdGuard;
 use App\Support\RegistryNationalId;
@@ -58,13 +59,16 @@ class RegisterFamilyAction
      *         longitude?: float|null,
      *     },
      * }  $data  Already-validated payload (see RegisterFamilyRequest).
+     * @param  RegistrationSource|null  $residenceSource  the residence's source;
+     *                                                    NULL for Staff registration (unchanged). CO-02.5: the
+     *                                                    APPLY of a REGISTER_FAMILY request passes COORDINATOR_REQUEST.
      */
-    public function handle(array $data, ?int $actingUserId): Family
+    public function handle(array $data, ?int $actingUserId, ?RegistrationSource $residenceSource = null): Family
     {
         // CO-01D.4: the head's National ID is required, canonical nine digits.
         $headNationalId = RegistryNationalId::required($data['household_head']['national_id'] ?? null, 'household_head.national_id');
 
-        return DB::transaction(function () use ($data, $actingUserId, $headNationalId) {
+        return DB::transaction(function () use ($data, $actingUserId, $headNationalId, $residenceSource) {
             // Clan/Branch are validated before anything is written.
             $this->families->lineage($data);
             // Never a second Person with the same National ID (docs/03 §21);
@@ -96,8 +100,9 @@ class RegisterFamilyAction
 
             $this->memberships->handle($family, $person, RelationshipTypes::HEAD, true, $data['registration_date'], $actingUserId);
 
-            // Staff registration never states a residence source (NULL, as before).
-            $this->residences->handle($family, [...$data['residence'], 'source' => null], $data['registration_date'], $actingUserId);
+            // Staff registration never states a residence source (NULL, as
+            // before); a REGISTER_FAMILY APPLY states COORDINATOR_REQUEST.
+            $this->residences->handle($family, [...$data['residence'], 'source' => $residenceSource?->value], $data['registration_date'], $actingUserId);
 
             // FAMILY_CREATED is recorded by CreateFamilyAction.
             return $family->fresh([

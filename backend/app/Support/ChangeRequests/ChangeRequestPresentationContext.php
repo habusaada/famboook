@@ -19,7 +19,8 @@ use App\Models\User;
  *   (the same rule as WorkflowEventResource); never a family.
  * - canViewMaskedIdentity: a masked National ID (`*****6789`): Staff with
  *   person.national-id.view-masked (docs/06 §39); the family for what it
- *   submitted itself (FP-ADR-062 masks its own members' IDs the same way).
+ *   submitted itself (FP-ADR-062 masks its own members' IDs the same way);
+ *   the Coordinator for what they submitted (CO-02.4).
  * - canViewPersonNames: names of OTHER registry Persons (e.g. an existing
  *   Person a proposal matches): Staff with person.view; never a family.
  */
@@ -49,6 +50,16 @@ final readonly class ChangeRequestPresentationContext
     public static function family(): self
     {
         return new self(ChangeRequestAudience::FAMILY, canViewSensitiveIdentity: false, canViewInternalNotes: false, canViewMaskedIdentity: true);
+    }
+
+    /**
+     * The Coordinator Space view (CO-02.4): the Coordinator's own request —
+     * what they proposed, identifiers masked like the family's view; never
+     * a Staff-only row (registry match), another Person's name or a note.
+     */
+    public static function coordinator(): self
+    {
+        return new self(ChangeRequestAudience::COORDINATOR, canViewSensitiveIdentity: false, canViewInternalNotes: false, canViewMaskedIdentity: true);
     }
 
     public function isStaff(): bool

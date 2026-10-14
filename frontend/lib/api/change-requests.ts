@@ -29,7 +29,7 @@ const PATH = "/api/v1/change-requests";
 /** Only the allow-listed filters, and only those that are set. */
 export function changeRequestQuery(filters: ChangeRequestFilters): string {
   const params = new URLSearchParams();
-  for (const key of ["status", "type", "family", "request_code", "submitted_from", "submitted_to"] as const) {
+  for (const key of ["status", "type", "family", "channel", "submitter", "request_code", "submitted_from", "submitted_to"] as const) {
     const value = filters[key];
     if (value) params.set(key, value);
   }
@@ -84,7 +84,7 @@ export type ChangeRequestActionInput =
  * APPLY changed the Family's registry data: its queries are refreshed too.
  * retry: false — never re-sent automatically.
  */
-export function useChangeRequestAction(id: string, familyCode: string) {
+export function useChangeRequestAction(id: string, familyCode: string | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -100,8 +100,10 @@ export function useChangeRequestAction(id: string, familyCode: string) {
     // National ID typed from a document (FP-ADR-076).
     gcTime: 0,
     onSuccess: (_outcome, input) => {
-      if (input.action === "apply" && familyCode) {
-        void queryClient.invalidateQueries({ queryKey: ["families", familyCode] });
+      if (input.action === "apply") {
+        // A proposed Family (CO-02.7a) has no code until APPLY created it:
+        // refresh the Family lists instead of one Family.
+        void queryClient.invalidateQueries({ queryKey: familyCode ? ["families", familyCode] : ["families"] });
       }
     },
     onSettled: () => {

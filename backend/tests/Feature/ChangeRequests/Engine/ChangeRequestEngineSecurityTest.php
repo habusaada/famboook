@@ -23,6 +23,7 @@ use App\Support\ChangeRequests\Handlers\AddFamilyMemberHandler;
 use App\Support\ChangeRequests\Handlers\ContactUpdateHandler;
 use App\Support\ChangeRequests\Handlers\DeathReportHandler;
 use App\Support\ChangeRequests\Handlers\PersonCorrectionHandler;
+use App\Support\ChangeRequests\Handlers\RegisterFamilyHandler;
 use App\Support\ChangeRequests\Handlers\ResidenceUpdateHandler;
 use App\Support\FamilyActivityVisibility;
 use Database\Seeders\RolePermissionSeeder;
@@ -53,11 +54,14 @@ class ChangeRequestEngineSecurityTest extends TestCase
             'PERSON_CORRECTION' => PersonCorrectionHandler::class,
             'DEATH_REPORT' => DeathReportHandler::class,
             'CONTACT_UPDATE' => ContactUpdateHandler::class,
+            // CO-02.5: Coordinators only (never family-submittable), behind its own switch.
+            'REGISTER_FAMILY' => RegisterFamilyHandler::class,
         ], ChangeRequestTypes::PRODUCTION);
         $registry = app(ChangeRequestTypes::class);
-        $production = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER, ChangeRequestType::PERSON_CORRECTION, ChangeRequestType::DEATH_REPORT, ChangeRequestType::CONTACT_UPDATE];
+        $familyTypes = [ChangeRequestType::RESIDENCE_UPDATE, ChangeRequestType::ADD_FAMILY_MEMBER, ChangeRequestType::PERSON_CORRECTION, ChangeRequestType::DEATH_REPORT, ChangeRequestType::CONTACT_UPDATE];
+        $production = [...$familyTypes, ChangeRequestType::REGISTER_FAMILY];
         $this->assertSame($production, $registry->registered());
-        $this->assertSame($production, $registry->familySubmittable());
+        $this->assertSame($familyTypes, $registry->familySubmittable());
         foreach (ChangeRequestType::cases() as $type) {
             $this->assertSame(in_array($type, $production, true), $registry->has($type), $type->value);
         }

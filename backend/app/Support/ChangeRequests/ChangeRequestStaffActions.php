@@ -35,7 +35,7 @@ final class ChangeRequestStaffActions
         if ($status === S::UNDER_REVIEW && $typeAvailable && $user->can('change-request.approve')) {
             $actions[] = 'approve';
         }
-        if ($user->can('change-request.reject') && ($status === S::UNDER_REVIEW
+        if ($user->can('change-request.reject') && (in_array($status, [S::UNDER_REVIEW, S::RETURNED_FOR_CLARIFICATION], true)
             || ($status === S::APPROVED && ChangeRequestWorkflow::applyWasRefused($request, $latestApplyFailure)))) {
             $actions[] = 'reject';
         }

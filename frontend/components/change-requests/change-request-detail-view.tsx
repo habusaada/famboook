@@ -17,7 +17,14 @@ import { ApiError } from "@/lib/api/client";
 import { useChangeRequest } from "@/lib/api/change-requests";
 import type { ChangeRequestApplyFailure, ChangeRequestDetail } from "@/lib/types/api/change-request";
 import { formatDateTime } from "@/lib/utils/date";
-import { applyFailureLabels, changeRequestTypeLabels, rejectionReasonLabels } from "@/lib/utils/change-request";
+import {
+  applyFailureLabels,
+  changeRequestTypeLabels,
+  counterpart,
+  placementLabel,
+  rejectionReasonLabels,
+  submissionChannelLabels,
+} from "@/lib/utils/change-request";
 
 const when = (iso: string | null) => (iso ? formatDateTime(iso) : "—");
 
@@ -60,7 +67,9 @@ function ApplyFailures({ request }: { request: ChangeRequestDetail }) {
       <AlertDescription className="flex flex-col gap-0.5">
         {label && <span>آخر سبب: {label}</span>}
         {last_failed_at && <span>آخر محاولة: {formatDateTime(last_failed_at)}</span>}
-        {request.status === "APPROVED" && <span>لم يتغير سجل الأسرة. يبقى الطلب معتمدًا بانتظار التطبيق.</span>}
+        {request.status === "APPROVED" && (
+          <span>{request.family === null ? "لم تُنشأ الأسرة في السجل." : "لم يتغير سجل الأسرة."} يبقى الطلب معتمدًا بانتظار التطبيق.</span>
+        )}
       </AlertDescription>
     </Alert>
   );
@@ -83,6 +92,47 @@ function DetailSkeleton() {
       <Skeleton className="h-32 w-full" />
       <Skeleton className="h-48 w-full" />
     </div>
+  );
+}
+
+function FamilyLink({ code }: { code: string }) {
+  return (
+    <Link href={`/families/${encodeURIComponent(code)}`} className="rounded-sm text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-ring" data-family-link>
+      <Code>{code}</Code>
+    </Link>
+  );
+}
+
+/**
+ * The subject of the request: its Family (code and head) — or, for a
+ * proposed Family (REGISTER_FAMILY, family = null; CO-02.7a), the proposed
+ * Clan / Branch and, once APPLIED, the created Family's code.
+ */
+function SubjectItems({ request }: { request: ChangeRequestDetail }) {
+  if (request.family) {
+    return (
+      <>
+        <DetailItem label="الأسرة">
+          <FamilyLink code={request.family.family_code} />
+        </DetailItem>
+        <DetailItem label="رب الأسرة" muted={!request.family.household_head_name}>
+          {request.family.household_head_name ?? "غير محدد"}
+        </DetailItem>
+      </>
+    );
+  }
+  return (
+    <>
+      <DetailItem label="العائلة المقترحة" muted={!request.placement}>
+        <span data-placement-clan>{request.placement ? (request.placement.clan.name ?? request.placement.clan.code) : "غير محددة"}</span>
+      </DetailItem>
+      <DetailItem label="الفرع المقترح" muted={!request.placement?.branch}>
+        <span data-placement-branch>{request.placement?.branch ? (request.placement.branch.name ?? request.placement.branch.code) : "دون فرع"}</span>
+      </DetailItem>
+      <DetailItem label="الأسرة في السجل" muted={!request.created_family_code}>
+        {request.created_family_code ? <FamilyLink code={request.created_family_code} /> : "تُنشأ عند تطبيق الطلب"}
+      </DetailItem>
+    </>
   );
 }
 
@@ -152,18 +202,28 @@ export function ChangeRequestDetailView({ id }: { id: string }) {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <Section title="التعديل المطلوب" description="البيانات الحالية في السجل مقابل ما تطلبه الأسرة." data-proposal>
+          <Section
+            title={request.family === null ? "الأسرة المقترحة" : "التعديل المطلوب"}
+            description={
+              request.family === null
+                ? `بيانات رب الأسرة ومكانها كما اقترحها المنسّق (${placementLabel(request.placement)}). لا تُنشأ الأسرة قبل الاعتماد والتطبيق.`
+                : request.submission_channel === "COORDINATOR"
+                  ? "البيانات الحالية في السجل مقابل ما يطلبه المنسّق."
+                  : "البيانات الحالية في السجل مقابل ما تطلبه الأسرة."
+            }
+            data-proposal
+          >
             <ChangeRequestProposal typeAvailable={request.type_available} presentation={request.presentation} applied={request.status === "APPLIED"} />
           </Section>
 
           {request.reason && (
-            <Section title="سبب الطلب" description="كما كتبته الأسرة." data-reason>
+            <Section title="سبب الطلب" description={request.submission_channel === "COORDINATOR" ? "كما كتبه المنسّق." : "كما كتبته الأسرة."} data-reason>
               <p className="break-words whitespace-pre-line text-sm text-foreground">{request.reason}</p>
             </Section>
           )}
 
           <Section title="مسار الطلب" description="الأحداث بالترتيب الزمني.">
-            <ChangeRequestTimeline events={request.timeline} />
+            <ChangeRequestTimeline events={request.timeline} channel={request.submission_channel} />
           </Section>
         </div>
 
@@ -178,18 +238,7 @@ export function ChangeRequestDetailView({ id }: { id: string }) {
               <DetailItem label="رقم الطلب" ltr>
                 {request.request_code}
               </DetailItem>
-              <DetailItem label="الأسرة">
-                <Link
-                  href={`/families/${encodeURIComponent(request.family.family_code)}`}
-                  className="rounded-sm text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-                  data-family-link
-                >
-                  <Code>{request.family.family_code}</Code>
-                </Link>
-              </DetailItem>
-              <DetailItem label="رب الأسرة" muted={!request.family.household_head_name}>
-                {request.family.household_head_name ?? "غير محدد"}
-              </DetailItem>
+              <SubjectItems request={request} />
               {request.target_person && (
                 <DetailItem label="الفرد المعني">
                   <Link
@@ -202,6 +251,9 @@ export function ChangeRequestDetailView({ id }: { id: string }) {
               )}
               <DetailItem label="مقدّم الطلب" muted={!request.submitted_by.name}>
                 {request.submitted_by.name ?? "غير معروف"}
+                <span className="block text-xs text-muted-foreground" data-submission-channel={request.submission_channel ?? "FAMILY"}>
+                  {submissionChannelLabels[request.submission_channel ?? "FAMILY"]}
+                </span>
               </DetailItem>
               <DetailItem label="تاريخ التقديم">{when(request.submitted_at)}</DetailItem>
               {request.review.reviewed_at && (
@@ -235,7 +287,7 @@ export function ChangeRequestDetailView({ id }: { id: string }) {
               </DetailList>
               {request.rejection.message && (
                 <div className="rounded-control bg-surface-2 px-3 py-2 text-sm">
-                  <span className="block text-xs font-medium text-muted-foreground">رسالة الرفض للأسرة</span>
+                  <span className="block text-xs font-medium text-muted-foreground">رسالة الرفض {counterpart(request.submission_channel).to}</span>
                   <p className="break-words whitespace-pre-line">{request.rejection.message}</p>
                 </div>
               )}

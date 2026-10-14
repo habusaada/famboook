@@ -21,11 +21,32 @@ return [
     // nothing — a leftover `true` never becomes GENERAL.
     'legacy_family_submission_enabled' => env('CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED'),
 
+    // Who may submit NEW Coordinator requests (CO-02.3b, docs/06
+    // AUTH-ADR-093): OFF (default) | PILOT (only the accounts below) |
+    // GENERAL. Read ONLY through CoordinatorSubmissionPolicy, which fails
+    // closed: missing or invalid → OFF. Independent of the family channel.
+    // No Production activation without explicit approval.
+    'coordinator_submission_mode' => env('CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE', 'OFF'),
+
+    // PILOT allowlist: comma-separated canonical user database ids of
+    // Coordinator accounts. Empty = nobody; one malformed entry = nobody.
+    // Server configuration only — never logged, returned or committed with
+    // real ids.
+    'coordinator_pilot_user_ids' => env('CHANGE_REQUESTS_COORDINATOR_PILOT_USER_IDS', ''),
+
     // Staff approval limits, per user (FP-ADR-076: an approval may compare a
     // typed National ID, so attempts are bounded).
     'staff_limits' => [
         'approve_user_minute' => (int) env('CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE', 10),
         'approve_user_hour' => (int) env('CHANGE_REQUESTS_APPROVE_LIMIT_USER_HOUR', 60),
+    ],
+
+    // Coordinator request limits, per signed-in user (CO-02.4).
+    'coordinator_limits' => [
+        'submit_user_minute' => (int) env('CHANGE_REQUESTS_COORDINATOR_SUBMIT_LIMIT_USER_MINUTE', 5),
+        'submit_user_hour' => (int) env('CHANGE_REQUESTS_COORDINATOR_SUBMIT_LIMIT_USER_HOUR', 40),
+        'action_user_minute' => (int) env('CHANGE_REQUESTS_COORDINATOR_ACTION_LIMIT_USER_MINUTE', 10),
+        'read_user_minute' => (int) env('CHANGE_REQUESTS_COORDINATOR_READ_LIMIT_USER_MINUTE', 60),
     ],
 
     // Family-side mutation limits, per signed-in user.

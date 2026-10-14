@@ -19,6 +19,8 @@ use LogicException;
  * - The family may cancel until approval, never from APPROVED (AE-3).
  * - APPROVED → REJECTED only as NO_LONGER_APPLICABLE (AE-4) — the "after a
  *   refused apply" condition is the action's check and a database CHECK.
+ * - RETURNED_FOR_CLARIFICATION → REJECTED by Staff (CO-02.7b), with any
+ *   controlled reason: a returned request no longer waits forever.
  * - Terminal states (APPLIED, REJECTED, CANCELLED) have no outgoing
  *   transition. A refused / failed apply is not a transition: the request
  *   stays APPROVED and only an APPLY_FAILED event is recorded.
@@ -52,6 +54,10 @@ final class ChangeRequestTransitions
 
             new ChangeRequestTransition(S::RETURNED_FOR_CLARIFICATION, S::RESUBMITTED, E::RESUBMITTED, $family, 'change-request.resubmit'),
             new ChangeRequestTransition(S::RETURNED_FOR_CLARIFICATION, S::CANCELLED, E::CANCELLED, $family, 'change-request.cancel'),
+            // CO-02.7b (approved): Staff may close a request that waits for a
+            // clarification that may never come (e.g. its Coordinator lost the
+            // scope) — a controlled reason is required, as for every rejection.
+            new ChangeRequestTransition(S::RETURNED_FOR_CLARIFICATION, S::REJECTED, E::REJECTED, $staff, 'change-request.reject', $anyReason),
 
             new ChangeRequestTransition(S::RESUBMITTED, S::UNDER_REVIEW, E::REVIEW_STARTED, $staff, 'change-request.review'),
             new ChangeRequestTransition(S::RESUBMITTED, S::CANCELLED, E::CANCELLED, $family, 'change-request.cancel'),
@@ -92,6 +98,51 @@ final class ChangeRequestTransitions
         }
 
         throw new LogicException('System change request transition not allowed: '.($from->value ?? 'NEW').' → '.$to->value);
+    }
+
+    /**
+     * The COORDINATOR transitions (CO-02.3b; docs/05 WF-ADR-054): a
+     * Coordinator submits, answers a clarification of, and withdraws THEIR
+     * OWN request — the family-side moves, with the coordinator-request.*
+     * permissions instead of change-request.* (which a Coordinator account
+     * holds as FAMILY_USER for its own household and which never authorize
+     * this channel). Kept apart from all() like system(): the family and
+     * Staff lookups (find(), from()) are unchanged, and a Coordinator can
+     * never reach a Staff transition. Review, approval, rejection and APPLY
+     * stay Staff transitions for every channel.
+     *
+     * @return list<ChangeRequestTransition>
+     */
+    public static function coordinator(): array
+    {
+        $coordinator = WorkflowActorSide::COORDINATOR;
+
+        return [
+            new ChangeRequestTransition(null, S::SUBMITTED, E::SUBMITTED, $coordinator, 'coordinator-request.submit'),
+            new ChangeRequestTransition(S::SUBMITTED, S::CANCELLED, E::CANCELLED, $coordinator, 'coordinator-request.cancel'),
+            new ChangeRequestTransition(S::UNDER_REVIEW, S::CANCELLED, E::CANCELLED, $coordinator, 'coordinator-request.cancel'),
+            new ChangeRequestTransition(S::RETURNED_FOR_CLARIFICATION, S::RESUBMITTED, E::RESUBMITTED, $coordinator, 'coordinator-request.resubmit'),
+            new ChangeRequestTransition(S::RETURNED_FOR_CLARIFICATION, S::CANCELLED, E::CANCELLED, $coordinator, 'coordinator-request.cancel'),
+            new ChangeRequestTransition(S::RESUBMITTED, S::CANCELLED, E::CANCELLED, $coordinator, 'coordinator-request.cancel'),
+        ];
+    }
+
+    public static function findCoordinator(?S $from, S $to): ?ChangeRequestTransition
+    {
+        foreach (self::coordinator() as $transition) {
+            if ($transition->from === $from && $transition->to === $to) {
+                return $transition;
+            }
+        }
+
+        return null;
+    }
+
+    /** A COORDINATOR transition, or a LogicException (codes only). */
+    public static function assertCoordinatorAllowed(?S $from, S $to): ChangeRequestTransition
+    {
+        return self::findCoordinator($from, $to)
+            ?? throw new LogicException('Coordinator change request transition not allowed: '.($from->value ?? 'NEW').' → '.$to->value);
     }
 
     public static function find(?S $from, S $to): ?ChangeRequestTransition

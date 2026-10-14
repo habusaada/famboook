@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ChangeRequestRejectionReason;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\ChangeRequestType;
+use App\Enums\SubmissionChannel;
 use App\Support\ChangeRequests\ChangeRequestCodes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,7 +18,9 @@ use LogicException;
 /**
  * A Change Request (docs/02 §49–§57, PWA-5a): one family's proposal of one
  * typed change to its canonical registry, with its review decision and apply
- * outcome. Never canonical data itself.
+ * outcome. Never canonical data itself. CO-02 adds the COORDINATOR submission
+ * channel and REGISTER_FAMILY, a proposal of a Family that does not exist yet
+ * (no family_id; a proposed Clan / Branch instead).
  *
  * - `uuid` is the public identifier (also the route key); `request_code`
  *   (CRQ-000001) the human reference; `id` never leaves the server.
@@ -36,7 +39,7 @@ class ChangeRequest extends Model
     private const PROPOSAL_FIELDS = [
         'uuid', 'request_code', 'family_id', 'type', 'payload_version', 'person_id', 'target_membership_id',
         'submitted_data', 'reason', 'base_fingerprint', 'base_key_version', 'submitted_by', 'submitted_by_person_id',
-        'client_reference',
+        'client_reference', 'submission_channel', 'proposed_clan_id', 'proposed_branch_id',
     ];
 
     protected $fillable = [
@@ -52,6 +55,18 @@ class ChangeRequest extends Model
         'submitted_by',
         'submitted_by_person_id',
         'client_reference',
+        'submission_channel',
+        'proposed_clan_id',
+        'proposed_branch_id',
+    ];
+
+    /**
+     * Mirrors the column default: every request is FAMILY-channel unless a
+     * Coordinator submitted it (CO-02). created_family_id is not fillable: only
+     * the APPLY of a REGISTER_FAMILY request records it.
+     */
+    protected $attributes = [
+        'submission_channel' => 'FAMILY',
     ];
 
     protected $hidden = [
@@ -86,6 +101,7 @@ class ChangeRequest extends Model
     {
         return [
             'type' => ChangeRequestType::class,
+            'submission_channel' => SubmissionChannel::class,
             'status' => ChangeRequestStatus::class,
             'rejection_reason_code' => ChangeRequestRejectionReason::class,
             'submitted_data' => 'array',
@@ -126,10 +142,32 @@ class ChangeRequest extends Model
             : null;
     }
 
-    /** The request's Family for good — still resolved if the Family is later archived (soft-deleted). */
+    /**
+     * The request's Family for good — still resolved if the Family is later
+     * archived (soft-deleted). NULL for a REGISTER_FAMILY proposal (CO-02):
+     * its Family is createdFamily(), once APPLIED.
+     */
     public function family(): BelongsTo
     {
         return $this->belongsTo(Family::class)->withTrashed();
+    }
+
+    /** The Family a REGISTER_FAMILY request created at APPLY (CO-02). */
+    public function createdFamily(): BelongsTo
+    {
+        return $this->belongsTo(Family::class, 'created_family_id')->withTrashed();
+    }
+
+    /** The proposed Clan of a REGISTER_FAMILY request (CO-02). */
+    public function proposedClan(): BelongsTo
+    {
+        return $this->belongsTo(Clan::class, 'proposed_clan_id');
+    }
+
+    /** The proposed Branch, when given, of a REGISTER_FAMILY request (CO-02). */
+    public function proposedBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'proposed_branch_id');
     }
 
     /** The targeted Person, when the type names one. */

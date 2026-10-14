@@ -31,4 +31,27 @@ final class RelationshipTypes
 
         return (int) $id;
     }
+
+    /**
+     * The relationship options for proposing a NEW member of a household
+     * (FP-ADR-076; CO-02.6a for the Coordinator form): the ACTIVE types
+     * except HEAD — a new member is never the head — by stable code and
+     * Arabic name, in the registry's order. The one definition shared by
+     * the family and Coordinator forms; the add-member validation applies
+     * the same rule (AddFamilyMemberHandler).
+     *
+     * @return list<array{code: string, name: string}>
+     */
+    public static function memberOptions(): array
+    {
+        return RelationshipType::query()
+            ->where('is_active', true)
+            ->where('code', '!=', self::HEAD)
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->get(['code', 'name'])
+            ->map(fn (RelationshipType $type) => ['code' => $type->code, 'name' => $type->name])
+            ->values()
+            ->all();
+    }
 }

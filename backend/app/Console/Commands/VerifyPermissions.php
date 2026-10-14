@@ -67,6 +67,7 @@ class VerifyPermissions extends Command
             'has' => ['family-portal.access'],
             'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
                 'coordinator-member.view', 'coordinator-member.view-sensitive',
+                'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel',
                 'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
                 // Family reads use family.context, never the Staff queue; a
                 // family never reviews its own request (WF-INV-026).
@@ -77,13 +78,16 @@ class VerifyPermissions extends Command
         // (CO-01C, AUTH-ADR-092) the members directory with its audited reveal
         // in its scope, and nothing of the Staff API, review, export or trust.
         'COORDINATOR' => [
-            'has' => ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive'],
+            'has' => ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive',
+                // CO-02.3b (AUTH-ADR-093): own requests in the scope.
+                'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel'],
             'lacks' => ['person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
                 'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
                 'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
-                // COORDINATOR ≠ REVIEWER; coordinator-submitted requests are deferred (AUTH-ADR-087).
+                // COORDINATOR ≠ REVIEWER (AUTH-ADR-087); its own requests use
+                // coordinator-request.* only, never change-request.* (AUTH-ADR-093).
                 'change-request.view', 'change-request.create', 'change-request.submit', 'change-request.cancel',
                 'change-request.approve', 'change-request.reject', 'change-request.apply'],
         ],

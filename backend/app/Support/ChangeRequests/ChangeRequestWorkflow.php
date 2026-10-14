@@ -7,7 +7,9 @@ use App\Enums\ChangeRequestStatus;
 use App\Enums\FamilyStatus;
 use App\Enums\WorkflowEventType;
 use App\Exceptions\ChangeRequestException;
+use App\Models\Branch;
 use App\Models\ChangeRequest;
+use App\Models\Clan;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
@@ -15,6 +17,7 @@ use App\Models\WorkflowEvent;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use LogicException;
 
 /**
  * Shared steps of the Change Request Domain Actions (PWA-5b). Lock order,
@@ -25,6 +28,11 @@ use InvalidArgumentException;
  * CorrectNationalIdAction; docs/11 FP-ADR-076). A handler never locks a
  * Person who is active in a Family (whose own writers lock Person → Family).
  * A submission locks only its Family.
+ *
+ * A request that proposes a NEW Family (CO-02.3b, ProposesNewFamily; no
+ * family_id) has no Family to lock: the order is request → proposed Clan →
+ * proposed Branch (shared locks — they must not change under the approval
+ * or the APPLY) → whatever the handler's Domain Actions lock.
  */
 final class ChangeRequestWorkflow
 {
@@ -52,6 +60,60 @@ final class ChangeRequestWorkflow
         }
 
         return ChangeRequestTarget::of($locked, $family);
+    }
+
+    /**
+     * Lock the proposed placement of a request for a NEW Family (CO-02.3b):
+     * the Clan, then the Branch, in shared mode. An inactive Clan, an
+     * inactive Branch, a Branch of another Clan or an inactive Group of a
+     * grouped Branch cannot take a new Family (NOT_APPLICABLE).
+     */
+    public static function lockPlacement(ChangeRequest $locked): void
+    {
+        if ($locked->family_id !== null || $locked->proposed_clan_id === null) {
+            throw new LogicException('Only a proposed Family has a placement to lock.');
+        }
+        $clan = Clan::query()->whereKey($locked->proposed_clan_id)->sharedLock()->first();
+        if ($clan === null || ! $clan->is_active) {
+            throw new ChangeRequestException(ChangeRequestException::NOT_APPLICABLE);
+        }
+        if ($locked->proposed_branch_id === null) {
+            return;
+        }
+        $branch = Branch::query()->with('group')->whereKey($locked->proposed_branch_id)->sharedLock()->first();
+        if ($branch === null || ! $branch->is_active || (int) $branch->clan_id !== (int) $clan->getKey()
+            || ($branch->branch_group_id !== null && $branch->group?->is_active !== true)) {
+            throw new ChangeRequestException(ChangeRequestException::NOT_APPLICABLE);
+        }
+    }
+
+    /**
+     * Re-validate a proposal for a NEW Family against current state and its
+     * base fingerprint (approve and apply; CO-02.3b).
+     */
+    public static function verifyProposal(ChangeRequestHandler $handler, ChangeRequest $locked): void
+    {
+        $proposal = self::proposalHandler($handler);
+        if ($locked->payload_version !== $handler->payloadVersion()) {
+            throw new ChangeRequestException(ChangeRequestException::NOT_APPLICABLE);
+        }
+        $proposal->proposalPreconditions($locked);
+        if (! ChangeRequestBase::matches($locked, $proposal->proposalBaseValues($locked))) {
+            throw new ChangeRequestException(ChangeRequestException::BASE_CHANGED);
+        }
+    }
+
+    /**
+     * The handler of a request for a NEW Family, or a LogicException: a
+     * family-less request whose handler cannot create a Family is a defect.
+     */
+    public static function proposalHandler(ChangeRequestHandler $handler): ProposesNewFamily
+    {
+        if (! $handler instanceof ProposesNewFamily) {
+            throw new LogicException('A change request without a Family needs a handler that proposes a new Family.');
+        }
+
+        return $handler;
     }
 
     /**

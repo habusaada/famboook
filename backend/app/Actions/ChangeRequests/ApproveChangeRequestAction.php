@@ -31,6 +31,10 @@ use Illuminate\Validation\ValidationException;
  * preconditions) and the base fingerprint recomputed — a request whose base
  * data changed is refused (CHANGE_REQUEST_BASE_CHANGED), never approved over
  * newer data.
+ *
+ * CO-02.3b: a request for a NEW Family (no family_id) locks its proposed
+ * placement instead and is re-validated by its ProposesNewFamily handler;
+ * nothing is created at approval.
  */
 class ApproveChangeRequestAction
 {
@@ -56,10 +60,17 @@ class ApproveChangeRequestAction
             }
 
             $handler = $this->types->handler($locked->type);
-            $target = ChangeRequestWorkflow::lockCanonical($locked);
-            ChangeRequestWorkflow::verify($handler, $locked, $target);
-            ChangeRequestWorkflow::assertBaseUnchanged($handler, $locked, $target);
-            $attested = self::verificationMethod($handler, $evidence) + self::attestations($handler, $locked, $target, $evidence);
+            if ($locked->family_id === null) {
+                // CO-02.3b: a proposed Family — its placement, then the proposal.
+                ChangeRequestWorkflow::lockPlacement($locked);
+                ChangeRequestWorkflow::verifyProposal($handler, $locked);
+                $attested = self::verificationMethod($handler, $evidence) + self::attestations($handler, $locked, null, $evidence);
+            } else {
+                $target = ChangeRequestWorkflow::lockCanonical($locked);
+                ChangeRequestWorkflow::verify($handler, $locked, $target);
+                ChangeRequestWorkflow::assertBaseUnchanged($handler, $locked, $target);
+                $attested = self::verificationMethod($handler, $evidence) + self::attestations($handler, $locked, $target, $evidence);
+            }
 
             $locked->forceFill(['status' => ChangeRequestStatus::APPROVED, 'approved_by' => $staff->getKey(), 'approved_at' => now()])->save();
             WorkflowEventRecorder::record($locked, ChangeRequestStatus::UNDER_REVIEW, WorkflowEventType::APPROVED, WorkflowActorSide::STAFF, $staff->getKey(),
@@ -100,7 +111,7 @@ class ApproveChangeRequestAction
      *
      * @return array<string, string> the event metadata
      */
-    private static function attestations(ChangeRequestHandler $handler, ChangeRequest $locked, ChangeRequestTarget $target, ChangeRequestApprovalEvidence $evidence): array
+    private static function attestations(ChangeRequestHandler $handler, ChangeRequest $locked, ?ChangeRequestTarget $target, ChangeRequestApprovalEvidence $evidence): array
     {
         if (! $handler instanceof RequiresApprovalAttestation) {
             if ($evidence->attestations !== [] || $evidence->verifiedNationalId !== null) {
@@ -117,7 +128,10 @@ class ApproveChangeRequestAction
             }
             $metadata[$attestation->metadataKey()] = $attestation->value;
         }
-        $handler->assertApprovable($locked, $target, $evidence);
+        // CO-02.3b: a proposed Family has no target; its handler checks the evidence itself.
+        $target === null
+            ? ChangeRequestWorkflow::proposalHandler($handler)->assertProposalApprovable($locked, $evidence)
+            : $handler->assertApprovable($locked, $target, $evidence);
 
         return $metadata;
     }

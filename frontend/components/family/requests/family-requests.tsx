@@ -43,6 +43,11 @@ function RequestCard({ request }: { request: FamilyChangeRequestSummary }) {
             <span className="min-w-0 font-semibold text-foreground">{changeRequestTypeLabels[request.type] ?? "طلب تحديث"}</span>
             <FamilyRequestStatus status={request.status} />
           </span>
+          {request.coordinator && (
+            <span className="text-xs text-muted-foreground" data-family-request-coordinator>
+              قدّمه المنسّق: <bdi>{request.coordinator.name ?? "—"}</bdi>
+            </span>
+          )}
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <bdi dir="ltr" className="font-mono tracking-wide">
               {request.request_code}
@@ -124,7 +129,7 @@ export function FamilyRequests() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>كل الأنواع</SelectItem>
-            {(Object.keys(changeRequestTypeLabels) as ChangeRequestType[]).map((t) => (
+            {(Object.keys(changeRequestTypeLabels) as ChangeRequestType[]).filter((t) => t !== "REGISTER_FAMILY").map((t) => (
               <SelectItem key={t} value={t}>
                 {changeRequestTypeLabels[t]}
               </SelectItem>

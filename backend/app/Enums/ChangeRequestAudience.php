@@ -8,4 +8,7 @@ enum ChangeRequestAudience: string
 {
     case FAMILY = 'FAMILY';
     case STAFF = 'STAFF';
+    // CO-02.4: a Coordinator following their OWN request (masked identifiers,
+    // nothing Staff-only, never another registry Person).
+    case COORDINATOR = 'COORDINATOR';
 }

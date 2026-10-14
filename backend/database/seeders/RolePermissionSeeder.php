@@ -295,6 +295,16 @@ class RolePermissionSeeder extends Seeder
         // full National ID / mobile is a separate, audited reveal.
         'coordinator-member.view',
         'coordinator-member.view-sensitive',
+
+        // §22b CO-02.3b: Coordinator-submitted Change Requests (approved
+        // 2026-10-13, AUTH-ADR-093). The Coordinator's OWN requests in the
+        // current scope; submission is also gated by
+        // CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE (OFF by default). Never
+        // change-request.*: review, approval and APPLY stay Staff acts.
+        'coordinator-request.view',
+        'coordinator-request.submit',
+        'coordinator-request.resubmit',
+        'coordinator-request.cancel',
     ];
 
     /**
@@ -723,6 +733,12 @@ class RolePermissionSeeder extends Seeder
             // scope, and the audited one-field reveal. Never family.* or person.*.
             'coordinator-member.view',
             'coordinator-member.view-sensitive',
+            // §22b CO-02.3b (AUTH-ADR-093): own requests in the scope — submit,
+            // follow, answer a clarification, withdraw. Never review or apply.
+            'coordinator-request.view',
+            'coordinator-request.submit',
+            'coordinator-request.resubmit',
+            'coordinator-request.cancel',
         ],
     ];
 
