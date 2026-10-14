@@ -1427,6 +1427,41 @@ family-visible `rejection_reason`; `cancelled_by` / `cancelled_at`;
 PostgreSQL CHECKs keep each status consistent with its actor / timestamp
 columns. Actor foreign keys restrict deletion.
 
+**Approved 2026-10-13, not migrated (CO-02.2, DB-ADR-062; design in
+`docs/adr/CO-02-COORDINATOR-REQUESTS.md` §5).** One additive migration for
+coordinator-submitted requests:
+
+```text
+change_requests
+  family_id            → NULLABLE, and NULL exactly for REGISTER_FAMILY
+                         (chk_change_request_family_subject)
+  submission_channel   VARCHAR(20) NOT NULL DEFAULT 'FAMILY'
+                         CHECK IN ('FAMILY','COORDINATOR')
+  proposed_clan_id     BIGINT NULL FK clans.id
+  proposed_branch_id   BIGINT NULL, FK (proposed_branch_id, proposed_clan_id)
+                         → branches (id, clan_id)
+  created_family_id    BIGINT NULL FK families.id — set at APPLY of
+                         REGISTER_FAMILY only
+  chk_change_request_type        + 'REGISTER_FAMILY'
+  chk_change_request_placement   placement present exactly for REGISTER_FAMILY
+  chk_change_request_created_family
+  chk_change_request_channel_type REGISTER_FAMILY only via COORDINATOR
+  INDEX (submission_channel, status, submitted_at), (submitted_by, status),
+        (proposed_clan_id, proposed_branch_id), created_family_id
+
+workflow_events
+  chk_workflow_event_actor_side  + 'COORDINATOR'
+```
+
+The CONTACT_UPDATE actor relaxations are preserved unchanged; existing
+rows default to FAMILY; `down()` refuses while any REGISTER_FAMILY or
+COORDINATOR-channel row exists.
+
+**Implemented locally 2026-10-13 (CO-02.3a, not deployed):** migration
+`2026_10_21_090000_add_coordinator_change_requests`; additionally
+`workflow_events.actor_side` widens from `varchar(10)` to `varchar(20)`
+(`COORDINATOR` has eleven characters). See DB-ADR-062.
+
 ---
 
 # 38. Change Request JSONB
@@ -4071,6 +4106,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-062
+Coordinator-submitted requests (2026-10-13, CO-02.2, approved design; NOT migrated — CO-02.3; full design docs/adr/CO-02-COORDINATOR-REQUESTS.md §5). One additive migration: `change_requests.family_id` becomes nullable, NULL exactly for the new type `REGISTER_FAMILY` (`chk_change_request_family_subject`); new `submission_channel` (FAMILY default / COORDINATOR, CHECK; existing rows FAMILY by the default, no backfill); `proposed_clan_id` (FK clans) and `proposed_branch_id` with a composite FK `(proposed_branch_id, proposed_clan_id)` → `branches (id, clan_id)`, present exactly for REGISTER_FAMILY (`chk_change_request_placement`); `created_family_id` (FK families, restrict) set exactly when a REGISTER_FAMILY request is APPLIED (`chk_change_request_created_family`); `chk_change_request_channel_type` limits REGISTER_FAMILY to the COORDINATOR channel; the type CHECK gains REGISTER_FAMILY; `workflow_events.chk_workflow_event_actor_side` gains COORDINATOR (append-only trigger and other CHECKs unchanged). The CONTACT_UPDATE-only actor relaxations (2026_10_18_090000) are kept verbatim. `registration_source` / residence `source` gain `COORDINATOR_REQUEST` in the application enum only (no DB CHECK exists). No Family, Person or identifier is created before APPLY; `family_activities` stays Family-bound. `down()` refuses while REGISTER_FAMILY or COORDINATOR-channel rows exist. **Implemented locally 2026-10-13 (CO-02.3a, not deployed)** as `2026_10_21_090000_add_coordinator_change_requests`, with one addition found by inspecting the live schema: `workflow_events.actor_side` was `varchar(10)` and `COORDINATOR` has eleven characters, so the column widens to `varchar(20)` (a length increase — no table rewrite, the append-only trigger does not fire; `down()` narrows it back once no COORDINATOR event exists). `SET LOCAL lock_timeout = '5s'` as in DB-ADR-061; the composite key is named `fk_change_request_proposed_branch_clan`; `down()` also refuses while a COORDINATOR workflow event or a NULL `family_id` exists.
+
 ### DB-ADR-061
 National ID uniqueness (2026-10-12, CO-01D.4; Production audit before the change: 3310 Persons, all canonical, 0 missing, 0 invalid, 0 duplicates). Migration `2026_10_20_090000_enforce_unique_person_national_id`, PostgreSQL only: `persons.national_id` SET NOT NULL; `chk_person_national_id_format` CHECK (`^[0-9]{9}$` and not nine identical digits); `uq_persons_national_id` UNIQUE (national_id) over EVERY row — no `deleted_at` predicate, so a soft-deleted Person keeps their value; the plain `persons_national_id_index` is dropped (the unique index replaces it). A direct UNIQUE on the column is sufficient because the CHECK admits only the canonical form: an equivalently formatted value (Arabic digits, spaces, dashes) cannot be stored, so it cannot bypass uniqueness — no generated canonical column is needed. Safety: one transaction; `SET LOCAL lock_timeout = '5s'` then `LOCK TABLE persons IN ACCESS EXCLUSIVE MODE` (no lock upgrade, fails fast behind a long transaction); a pre-flight counts missing, non-canonical / placeholder and duplicate values (soft-deleted included) and refuses — counts only, never a value — so the migration NEVER changes a Person. `down()` restores the previous schema exactly (nullable, no CHECK, no UNIQUE, plain index) without touching rows. Application: `RegistryNationalId` (strict nine-digit normalization, canonical storage, required for every new Person) in `CreatePersonAction`, `RegisterFamilyAction` and `CorrectNationalIdAction`; `NationalIdGuard` refuses a soft-deleted holder without describing it; a unique violation on `uq_persons_national_id` is mapped to the existing duplicate error without the driver message (which carries the value) and without references. SQLite (test suite) has no constraints, as for every CHECK; the application enforces the same rule there.
 
@@ -4384,6 +4422,8 @@ Date: 2026-09-24
 | 1.2.42 | 2026-10-08 | Approved | PWA-6.1a: §99 RESIDENCE_UPDATE mapping corrected to ResidenceUpdateHandler → UpdateFamilyResidenceAction (no schema change) |
 | 1.2.43 | 2026-10-12 | Approved | CO-01C (DB-ADR-060): nullable `auth_security_events.family_id` FK (restrict) and `(family_id, created_at)` index for the audited Coordinator member reveal; additive, no backfill |
 | 1.2.44 | 2026-10-12 | Approved | CO-01D.4 (DB-ADR-061): `persons.national_id` NOT NULL, canonical nine-digit CHECK and UNIQUE over every row (soft-deleted included); pre-flight refuses dirty data, lock_timeout 5s, exact rollback; no Person changed |
+| 1.2.45 | 2026-10-13 | Approved | CO-02.2 (DB-ADR-062): approved, not migrated — coordinator-request schema: nullable `family_id` only for REGISTER_FAMILY, `submission_channel`, proposed Clan / Branch (composite FK), `created_family_id`, type and actor-side CHECKs extended; CONTACT_UPDATE relaxations preserved; guarded rollback |
+| 1.2.46 | 2026-10-13 | Approved | CO-02.3a (DB-ADR-062): coordinator-request schema implemented locally as `2026_10_21_090000_add_coordinator_change_requests` (not deployed); `workflow_events.actor_side` widened to varchar(20) for COORDINATOR; guarded rollback also refuses COORDINATOR events |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

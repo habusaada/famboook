@@ -1382,6 +1382,57 @@ Coordinator-assisted mobile verification is a future dedicated workflow.
   inside its transaction. Entering Coordinator Space and reading summaries
   are not recorded.
 
+## Coordinator-submitted requests (CO-02, approved — not implemented)
+
+Approved 2026-10-13 (WF-ADR-054; full design `docs/adr/CO-02-COORDINATOR-REQUESTS.md`). The
+existing Change Request lifecycle (WF-ADR-049) and the central Staff queue
+are reused; there is no parallel workflow. A new submission channel
+COORDINATOR and actor side COORDINATOR are added.
+
+```text
+Coordinator (channel COORDINATOR, scope re-checked)
+   ──submit PERSON_ADD (Family in scope) | FAMILY_ADD (placement in scope)──▶ SUBMITTED
+Staff (unchanged): start review → UNDER_REVIEW → return / approve / reject
+   RETURNED ──resubmit (submitting coordinator, in scope)──▶ RESUBMITTED
+   APPROVED ──apply (Staff)──▶ APPLIED
+             PERSON_ADD: AddFamilyMember / AttachFamilyMember (unchanged)
+             FAMILY_ADD: RegisterFamilyAction → created_family_id
+   open, before APPROVED ──cancel (submitting coordinator, in scope)──▶ CANCELLED
+```
+
+- APPROVED ≠ APPLIED as everywhere. Approval re-validates; APPLY is one
+  transaction; a failed APPLY leaves the request APPROVED with an
+  APPLY_FAILED event and changes nothing (existing).
+- FAMILY_ADD APPLY locks request → National ID (advisory) → proposed Clan /
+  Branch → registration; the unique National ID index is the final guard.
+- Workflow events of coordinator acts carry `actor_side = COORDINATOR` and
+  the coordinator's user. Family activity: PERSON_ADD on the target Family
+  from submission; FAMILY_ADD only from APPLY on the created Family.
+- Edge cases: scope revoked → coordinator 404, Staff continue; target
+  Family inactive / Clan or Branch inactive → approval and APPLY refuse,
+  Staff reject `NO_LONGER_APPLICABLE`; head ID taken meanwhile → refused;
+  concurrent Staff acts → existing row lock and transition rules.
+- **Implemented locally 2026-10-13 (CO-02.3b, not deployed):** the
+  COORDINATOR transitions are a separate table
+  (`ChangeRequestTransitions::coordinator()`); the event recorder keeps
+  each side on its own channel; family-less approve / APPLY through
+  `ProposesNewFamily`. Open finding: a returned coordinator request whose
+  Coordinator lost the scope cannot be closed (no Staff transition out of
+  RETURNED_FOR_CLARIFICATION) — see the ADR §14.
+- **CO-02.5 (local, not deployed):** REGISTER_FAMILY submission through
+  `handleCoordinatorProposal()` (lock: the head's National ID); APPLY
+  order request → Clan → Branch → National ID → RegisterFamilyAction, then
+  the exact-placement check and `created_family_id` with APPLIED. ADR §16.
+- **CO-02.7a (local, not deployed):** the Staff review workspace (WF-ADR-052)
+  handles requests without a Family: placement, channel badge, wording
+  addressed to the Coordinator, attestation wording for a new household
+  head, «تسجيل الأسرة في السجل» at APPLY. Workflow unchanged. ADR §19.
+- **Amended 2026-10-14 (CO-02.7b, approved decision):** the state machine
+  (WF-ADR-049) gains **RETURNED_FOR_CLARIFICATION → REJECTED** by Staff with
+  `change-request.reject` and a required controlled reason, for both
+  channels, so a clarification that never comes no longer leaves the request
+  open forever. Every other transition is unchanged. ADR §20.
+
 ## User-Person Link
 
 ```text
@@ -3297,6 +3348,9 @@ Staff review workspace as implemented by PWA-5d (2026-10-08): the Staff applicat
 
 ### WF-ADR-053
 Family Change Request API as implemented by PWA-5e (2026-10-08): submit, resubmit and cancel are the PWA-5b family Domain Actions behind the family.context boundary. The submission switch is checked first and by the Submit action itself (no new request while off); it never blocks resubmission or cancellation of existing requests or any Staff step. Submission replays (same user, client_reference and material) return the existing request; different material is refused. The family timeline omits APPLY_FAILED diagnostics and internal notes.
+
+### WF-ADR-054
+Coordinator-submitted requests (2026-10-13, CO-02.2, approved architecture; not implemented; full design docs/adr/CO-02-COORDINATOR-REQUESTS.md): one Change Request engine and one Staff queue. New submission channel COORDINATOR and workflow actor side COORDINATOR. The Coordinator submits ADD_FAMILY_MEMBER for a Family in the effective scope or REGISTER_FAMILY (new type, no Family until APPLY) for a placement the scope covers, and may resubmit or cancel only their own request while it is in their current scope; the household head views but cannot cancel or answer it. Review, return, approve, reject and APPLY are unchanged Staff transitions; APPLY of REGISTER_FAMILY runs RegisterFamilyAction in the APPLY transaction (registration_source COORDINATOR_REQUEST) and records created_family_id. Scope revocation stops only the coordinator's access; nothing is deleted. Handlers receive a submission context (channel, actor, Family or placement) instead of the family-only context.
 ```
 
 ---
@@ -3576,3 +3630,8 @@ Date: 2026-09-24
 | 1.2.23 | 2026-10-08 | Approved | PWA-6.1a: §71 rewritten — RESIDENCE_UPDATE is one in-place correction through UpdateFamilyResidenceAction; the move flow (ChangeFamilyResidenceAction) is kept as a distinct, unbuilt use case |
 | 1.2.24 | 2026-10-09 | Approved | §73 annotated — ADD_FAMILY_MEMBER as implemented (docs/11 FP-ADR-076): attested approval, equivalent-ID resolution at approval / APPLY, reuse only without an active membership |
 | 1.2.25 | 2026-10-10 | Approved | §73: existing-Person eligibility and the Family → National ID → Person lock order (docs/11 FP-ADR-076 amended) |
+| 1.2.26 | 2026-10-13 | Approved | CO-02.2 (WF-ADR-054): coordinator-submitted requests — approved, not implemented: COORDINATOR channel and actor side on the existing lifecycle, REGISTER_FAMILY applied by RegisterFamilyAction, submitter-only resubmit / cancel, edge-case behaviour |
+| 1.2.27 | 2026-10-13 | Approved | CO-02.3b (WF-ADR-054): coordinator transitions, channel-safe events and family-less approve / APPLY implemented locally (not deployed); open finding on returned requests of a Coordinator who lost the scope |
+| 1.2.28 | 2026-10-14 | Approved | CO-02.5 (WF-ADR-054): REGISTER_FAMILY submission and APPLY implemented locally (not deployed); exact-placement check at APPLY |
+| 1.2.29 | 2026-10-14 | Approved | CO-02.7a: Staff review workspace compatible with Coordinator requests and proposed Families (family = null); wording by channel; no workflow change |
+| 1.2.30 | 2026-10-14 | Approved | CO-02.7b (approved): Staff RETURNED_FOR_CLARIFICATION → REJECTED with change-request.reject and a required reason, both channels; no other transition changed |

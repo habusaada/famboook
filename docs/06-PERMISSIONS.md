@@ -1210,6 +1210,61 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
 - `OrganizationalScope` remains a reporting filter and is not used for
   coordinator authorization.
 
+### Coordinator-submitted requests (CO-02, approved architecture — not implemented)
+
+Approved 2026-10-13 (AUTH-ADR-093; full design in `docs/adr/CO-02-COORDINATOR-REQUESTS.md`).
+Amends the PWA-1H rule "the Coordinator modifies nothing" ONLY as follows:
+a Coordinator may SUBMIT a Change Request — never review, approve, reject
+or apply one, and never change a registry record directly.
+
+- No role is created; the eight roles and every existing mapping stay.
+- Four new permissions, seeded to **COORDINATOR only** (in CO-02.3):
+  `coordinator-request.view`, `coordinator-request.submit`,
+  `coordinator-request.resubmit`, `coordinator-request.cancel`. Coordinator
+  paths never authorize through `change-request.*`, which the same account
+  holds as FAMILY_USER for its own household.
+- Types: PERSON_ADD (`ADD_FAMILY_MEMBER`) for a Family in the effective
+  scope; FAMILY_ADD (`REGISTER_FAMILY`) for a new Family whose proposed
+  Clan / Branch is covered by the scope. Scope is enforced in the Domain
+  Actions and re-resolved on every request; out of scope = 404.
+- A Coordinator sees, answers and cancels only the requests THEY submitted
+  that are still in their CURRENT scope. Scope revocation removes that
+  access; Staff keep the full request and its history; nothing is deleted.
+- Cancel and resubmit belong to the submitting actor: a COORDINATOR-channel
+  request only to the submitting coordinator; the household head sees it in
+  the family history (submitter and channel shown) but cannot cancel or
+  answer it. FAMILY-channel requests are unchanged.
+- Review, approval, rejection and APPLY stay Staff acts with the existing
+  `change-request.*` permissions (SUPER_ADMIN, ADMINISTRATOR, REVIEWER).
+- Feature gate `CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE`: OFF (default)
+  / PILOT (user allowlist) / GENERAL; no Production activation without
+  approval.
+- Coordinator request views never show health, disability, assessments,
+  assistance, needs, notes or current residence, and never answer whether a
+  National ID exists; identifiers are masked.
+- **Implemented locally 2026-10-13 (CO-02.3b, not deployed):** the four
+  permissions are seeded to COORDINATOR only and checked by
+  `famboook:verify-permissions`; the Domain Actions enforce them
+  (`ChangeRequestActors::coordinator()`, `submittedByCoordinator()`,
+  `familyChannel()`). No route uses them yet.
+- **API (CO-02.4, local, not deployed):** `/api/v1/family/coordinator/requests`
+  (types, list, detail: `coordinator-request.view`), `POST
+  /families/{familyCode}/requests` (`coordinator-family.view-summary` +
+  `coordinator-request.submit`), `/requests/{uuid}/resubmit`
+  (`.resubmit`) and `/cancel` (`.cancel`), each with a per-user throttle;
+  as built in `docs/adr/CO-02-COORDINATOR-REQUESTS.md` §15.
+- **CO-02.5:** `POST /api/v1/family/coordinator/requests` (FAMILY_ADD) —
+  `coordinator-request.submit` and the submission throttle; the placement
+  is checked against the scope in the Domain Action, one 422 answer for
+  any unusable placement (ADR §16).
+- **CO-02.6a:** `GET /coordinator/requests/relationship-types` and
+  `/requests/placements` — `coordinator-request.submit`, the read throttle;
+  placements are only the current scope's active structure (ADR §17).
+- **CO-02.7b:** no permission added. The new Staff rejection of a returned
+  request uses `change-request.reject`; `/coordinator/context`, `/families`
+  and `/families/{code}` gain the per-user `coordinator-read` throttle; the
+  household sees the submitting Coordinator's name (D8), nothing else (ADR §20).
+
 ## SMS delivery (TweetsMS)
 
 - **No new permission, route or role** (AUTH-ADR-071). The TweetsMS
@@ -4442,6 +4497,9 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-093
+Coordinator-submitted requests (2026-10-13, CO-02.2, approved architecture; not implemented; full design `docs/adr/CO-02-COORDINATOR-REQUESTS.md`): no role added; the eight roles and every existing permission mapping are unchanged. Four new permissions, COORDINATOR only — `coordinator-request.view`, `.submit`, `.resubmit`, `.cancel` — authorize the coordinator channel; `change-request.*` is never consulted for it (a coordinator account holds `change-request.submit` as FAMILY_USER for its own household). A Coordinator may submit ADD_FAMILY_MEMBER (PERSON_ADD) for a Family in the effective scope and REGISTER_FAMILY (FAMILY_ADD) for a placement the scope covers; they never review, return, approve, reject or apply (Staff only, unchanged, AUTH-ADR-087/088). Every coordinator Domain Action re-checks family side, the `coordinator.space` context, the permission, the feature gate, ownership (`submitted_by` = the user, channel COORDINATOR) and the CURRENT scope; out of scope and nonexistent are the same 404. Cancel and resubmit are the submitting actor's: the household head views coordinator-channel requests about their Family (submitter and channel shown) but cannot cancel or answer them; family-channel requests keep AUTH-ADR-091. Scope revocation ends the coordinator's access, never Staff's, and deletes nothing. A coordinator who heads a household keeps the Family Portal for their own household (AUTH-ADR-091) independently of Coordinator Space. Gate OFF by default (OFF / PILOT allowlist / GENERAL). Throttles per user on submit and actions; the existing `/coordinator/context` and `/families` reads gain throttles (CO-02.7). Amends PWA-1H "the Coordinator modifies nothing" only by allowing submission.
+
 ### AUTH-ADR-092
 Coordinator members directory (2026-10-12, CO-01C, Option B): an APPROVED EXCEPTION to the PWA-1H summary-only Coordinator policy (AUTH-ADR-070), which otherwise stands and is kept as history. Two new permissions, seeded to COORDINATOR only: `coordinator-member.view` — the extended details of a Family in the effective scope (code, Clan / Branch Group / Branch, head, REGISTERED member count and, separately, the DECLARED household size) and its members directory (full name, relationship, sex, age, marital status, life status; National ID and mobile MASKED) — and `coordinator-member.view-sensitive` — an explicit reveal of ONE full value (National ID or primary mobile) of ONE member per request, never in bulk. COORDINATOR still receives no `family.*` or `person.*` permission; Staff role mappings, REVIEWER and the approval workflows are unchanged; `coordinator-family.view-summary` keeps its meaning and is still required on both new routes. Routes (family side, behind `coordinator.space`, re-resolved on every request): `GET /api/v1/family/coordinator/families/{code}/members` (+ `coordinator-member.view`, throttle `coordinator-member-directory`) and `POST /api/v1/family/coordinator/families/{code}/members/{memberRef}/reveal` (+ `coordinator-member.view-sensitive`, throttle `coordinator-member-reveal`). The Family is found only inside `CoordinatorScopes::families()`; the member only by an opaque keyed reference (own fingerprint context `COORDINATOR_MEMBER_REF`) among that Family's ACTIVE memberships; out of scope and nonexistent are the same 404. Every reveal attempt that passes the permission gates records one `COORDINATOR_MEMBER_SENSITIVE_REVEALED` security event — SUCCESS before the value is returned, DENIED with a reason code otherwise — with actor, Family (new nullable `auth_security_events.family_id`, docs/04 DB-ADR-060), target Person, field code and time; never the value, a mask or the reference. Responses are `no-store, private`. Never exposed: birth date, alternate mobile, residence, health, disability, assessments, needs, assistance, case notes, documents, account, OTP or authentication data.
 
@@ -4906,6 +4964,12 @@ Date: 2026-09-24
 | 1.2.61 | 2026-10-11 | Approved | FU-16 (docs/11 FP-ADR-078): §22b `POST /api/v1/family/account/password` — self only, current password, Family password policy, all sessions ended and the browser signed in afresh, own gate (off by default; `FAMILY_PASSWORD_CHANGE_ENABLED=true`) and per-user throttle; AUTH-ADR-082 amended. No permission seeded |
 | 1.2.60 | 2026-10-10 | Approved | ADD_FAMILY_MEMBER note amended: Staff-only status in the match summary; only evidence-bearing approvals are throttled; no permission added |
 | 1.2.62 | 2026-10-12 | Approved | CO-01C (AUTH-ADR-092): §22b Coordinator members directory — `coordinator-member.view` and `coordinator-member.view-sensitive` seeded to COORDINATOR only (approved exception to the PWA-1H summary-only rule); masked directory and audited one-field reveal routes; no Staff, REVIEWER or workflow change |
+| 1.2.63 | 2026-10-13 | Approved | CO-02.2 (AUTH-ADR-093): coordinator-submitted requests — approved architecture, not implemented; four COORDINATOR-only `coordinator-request.*` permissions (to be seeded in CO-02.3), PERSON_ADD / FAMILY_ADD within scope, Staff-only review, submitter-only cancel / resubmit, scope revocation ends coordinator access only, gated OFF by default. No seeder, role or mapping change |
+| 1.2.64 | 2026-10-13 | Approved | CO-02.3b (AUTH-ADR-093): `coordinator-request.view` / `.submit` / `.resubmit` / `.cancel` seeded to COORDINATOR only and verified; enforced in the Domain Actions; no route, no other role or mapping changed |
+| 1.2.65 | 2026-10-14 | Approved | CO-02.4 (AUTH-ADR-093): Coordinator request API — six routes behind `coordinator.space`, one `coordinator-request.*` permission each (submission also `coordinator-family.view-summary`), per-user throttles; out of scope = 404. No permission, role or mapping change |
+| 1.2.66 | 2026-10-14 | Approved | CO-02.5 (AUTH-ADR-093): FAMILY_ADD route `POST /coordinator/requests` with `coordinator-request.submit`; no permission, role or mapping change |
+| 1.2.67 | 2026-10-14 | Approved | CO-02.6a (AUTH-ADR-093): Coordinator form reference routes (relationship options, placements in scope) with `coordinator-request.submit` and the read throttle; no permission, role or mapping change |
+| 1.2.68 | 2026-10-14 | Approved | CO-02.7b: RETURNED → REJECTED under the existing change-request.reject; coordinator-read throttle on the Coordinator Space reads; Staff queue channel / submitter filters; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

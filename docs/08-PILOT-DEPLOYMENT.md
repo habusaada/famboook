@@ -1179,6 +1179,160 @@ new Persons until it is rolled back too.
 
 ---
 
+# 16d. Coordinator requests release (CO-02)
+
+Coordinator-submitted Change Requests — PERSON_ADD (`ADD_FAMILY_MEMBER`)
+and FAMILY_ADD (`REGISTER_FAMILY`), the Coordinator request workspace, the
+Staff workspace changes and the Staff RETURNED → REJECTED transition
+(design: `docs/adr/CO-02-COORDINATOR-REQUESTS.md`). It is deployed
+**closed**: the coordinator submission mode stays `OFF`, and opening the
+coordinator pilot is a separate, written authorization (docs/09
+«طلبات التنسيق — التجربة المضبوطة»). Nothing here assumes Production's
+current commit or migration status: step 0 reads them.
+
+## Release content
+
+| Item | Change |
+|---|---|
+| Migrations (this release) | `2026_10_21_090000_add_coordinator_change_requests` — additive: `change_requests.family_id` nullable (NULL only for REGISTER_FAMILY), `submission_channel` (default FAMILY), `proposed_clan_id` / `proposed_branch_id` (composite key to `branches`), `created_family_id`, CHECKs; `workflow_events.actor_side` widened to `varchar(20)` and gains COORDINATOR. `lock_timeout` 5s; existing rows become FAMILY by the column default; `down()` refuses while any coordinator record exists |
+| Migrations this release DEPENDS ON | `2026_10_19_090000_add_family_id_to_auth_security_events` (CO-01C) and `2026_10_20_090000_enforce_unique_person_national_id` (CO-01D.4, **its own release §16c with its audit gate**) — if either is pending on Production, release CO-01 first and stop here |
+| Seeders / permissions | `RolePermissionSeeder`: `coordinator-request.view / .submit / .resubmit / .cancel` → COORDINATOR only (151 permissions in all). No role added, no other mapping changed |
+| Packages | None (`composer.lock`, `package-lock.json` unchanged) |
+| Configuration | New `.env` keys (below); new optional limits; `config/change_requests.php`, `config/family_auth.php` |
+| Backend | Coordinator channel of the Change Request engine, REGISTER_FAMILY handler (registered in `ChangeRequestTypes::PRODUCTION`; never family-submittable), Coordinator request API under `/api/v1/family/coordinator/requests…`, Staff API fields and filters (`submission_channel`, `placement`, `created_family_code`, `channel`, `submitter`), household request field `coordinator`, Staff RETURNED → REJECTED, `coordinator-read` throttle |
+| Frontend | Coordinator request workspace (`/family/coordinator/requests…`), Staff queue / detail for requests without a Family, household history shows the Coordinator's name |
+| Unchanged | Family authentication, the household's own request flows (incl. live CONTACT_UPDATE), the Digital Family Card, registry screens |
+
+## Release gates (all before the deployment)
+
+1. The release commits are on `origin/main`; the exact SHA is recorded.
+2. On that SHA, locally: clean tree; backend SQLite suite, frontend suite,
+   typecheck, ESLint and production build pass; the PostgreSQL suite
+   (§16a cluster on port 5433) passes for `tests/Feature/ChangeRequests`
+   (incl. the coordinator concurrency tests) and `tests/Feature/FamilyAuth`.
+3. **Production state read (step 0 below) shows** the two dependency
+   migrations applied and `2026_10_21_090000` pending. Anything else: STOP.
+4. A verified backup (§12) taken immediately before, **and** a restore
+   test (§13) passed on a recent backup.
+5. The server `.env` contains, explicitly:
+   `CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE=OFF` and an empty
+   `CHANGE_REQUESTS_COORDINATOR_PILOT_USER_IDS=`. The family keys and
+   `FAMILY_CONTACT_UPDATE_ENABLED` stay as they are.
+6. Disk and memory are sufficient for `npm run build` (≈ 2 GB free).
+7. Staff reviewers are briefed (docs/09): coordinator requests in the queue,
+   the «عبر منسّق» badge, proposed Families, the attestation wording for a
+   new household head, and the new «رفض» on returned requests.
+
+## Deployment (runbook — do not improvise)
+
+As in §16b, every git and deployment command runs **as `deploy`**.
+
+```text
+# 0. read-only state (record the output, no change)
+sudo -u deploy git -C <app-root> rev-parse HEAD
+sudo -u deploy php <app-root>/backend/artisan migrate:status | grep -E "2026_10_(19|20|21)"
+sudo -u deploy php <app-root>/backend/artisan famboook:change-requests-check
+#   before the release the command has no coordinator lines; after it, see step 6
+psql -c "SELECT count(*) FROM change_requests" -c "SELECT count(*) FROM workflow_events"
+
+# 1. backup, then confirm it (§12)
+sudo -u deploy <app-root>/deploy/scripts/backup-db.sh
+
+# 2. code
+sudo -u deploy git -C <app-root> fetch origin
+sudo -u deploy git -C <app-root> checkout --detach <sha>
+sudo -u deploy git -C <app-root> status --short     # must be empty
+sudo -u deploy git -C <app-root> rev-parse HEAD      # must equal <sha>
+
+# 3. configuration (server .env, by the system administrator)
+CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE=OFF
+CHANGE_REQUESTS_COORDINATOR_PILOT_USER_IDS=
+
+# 4. backend: down → composer → migrate (expects ONLY 2026_10_21_090000)
+#    → RolePermissionSeeder → famboook:verify-permissions → optimize → up
+sudo -u deploy <app-root>/deploy/scripts/deploy-backend.sh
+sudo systemctl reload php<version>-fpm
+
+# 5. frontend: npm ci → build → restart, then the web server
+sudo -u deploy <app-root>/deploy/scripts/deploy-frontend.sh
+sudo nginx -t && sudo systemctl reload nginx
+
+# 6. readiness (must exit 0)
+sudo -u deploy php <app-root>/backend/artisan famboook:change-requests-check
+#   expect: Family … (unchanged values), Coordinator submission mode
+#   (effective): OFF, Coordinator pilot allowlist: empty, Coordinator request
+#   permissions: OK (4 of 4, COORDINATOR only), the three migrations
+#   "applied", "no warnings"
+```
+
+If `migrate` runs anything other than `2026_10_21_090000_add_coordinator_change_requests`,
+**stop**: the server is not at the expected schema. A refusal or a lock
+timeout (SQLSTATE 55P03) changed nothing — `php artisan up`, investigate.
+Verify the schema (read-only):
+
+```text
+psql -c "SELECT conname FROM pg_constraint WHERE conrelid = 'change_requests'::regclass AND conname IN ('chk_change_request_channel','chk_change_request_family_subject','chk_change_request_placement','chk_change_request_created_family','chk_change_request_channel_type','fk_change_request_proposed_branch_clan')"
+psql -c "SELECT submission_channel, count(*) FROM change_requests GROUP BY 1"    # FAMILY only
+```
+
+## Post-deployment smoke checks (read-only)
+
+No request is created; no data is written beyond logins.
+
+1. Health, `famboook.com/login`, `famboook.com/family/login` load;
+   `famboook:verify-permissions` passes; step 6 above passes.
+2. Guest: `GET /api/v1/family/coordinator/requests` → 401;
+   `GET /api/v1/change-requests` → 401.
+3. A Staff REVIEWER: «طلبات تحديث البيانات» opens with the new «جهة
+   التقديم» filter and «مقدّم الطلب» field; existing requests show as
+   before (no «عبر منسّق» badge — none exist); a request opens.
+4. A household head (pilot account per docs/09 §16b practice): «طلباتي»
+   opens unchanged; the live CONTACT_UPDATE entry is still offered (do
+   NOT submit).
+5. A Coordinator (if any exists): Coordinator Space opens; «طلبات
+   التنسيق» shows an empty list and no «طلب جديد»;
+   `GET …/coordinator/requests/types` →
+   `{"data": [], "meta": {"submission_enabled": false}}`; any POST → 503.
+6. `storage/logs/laravel.log` shows no new errors.
+
+## Monitoring (first two weeks)
+
+- Daily: `famboook:change-requests-check` (exit 0; mode as authorized),
+  `laravel.log` errors, 429 responses on `coordinator-*` throttles in the
+  web server log.
+- Read-only counts: `SELECT submission_channel, status, count(*) FROM change_requests GROUP BY 1, 2`.
+- Any `APPLY_FAILED` event on a REGISTER_FAMILY request is reviewed the
+  same day (docs/09).
+
+## Feature shutdown (any time, no code change)
+
+```text
+CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE=OFF
+sudo -u deploy php artisan config:clear
+sudo -u deploy php artisan optimize
+sudo systemctl reload php<version>-fpm
+sudo -u deploy php artisan famboook:change-requests-check
+```
+
+NEW coordinator submissions stop at once (503); existing requests stay
+readable, answerable, cancellable and reviewable. The household channel is
+not affected.
+
+## Rollback and fix-forward
+
+| Situation | Action |
+|---|---|
+| Any problem with coordinator submissions | Feature shutdown (above) first |
+| A defect, and **no coordinator-channel request exists** (`SELECT count(*) FROM change_requests WHERE submission_channel = 'COORDINATOR'` = 0) | Code rollback to the previous SHA as `deploy` (`deploy-backend.sh`, `deploy-frontend.sh`); **leave the migration in place** — it is additive, the previous code ignores the new columns, and no NULL `family_id` exists |
+| A defect after a coordinator request exists | Feature shutdown, then **fix forward**. Previous code cannot display a REGISTER_FAMILY request (no Family) and would break the Staff queue |
+| Never | `migrate:rollback` of `2026_10_21_090000` after the pilot started (it refuses anyway); editing or deleting `change_requests` or `workflow_events` rows; restoring a backup to "undo" requests |
+
+A request that should not take effect is rejected through the workflow
+(Staff may now reject a returned request); an applied proposal created a
+real Family and is corrected through the normal registry flows.
+
+---
+
 # 17. Post-deployment smoke test
 
 Use synthetic data only, before any real entry. The smoke Family cannot be
@@ -1340,6 +1494,7 @@ Never do this once real data has been entered.
 | 1.1.24 | 2026-10-08 | Approved | §16b: PWA-6.1b submission modes OFF / PILOT / GENERAL with a Family allowlist (replaces the boolean), allowlist format, opening the pilot in PILOT, changing the allowlist, feature shutdown to OFF, configuration-cache rule, famboook:change-requests-check |
 | 1.1.25 | 2026-10-09 | Approved | §16b: ADD_FAMILY_MEMBER activation steps (code registration, reviewer briefing, PILOT check) — not performed; new optional limits CHANGE_REQUESTS_APPROVE_LIMIT_USER_MINUTE / _HOUR |
 | 1.1.26 | 2026-10-12 | Approved | §16c National ID uniqueness release (CO-01D.4, docs/04 DB-ADR-061): audit gate, maintenance-window migration with lock_timeout, verification and exact rollback |
+| 1.1.27 | 2026-10-14 | Ready for Review | §16d Coordinator requests release (CO-02): content, dependency migrations (CO-01C / CO-01D.4 first), gates, read-only state step, deployment with the coordinator mode OFF, permission seeding and readiness check, smoke checks, monitoring, feature shutdown, rollback / fix-forward |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

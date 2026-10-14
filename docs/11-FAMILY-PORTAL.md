@@ -415,6 +415,13 @@ made by an authorized administrator.
   audited reveal of one National ID or mobile of one member at a time.
   Still never health, disability, needs, assistance, assessments, notes
   or account data.
+- **Amended 2026-10-13 (CO-02.2, FP-ADR-080, approved — not
+  implemented):** submit requests through the existing Change Request
+  workflow — PERSON_ADD (`ADD_FAMILY_MEMBER`) for a family in scope and
+  FAMILY_ADD (`REGISTER_FAMILY`) for a new family placed in scope (head
+  identity, Clan / Branch, original residence only); follow, answer and
+  cancel only their own requests still in scope. Staff review and apply;
+  the family is created only at APPLY. Gated, off by default.
 - See a family's Profile Review summary status and Staff Family
   Verification status, where authorized — never section contents or
   missing-item details (exact visibility decided before PWA-9).
@@ -4915,6 +4922,52 @@ Production 2026-10-11; gate default off, `true` on Production).
   SELF_OTP_TRANSFER method, and the CONTACT_UPDATE-only relaxations of the
   change_requests actor CHECKs. No role or permission: it uses
   change-request.submit / cancel.
+
+FP-ADR-080
+Coordinator-submitted requests in Coordinator Space (approved 2026-10-13,
+CO-02.2; NOT implemented; gate off by default; full design
+docs/adr/CO-02-COORDINATOR-REQUESTS.md).
+- a Coordinator may submit PERSON_ADD (ADD_FAMILY_MEMBER) for a family in
+  the effective scope and FAMILY_ADD (new type REGISTER_FAMILY) for a new
+  family whose Clan / Branch the scope covers; the existing engine and the
+  central Staff queue are reused; the Coordinator never reviews, approves,
+  rejects or applies, and never edits a record directly;
+- FAMILY_ADD V1 captures the head's identity, the Clan / Branch and the
+  ORIGINAL residence; the family is created only at the Staff APPLY
+  (registration_source COORDINATOR_REQUEST);
+- Coordinator Space lists only the coordinator's own requests in current
+  scope; identifiers masked; no health, assessment, assistance, needs or
+  current residence; no answer about National ID existence at submission;
+- the household head sees coordinator requests about their family in the
+  Family Portal history, with the coordinator's name, but cannot cancel or
+  answer them; family-channel requests are unchanged;
+- scope revocation removes the coordinator's access only; Staff keep
+  everything; nothing is deleted;
+- a Coordinator who is a household head stays eligible (V1) and manages
+  their own household in the Family Portal, independently;
+- permissions coordinator-request.view / .submit / .resubmit / .cancel
+  (COORDINATOR only, docs/06 AUTH-ADR-093); schema docs/04 DB-ADR-062;
+  workflow docs/05 WF-ADR-054; gate OFF / PILOT / GENERAL.
+- CO-02.4 (2026-10-14, local, not deployed): the PERSON_ADD API —
+  /api/v1/family/coordinator/requests (types, list, detail, resubmit,
+  cancel) and POST /families/{familyCode}/requests; contract in the ADR
+  §15. No frontend yet.
+- CO-02.5 (2026-10-14, local, not deployed): FAMILY_ADD —
+  POST /api/v1/family/coordinator/requests (REGISTER_FAMILY), the Family
+  created only at the Staff APPLY in the exact proposed placement; ADR §16.
+- CO-02.6a (2026-10-14, local, not deployed): the Coordinator form
+  reference data — relationship options and the placements in scope; the
+  household's relationship options now come from the same shared
+  definition; ADR §17.
+- CO-02.6b (2026-10-14, local, not deployed): the Coordinator request
+  workspace UI in Coordinator Space — dashboard, discovery, PERSON_ADD and
+  FAMILY_ADD forms, request detail with reply and cancellation; the
+  proposal is never edited after submission (reply only); ADR §18.
+- CO-02.7b (2026-10-14, local, not deployed): D8 — the household's history
+  shows the submitting Coordinator's display name on a Coordinator's
+  request (`coordinator: {name}`), nothing else about them and no action;
+  Staff may reject a returned request; Coordinator Space reads throttled;
+  ADR §20.
 ```
 
 ---
@@ -5152,3 +5205,9 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.45 | 2026-10-11 | Approved | FB-BRAND-01 official Famboook identity: `FamilyBrand` and the Staff lockups use the official full logo (`BrandLogo`, docs/10 §7a); the installable app's icons regenerated from the official icon at `/icons/v2` (manifest `icons` only — id, start_url, scope, display and colours unchanged; legacy icons kept one release; no service-worker change: it never caches icons); site favicon `app/icon.svg` / `favicon.ico` / `apple-icon.png`; the Family Card PDF logo; the shared copyright footer `SiteFooter`. No colour, workflow or API change |
 | 1.46 | 2026-10-12 | Approved | CO-01C Coordinator members directory (docs/06 AUTH-ADR-092, docs/04 DB-ADR-060): §8 amended, amendment A-20, implementation record — masked directory of families in scope and audited one-field reveal; local only, not deployed |
 | 1.47 | 2026-10-13 | Approved | CO-01D.5 National ID alignment (docs/04 DB-ADR-061): shared client rule, Staff forms require the ID, pre-check honours `exists` without describing soft-deleted holders; Import Dry Run blocks missing / invalid head IDs and invalid spouse IDs; local only, not deployed |
+| 1.48 | 2026-10-13 | Approved | FP-ADR-080 coordinator-submitted requests (CO-02.2): approved architecture, not implemented — PERSON_ADD / FAMILY_ADD in scope through the existing engine, Staff review and APPLY, family created only at APPLY, own-request list, submitter-only cancel, household head sees but cannot cancel, gated off by default; §8 V1 responsibilities amended |
+| 1.49 | 2026-10-14 | Approved | FP-ADR-080 CO-02.4: Coordinator PERSON_ADD API implemented locally (not deployed) — own requests in scope, masked coordinator presentation, family-visible timeline, per-user throttles; no frontend |
+| 1.50 | 2026-10-14 | Approved | FP-ADR-080 CO-02.5: FAMILY_ADD (REGISTER_FAMILY) implemented locally (not deployed) — proposal route, Staff approval with both attestations, APPLY through RegisterFamilyAction in the exact placement; no frontend |
+| 1.51 | 2026-10-14 | Approved | FP-ADR-080 CO-02.6a: Coordinator form reference APIs (relationship options, placements in the current scope) implemented locally (not deployed) |
+| 1.52 | 2026-10-14 | Approved | FP-ADR-080 CO-02.6b: Coordinator request workspace UI implemented locally (not deployed) — server-driven types, placements and actions; text-only clarification reply |
+| 1.53 | 2026-10-14 | Approved | FP-ADR-080 CO-02.7b: D8 coordinator name in the household history (read-only), Staff rejection of returned requests, Coordinator Space read throttle |

@@ -255,6 +255,14 @@ IMPORT
 VERIFIED_SOURCE
 ```
 
+**Amended 2026-10-13 (CO-02.3a, DD-ADR-035; docs/04 DB-ADR-062).**
+`COORDINATOR_REQUEST` is added: the Family was registered by the Staff
+APPLY of an approved coordinator FAMILY_ADD request (`REGISTER_FAMILY`).
+It is set only by that APPLY; the Staff registration form and the
+household-declaration forms never accept it. The value is application-level
+(no database CHECK exists on this column), and the same value may appear as
+the `source` of the residence created by that APPLY.
+
 ---
 
 ### paper_form_no
@@ -2631,6 +2639,23 @@ family_id
 
 is mandatory.
 
+**Amended 2026-10-13 (CO-02.3a, DD-ADR-035; docs/04 DB-ADR-062).** One
+exception: a `REGISTER_FAMILY` request (product name FAMILY_ADD) proposes a
+Family that does not exist yet, so its `family_id` is NULL — and NULL is
+allowed for that type ONLY (`chk_change_request_family_subject`). Every
+other type keeps a mandatory `family_id`.
+
+| Field | Meaning |
+|---|---|
+| `submission_channel` | Who submitted: `FAMILY` (the household, through the Family Portal — every request before CO-02) or `COORDINATOR` (a Coordinator acting within their scope). NOT NULL, default `FAMILY`; existing rows are FAMILY. `REGISTER_FAMILY` is COORDINATOR only. Part of the immutable proposal. |
+| `proposed_clan_id` | The Clan the proposed Family is to belong to. Present exactly for `REGISTER_FAMILY`; NULL for every other type. |
+| `proposed_branch_id` | The optional Branch of that Clan. NULL means "Clan level, no Branch" (allowed only to a Coordinator with a CLAN-level assignment — enforced by the application). When present it must belong to `proposed_clan_id` (composite foreign key to `branches (id, clan_id)`). |
+| `created_family_id` | The Family created when the `REGISTER_FAMILY` request was APPLIED. Set exactly then (NULL before APPLY and for every other type); written by the Staff APPLY, never by the submitter. |
+
+`submitted_by` / `submitted_by_person_id` keep their meaning for the
+COORDINATOR channel: the Coordinator's account and the Coordinator's own
+Person.
+
 ---
 
 # 53. Change Request Person
@@ -2809,6 +2834,16 @@ event type (SUBMITTED, REVIEW_STARTED, RETURNED, RESUBMITTED, APPROVED,
 REJECTED, APPLIED, APPLY_FAILED, CANCELLED), actor and actor side,
 reason code, family-visible `public_message`, Staff-only `internal_note`,
 allow-listed metadata codes; never payload copies.
+
+**Amended 2026-10-13 (CO-02.3a, DD-ADR-035).** Type `REGISTER_FAMILY`
+(product name FAMILY_ADD) is added: a Coordinator's proposal of a NEW
+Family (head identity, Clan / Branch, original residence), applied by
+`RegisterFamilyAction`; no Family exists before APPLY. Product name
+PERSON_ADD is the existing `ADD_FAMILY_MEMBER` through the COORDINATOR
+channel. `workflow_events.actor_side` adds **COORDINATOR**: an act of a
+Coordinator on their own request (submit, resubmit, cancel) — always with
+an actor user, never a Staff-only note. The schema exists; the types are
+not submittable until a later, approved phase.
 
 ---
 
@@ -4017,6 +4052,10 @@ Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIE
 
 Registered Members (`registered_member_count`) are ACTIVE memberships whatever the Person's life status, activity or soft-deleted state; Living Members (not DECEASED, not soft-deleted) is the targeting and health-summary population; "Registered Household Size" is superseded (§20a, §75). Family Profile Review (derived completeness and states, stored confirmations with a keyed fingerprint, no registry copy) is distinct from Staff Family Verification (§45a; docs/11 FP-ADR-056, FP-ADR-057).
 
+### DD-ADR-035
+
+Coordinator-request data (CO-02.3a, 2026-10-13; docs/04 DB-ADR-062, docs/adr/CO-02-COORDINATOR-REQUESTS.md): `change_requests` gains `submission_channel` (FAMILY / COORDINATOR, existing rows FAMILY), `proposed_clan_id` / `proposed_branch_id` (the placement of a proposed Family; Branch consistent with Clan) and `created_family_id` (set at APPLY); `family_id` is NULL only for the new type `REGISTER_FAMILY`; `workflow_events.actor_side` gains COORDINATOR; `registration_source` gains `COORDINATOR_REQUEST` (set only by the APPLY of a REGISTER_FAMILY request). Schema and constants only; no route, handler or permission.
+
 ### DD-ADR-034
 
 Change Request data as implemented by PWA-5a (§49–§57): a public `uuid` and the human `request_code`; a checked type code; the targeted membership; a base fingerprint for stale-write protection; rejection reason codes separate from the family-visible message; the CANCELLED status; and `workflow_events` with separate family-visible and Staff-only text. Proposed values (`submitted_data`) are immutable after submission.
@@ -4260,6 +4299,7 @@ Date: 2026-09-24
 | 1.2.36 | 2026-10-08 | Approved | PWA-6.1: §47 RESIDENCE_UPDATE submitted_data (payload version 1) recorded |
 | 1.2.37 | 2026-10-08 | Approved | PWA-6.1a: §57 RESIDENCE_UPDATE maps to UpdateFamilyResidenceAction (in-place correction); the move action stays future |
 | 1.2.38 | 2026-10-09 | Approved | §47 ADD_FAMILY_MEMBER submitted_data and APPROVED attestation metadata recorded (docs/11 FP-ADR-076) |
+| 1.2.39 | 2026-10-13 | Approved | CO-02.3a (DD-ADR-035): §52 nullable `family_id` for `REGISTER_FAMILY` only, `submission_channel`, `proposed_clan_id`, `proposed_branch_id`, `created_family_id`; §57 REGISTER_FAMILY type and COORDINATOR workflow actor; §7 `registration_source` COORDINATOR_REQUEST. Schema foundation only |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

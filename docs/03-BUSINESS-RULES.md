@@ -2632,6 +2632,66 @@ workflow).
 - `person-mobile-trust.assist` stays withheld from COORDINATOR until a
   dedicated assisted-mobile-trust workflow exists.
 
+## Coordinator-submitted requests (CO-02, approved — not implemented)
+
+Approved 2026-10-13 (docs/06 AUTH-ADR-093, docs/05 WF-ADR-054, docs/04
+DB-ADR-062, docs/11 FP-ADR-080; full design `docs/adr/CO-02-COORDINATOR-REQUESTS.md`). Amends
+"The Coordinator still modifies nothing" above: a Coordinator may PROPOSE,
+through the existing Change Request workflow; registry data still changes
+only at a Staff APPLY.
+
+- **Two request kinds.** PERSON_ADD = `ADD_FAMILY_MEMBER` for an ACTIVE
+  Family in the Coordinator's effective scope, with exactly the household
+  form's fields and rules. FAMILY_ADD = new type `REGISTER_FAMILY`: the
+  proposed head's identity (full name, National ID, sex; optional marital
+  status, birth date, mobile), the Clan and optional Branch, and the
+  ORIGINAL residence only. No current residence, health, assessment or
+  assistance data is captured.
+- **Scope.** The Family, or the proposed placement, must be within the
+  Coordinator's effective scope at submission and at every later
+  coordinator act. A placement without a Branch is covered only by a CLAN
+  assignment. Approval and APPLY never depend on the coordinator's scope.
+- **No Family before APPLY.** A FAMILY_ADD creates no Family, Person,
+  identifier or activity until a Staff APPLY, which registers the Family
+  through `RegisterFamilyAction` with `registration_source =
+  COORDINATOR_REQUEST` (new value, never selectable by Staff or households),
+  registration date = APPLY date, the head as HEAD member, and the original
+  residence only.
+- **National ID (§19–§21 unchanged).** Required, nine digits, canonical,
+  globally unique. Submission never says whether an ID exists. At approval
+  Staff attest identity and re-type the ID; a FAMILY_ADD head ID must be
+  free (no Person holds it, soft-deleted included). For FAMILY_ADD the two
+  attestations mean (approved, docs/adr/CO-02 §21): identity — the proposed
+  head's identity verified against an official document; relationship and
+  placement — the person is genuinely the household head and the Family
+  belongs to the selected Clan and Branch (Clan membership for a Family
+  without a Branch). They certify no social, health or assistance
+  information. PERSON_ADD keeps the
+  ADD_FAMILY_MEMBER resolution (create, or attach an eligible unattached
+  Person).
+- **One open request.** PERSON_ADD: one per Family and National ID, any
+  channel. FAMILY_ADD: one per submitting Coordinator and National ID —
+  never a cross-coordinator check (no existence oracle); Staff see
+  competing proposals and the first APPLY wins.
+- **Cancel / clarify.** Only the submitting actor: a coordinator-channel
+  request by the submitting Coordinator while in scope; the household head
+  sees it (with the Coordinator's name) but cannot cancel or answer it.
+- **Scope revocation** ends the Coordinator's access to requests now out of
+  scope; Staff keep everything; nothing is deleted or transferred.
+- **Own household.** A Coordinator who is a household head stays an
+  eligible head (V1) and uses the Family Portal for their own household,
+  independently of Coordinator Space.
+- **Gate.** Disabled by default; pilot allowlist; no Production activation
+  without approval.
+- **Implemented locally 2026-10-14 (CO-02.5, not deployed).** FAMILY_ADD
+  approval needs both attestation codes: identity (the typed National ID
+  matches) and relationship — for a new Family, the reviewer verified the
+  head's household and its Clan / Branch placement. The proposed head's
+  National ID must be free, soft-deleted holders included. APPLY creates
+  the Family in exactly the proposed Clan / Branch, with registration
+  source and residence source COORDINATOR_REQUEST; an unusable placement
+  is refused with one answer whatever the reason.
+
 ## Login and password reset as implemented (PWA-1G)
 
 - **Lookup.** The typed National ID is normalized, fingerprinted and
@@ -5152,6 +5212,9 @@ Date: 2026-09-24
 | 1.2.56 | 2026-10-12 | Approved | CO-01C (docs/06 AUTH-ADR-092): §89b Coordinator members directory — approved exception to summary-only data: masked directory of families in scope, registered vs declared counts kept distinct, audited one-field reveal of National ID or mobile |
 | 1.2.57 | 2026-10-12 | Approved | CO-01D.4 (docs/04 DB-ADR-061): §19 National ID required for every new Person, newborns included; §20 strict nine-digit normalization stored canonically; §21 global uniqueness, soft-deleted Persons keep their value; §89b and §93a amended accordingly |
 | 1.2.58 | 2026-10-13 | Approved | CO-01D.5 (docs/04 DB-ADR-061): §96b Import Dry Run aligned with the National ID rule — `HEAD_WITHOUT_NATIONAL_ID` blocks (was a warning), new blocks `HEAD_NATIONAL_ID_INVALID` and `SPOUSE_NATIONAL_ID_INVALID`; spouse without ID still OMIT; CREATE values stay raw; §96b Person creation note amended |
+| 1.2.59 | 2026-10-13 | Approved | CO-02.2 (docs/06 AUTH-ADR-093, docs/05 WF-ADR-054): coordinator-submitted requests — approved, not implemented: PERSON_ADD (`ADD_FAMILY_MEMBER`) and FAMILY_ADD (`REGISTER_FAMILY`) within scope, no Family before APPLY, `COORDINATOR_REQUEST` registration source, National ID rules unchanged and no existence oracle, submitter-only cancel, scope revocation, gate off by default; amends the PWA-1H "modifies nothing" rule only by allowing submission |
+| 1.2.60 | 2026-10-14 | Approved | CO-02.5: FAMILY_ADD (REGISTER_FAMILY) as implemented locally — both attestations (relationship = household and placement verified), free head National ID, exact placement at APPLY, COORDINATOR_REQUEST registration and residence source, one answer for an unusable placement |
+| 1.2.61 | 2026-10-14 | Approved | CO-02.7d: meaning of the FAMILY_ADD (REGISTER_FAMILY) approval attestations — identity against an official document; the person is genuinely the household head and the Family belongs to the selected Clan / Branch (Clan membership without a Branch); no social, health or assistance information certified (docs/adr/CO-02 §21) |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |
