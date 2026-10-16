@@ -9,6 +9,18 @@ import type {
 
 type Residence = NonNullable<FamilyDetail["residence"]>;
 
+// FB-GEO-01 Stage 4B: a structured location reference is sent ONLY when it
+// differs from the saved one — compared with the saved residence, not with
+// the control's state. Omitted = unchanged (an inactive saved value stays);
+// a new UUID = a new selection; null = an explicit, confirmed clear.
+function locationChange(
+  key: "original_location_id" | "current_location_id",
+  value: string | null,
+  residence: Residence
+): UpdateFamilyResidencePayload {
+  return value === (residence[key] ?? null) ? {} : { [key]: value };
+}
+
 // ---------- النزوح ----------
 
 // UNKNOWN is the form's name for a NULL status (not collected). It is
@@ -18,6 +30,8 @@ export const editDisplacementSchema = z.object({
   originalResidenceText: z.string().max(255, "النص طويل جدًا").optional(),
   displacementStatus: z.enum(["DISPLACED", "NOT_DISPLACED", "UNKNOWN"]),
   displacementLocationText: z.string().max(255, "النص طويل جدًا").optional(),
+  // Residence before displacement (original_location_id).
+  originalLocationId: z.string().nullable(),
 });
 
 export type EditDisplacementValues = z.infer<typeof editDisplacementSchema>;
@@ -27,11 +41,13 @@ export function displacementFormValues(residence: Residence): EditDisplacementVa
     originalResidenceText: residence.original_residence_text ?? "",
     displacementStatus: residence.displacement_status ?? "UNKNOWN",
     displacementLocationText: residence.displacement_location_text ?? "",
+    originalLocationId: residence.original_location_id ?? null,
   };
 }
 
 export function toDisplacementPayload(
-  values: EditDisplacementValues
+  values: EditDisplacementValues,
+  residence: Residence
 ): UpdateFamilyResidencePayload {
   const status =
     values.displacementStatus === "UNKNOWN" ? null : values.displacementStatus;
@@ -41,6 +57,7 @@ export function toDisplacementPayload(
     displacement_status: status,
     displacement_location_text:
       status === "DISPLACED" ? values.displacementLocationText || null : null,
+    ...locationChange("original_location_id", values.originalLocationId, residence),
   };
 }
 
@@ -51,6 +68,7 @@ export const displacementApiFieldToFormField: Record<
   original_residence_text: "originalResidenceText",
   displacement_status: "displacementStatus",
   displacement_location_text: "displacementLocationText",
+  original_location_id: "originalLocationId",
 };
 
 // ---------- السكن الحالي ----------
@@ -62,6 +80,9 @@ export const editCurrentResidenceSchema = z.object({
   area: z.string().max(255, "النص طويل جدًا").optional(),
   neighborhood: z.string().max(255, "النص طويل جدًا").optional(),
   addressText: z.string().optional(),
+  // Where the family lives now — the displacement location when DISPLACED
+  // (current_location_id).
+  currentLocationId: z.string().nullable(),
 });
 
 export type EditCurrentResidenceValues = z.infer<typeof editCurrentResidenceSchema>;
@@ -75,11 +96,13 @@ export function currentResidenceFormValues(
     area: residence.area ?? "",
     neighborhood: residence.neighborhood ?? "",
     addressText: residence.address_text ?? "",
+    currentLocationId: residence.current_location_id ?? null,
   };
 }
 
 export function toCurrentResidencePayload(
-  values: EditCurrentResidenceValues
+  values: EditCurrentResidenceValues,
+  residence: Residence
 ): UpdateFamilyResidencePayload {
   return {
     governorate: values.governorate?.trim() || null,
@@ -87,6 +110,7 @@ export function toCurrentResidencePayload(
     area: values.area || null,
     neighborhood: values.neighborhood || null,
     address_text: values.addressText || null,
+    ...locationChange("current_location_id", values.currentLocationId, residence),
   };
 }
 
@@ -99,4 +123,5 @@ export const currentResidenceApiFieldToFormField: Record<
   area: "area",
   neighborhood: "neighborhood",
   address_text: "addressText",
+  current_location_id: "currentLocationId",
 };

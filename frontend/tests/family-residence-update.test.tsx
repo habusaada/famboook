@@ -71,6 +71,8 @@ const AVAILABLE: FamilyChangeRequestTypes = { data: [{ type: "RESIDENCE_UPDATE" 
 
 function mockGet({ types = AVAILABLE as unknown, prof = { data: profile() } as unknown } = {}) {
   return vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
+    // FB-GEO-01 v2: the form's two GazaLocationSelectors read the family mirrors.
+    if (path.startsWith("/api/v1/family/change-requests/gaza-locations")) return { data: [] };
     const value = path.endsWith("/types") ? types : path === "/api/v1/family/household/profile" ? prof : undefined;
     if (value instanceof Error) throw value;
     if (value === undefined) throw new Error(`unexpected GET ${path}`);
@@ -123,6 +125,7 @@ describe("availability comes from the server", () => {
     let fail = true;
     vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
       if (fail) throw new ApiError(500, { message: "x" });
+      if (path.startsWith("/api/v1/family/change-requests/gaza-locations")) return { data: [] };
       return path.endsWith("/types") ? AVAILABLE : { data: profile() };
     });
     const user = userEvent.setup();
@@ -145,8 +148,8 @@ describe("the residence update form", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "تحديث بيانات السكن" })).toBeInTheDocument();
     expect(screen.getByText("سيُرسل طلبك للمراجعة، ولن تتغير بيانات السجل الرسمي إلا بعد اعتماد الطلب وتطبيقه.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/المحافظة/)).toHaveValue("خانيونس");
-    expect(screen.getByLabelText(/^الحي/)).toHaveValue("حي الأمل");
+    expect(screen.getByLabelText(/المحافظة/, { selector: "input" })).toHaveValue("خانيونس");
+    expect(screen.getByLabelText(/^الحي/, { selector: "input" })).toHaveValue("حي الأمل");
     expect(screen.getByLabelText(/العنوان التفصيلي/)).toHaveValue("شارع التجربة 1");
     expect(screen.getByLabelText(/السكن الأصلي قبل النزوح/)).toHaveValue("بني سهيلا");
     expect(screen.getByRole("combobox", { name: /هل الأسرة نازحة حاليًا؟/ })).toHaveTextContent("لا، غير نازحة");
@@ -162,8 +165,8 @@ describe("the residence update form", () => {
     const post = vi.spyOn(apiClient, "post").mockResolvedValue(outcome());
     const user = await renderForm();
 
-    await user.clear(screen.getByLabelText(/^الحي/));
-    await user.type(screen.getByLabelText(/^الحي/), "  حي النصر ");
+    await user.clear(screen.getByLabelText(/^الحي/, { selector: "input" }));
+    await user.type(screen.getByLabelText(/^الحي/, { selector: "input" }), "  حي النصر ");
     await chooseStatus(user, /نعم، نازحة/);
     await user.type(await screen.findByLabelText(/مكان النزوح الحالي/), "مواصي خانيونس");
     await user.type(screen.getByLabelText(/سبب الطلب/), "انتقلنا داخل المدينة");
@@ -186,6 +189,9 @@ describe("the residence update form", () => {
         original_residence_text: "بني سهيلا",
         displacement_status: "DISPLACED",
         displacement_location_text: "مواصي خانيونس",
+        // v2: the structured references, none recorded or chosen here.
+        original_location_id: null,
+        current_location_id: null,
       },
     });
     // Never a family, person, residence or member identifier.
@@ -223,13 +229,13 @@ describe("the residence update form", () => {
     const post = vi.spyOn(apiClient, "post");
     const user = await renderForm();
 
-    await user.clear(screen.getByLabelText(/المدينة/));
-    await user.click(screen.getByLabelText(/المدينة/));
+    await user.clear(screen.getByLabelText(/المدينة/, { selector: "input" }));
+    await user.click(screen.getByLabelText(/المدينة/, { selector: "input" }));
     await user.paste("م".repeat(256));
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     expect(await screen.findByText("النص طويل جدًا.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/المدينة/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(/المدينة/, { selector: "input" })).toHaveAttribute("aria-invalid", "true");
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -240,7 +246,7 @@ describe("the residence update form", () => {
     );
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/), "!");
+    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), "!");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     expect(await screen.findByText("اسم المدينة غير صالح.")).toBeInTheDocument();
@@ -258,7 +264,7 @@ describe("the residence update form", () => {
     vi.spyOn(apiClient, "post").mockRejectedValue(new ApiError(status, { message: "SQLSTATE secret", code }));
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/), " الجديدة");
+    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
@@ -275,13 +281,13 @@ describe("the residence update form", () => {
     const user = await renderForm();
     const send = () => user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
-    await user.type(screen.getByLabelText(/المدينة/), " الجديدة");
+    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
     await send();
     expect(await screen.findByRole("alert")).toHaveTextContent("لن يُكرَّر طلبك");
     await send();
     await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
 
-    await user.type(screen.getByLabelText(/المنطقة/), " الغربية");
+    await user.type(screen.getByLabelText(/المنطقة/, { selector: "input" }), " الغربية");
     await send();
     await waitFor(() => expect(post).toHaveBeenCalledTimes(3));
 
@@ -297,12 +303,12 @@ describe("the residence update form", () => {
     const post = vi.spyOn(apiClient, "post").mockImplementation(() => new Promise((r) => (resolve = r)));
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/), " الجديدة");
+    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     const button = await screen.findByRole("button", { name: "جارٍ الإرسال…" });
     expect(button).toBeDisabled();
-    expect(screen.getByLabelText(/المدينة/)).toBeDisabled();
+    expect(screen.getByLabelText(/المدينة/, { selector: "input" })).toBeDisabled();
     await user.click(button);
     expect(post).toHaveBeenCalledTimes(1);
     resolve(outcome());

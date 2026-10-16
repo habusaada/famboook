@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY, type FamilyUser } from "@/lib/api/family-auth";
 import type { DisplacementStatus, Gender } from "@/lib/types/api/family";
+import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import type { MaritalStatus } from "@/lib/utils/marital-status";
 
 // The signed-in household head's own household (PWA-3A). The server resolves
@@ -108,6 +109,13 @@ export type FamilyProfile = {
       neighborhood: string | null;
       address_text: string | null;
     };
+    /**
+     * FB-GEO-01 (RESIDENCE_UPDATE v2): the saved structured references as
+     * summaries {id, level, name, is_active, path} — beside, never instead
+     * of, the text. Null when not recorded.
+     */
+    original_location?: GazaLocationSummary | null;
+    current_location?: GazaLocationSummary | null;
   } | null;
 };
 

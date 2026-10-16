@@ -2,9 +2,10 @@ import { z } from "zod";
 import type { FamilyProfile } from "@/lib/api/family-household";
 
 // The household head's RESIDENCE_UPDATE form (PWA-6.1): a correction of the
-// CURRENT residence. The eight fields are exactly the backend handler's V1
-// set (ResidenceUpdateHandler::FIELDS); Laravel is the validation authority
-// — these rules only spare a round trip.
+// CURRENT residence. The eight text/status fields are the backend handler's
+// set (ResidenceUpdateHandler::FIELDS); payload v2 (FB-GEO-01 ADR §8.5) adds
+// the two optional structured references (LOCATION_FIELDS). Laravel is the
+// validation authority — these rules only spare a round trip.
 
 type Residence = NonNullable<FamilyProfile["residence"]>;
 
@@ -24,6 +25,9 @@ export const residenceUpdateSchema = z
     // "" = not collected; only allowed while the registry has no status.
     displacementStatus: z.enum(["", "DISPLACED", "NOT_DISPLACED"]),
     displacementLocationText: shortText,
+    // v2: Gaza location UUIDs from GazaLocationSelector (source "family"); null = not recorded.
+    originalLocationId: z.string().nullable(),
+    currentLocationId: z.string().nullable(),
     reason: z.string().max(2000, "النص طويل جدًا."),
   });
 export type ResidenceUpdateValues = z.infer<typeof residenceUpdateSchema>;
@@ -48,6 +52,8 @@ export function residenceUpdateFormValues(residence: Residence): ResidenceUpdate
     originalResidenceText: residence.original_residence_text ?? "",
     displacementStatus: residence.displacement_status ?? "",
     displacementLocationText: residence.displacement_location_text ?? "",
+    originalLocationId: residence.original_location?.id ?? null,
+    currentLocationId: residence.current_location?.id ?? null,
     reason: "",
   };
 }
@@ -66,6 +72,10 @@ export function toResidenceUpdateData(values: ResidenceUpdateValues) {
     original_residence_text: orNull(values.originalResidenceText),
     displacement_status: values.displacementStatus === "" ? null : values.displacementStatus,
     displacement_location_text: displaced ? orNull(values.displacementLocationText) : null,
+    // v2: always the whole proposal; the server keeps only what changed, and
+    // an unchanged (even inactive) saved reference is accepted as is.
+    original_location_id: values.originalLocationId,
+    current_location_id: values.currentLocationId,
   };
 }
 export type ResidenceUpdateData = ReturnType<typeof toResidenceUpdateData>;
@@ -87,5 +97,7 @@ export const RESIDENCE_UPDATE_FIELDS: Record<string, keyof ResidenceUpdateValues
   original_residence_text: "originalResidenceText",
   displacement_status: "displacementStatus",
   displacement_location_text: "displacementLocationText",
+  original_location_id: "originalLocationId",
+  current_location_id: "currentLocationId",
   reason: "reason",
 };

@@ -1,6 +1,8 @@
 "use client";
 
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { useEffect, useRef } from "react";
+import { useIsFetching } from "@tanstack/react-query";
+import { Controller, useForm, useWatch, type FieldValues, type UseFormReset } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +27,7 @@ import {
   FieldLabel,
   SaveError,
 } from "@/components/shared/edit-dialog-parts";
+import { GazaLocationSelector } from "@/components/geography/gaza-location-selector";
 import { useUpdateFamilyResidence } from "@/lib/api/families";
 import { useGuardedSave } from "@/lib/hooks/use-guarded-save";
 import {
@@ -47,6 +50,42 @@ const RESIDENCE_STATUS_MESSAGES = {
   403: "لا تملك صلاحية تعديل سكن هذه الأسرة.",
   409: "لا يوجد سكن حالي مسجّل لهذه الأسرة.",
 };
+
+/**
+ * FB-GEO-01 PX-1: a correction dialog must never submit stale text.
+ * - The mutation puts the saved residence in the cache at once
+ *   (useUpdateFamilyResidence), so the `residence` prop is authoritative.
+ * - If newer residence data arrives while the dialog is open, the form is
+ *   reset to it (a stale baseline is never kept).
+ * - While the family is being refetched, saving is blocked: the latest
+ *   state is not known yet.
+ */
+function useAuthoritativeResidence<TValues extends FieldValues>(
+  familyCode: string,
+  residence: Residence,
+  open: boolean,
+  reset: UseFormReset<TValues>,
+  toValues: (residence: Residence) => TValues
+): boolean {
+  const refreshing = useIsFetching({ queryKey: ["families", familyCode], exact: true }) > 0;
+  const seen = useRef(residence);
+  useEffect(() => {
+    if (seen.current === residence) return;
+    seen.current = residence;
+    if (open) reset(toValues(residence));
+  }, [residence, open, reset, toValues]);
+
+  return refreshing;
+}
+
+function RefreshingNotice({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="text-xs text-muted-foreground" role="status" data-residence-refreshing>
+      جارٍ تحديث بيانات السكن من الخادم… يمكنك الحفظ بعد اكتمال التحديث.
+    </p>
+  );
+}
 
 // ---------------------------------------------------------------------------
 
@@ -76,9 +115,12 @@ export function EditDisplacementDialog({
     statusMessages: RESIDENCE_STATUS_MESSAGES,
   });
   const isDisplaced = useWatch({ control, name: "displacementStatus" }) === "DISPLACED";
+  const refreshing = useAuthoritativeResidence(familyCode, residence, flow.open, reset, displacementFormValues);
 
   function onSubmit() {
-    flow.submit(handleSubmit, toDisplacementPayload);
+    if (refreshing) return;
+    // Compared with the saved residence: an untouched location is omitted.
+    flow.submit(handleSubmit, (values) => toDisplacementPayload(values, residence));
   }
 
   return (
@@ -121,6 +163,21 @@ export function EditDisplacementDialog({
             />
             <FieldError message={errors.originalResidenceText?.message} />
           </div>
+
+          <Controller
+            control={control}
+            name="originalLocationId"
+            render={({ field }) => (
+              <GazaLocationSelector
+                id="edit-originalLocationId"
+                label="الموقع الجغرافي للسكن الأصلي (اختياري)"
+                value={field.value}
+                onChange={field.onChange}
+                disabled={flow.isPending}
+                error={errors.originalLocationId?.message}
+              />
+            )}
+          />
 
           <div className="flex flex-col gap-1.5">
             <FieldLabel htmlFor="edit-displacementStatus">
@@ -169,9 +226,11 @@ export function EditDisplacementDialog({
           )}
         </form>
 
+        <RefreshingNotice show={refreshing} />
         <EditDialogFooter
           formId="edit-displacement-form"
           isPending={flow.isPending}
+          submitDisabled={refreshing}
           onCancel={() => flow.setOpen(false)}
         />
       </DialogContent>
@@ -190,6 +249,7 @@ export function EditCurrentResidenceDialog({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setError,
@@ -205,8 +265,12 @@ export function EditCurrentResidenceDialog({
     statusMessages: RESIDENCE_STATUS_MESSAGES,
   });
 
+  const refreshing = useAuthoritativeResidence(familyCode, residence, flow.open, reset, currentResidenceFormValues);
+
   function onSubmit() {
-    flow.submit(handleSubmit, toCurrentResidencePayload);
+    if (refreshing) return;
+    // Compared with the saved residence: an untouched location is omitted.
+    flow.submit(handleSubmit, (values) => toCurrentResidencePayload(values, residence));
   }
 
   return (
@@ -272,11 +336,32 @@ export function EditCurrentResidenceDialog({
             <Textarea id="edit-addressText" rows={2} {...register("addressText")} />
             <FieldError message={errors.addressText?.message} />
           </div>
+
+          <Controller
+            control={control}
+            name="currentLocationId"
+            render={({ field }) => (
+              <GazaLocationSelector
+                id="edit-currentLocationId"
+                label={
+                  residence.displacement_status === "DISPLACED"
+                    ? "الموقع الجغرافي الحالي / مكان النزوح (اختياري)"
+                    : "الموقع الجغرافي للسكن الحالي (اختياري)"
+                }
+                value={field.value}
+                onChange={field.onChange}
+                disabled={flow.isPending}
+                error={errors.currentLocationId?.message}
+              />
+            )}
+          />
         </form>
 
+        <RefreshingNotice show={refreshing} />
         <EditDialogFooter
           formId="edit-current-residence-form"
           isPending={flow.isPending}
+          submitDisabled={refreshing}
           onCancel={() => flow.setOpen(false)}
         />
       </DialogContent>

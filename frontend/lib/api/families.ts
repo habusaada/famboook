@@ -157,7 +157,15 @@ export function useUpdateFamilyResidence(familyCode: string) {
         `/api/v1/families/${encodeURIComponent(familyCode)}/residence`,
         payload
       ),
-    onSuccess: () => {
+    onSuccess: (response) => {
+      // FB-GEO-01 PX-1: the response carries the authoritative residence.
+      // Put it in the cached family at once, so a dialog reopened before the
+      // refetch lands starts from what was just saved — never from stale
+      // text. Only the residence is merged (the response omits some family
+      // relations the detail query loads).
+      queryClient.setQueryData<ResourceResponse<FamilyDetail>>(["families", familyCode], (cached) =>
+        cached ? { ...cached, data: { ...cached.data, residence: response.data.residence } } : cached
+      );
       queryClient.invalidateQueries({ queryKey: ["families", familyCode] });
       queryClient.invalidateQueries({ queryKey: ["families"] });
     },

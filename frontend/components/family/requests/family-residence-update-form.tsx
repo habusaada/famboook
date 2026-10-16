@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldError, FieldLabel } from "@/components/shared/edit-dialog-parts";
 import { FamilyRequestsHeader } from "@/components/family/requests/family-request-parts";
+import { GazaLocationSelector } from "@/components/geography/gaza-location-selector";
 import { ApiError } from "@/lib/api/client";
 import { changeRequestErrorCode } from "@/lib/api/change-requests";
 import { useSubmitFamilyChangeRequest, useFamilyChangeRequestTypesQuery } from "@/lib/api/family-change-requests";
@@ -165,6 +166,21 @@ function ResidenceForm({ residence }: { residence: Residence }) {
           <Textarea id="residence-address-text" rows={3} className="rounded-xl" aria-invalid={Boolean(errors.addressText)} {...register("addressText")} />
           <FieldError message={errors.addressText?.message} />
         </div>
+        <Controller
+          control={control}
+          name="currentLocationId"
+          render={({ field }) => (
+            <GazaLocationSelector
+              id="residence-current-location"
+              source="family"
+              label={displaced ? "الموقع الجغرافي الحالي / مكان النزوح (اختياري)" : "الموقع الجغرافي للسكن الحالي (اختياري)"}
+              value={field.value}
+              onChange={field.onChange}
+              disabled={pending}
+              error={errors.currentLocationId?.message}
+            />
+          )}
+        />
       </fieldset>
 
       <fieldset className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-1 p-4" disabled={pending}>
@@ -175,6 +191,21 @@ function ResidenceForm({ residence }: { residence: Residence }) {
           placeholder="مثال: بني سهيلا – خانيونس"
           error={errors.originalResidenceText?.message}
           {...register("originalResidenceText")}
+        />
+        <Controller
+          control={control}
+          name="originalLocationId"
+          render={({ field }) => (
+            <GazaLocationSelector
+              id="residence-original-location"
+              source="family"
+              label="الموقع الجغرافي للسكن الأصلي (اختياري)"
+              value={field.value}
+              onChange={field.onChange}
+              disabled={pending}
+              error={errors.originalLocationId?.message}
+            />
+          )}
         />
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="residence-displacement-status" optional={!statusKnown}>

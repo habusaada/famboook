@@ -5,6 +5,7 @@
 // not-yet-implemented concept and must not be conflated with this field.
 
 import type { FamilyBranchRef, FamilyClanRef } from "@/lib/types/api/clan";
+import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import type { RelationshipType } from "@/lib/types/api/reference";
 import type { MaritalStatus } from "@/lib/utils/marital-status";
 
@@ -75,6 +76,13 @@ export interface FamilyDetail {
     original_residence_text: string | null;
     displacement_status: DisplacementStatus | null;
     displacement_location_text: string | null;
+    // FB-GEO-01 Stage 3.2 (Staff, additive): structured Gaza location
+    // references beside the text above — never derived from it. null = not
+    // recorded. current_location is the displacement location when DISPLACED.
+    original_location_id?: string | null;
+    current_location_id?: string | null;
+    original_location?: GazaLocationSummary | null;
+    current_location?: GazaLocationSummary | null;
   } | null;
   // Persons registered individually (ACTIVE memberships) — not the household size.
   member_count: number;
@@ -159,6 +167,10 @@ export interface RegisterFamilyPayload {
     residence_type?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    // FB-GEO-01 Stage 3.2: optional active Gaza location UUIDs (any level);
+    // null = not recorded.
+    original_location_id?: string | null;
+    current_location_id?: string | null;
   };
 }
 
@@ -202,6 +214,10 @@ export interface UpdateFamilyResidencePayload {
   original_residence_text?: string | null;
   displacement_status?: DisplacementStatus | null;
   displacement_location_text?: string | null;
+  // FB-GEO-01 Stage 3.2: omitted = unchanged; null = cleared; a new UUID
+  // must be an active location (the stored one is accepted unchanged).
+  original_location_id?: string | null;
+  current_location_id?: string | null;
 }
 
 // Canonical payload for POST /api/v1/families/{family}/members

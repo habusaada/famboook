@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MaritalStatusSelect } from "@/components/shared/marital-status-select";
 import { ClanBranchFields } from "@/components/shared/clan-branch-fields";
+import { GazaLocationSelector } from "@/components/geography/gaza-location-selector";
 import { Controller, useForm, useWatch, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -62,7 +63,7 @@ const SECTIONS: { id: string; title: string; fields: (keyof FamilyRegistrationVa
   { id: "family", title: "الأسرة والانتماء", fields: ["registrationDate", "registrationSource", "paperFormNo", "notes", "clanCode", "branchCode"] },
   { id: "head", title: "رب الأسرة", fields: ["headFullName", "headNationalId", "headGender", "headMaritalStatus", "headBirthDate"] },
   { id: "contact", title: "التواصل", fields: ["headMobile", "headAlternateMobile", "headAlternateMobileOwnerRelation"] },
-  { id: "residence", title: "السكن والنزوح", fields: ["governorate", "city", "area", "neighborhood", "addressText", "originalResidenceText", "isDisplaced", "displacementLocationText"] },
+  { id: "residence", title: "السكن والنزوح", fields: ["governorate", "city", "area", "neighborhood", "addressText", "originalResidenceText", "isDisplaced", "displacementLocationText", "originalLocationId", "currentLocationId"] },
 ];
 
 // ------------------------------------------------------------------ field primitives
@@ -285,6 +286,9 @@ function RegisterFamilyForm() {
       headNationalId: "",
       clanCode: "",
       branchCode: "",
+      // FB-GEO-01 Stage 4B: not recorded until a staff member chooses one.
+      originalLocationId: null,
+      currentLocationId: null,
     },
   });
 
@@ -608,6 +612,20 @@ function RegisterFamilyForm() {
                   <Textarea id="addressText" rows={2} className="min-h-10 bg-surface-2 focus-visible:bg-surface-1" {...register("addressText")} />
                 </Field>
               </div>
+              <Controller
+                control={formControl}
+                name="currentLocationId"
+                render={({ field }) => (
+                  <GazaLocationSelector
+                    id="currentLocationId"
+                    label={isDisplaced ? "الموقع الجغرافي الحالي / مكان النزوح (اختياري)" : "الموقع الجغرافي للسكن الحالي (اختياري)"}
+                    value={field.value ?? null}
+                    onChange={field.onChange}
+                    disabled={pending}
+                    error={errors.currentLocationId?.message}
+                  />
+                )}
+              />
             </fieldset>
 
             <fieldset className="flex min-w-0 flex-col gap-3 rounded-lg border border-stroke-subtle p-3 sm:p-4" data-residence-block="displacement">
@@ -626,6 +644,20 @@ function RegisterFamilyForm() {
                   />
                   <FieldError id="originalResidenceText-error" message={errors.originalResidenceText?.message} />
                 </Field>
+                <Controller
+                  control={formControl}
+                  name="originalLocationId"
+                  render={({ field }) => (
+                    <GazaLocationSelector
+                      id="originalLocationId"
+                      label="الموقع الجغرافي للسكن الأصلي (اختياري)"
+                      value={field.value ?? null}
+                      onChange={field.onChange}
+                      disabled={pending}
+                      error={errors.originalLocationId?.message}
+                    />
+                  )}
+                />
                 <Controller
                   control={formControl}
                   name="isDisplaced"
@@ -665,6 +697,9 @@ function RegisterFamilyForm() {
               </div>
             </fieldset>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground" data-location-text-note>
+            الموقع الجغرافي اختياري ويُضاف إلى النص المسجّل ولا يحلّ محلّه؛ لا يُستنتج من النص ولا يُختار تلقائيًا.
+          </p>
         </Section>
 
         {/* Actions: what saving does, then cancel / register. */}

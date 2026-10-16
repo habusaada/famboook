@@ -44,6 +44,11 @@ export const familyRegistrationSchema = z.object({
   // Unanswered = not collected (null), never silently "NO".
   isDisplaced: z.enum(["YES", "NO"]).optional(),
   displacementLocationText: z.string().optional(),
+  // FB-GEO-01 Stage 4B: optional structured Gaza location UUIDs (any level),
+  // independent of the text above and never derived from it. null = not
+  // recorded. Laravel checks the UUID is an active location.
+  originalLocationId: z.string().nullable().optional(),
+  currentLocationId: z.string().nullable().optional(),
 });
 
 export type FamilyRegistrationValues = z.infer<typeof familyRegistrationSchema>;
@@ -93,6 +98,8 @@ export function toRegisterFamilyPayload(
         values.isDisplaced === "YES"
           ? values.displacementLocationText || null
           : null,
+      original_location_id: values.originalLocationId ?? null,
+      current_location_id: values.currentLocationId ?? null,
     },
   };
 }
@@ -122,4 +129,6 @@ export const apiFieldToFormField: Record<string, keyof FamilyRegistrationValues>
   "residence.original_residence_text": "originalResidenceText",
   "residence.displacement_status": "isDisplaced",
   "residence.displacement_location_text": "displacementLocationText",
+  "residence.original_location_id": "originalLocationId",
+  "residence.current_location_id": "currentLocationId",
 };

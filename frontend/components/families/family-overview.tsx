@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/auth-context";
 import { EditPersonDialog } from "@/components/people/edit-person-dialog";
 import { FamilyCardPanel } from "@/components/families/family-card-panel";
 import { FamilyStatusBadge } from "@/components/families/family-status-badge";
+import { GazaLocationPathLine } from "@/components/geography/gaza-location-selector";
 import type { FamilySnapshot } from "@/components/families/family-snapshot";
 import { AppCard } from "@/components/shared/app-card";
 import { ActivityItem } from "@/components/shared/activity-item";
@@ -18,6 +19,7 @@ import { AssessmentRatingBadge, AssessmentStatusBadge } from "@/components/asses
 import { activitySubject } from "@/components/families/family-activity-tab";
 import { usePerson } from "@/lib/api/people";
 import type { FamilyDetail } from "@/lib/types/api/family";
+import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import { activityPresentation, formatActivityTime } from "@/lib/utils/activity";
 import { birthDateLabel, formatDateTime } from "@/lib/utils/date";
 import { displacementStatusLabel } from "@/lib/utils/displacement";
@@ -76,6 +78,28 @@ function ResidenceBlock({
 }
 
 /**
+ * FB-GEO-01 Stage 4B: a structured location reference from the residence
+ * summary already in the family response (no extra request), shown as its
+ * full path with «غير مفعّلة» on inactive items. It sits BESIDE the recorded
+ * text, which stays the record of what the form said.
+ */
+function LocationReference({ label, location }: { label: string; location: GazaLocationSummary | null | undefined }) {
+  return (
+    <div className="flex flex-col gap-0.5" data-location-reference>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {location ? (
+        <GazaLocationPathLine
+          items={[...location.path, { id: location.id, name: location.name, is_active: location.is_active }]}
+          showStatus
+        />
+      ) : (
+        <Missing>لم يُحدَّد موقع جغرافي</Missing>
+      )}
+    </div>
+  );
+}
+
+/**
  * Original residence, displacement and current residence as three distinct
  * facts. Governorate/city are optional in the Pilot; free text may be the
  * authoritative value.
@@ -101,6 +125,7 @@ export function ResidenceSummary({
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       <ResidenceBlock icon={Home} tone="text-muted-foreground" title="السكن الأصلي (قبل النزوح)">
         <span className="font-medium">{residence.original_residence_text ?? <Missing />}</span>
+        <LocationReference label="الموقع الجغرافي" location={residence.original_location} />
       </ResidenceBlock>
 
       <ResidenceBlock icon={Tent} tone={displaced ? "text-warning" : "text-muted-foreground"} title="النزوح" action={displacementAction}>
@@ -128,6 +153,10 @@ export function ResidenceSummary({
           <span className="text-subtle-foreground">المحافظة والمدينة غير مسجّلتين (اختياريتان)</span>
         )}
         {residence.address_text && <span className="text-muted-foreground">{residence.address_text}</span>}
+        <LocationReference
+          label={displaced ? "الموقع الجغرافي الحالي / مكان النزوح" : "الموقع الجغرافي"}
+          location={residence.current_location}
+        />
         {residence.started_at && (
           <span className="text-xs text-subtle-foreground">
             منذ <bdi dir="ltr">{residence.started_at}</bdi>

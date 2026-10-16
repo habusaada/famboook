@@ -60,18 +60,21 @@ export function EditDialogFooter({
   isPending,
   onCancel,
   submitLabel = "حفظ التعديلات",
+  submitDisabled = false,
 }: {
   formId: string;
   isPending: boolean;
   onCancel: () => void;
   submitLabel?: string;
+  /** Blocks saving without a pending request (e.g. while fresh data loads). */
+  submitDisabled?: boolean;
 }) {
   return (
     <DialogFooter>
       <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
         إلغاء
       </Button>
-      <Button type="submit" form={formId} disabled={isPending}>
+      <Button type="submit" form={formId} disabled={isPending || submitDisabled}>
         {isPending ? "جارٍ الحفظ..." : submitLabel}
       </Button>
     </DialogFooter>
