@@ -6,6 +6,7 @@ use App\Enums\DisplacementStatus;
 use App\Enums\RegistrationSource;
 use App\Models\Family;
 use App\Models\FamilyResidence;
+use App\Support\Geography\GazaLocationSelection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +22,10 @@ use Illuminate\Validation\ValidationException;
  *   existing residence stays UpdateFamilyResidenceAction.
  * - A displacement location is kept only for a DISPLACED family.
  * - source, when given, is a RegistrationSource value.
+ * - original_location_id / current_location_id (FB-GEO-01 Stage 3.2) are
+ *   optional; when given they must be active Gaza locations, re-checked
+ *   here under a shared lock. Callers that omit them (coordinator
+ *   REGISTER_FAMILY, import) store NULL, exactly as before.
  * - No activity entry: the calling Family action records its own event.
  */
 class CreateFamilyResidenceAction
@@ -28,7 +33,10 @@ class CreateFamilyResidenceAction
     private const FIELDS = [
         'residence_type', 'governorate', 'city', 'area', 'neighborhood', 'address_text',
         'original_residence_text', 'latitude', 'longitude', 'displacement_status',
+        'original_location_id', 'current_location_id',
     ];
+
+    private const LOCATION_FIELDS = ['original_location_id', 'current_location_id'];
 
     /** @param array<string, mixed> $data */
     public function handle(Family $family, array $data, string $startedAt, ?int $actingUserId): FamilyResidence
@@ -47,6 +55,12 @@ class CreateFamilyResidenceAction
             $values = [];
             foreach (self::FIELDS as $field) {
                 $values[$field] = $data[$field] ?? null;
+            }
+            foreach (self::LOCATION_FIELDS as $field) {
+                $values[$field] = GazaLocationSelection::normalize($values[$field]);
+                if ($values[$field] !== null) {
+                    GazaLocationSelection::assertSelectable("residence.{$field}", $values[$field]);
+                }
             }
             $isDisplaced = $values['displacement_status'] === DisplacementStatus::DISPLACED->value;
 

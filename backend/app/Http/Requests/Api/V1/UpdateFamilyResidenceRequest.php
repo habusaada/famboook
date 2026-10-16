@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api\V1;
 
 use App\Enums\DisplacementStatus;
 use App\Models\Family;
+use App\Rules\SelectableGazaLocation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -48,7 +49,23 @@ class UpdateFamilyResidenceRequest extends FormRequest
                     }
                 },
             ],
+
+            // FB-GEO-01 Stage 3.2: structured references. Omitted = unchanged;
+            // null = cleared; a new value must be an active location (any
+            // level); the stored value is accepted unchanged even if inactive.
+            // current_location_id is the displacement location when DISPLACED
+            // and is never tied to displacement_status.
+            'original_location_id' => ['sometimes', 'nullable', 'bail', 'uuid', new SelectableGazaLocation($this->storedLocation('original_location_id'))],
+            'current_location_id' => ['sometimes', 'nullable', 'bail', 'uuid', new SelectableGazaLocation($this->storedLocation('current_location_id'))],
         ];
+    }
+
+    private function storedLocation(string $column): ?string
+    {
+        /** @var Family $family */
+        $family = $this->route('family');
+
+        return $family->currentResidence?->getAttribute($column);
     }
 
     /**

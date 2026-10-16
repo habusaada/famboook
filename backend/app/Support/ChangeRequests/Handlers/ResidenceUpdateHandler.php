@@ -9,12 +9,17 @@ use App\Exceptions\ChangeRequestException;
 use App\Models\ChangeRequest;
 use App\Models\Family;
 use App\Models\FamilyResidence;
+use App\Models\GazaLocation;
 use App\Rules\OnlyKeys;
+use App\Rules\SelectableGazaLocation;
 use App\Support\ChangeRequests\ChangeRequestHandler;
 use App\Support\ChangeRequests\ChangeRequestPresentation;
 use App\Support\ChangeRequests\ChangeRequestPresentationContext;
 use App\Support\ChangeRequests\ChangeRequestTarget;
+use App\Support\ChangeRequests\ReadsEarlierPayloadVersions;
 use App\Support\FamilyAuth\FamilyAccessResult;
+use App\Support\Geography\GazaLocationPaths;
+use App\Support\Geography\GazaLocationSelection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -37,8 +42,21 @@ use Illuminate\Validation\ValidationException;
  *   Nothing changed → refused.
  * - Base: the current residence row and all eight fields, read under lock.
  * - One open RESIDENCE_UPDATE per Family.
+ *
+ * Payload v2 (FB-GEO-01 ADR §8.5, owner-approved 2026-10-16) adds the two
+ * optional structured references original_location_id / current_location_id:
+ * - input: optional keys (omitted = unchanged, so a client still sending the
+ *   eight v1 fields keeps working); null clears; a UUID must exist, and a NEW
+ *   one must be active — the stored value is accepted unchanged even if
+ *   inactive (SelectableGazaLocation); re-checked at approve and apply;
+ * - base: the eight fields plus both ids, so a Staff change of either after
+ *   submission is CHANGE_REQUEST_BASE_CHANGED;
+ * - presentation: names and full paths with «غير مفعّلة», never a UUID.
+ * v1 requests submitted before v2 are read unchanged (never migrated): their
+ * data holds only the eight fields and their base is recomputed over exactly
+ * those (ReadsEarlierPayloadVersions).
  */
-final class ResidenceUpdateHandler implements ChangeRequestHandler
+final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlierPayloadVersions
 {
     /** The V1 field set, in presentation order, with its Arabic labels. */
     public const FIELDS = [
@@ -52,6 +70,12 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         'displacement_location_text' => 'مكان النزوح الحالي',
     ];
 
+    /** v2: the structured references (any level), with their Arabic labels. */
+    public const LOCATION_FIELDS = [
+        'original_location_id' => 'الموقع الجغرافي للسكن الأصلي',
+        'current_location_id' => 'الموقع الجغرافي الحالي / مكان النزوح',
+    ];
+
     private const SHORT_TEXT_MAX = 255;
 
     private const ADDRESS_TEXT_MAX = 1000;
@@ -63,7 +87,12 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
 
     public function payloadVersion(): int
     {
-        return 1;
+        return 2;
+    }
+
+    public function acceptedPayloadVersions(): array
+    {
+        return [1, 2];
     }
 
     public function inputRules(Family $family): array
@@ -75,7 +104,10 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         foreach (array_keys(self::FIELDS) as $field) {
             $rules[$field] = ['present', 'nullable', 'string', 'max:'.self::maxLength($field)];
         }
-        $rules['governorate'][] = new OnlyKeys(array_keys(self::FIELDS));
+        $rules['governorate'][] = new OnlyKeys([...array_keys(self::FIELDS), ...array_keys(self::LOCATION_FIELDS)]);
+        foreach (array_keys(self::LOCATION_FIELDS) as $field) {
+            $rules[$field] = ['sometimes', 'nullable', 'bail', 'uuid', new SelectableGazaLocation($current?->getAttribute($field))];
+        }
         $rules['displacement_status'] = [$statusKnown ? 'required' : 'present', 'nullable', Rule::enum(DisplacementStatus::class)];
         $rules['displacement_location_text'][] = 'prohibited_unless:displacement_status,'.DisplacementStatus::DISPLACED->value;
 
@@ -90,6 +122,10 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         }
         // The location ↔ status rule needs the current residence: preconditions().
         $rules['displacement_status'] = ['sometimes', 'nullable', Rule::enum(DisplacementStatus::class)];
+        // v2 references (absent from v1 data); activity: preconditions().
+        foreach (array_keys(self::LOCATION_FIELDS) as $field) {
+            $rules[$field] = ['sometimes', 'nullable', 'uuid'];
+        }
 
         return $rules;
     }
@@ -116,7 +152,14 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
             $proposed['displacement_location_text'] = null;
         }
 
-        $currentValues = self::values($current);
+        // v2 references: only when sent (omitted = unchanged).
+        foreach (array_keys(self::LOCATION_FIELDS) as $field) {
+            if (array_key_exists($field, $validated)) {
+                $proposed[$field] = GazaLocationSelection::normalize($validated[$field]);
+            }
+        }
+
+        $currentValues = self::values($current, withLocations: true);
         $changed = array_filter($proposed, fn ($value, string $field) => $value !== $currentValues[$field], ARRAY_FILTER_USE_BOTH);
         if ($changed === []) {
             throw ValidationException::withMessages(['data' => 'لم تغيّر أي بيانات في السكن الحالي.']);
@@ -127,13 +170,19 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
 
     public function baseValues(ChangeRequestTarget $target, array $data): array
     {
+        return $this->baseValuesForVersion($this->payloadVersion(), $target, $data);
+    }
+
+    /** v1: the residence and its eight fields (as taken at v1 submission); v2: plus both ids. */
+    public function baseValuesForVersion(int $payloadVersion, ChangeRequestTarget $target, array $data): array
+    {
         $current = FamilyResidence::query()
             ->where('family_id', $target->family->getKey())
             ->where('is_current', true)
             ->lockForUpdate()
             ->first();
 
-        return ['residence' => $current?->getKey(), ...($current === null ? [] : self::values($current))];
+        return ['residence' => $current?->getKey(), ...($current === null ? [] : self::values($current, withLocations: $payloadVersion >= 2))];
     }
 
     public function preconditions(ChangeRequestTarget $target, array $data): void
@@ -145,6 +194,16 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         $status = array_key_exists('displacement_status', $data) ? $data['displacement_status'] : $current->displacement_status?->value;
         if (($data['displacement_location_text'] ?? null) !== null && $status !== DisplacementStatus::DISPLACED->value) {
             throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
+        }
+
+        // A NEW reference must still exist and be active (it may have been
+        // deactivated since submission); an unchanged one is kept as is.
+        foreach (array_keys(self::LOCATION_FIELDS) as $field) {
+            $proposed = array_key_exists($field, $data) ? GazaLocationSelection::normalize($data[$field]) : null;
+            if ($proposed !== null && $proposed !== $current->getAttribute($field)
+                && ! GazaLocation::query()->whereKey($proposed)->where('is_active', true)->exists()) {
+                throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
+            }
         }
     }
 
@@ -158,7 +217,7 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         // Residence data is family-visible (FamilyHouseholdProfileResource):
         // both audiences see the same rows. No identity value is ever shown.
         $current = self::currentResidence($request->family);
-        $currentValues = $current === null ? [] : self::values($current);
+        $currentValues = $current === null ? [] : self::values($current, withLocations: true);
 
         $presentation = ChangeRequestPresentation::make();
         foreach (self::FIELDS as $field => $label) {
@@ -166,6 +225,13 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
                 continue;
             }
             $presentation->row($label, self::display($field, $currentValues[$field] ?? null), self::display($field, $request->submitted_data[$field]));
+        }
+        // v2 references: names and full paths, never a UUID.
+        foreach (self::LOCATION_FIELDS as $field => $label) {
+            if (! array_key_exists($field, $request->submitted_data)) {
+                continue;
+            }
+            $presentation->row($label, self::locationText($currentValues[$field] ?? null), self::locationText($request->submitted_data[$field]));
         }
 
         return $presentation->toArray();
@@ -186,11 +252,15 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         return FamilyResidence::query()->where('family_id', $family->getKey())->where('is_current', true)->first();
     }
 
-    /** @return array<string, ?string> the eight fields as stored (status as its code) */
-    private static function values(FamilyResidence $residence): array
+    /** @return array<string, ?string> the eight fields as stored (status as its code), plus the v2 references when asked */
+    private static function values(FamilyResidence $residence, bool $withLocations = false): array
     {
+        $fields = array_keys(self::FIELDS);
+        if ($withLocations) {
+            $fields = [...$fields, ...array_keys(self::LOCATION_FIELDS)];
+        }
         $values = [];
-        foreach (array_keys(self::FIELDS) as $field) {
+        foreach ($fields as $field) {
             $value = $residence->getAttribute($field);
             $values[$field] = $value instanceof DisplacementStatus ? $value->value : $value;
         }
@@ -209,6 +279,23 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler
         }
 
         return $value;
+    }
+
+    /** «المحافظة ‹ … ‹ الموقع», inactive items marked; null when not recorded. Never the UUID. */
+    private static function locationText(?string $id): ?string
+    {
+        if ($id === null) {
+            return null;
+        }
+        $location = GazaLocation::query()->find(GazaLocationSelection::normalize($id));
+        if ($location === null) {
+            return 'موقع غير متاح';
+        }
+        GazaLocationPaths::attach(collect([$location]));
+
+        return collect([...$location->path, $location])
+            ->map(fn (GazaLocation $item) => $item->displayName().($item->is_active ? '' : ' (غير مفعّلة)'))
+            ->implode(' ‹ ');
     }
 
     private static function maxLength(string $field): int

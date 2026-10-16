@@ -7,6 +7,7 @@ use App\Enums\FamilyActivityType;
 use App\Models\Family;
 use App\Models\FamilyResidence;
 use App\Support\FamilyActivityLog;
+use App\Support\Geography\GazaLocationSelection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,6 +28,9 @@ class UpdateFamilyResidenceAction
         'area',
         'neighborhood',
         'address_text',
+        // FB-GEO-01 Stage 3.2 (audit D-5): where the Family lives now — the
+        // displacement location when DISPLACED.
+        'current_location_id',
     ];
 
     /** Displacement fields (docs/02 §19) → DISPLACEMENT_UPDATED. */
@@ -34,7 +38,11 @@ class UpdateFamilyResidenceAction
         'original_residence_text',
         'displacement_status',
         'displacement_location_text',
+        // FB-GEO-01 Stage 3.2 (audit D-5): the residence before displacement.
+        'original_location_id',
     ];
+
+    private const LOCATION_FIELDS = ['original_location_id', 'current_location_id'];
 
     /**
      * @param  array<string, mixed>  $data  Already-validated partial payload
@@ -49,10 +57,27 @@ class UpdateFamilyResidenceAction
             abort_if($residence === null, 409, 'لا يوجد سكن حالي مسجّل لهذه الأسرة.');
 
             $editable = [...self::ADDRESS_FIELDS, ...self::DISPLACEMENT_FIELDS];
-            $residence->fill(array_intersect_key($data, array_flip($editable)));
+            $changes = array_intersect_key($data, array_flip($editable));
+            foreach (self::LOCATION_FIELDS as $field) {
+                if (array_key_exists($field, $changes)) {
+                    $changes[$field] = GazaLocationSelection::normalize($changes[$field]);
+                }
+            }
+            $residence->fill($changes);
+
+            // A NEW location reference must be active (re-checked under a
+            // shared lock); an unchanged one — even inactive — is kept, and
+            // null clears it. Omitted keys never reach fill().
+            foreach (self::LOCATION_FIELDS as $field) {
+                if ($residence->isDirty($field) && $residence->getAttribute($field) !== null) {
+                    GazaLocationSelection::assertSelectable($field, $residence->getAttribute($field));
+                }
+            }
 
             // A displacement location only exists for a displaced family:
             // switching to NOT_DISPLACED or unknown never leaves a stale one.
+            // current_location_id is NOT cleared: it is the current residence
+            // for every displacement status (ADR-FB-GEO-01 §5).
             if ($residence->displacement_status !== DisplacementStatus::DISPLACED) {
                 $residence->displacement_location_text = null;
             }

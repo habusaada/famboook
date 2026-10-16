@@ -123,7 +123,7 @@ final class ChangeRequestWorkflow
      */
     public static function verify(ChangeRequestHandler $handler, ChangeRequest $locked, ChangeRequestTarget $target): void
     {
-        if ($locked->payload_version !== $handler->payloadVersion()) {
+        if (! self::readsVersion($handler, $locked->payload_version)) {
             throw new ChangeRequestException(ChangeRequestException::NOT_APPLICABLE);
         }
         try {
@@ -137,9 +137,22 @@ final class ChangeRequestWorkflow
     /** The fresh base values still match the stored base fingerprint. */
     public static function assertBaseUnchanged(ChangeRequestHandler $handler, ChangeRequest $locked, ChangeRequestTarget $target): void
     {
-        if (! ChangeRequestBase::matches($locked, $handler->baseValues($target, $locked->submitted_data))) {
+        // Recomputed for the request's own payload version (an earlier
+        // version's base covers exactly the values it was taken over).
+        $values = $handler instanceof ReadsEarlierPayloadVersions
+            ? $handler->baseValuesForVersion($locked->payload_version, $target, $locked->submitted_data)
+            : $handler->baseValues($target, $locked->submitted_data);
+        if (! ChangeRequestBase::matches($locked, $values)) {
             throw new ChangeRequestException(ChangeRequestException::BASE_CHANGED);
         }
+    }
+
+    /** The handler's own version, or an earlier one it declares it still reads. */
+    private static function readsVersion(ChangeRequestHandler $handler, int $version): bool
+    {
+        return $handler instanceof ReadsEarlierPayloadVersions
+            ? in_array($version, $handler->acceptedPayloadVersions(), true)
+            : $version === $handler->payloadVersion();
     }
 
     public static function invalidTransition(): ChangeRequestException

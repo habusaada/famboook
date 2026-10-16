@@ -6,6 +6,7 @@ use App\Enums\DisplacementStatus;
 use App\Enums\Gender;
 use App\Enums\MaritalStatus;
 use App\Enums\RegistrationSource;
+use App\Rules\SelectableGazaLocation;
 use App\Support\FamilyLineage;
 use App\Support\RegistryNationalId;
 use Illuminate\Foundation\Http\FormRequest;
@@ -67,6 +68,10 @@ class RegisterFamilyRequest extends FormRequest
                 'nullable', 'string', 'max:255',
                 'prohibited_unless:residence.displacement_status,'.DisplacementStatus::DISPLACED->value,
             ],
+            // FB-GEO-01 Stage 3.2: optional structured references (any level,
+            // active only; no stored value yet). Absent or null = not recorded.
+            'residence.original_location_id' => ['nullable', 'bail', 'uuid', new SelectableGazaLocation],
+            'residence.current_location_id' => ['nullable', 'bail', 'uuid', new SelectableGazaLocation],
             'residence.residence_type' => ['nullable', 'string', 'max:255'],
             'residence.latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'residence.longitude' => ['nullable', 'numeric', 'between:-180,180'],

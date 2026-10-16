@@ -124,6 +124,9 @@ class FamilyHouseholdProfileTest extends TestCase
                 'current_address' => [
                     'governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'المواصي', 'neighborhood' => 'حي تجريبي', 'address_text' => 'قرب المسجد',
                 ],
+                // FB-GEO-01 RESIDENCE_UPDATE v2: location summaries (none recorded here).
+                'original_location' => null,
+                'current_location' => null,
             ],
         ]]);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
@@ -223,6 +226,8 @@ class FamilyHouseholdProfileTest extends TestCase
             'residence_type' => null,
             'started_at' => '2026-10-01',
             'current_address' => self::NO_ADDRESS,
+            'original_location' => null,
+            'current_location' => null,
         ]);
     }
 
@@ -238,6 +243,8 @@ class FamilyHouseholdProfileTest extends TestCase
             'residence_type' => null,
             'started_at' => null,
             'current_address' => ['governorate' => null, 'city' => 'غزة', 'area' => null, 'neighborhood' => 'الرمال', 'address_text' => null],
+            'original_location' => null,
+            'current_location' => null,
         ]);
     }
 

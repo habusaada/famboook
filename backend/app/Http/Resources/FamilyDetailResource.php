@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Support\FamilyLineage;
+use App\Support\Geography\GazaLocationSummary;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,6 +33,7 @@ class FamilyDetailResource extends JsonResource
             'notes' => $this->notes,
             'updated_at' => $this->updated_at?->toIso8601String(),
             'residence' => $this->when($this->currentResidence, fn () => [
+                ...$this->locationReferences(),
                 'governorate' => $this->currentResidence->governorate,
                 'city' => $this->currentResidence->city,
                 'area' => $this->currentResidence->area,
@@ -61,6 +63,27 @@ class FamilyDetailResource extends JsonResource
                 fn ($m) => $m->person->gender?->value === 'FEMALE'
             )->count(),
             'members' => FamilyMemberResource::collection($members),
+        ];
+    }
+
+    /**
+     * FB-GEO-01 Stage 3.2 (Staff only; additive): the structured location
+     * references beside the unchanged text fields, with display summaries
+     * {id, level, name, is_active, path}. current_location is the
+     * displacement location when DISPLACED. Null when not recorded.
+     *
+     * @return array<string, mixed>
+     */
+    private function locationReferences(): array
+    {
+        $residence = $this->currentResidence;
+        $summaries = GazaLocationSummary::forResidence($residence);
+
+        return [
+            'original_location_id' => $residence->original_location_id,
+            'current_location_id' => $residence->current_location_id,
+            'original_location' => $summaries['original'],
+            'current_location' => $summaries['current'],
         ];
     }
 }

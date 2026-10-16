@@ -3,7 +3,9 @@
 namespace App\Http\Resources;
 
 use App\Models\Family;
+use App\Models\FamilyResidence;
 use App\Models\Person;
+use App\Support\Geography\GazaLocationSummary;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -79,7 +81,20 @@ class FamilyHouseholdProfileResource extends JsonResource
                     'neighborhood' => $residence->neighborhood,
                     'address_text' => $residence->address_text,
                 ],
+                // FB-GEO-01 (RESIDENCE_UPDATE v2): the saved structured
+                // references as display summaries {id, level, name, is_active,
+                // path} — beside, never instead of, the text above. Never a
+                // source code or review flag. Null when not recorded.
+                ...$this->locations($residence),
             ],
         ];
+    }
+
+    /** @return array{original_location: ?array<string, mixed>, current_location: ?array<string, mixed>} */
+    private function locations(FamilyResidence $residence): array
+    {
+        $summaries = GazaLocationSummary::forResidence($residence);
+
+        return ['original_location' => $summaries['original'], 'current_location' => $summaries['current']];
     }
 }

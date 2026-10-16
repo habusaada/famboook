@@ -40,7 +40,8 @@ final class HouseholdReadModel
      * no residence history to read: residence corrections are made in place.
      * Only the family-facing residence columns are selected (PWA-3B.3 adds
      * address_text, residence_type and started_at — never coordinates,
-     * source, notes or lifecycle flags).
+     * source, notes or lifecycle flags). FB-GEO-01 RESIDENCE_UPDATE v2 adds
+     * the two location references, presented only as summaries.
      */
     public function profile(FamilyAccessResult $context): Family
     {
@@ -48,6 +49,7 @@ final class HouseholdReadModel
             ->with(['currentResidence' => fn ($r) => $r->select([
                 'id', 'family_id', 'original_residence_text', 'displacement_status', 'displacement_location_text',
                 'governorate', 'city', 'area', 'neighborhood', 'address_text', 'residence_type', 'started_at',
+                'original_location_id', 'current_location_id',
             ])])
             ->firstOrFail();
     }

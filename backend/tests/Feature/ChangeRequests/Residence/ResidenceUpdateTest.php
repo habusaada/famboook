@@ -154,7 +154,8 @@ class ResidenceUpdateTest extends TestCase
         $this->assertSame($this->context->family->id, $request->family_id);
         $this->assertNull($request->target_membership_id);
         $this->assertNull($request->person_id);
-        $this->assertSame(1, $request->payload_version);
+        // New submissions are v2 since FB-GEO-01 (v1 requests stay readable).
+        $this->assertSame(2, $request->payload_version);
         $this->assertNotNull($request->base_fingerprint);
         $this->assertSame($before, $this->residenceSnapshot());
 

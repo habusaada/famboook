@@ -20,6 +20,9 @@ class FamilyResidence extends Model
         'neighborhood',
         'address_text',
         'original_residence_text',
+        // FB-GEO-01 Stage 3.2: structured references (nullable, beside the text).
+        'original_location_id',
+        'current_location_id',
         'latitude',
         'longitude',
         'displacement_status',
@@ -48,5 +51,17 @@ class FamilyResidence extends Model
     public function family(): BelongsTo
     {
         return $this->belongsTo(Family::class);
+    }
+
+    /** The residence before displacement (ADR-FB-GEO-01 §5). */
+    public function originalLocation(): BelongsTo
+    {
+        return $this->belongsTo(GazaLocation::class, 'original_location_id');
+    }
+
+    /** Where the Family lives now — the displacement location when DISPLACED. */
+    public function currentLocation(): BelongsTo
+    {
+        return $this->belongsTo(GazaLocation::class, 'current_location_id');
     }
 }
