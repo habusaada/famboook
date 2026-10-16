@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardPdfController;
 use App\Http\Controllers\Api\V1\Family\FamilyChangeRequestController;
+use App\Http\Controllers\Api\V1\Family\FamilyGazaLocationController;
 use App\Http\Controllers\Api\V1\Family\FamilyContactUpdateController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\Api\V1\FamilyCredentialController;
 use App\Http\Controllers\Api\V1\FamilyHouseholdDeclarationController;
 use App\Http\Controllers\Api\V1\FamilyMemberController;
 use App\Http\Controllers\Api\V1\FamilyResidenceController;
+use App\Http\Controllers\Api\V1\GazaLocationController;
 use App\Http\Controllers\Api\V1\HealthRecordController;
 use App\Http\Controllers\Api\V1\ImportApplyController;
 use App\Http\Controllers\Api\V1\InitialFamilyImportController;
@@ -174,6 +176,12 @@ Route::prefix('family')->group(function () {
             Route::get('/change-requests/types', [FamilyChangeRequestController::class, 'types']);
             // FP-ADR-076: the relationship options of the add-member form (active, never HEAD).
             Route::get('/change-requests/relationship-types', [FamilyChangeRequestController::class, 'relationshipTypes']);
+            // FB-GEO-01 API-D2: read-only Gaza reference mirrors for the residence
+            // form (same queries as the Staff lookups, no landmark type, no-store).
+            // {location} is a UUID only; before {changeRequest}.
+            Route::get('/change-requests/gaza-locations/governorates', [FamilyGazaLocationController::class, 'governorates']);
+            Route::get('/change-requests/gaza-locations/{location}/children', [FamilyGazaLocationController::class, 'children'])->whereUuid('location');
+            Route::get('/change-requests/gaza-locations/{location}', [FamilyGazaLocationController::class, 'show'])->whereUuid('location');
             Route::get('/change-requests/{changeRequest}', [FamilyChangeRequestController::class, 'show']);
             Route::post('/change-requests', [FamilyChangeRequestController::class, 'store'])
                 ->middleware(['can:change-request.submit', 'throttle:family-change-request-submit']);
@@ -573,6 +581,17 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
 
     Route::get('/reference/relationship-types', [ReferenceController::class, 'relationshipTypes'])
         ->middleware('can:reference-data.view');
+
+    // Gaza geographic reference, read-only (FB-GEO-01 Stage 2B, AUTH-ADR-095):
+    // reference-data.view OR residence.update (checked in the controller).
+    // Static paths first; {location} is a UUID only, so a malformed id is a
+    // 404 and never reaches the uuid column.
+    Route::prefix('gaza-locations')->group(function () {
+        Route::get('/governorates', [GazaLocationController::class, 'governorates']);
+        Route::get('/search', [GazaLocationController::class, 'search']);
+        Route::get('/{location}/children', [GazaLocationController::class, 'children'])->whereUuid('location');
+        Route::get('/{location}', [GazaLocationController::class, 'show'])->whereUuid('location');
+    });
 
     // Clan → Branch Group → Branch structure (docs/06 §56a, AUTH-ADR-054).
     // Reads return the active structure (include_inactive=1 needs clan.manage).

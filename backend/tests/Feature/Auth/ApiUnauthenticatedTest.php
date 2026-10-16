@@ -72,13 +72,19 @@ class ApiUnauthenticatedTest extends TestCase
 
         foreach ($routes as $route) {
             // A parameter value the route accepts: the first literal of a
-            // constrained alternation (e.g. a report name), else a uuid.
+            // constrained alternation (e.g. a report name); a hyphenated uuid
+            // where the constraint requires one (whereUuid, FB-GEO-01); else a
+            // uuid without hyphens (fits the alphanumeric constraints too).
             $uri = '/'.preg_replace_callback('/\{([^}?]+)\??\}/', function (array $m) use ($route) {
                 $pattern = $route->wheres[$m[1]] ?? null;
+                $uuid = (string) Str::uuid();
+                $accepts = fn (string $value) => $pattern !== null && preg_match('#\A(?:'.$pattern.')\z#', $value) === 1;
 
-                return $pattern !== null && preg_match('/\A[a-z][a-z\-]*(\|[a-z][a-z\-]*)+\z/', $pattern) === 1
-                    ? explode('|', $pattern)[0]
-                    : str_replace('-', '', (string) Str::uuid());
+                return match (true) {
+                    $pattern !== null && preg_match('/\A[a-z][a-z\-]*(\|[a-z][a-z\-]*)+\z/', $pattern) === 1 => explode('|', $pattern)[0],
+                    $accepts($uuid) && ! $accepts(str_replace('-', '', $uuid)) => $uuid,
+                    default => str_replace('-', '', $uuid),
+                };
             }, $route->uri());
             foreach (array_diff($route->methods(), ['HEAD']) as $method) {
                 $this->app['auth']->forgetGuards();

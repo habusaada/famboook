@@ -272,7 +272,8 @@ class FamilySideBoundaryTest extends TestCase
         // four contact-update routes (FP-ADR-079) + the Coordinator members
         // directory and reveal (CO-01C, AUTH-ADR-092) + the six Coordinator
         // request routes (CO-02.4, AUTH-ADR-093) + the FAMILY_ADD proposal
-        // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a).
-        $this->assertSame(51, $checked);
+        // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a)
+        // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2).
+        $this->assertSame(54, $checked);
     }
 }
