@@ -1330,6 +1330,112 @@ TransferFamilyMemberAction / attaching an existing Person, ChangeHouseholdHeadAc
 re-activating an ended membership, residence history (`residence.change`),
 National ID normalization (PDD-001), geographic hierarchy (PDD-006).
 
+2026-10-15: **FB-GEO-01 Phase 0** — PDD-006 architecturally resolved by
+ADR-FB-GEO-01 (`docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md`,
+RM-ADR-061); implementation pending in separately approved stages 1–6
+(ADR §12). Documentation only; no code, schema or permission change.
+
+2026-10-15: **FB-GEO-01 Stages 1A–1C** (RM-ADR-062):
+- 1A dataset validation: CONDITIONAL PASS.
+- 1B governance and decision register.
+- 1C, implemented **locally only**: `gaza_locations` and
+  `gaza_location_review_flags`, and the checksum-verified, idempotent
+  `famboook:import-gaza-geography`. The official MoSD workbook (kept
+  outside Git) was imported into the local development database: 2,139
+  records and 228 review flags.
+
+**Production not migrated or imported.** Next, each separately approved:
+Stage 2 (read API), Stage 3 (residence references).
+
+2026-10-15: **FB-GEO-01 Stage 1C.1, import governance and hardening**
+(RM-ADR-063), **local only**:
+- Persistent import history in `gaza_geography_import_runs`, with statuses
+  RUNNING / SUCCEEDED / FAILED / REJECTED.
+- A defined lifecycle: the run is recorded outside the import transaction;
+  a failure leaves no partial records.
+- A PostgreSQL advisory lock plus a single-RUNNING index prevent concurrent
+  imports.
+
+Only the new migration was applied to the local development database
+(PostgreSQL 18.6). Production is not migrated. Stage 2 not started.
+
+2026-10-15: **FB-GEO-01 Stages 2A–2B** (RM-ADR-064), **local only**:
+- 2A: API contract and authorization audit.
+- 2B: read-only Staff API `/api/v1/gaza-locations/…` (governorates,
+  children, search with paths, details), authorized by
+  `reference-data.view` OR `residence.update`. No permission, role, schema
+  or workflow change.
+
+Production is not deployed. Not started: Stage 3 (residence references),
+Stage 4 (Staff UI), Stage 5 (Family PWA mirrors with RESIDENCE_UPDATE v2).
+
+2026-10-15: **FB-GEO-01 Stage 3** (RM-ADR-065), **local only**:
+- 3A: selector design audit (advance design for Stage 4).
+- 3.1: residence linkage contract audit.
+- 3.2: implemented:
+  - nullable UUID `original_location_id` / `current_location_id` on
+    `family_residences` (FK RESTRICT, indexed, no backfill);
+  - `SelectableGazaLocation` validation (new selections active only;
+    unchanged inactive values kept; omitted = unchanged, null = cleared);
+  - staff registration / correction fields and staff family response
+    summaries;
+  - `is_active` on location details.
+
+  RESIDENCE_UPDATE v1, coordinator, import and Family PWA contracts are
+  unchanged.
+
+Only the new migration was applied locally. Production is not migrated.
+Not started: Stage 4 (Staff selector UI), Stage 5, Stage 6.
+
+2026-10-15: **FB-GEO-01 Stage 4A** (RM-ADR-066), **local only**: the
+reusable, data-driven `GazaLocationSelector` (frontend), with its query
+hooks, types and tests. It is not yet placed in any form. Stage 4B
+(integration into staff registration and residence correction) needs
+separate approval.
+
+2026-10-15: **FB-GEO-01 Stage 4B** (RM-ADR-067), **local only** (ADR
+§8.3):
+- Selector cancellation fix: replacing a saved value is a staged candidate;
+  cancelling emits nothing.
+- Staff registration: optional original / current location selectors.
+- Staff residence correction: both dialogs. An unchanged reference is
+  omitted, a new one sent, a confirmed clear sent as null.
+- Residence display: full geographic paths with an inactive marker, beside
+  the unchanged text.
+
+No backend, migration, RBAC, theme, Family PWA, coordinator or
+RESIDENCE_UPDATE v1 change. Not started: Stage 5 (Family PWA /
+RESIDENCE_UPDATE v2), Stage 6.
+
+2026-10-16: **FB-GEO-01 Stage 4C** (RM-ADR-068), **local only**: Stage
+3.2–4B verified end to end on the real API, a disposable PostgreSQL database
+on the test instance and a real browser
+(`docs/audits/FB-GEO-01-STAGE-4C-INTEGRATION-VERIFICATION.md`).
+- Fixed: selector trigger height (D-1) and geography test timeouts (D-2).
+- Recorded: PX-1 (pre-existing stale reopen of residence correction
+  dialogs can overwrite text) and OBS-1 (active child under an inactive
+  ancestor).
+- Stage 5 readiness: CONDITIONAL.
+
+2026-10-16: **FB-GEO-01 Stage 5 progress** (RM-ADR-069), **local only**
+(ADR §8.5):
+- Built: read-only Family PWA geography mirrors (API-D2) and a
+  source-aware `GazaLocationSelector`.
+- Blocked on owner approval: RESIDENCE_UPDATE v1 cannot carry location
+  references without a v2 contract. The v2 change, payload-version
+  compatibility, family read-model exposure and form integration are
+  specified in ADR §8.5.
+- No v1, RBAC, theme or workflow change.
+
+2026-10-16: **FB-GEO-01 RESIDENCE_UPDATE v2** (RM-ADR-070, owner-approved),
+**local only** (ADR §8.6):
+- v2 with optional location references; v1 requests still review and apply.
+- Family profile location summaries.
+- Family PWA form selectors.
+- Reviewer sees names and paths.
+- PX-1 fixed (stale Staff residence dialogs).
+- No RBAC, theme or coordinator change; no backfill.
+
 ---
 
 # 22. Phase 10 — Staff Registry Experience
@@ -4765,6 +4871,43 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-070
+FB-GEO-01 RESIDENCE_UPDATE v2 done locally (2026-10-16, owner-approved; ADR §8.6): versioned handler (v1 + v2), optional location references with active-only new selections, both in the base, name/path presentation, family profile summaries, Family PWA selectors, PX-1 fix. Production needs the FB-GEO-01 migration and import approvals.
+
+### RM-ADR-069
+FB-GEO-01 Stage 5 progress (2026-10-16; ADR §8.5): Family PWA read-only geography API (API-D2) and source-aware selector done locally. RESIDENCE_UPDATE v2, payload-version compatibility, the family read-model exposure and the form are blocked on owner approval; v1 is unchanged.
+
+### RM-ADR-068
+FB-GEO-01 Stage 4C done locally (2026-10-16; ADR §8.4): integration verification of Stage 3.2–4B, verdict CONDITIONAL. Two defects fixed (selector trigger height, test timeouts). PX-1 (pre-existing stale-reopen text overwrite in residence correction dialogs) needs a separate fix; OBS-1 (ancestor activity) needs a decision before any deactivation workflow. Stage 5 needs separate approval.
+
+### RM-ADR-067
+FB-GEO-01 Stage 4B done locally (2026-10-15; ADR §8.3): `GazaLocationSelector` in Staff registration and residence correction, residence summaries on the family residence tab, staged replacement and confirmed-clear semantics, frontend tests. No backend, RBAC, theme or Family PWA change. Stage 5 (Family PWA, RESIDENCE_UPDATE v2) needs separate approval.
+
+### RM-ADR-066
+FB-GEO-01 Stage 4A done locally (2026-10-15; ADR §8.2): reusable `GazaLocationSelector`, Gaza location query hooks and types, and frontend tests. No form integration, backend, RBAC or theme change. Stage 4B (residence form integration) needs separate approval.
+
+### RM-ADR-065
+FB-GEO-01 Stage 3 (3A, 3.1, 3.2) done locally (2026-10-15; docs/04 DB-ADR-066; ADR §4.2): residence geographic linkage with validation, staff API fields and location-details `is_active`. Production migration needs explicit approval and the ordered migration backlog. Stage 4 (Staff selector UI) is not started.
+
+### RM-ADR-064
+FB-GEO-01 Stages 2A–2B done locally (2026-10-15; docs/06 AUTH-ADR-095; ADR §8.1; audit `docs/audits/FB-GEO-01-STAGE-2A-API-AUTHORIZATION-AUDIT.md` §12): the read-only Staff geographic reference API. The Family PWA mirrors are deferred to Stage 5. Production deployment needs explicit approval. Stage 3 is not started.
+
+### RM-ADR-063
+FB-GEO-01 Stage 1C.1 done locally (2026-10-15; docs/04 DB-ADR-065; ADR §4.4): import history (`gaza_geography_import_runs`), the run lifecycle and failure semantics, and concurrency control.
+
+PostgreSQL 16 compatibility of FB-GEO-01 is **not tested**: the local development and test servers are PostgreSQL 18.6. The project-wide PostgreSQL requirement is unchanged. Production deployment needs explicit approval; Stage 2 is not started.
+
+### RM-ADR-062
+FB-GEO-01 Stages 1A–1C done (2026-10-15):
+- **1A:** dataset validation (`docs/audits/FB-GEO-01-STAGE-1A-DATASET-VALIDATION.md`).
+- **1B:** source authority (MoSD, owner-confirmed) and governance principles G1–G10 (`docs/audits/FB-GEO-01-STAGE-1B-DECISION-REGISTER.md`).
+- **1C:** geographic reference schema, review flags and import implemented and run **locally only** (docs/04 DB-ADR-064; ADR §4.3). 2,139 records and 228 flags in the local development database.
+
+Production migration and import need explicit approval. Stages 2–6 are not started.
+
+### RM-ADR-061
+FB-GEO-01 — Unified Gaza Geographic Reference (2026-10-15): Phase 0 (architecture decision and documentation) is done; PDD-006 is architecturally resolved, implementation pending. Delivery is staged and each stage needs its own approval: 1 reference data from the supplied spreadsheet, 2 read API, 3 residence references, 4 Staff UI, 5 RESIDENCE_UPDATE v2 and Family Portal, 6 reporting. Residence history (`residence.change`) stays a separate roadmap item. Full design `docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md`.
+
 ### RM-ADR-060
 PWA-5f — Family request views are done (2026-10-08; docs/11 §30a): «طلباتي» (Family-subject history, URL filters, server pagination), the request detail (status meaning, proposal in the approved `{rows}` shape only, family-visible timeline, resubmit / cancel from `available_actions`) and «طلب جديد» discovery, on the PWA-5e API. Frontend only — no backend change, migration or request type. The views are built but not linked: «+», «طلباتي» and the quick actions stay disabled until PWA-6.1 (RM-ADR-055). PWA-5 is complete; PWA-6.1 RESIDENCE_UPDATE follows, with the presentation prerequisites of RM-ADR-059.
 
@@ -5075,6 +5218,16 @@ Date: 2026-09-24
 | 1.2.61 | 2026-10-08 | Approved | PWA-6.1b done: controlled pilot submission gate (docs/11 FP-ADR-075); Production pilot not started |
 | 1.2.62 | 2026-10-09 | Approved | ADD_FAMILY_MEMBER built (docs/11 FP-ADR-076), not registered in Production |
 | 1.2.63 | 2026-10-11 | Approved | FU-16 done (docs/11 FP-ADR-078): signed-in Family password change, implemented and OFF by default (`FAMILY_PASSWORD_CHANGE_ENABLED=true`); no migration, no role or permission |
+| 1.2.64 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (RM-ADR-061): ADR-FB-GEO-01 recorded; PDD-006 architecturally resolved, implementation pending; stages 1–6 planned. Documentation only |
+| 1.2.65 | 2026-10-15 | Approved | FB-GEO-01 Stages 1A–1C (RM-ADR-062): dataset validated, governance recorded, reference schema and import implemented and run locally (2,139 records, 228 flags); Production NOT migrated; Stages 2–6 not started |
+| 1.2.66 | 2026-10-15 | Approved | FB-GEO-01 Stage 1C.1 (RM-ADR-063): import history, lifecycle and concurrency control implemented locally; PostgreSQL 16 not tested (local 18.6); Production NOT migrated; Stage 2 not started |
+| 1.2.67 | 2026-10-15 | Approved | FB-GEO-01 Stages 2A–2B (RM-ADR-064): API audit and read-only Staff `/gaza-locations` API implemented locally; Production not deployed; Stage 3 not started |
+| 1.2.68 | 2026-10-15 | Approved | FB-GEO-01 Stage 3 (RM-ADR-065): selector design audit, linkage contract audit, and residence geographic linkage implemented locally; Production NOT migrated; Stage 4 not started |
+| 1.2.69 | 2026-10-15 | Approved | FB-GEO-01 Stage 4A (RM-ADR-066): reusable `GazaLocationSelector`, hooks, types and tests implemented locally; no form integration (4B not started) |
+| 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 4B (RM-ADR-067): selector in Staff registration and residence correction, residence geographic display, staged cancellation semantics; local only; Stage 5 not started |
+| 1.2.71 | 2026-10-16 | Approved | FB-GEO-01 Stage 4C (RM-ADR-068): integration verification (real API, disposable PostgreSQL, real browser); D-1 / D-2 fixed; PX-1 and OBS-1 recorded; Stage 5 CONDITIONAL |
+| 1.2.72 | 2026-10-16 | Approved | FB-GEO-01 Stage 5 progress (RM-ADR-069): Family PWA geography API and source-aware selector; RESIDENCE_UPDATE v2 and form blocked on approval |
+| 1.2.73 | 2026-10-16 | Approved | FB-GEO-01 RESIDENCE_UPDATE v2 (RM-ADR-070): v1-compatible versioned handler, family profile summaries, Family PWA selectors, PX-1 fixed; local only |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

@@ -3551,6 +3551,7 @@ enabled in Production by this slice.
 | Target | Always the family.context Family (`ChangeRequestTarget::family`); no `member_ref`, id or Family is read from the input |
 | Preconditions | A current residence exists (else 422 PRECONDITION_FAILED, at submit, approve and apply); the location ↔ status rule against the residence as it will be after the change |
 | Base fingerprint | The current residence id and all eight V1 fields, read with the residence row locked (`FOR UPDATE`) — any change to them after submission blocks approve / apply (409 BASE_CHANGED). No timestamps |
+| Payload v2 (FB-GEO-01, 2026-10-16) | Adds optional `original_location_id` / `current_location_id` (Gaza reference; new must be active, unchanged inactive kept), both also in the base; shown by name and path. v1 requests still review and apply with their eight-field base. See ADR-FB-GEO-01 §8.6 |
 | Open conflict | One open RESIDENCE_UPDATE per Family (409 ALREADY_OPEN) |
 | APPLY | Inside the engine's transaction: re-read under lock, re-validate, re-fingerprint, then the Domain Action with the stored proposal; rollback, failure recording, retry and replay are the PWA-5b semantics unchanged |
 | Presentation | `{rows: [{label, current, proposed}]}` built with `ChangeRequestPresentation`: one row per proposed field, in V1 order, Arabic labels, status shown as «نازحة» / «غير نازحة», current = the LIVE registry value. Same rows for Staff and family (residence is family-visible data); no identity value |

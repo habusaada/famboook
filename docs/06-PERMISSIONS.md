@@ -1949,6 +1949,22 @@ status/location. It does not create, end or delete residence records.
 create a new one, preserve history). It stays unassigned until that
 operation is built.
 
+**FB-GEO-01 note (2026-10-15, AUTH-ADR-094; approved design, not
+implemented):** setting the future Gaza location references
+(`original_location_id`, `current_location_id`) is part of the residence
+data each existing operation already writes — `residence.update`,
+registration and Change Request APPLY. No permission is added and no role
+mapping changes.
+
+**Implemented locally 2026-10-15 (FB-GEO-01 Stage 3.2):**
+- Staff registration (`family.create`) and the staff residence correction
+  (`residence.update`) accept the two optional references under their
+  existing permissions.
+- RESIDENCE_UPDATE v1, coordinator REGISTER_FAMILY and the import do not
+  carry them.
+- No permission, role, mapping or middleware changed. Production is not
+  deployed.
+
 ---
 
 # 47. Assessment Permissions
@@ -2346,6 +2362,25 @@ reference-data.deactivate
 (for example, the relationship-type options in Add Family Member). It exposes
 no personal or sensitive data. Roles that create or edit canonical records
 need it to select valid coded values.
+
+**Gaza geographic reference (FB-GEO-01, AUTH-ADR-094; approved design, not
+implemented):** the future `gaza_locations` reference is centrally
+controlled through a reviewed, versioned dataset; no management interface
+is approved. Reading it for residence forms is intended to follow the
+existing union pattern (`reference-data.view` **or** the feature
+permission, as for assessment domains and need categories), confirmed at
+its implementation stage. The mappings in this section are unchanged.
+
+**Implemented locally 2026-10-15 (FB-GEO-01 Stage 2B, AUTH-ADR-095):**
+- `GET /gaza-locations/governorates`, `/gaza-locations/search`,
+  `/gaza-locations/{uuid}/children` and `/gaza-locations/{uuid}` (Staff API,
+  read-only) accept `reference-data.view` **or** `residence.update`,
+  checked in `GazaLocationController`.
+- This lets SOCIAL_WORKER, who may correct residences, read the reference
+  without receiving `reference-data.view`.
+- REVIEWER and REPORTS_VIEWER get 403. FAMILY_USER and COORDINATOR are
+  refused by `staff.side`.
+- No permission, role or mapping changed. Production is not deployed.
 
 Other roles (REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER, FAMILY_USER) do not
 receive it by default in V1. A later decision can grant it when one of those
@@ -4497,6 +4532,16 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-095
+Gaza geographic reference read API (2026-10-15, FB-GEO-01 Stage 2B; implemented LOCALLY, Production not deployed; contract and decisions `docs/audits/FB-GEO-01-STAGE-2A-API-AUTHORIZATION-AUDIT.md` §12; ADR-FB-GEO-01 §8.1).
+- **Routes:** four read-only Staff routes under `/gaza-locations` inside `auth:sanctum` + `staff.side`.
+- **Authorization (API-D1):** `reference-data.view` **or** `residence.update`, checked in the controller like the assessment-domain, need-category and assistance-category reference routes. SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER may read; REVIEWER and REPORTS_VIEWER may not; family-side and mixed accounts never reach the routes.
+- **Exposure (API-D4):** id, level, trimmed name, parent_id, has_children, landmark type name (Staff only) and ancestor path. Never source codes, review flags, import history, timestamps or family data.
+- No permission, role or mapping added or changed. Family PWA mirrors are deferred to Stage 5 (API-D2); no coordinator access (API-D3).
+
+### AUTH-ADR-094
+Unified Gaza geographic reference (2026-10-15, FB-GEO-01 Phase 0, approved architecture; NOT implemented; full design `docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md` §8): **no RBAC change** — no role or permission is added and every existing mapping is unchanged. Writing a residence location reference is covered by the permission of the operation that writes the residence (`residence.update`, registration, Change Request APPLY). The reference is centrally controlled (reviewed dataset; any future management UI belongs to System / High Administration under the existing `reference-data.*`, by a separate decision). Read access for forms is intended to use the existing union pattern and is confirmed at the API stage. Reviewer and coordinator workflows are unchanged; Coordinator Space still never shows another Family's current residence.
+
 ### AUTH-ADR-093
 Coordinator-submitted requests (2026-10-13, CO-02.2, approved architecture; not implemented; full design `docs/adr/CO-02-COORDINATOR-REQUESTS.md`): no role added; the eight roles and every existing permission mapping are unchanged. Four new permissions, COORDINATOR only — `coordinator-request.view`, `.submit`, `.resubmit`, `.cancel` — authorize the coordinator channel; `change-request.*` is never consulted for it (a coordinator account holds `change-request.submit` as FAMILY_USER for its own household). A Coordinator may submit ADD_FAMILY_MEMBER (PERSON_ADD) for a Family in the effective scope and REGISTER_FAMILY (FAMILY_ADD) for a placement the scope covers; they never review, return, approve, reject or apply (Staff only, unchanged, AUTH-ADR-087/088). Every coordinator Domain Action re-checks family side, the `coordinator.space` context, the permission, the feature gate, ownership (`submitted_by` = the user, channel COORDINATOR) and the CURRENT scope; out of scope and nonexistent are the same 404. Cancel and resubmit are the submitting actor's: the household head views coordinator-channel requests about their Family (submitter and channel shown) but cannot cancel or answer them; family-channel requests keep AUTH-ADR-091. Scope revocation ends the coordinator's access, never Staff's, and deletes nothing. A coordinator who heads a household keeps the Family Portal for their own household (AUTH-ADR-091) independently of Coordinator Space. Gate OFF by default (OFF / PILOT allowlist / GENERAL). Throttles per user on submit and actions; the existing `/coordinator/context` and `/families` reads gain throttles (CO-02.7). Amends PWA-1H "the Coordinator modifies nothing" only by allowing submission.
 
@@ -4970,6 +5015,9 @@ Date: 2026-09-24
 | 1.2.66 | 2026-10-14 | Approved | CO-02.5 (AUTH-ADR-093): FAMILY_ADD route `POST /coordinator/requests` with `coordinator-request.submit`; no permission, role or mapping change |
 | 1.2.67 | 2026-10-14 | Approved | CO-02.6a (AUTH-ADR-093): Coordinator form reference routes (relationship options, placements in scope) with `coordinator-request.submit` and the read throttle; no permission, role or mapping change |
 | 1.2.68 | 2026-10-14 | Approved | CO-02.7b: RETURNED → REJECTED under the existing change-request.reject; coordinator-read throttle on the Coordinator Space reads; Staff queue channel / submitter filters; no permission, role or mapping change |
+| 1.2.69 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (AUTH-ADR-094): §46 and §56 notes for the approved, not implemented Gaza geographic reference; no permission, role or mapping change |
+| 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B (AUTH-ADR-095): read-only Staff `/gaza-locations` API implemented locally with `reference-data.view` OR `residence.update` (controller union check); §56 note; no permission, role or mapping change |
+| 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1C (AUTH-ADR-064): COORDINATOR role and the ten PWA-1 permissions seeded; seeded mapping recorded; `person-mobile-trust.assist` intentionally deferred for COORDINATOR to PWA-1H (staged activation); verifier checks added. Nothing is enforced by an endpoint yet |

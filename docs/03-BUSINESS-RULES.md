@@ -3167,7 +3167,30 @@ geography. Labels distinguish:
 مكان النزوح الحالي           displacement_location_text (DISPLACED only)
 ```
 
-No geographic hierarchy or maps (PDD-006 stays open).
+**Current implementation:** no geographic hierarchy or maps; every
+location above is free text.
+
+**Approved future design — not implemented (2026-10-15, ADR-FB-GEO-01;
+`docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md`).** PDD-006 is
+architecturally resolved, implementation pending. Rules adopted for the
+implementation:
+
+- One Gaza geographic reference (Governorate → City → Area → Neighborhood
+  → optional Landmark; the five Gaza governorates only; source: the
+  supplied classification spreadsheet, never invented records) serves both
+  the original and the current residence.
+- When the Family is DISPLACED the current residence is the displacement
+  location; when NOT_DISPLACED it is the ordinary current accommodation. No
+  separate structured displacement address is created.
+- The free-text fields above keep their meaning and labels. Existing
+  addresses are never inferred, overwritten, deleted or backfilled into the
+  reference; a structured location is set only by an explicit selection.
+- Reports keep grouping by exact stored text until a separately approved
+  change (ADR-FB-GEO-01 §9); a Family without a structured location is
+  never placed by parsing its text.
+- RESIDENCE_UPDATE payload v1, reviewer workflows, coordinator workflows
+  and RBAC are unchanged; residence history (`residence.change`, §32–§34)
+  stays a separate concern. No maps or coordinates (PDD-024 stays open).
 
 ## Remaining limitations
 
@@ -3178,8 +3201,9 @@ No geographic hierarchy or maps (PDD-006 stays open).
   Family-less until transfer exists.
 - Household-head change is not implemented; a wrong head needs that future
   operation.
-- National ID normalization (PDD-001) and the geographic hierarchy
-  (PDD-006) stay open.
+- National ID normalization (PDD-001) stays open. The geographic hierarchy
+  (PDD-006) is architecturally resolved by ADR-FB-GEO-01 (2026-10-15);
+  its implementation is pending.
 
 ---
 
@@ -5215,6 +5239,7 @@ Date: 2026-09-24
 | 1.2.59 | 2026-10-13 | Approved | CO-02.2 (docs/06 AUTH-ADR-093, docs/05 WF-ADR-054): coordinator-submitted requests — approved, not implemented: PERSON_ADD (`ADD_FAMILY_MEMBER`) and FAMILY_ADD (`REGISTER_FAMILY`) within scope, no Family before APPLY, `COORDINATOR_REQUEST` registration source, National ID rules unchanged and no existence oracle, submitter-only cancel, scope revocation, gate off by default; amends the PWA-1H "modifies nothing" rule only by allowing submission |
 | 1.2.60 | 2026-10-14 | Approved | CO-02.5: FAMILY_ADD (REGISTER_FAMILY) as implemented locally — both attestations (relationship = household and placement verified), free head National ID, exact placement at APPLY, COORDINATOR_REQUEST registration and residence source, one answer for an unusable placement |
 | 1.2.61 | 2026-10-14 | Approved | CO-02.7d: meaning of the FAMILY_ADD (REGISTER_FAMILY) approval attestations — identity against an official document; the person is genuinely the household head and the Family belongs to the selected Clan / Branch (Clan membership without a Branch); no social, health or assistance information certified (docs/adr/CO-02 §21) |
+| 1.2.62 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (ADR-FB-GEO-01): "Residence decision" amended — PDD-006 architecturally resolved, implementation pending; current residence is the displacement location when DISPLACED; free text kept, no inference or backfill; reporting, workflows and RBAC unchanged. Documentation only |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

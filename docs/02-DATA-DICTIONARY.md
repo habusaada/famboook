@@ -1063,8 +1063,20 @@ created before this field existed). It must not be read or back-filled as
 It may be set only when `displacement_status = DISPLACED`; otherwise it is
 `NULL`.
 
-V1 uses free text for both location fields. There are no governorate/city
-reference data for them; see PDD-006 for the geographic hierarchy.
+**Current implementation:** V1 uses free text for both location fields.
+There are no governorate/city reference data for them, and the current
+address (`governorate`, `city`, `area`, `neighborhood`) is free text too.
+
+**Approved future design — not implemented (2026-10-15, ADR-FB-GEO-01,
+DD-ADR-036; full design `docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md`).**
+PDD-006 is architecturally resolved: one Gaza geographic reference
+(Governorate → City → Area → Neighborhood → optional Landmark, the five
+Gaza governorates only, from the supplied classification spreadsheet) for
+both the original and the current residence, through two proposed nullable
+references `original_location_id` and `current_location_id`. When the
+Family is DISPLACED the current residence **is** the displacement location;
+no separate structured displacement address exists. Every free-text field
+above is kept; nothing is inferred, overwritten or backfilled.
 
 ### governorate / city (V1)
 
@@ -2525,6 +2537,11 @@ of the changed current-residence fields only, from `governorate`, `city`,
 `displacement_location_text`; values are trimmed strings or null. No
 target membership or person (the Family is the target). Details: docs/11
 §30a.
+
+*Future (approved design, not implemented — ADR-FB-GEO-01 §7):* payload
+version 2 adds optional `original_location` / `current_location` (Gaza
+location codes, nullable). Version 1 stays accepted unchanged, and open v1
+requests apply as before.
 
 **ADD_FAMILY_MEMBER `submitted_data` (payload version 1, FP-ADR-076):**
 `full_name`, `national_id` (nine ASCII digits), `gender`, `relationship`
@@ -4052,6 +4069,10 @@ Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIE
 
 Registered Members (`registered_member_count`) are ACTIVE memberships whatever the Person's life status, activity or soft-deleted state; Living Members (not DECEASED, not soft-deleted) is the targeting and health-summary population; "Registered Household Size" is superseded (§20a, §75). Family Profile Review (derived completeness and states, stored confirmations with a keyed fingerprint, no registry copy) is distinct from Staff Family Verification (§45a; docs/11 FP-ADR-056, FP-ADR-057).
 
+### DD-ADR-036
+
+Unified Gaza geographic reference (FB-GEO-01 Phase 0, 2026-10-15; approved architecture, NOT implemented; full design docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md; docs/04 DB-ADR-063). Resolves PDD-006 architecturally. One reference, Governorate → City → Area → Neighborhood → optional Landmark, limited to the five Gaza governorates and sourced only from the supplied classification spreadsheet, serves both residences through proposed nullable `family_residences.original_location_id` and `current_location_id` (deepest known node; ancestors derived, never stored on the residence). The current residence is the displacement location when DISPLACED and the ordinary accommodation when NOT_DISPLACED; no structured displacement address. Free-text fields kept; no inference, overwrite or backfill. RESIDENCE_UPDATE v1 unchanged; v2 future. Residence history stays separate.
+
 ### DD-ADR-035
 
 Coordinator-request data (CO-02.3a, 2026-10-13; docs/04 DB-ADR-062, docs/adr/CO-02-COORDINATOR-REQUESTS.md): `change_requests` gains `submission_channel` (FAMILY / COORDINATOR, existing rows FAMILY), `proposed_clan_id` / `proposed_branch_id` (the placement of a proposed Family; Branch consistent with Clan) and `created_family_id` (set at APPLY); `family_id` is NULL only for the new type `REGISTER_FAMILY`; `workflow_events.actor_side` gains COORDINATOR; `registration_source` gains `COORDINATOR_REQUEST` (set only by the APPLY of a REGISTER_FAMILY request). Schema and constants only; no route, handler or permission.
@@ -4085,6 +4106,8 @@ Final relationship-type reference values.
 
 PDD-006
 Final residence geographic hierarchy.
+(Architecturally resolved 2026-10-15 — ADR-FB-GEO-01, DD-ADR-036; implementation pending.
+See docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md and §19.)
 
 PDD-007
 Exact health condition taxonomy.
@@ -4300,6 +4323,7 @@ Date: 2026-09-24
 | 1.2.37 | 2026-10-08 | Approved | PWA-6.1a: §57 RESIDENCE_UPDATE maps to UpdateFamilyResidenceAction (in-place correction); the move action stays future |
 | 1.2.38 | 2026-10-09 | Approved | §47 ADD_FAMILY_MEMBER submitted_data and APPROVED attestation metadata recorded (docs/11 FP-ADR-076) |
 | 1.2.39 | 2026-10-13 | Approved | CO-02.3a (DD-ADR-035): §52 nullable `family_id` for `REGISTER_FAMILY` only, `submission_channel`, `proposed_clan_id`, `proposed_branch_id`, `created_family_id`; §57 REGISTER_FAMILY type and COORDINATOR workflow actor; §7 `registration_source` COORDINATOR_REQUEST. Schema foundation only |
+| 1.2.40 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (DD-ADR-036, ADR-FB-GEO-01): PDD-006 architecturally resolved, implementation pending — unified Gaza geographic reference for original and current residence (§19 current vs future), RESIDENCE_UPDATE v2 noted as future (§47). Documentation only; no schema change |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

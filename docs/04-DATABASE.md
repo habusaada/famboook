@@ -862,6 +862,153 @@ CHECK (displacement_location_text IS NULL
 
 `displacement_status` stays nullable: `NULL` = not collected.
 
+**Approved future columns — NOT migrated (2026-10-15, DB-ADR-063,
+ADR-FB-GEO-01 §4.2).** The columns above are the current implementation.
+The approved design adds two nullable references to §24a:
+
+```text
+original_location_id UUID NULL FK gaza_locations.id RESTRICT
+current_location_id  UUID NULL FK gaza_locations.id RESTRICT
+```
+
+(UUID since Stage 1C D-7: `gaza_locations.id` is a UUID.)
+
+**Implemented LOCALLY 2026-10-15 (FB-GEO-01 Stage 3.2, DB-ADR-066;
+Production NOT migrated):** migration
+`2026_10_22_090003_add_location_references_to_family_residences_table`.
+- Both columns: `foreignUuid` nullable, FK `gaza_locations` RESTRICT, one
+  btree index each. No CHECK and no backfill.
+- `down()` refuses while any residence references a location.
+- New selections must be active (application validation plus an action
+  re-check under `FOR SHARE`); an unchanged stored value may be inactive.
+
+Each holds the deepest known node. `current_location_id` is valid for
+every displacement status (it is the displacement location when DISPLACED)
+and is not subject to the DISPLACED-only CHECK above. No existing column,
+CHECK or index changes; no backfill.
+
+---
+
+# 24a. Gaza Locations Reference Tables (implemented LOCALLY, NOT deployed)
+
+Approved 2026-10-15 (DB-ADR-063). **Implemented locally 2026-10-15**
+(FB-GEO-01 Stage 1C, DB-ADR-064) as migrations
+`2026_10_22_090000_create_gaza_locations_table` and
+`2026_10_22_090001_create_gaza_location_review_flags_table`. **Production
+is not migrated.** Full design and differences from the first draft:
+`docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md` §4.3.
+
+```text
+gaza_locations
+
+id                  UUID PK            -- deterministic UUIDv5 of (level, source_code)
+level               VARCHAR(20)        -- GOVERNORATE | CITY | AREA | NEIGHBORHOOD | LANDMARK
+source_code         VARCHAR(20)        -- official MoSD code, as supplied
+name                VARCHAR(255)       -- source name byte-for-byte
+parent_id           UUID NULL
+parent_level        VARCHAR(20) NULL
+landmark_type_code  VARCHAR(20) NULL   -- LANDMARK only
+landmark_type_name  VARCHAR(255) NULL  -- LANDMARK only
+is_active           BOOLEAN DEFAULT TRUE
+sort_order          INTEGER NULL
+created_at
+updated_at
+
+UNIQUE (level, source_code)
+UNIQUE (id, level)
+FK (parent_id, parent_level) → gaza_locations (id, level) RESTRICT
+```
+
+```text
+gaza_location_review_flags
+
+id                UUID PK
+gaza_location_id  UUID FK gaza_locations RESTRICT
+issue_code        VARCHAR(50)
+severity          VARCHAR(10)          -- WARNING | INFO
+source_reference  VARCHAR(100)
+review_status     VARCHAR(30) DEFAULT 'OPEN'
+notes             TEXT NULL
+created_at
+updated_at
+
+UNIQUE (gaza_location_id, issue_code)
+```
+
+PostgreSQL CHECKs:
+- `chk_gaza_location_level`
+- `chk_gaza_location_parent`: a GOVERNORATE has no parent; every other
+  node's parent is the level directly above
+- `chk_gaza_location_landmark_type`: type fields on landmarks only
+- `chk_gaza_location_source_code`: non-empty code and name
+- `chk_gaza_review_flag_severity`
+- `chk_gaza_review_flag_status`
+
+SQLite enforces the keys and the composite parent FK; the level rules are
+enforced there by the import.
+
+Rules:
+- Content comes only from the checksum-verified MoSD workbook (kept outside
+  Git) through `php artisan famboook:import-gaza-geography`, never by hand
+  and never from `DatabaseSeeder`.
+- Nodes are deactivated, never deleted.
+- Flags never change a node.
+
+**Import history** (implemented LOCALLY 2026-10-15, FB-GEO-01 Stage 1C.1,
+DB-ADR-065; Production NOT migrated): migration
+`2026_10_22_090002_create_gaza_geography_import_runs_table`.
+
+```text
+gaza_geography_import_runs
+
+id                             UUID PK
+source_authority               VARCHAR(150)
+source_filename                VARCHAR(255)       -- file name only
+source_sha256                  VARCHAR(64)        -- of the file actually read
+source_version                 VARCHAR(50) NULL   -- NULL = unstated
+status                         VARCHAR(20)        -- RUNNING | SUCCEEDED | FAILED | REJECTED
+started_at                     TIMESTAMP
+finished_at                    TIMESTAMP NULL
+governorates_count, cities_count, areas_count,
+neighborhoods_count, landmarks_count              INT NULL
+locations_created, locations_unchanged,
+locations_missing_from_source,
+flags_created, flags_unchanged                    INT NULL
+error_summary                  TEXT NULL          -- sanitized
+created_at
+updated_at
+
+UNIQUE (status) WHERE status = 'RUNNING'          -- uq_gaza_import_single_running
+```
+
+The table has no foreign key to the geographic tables.
+
+PostgreSQL CHECKs:
+- `chk_gaza_import_status`
+- `chk_gaza_import_finished`: `finished_at` is NULL exactly while RUNNING
+- `chk_gaza_import_sha256`: 64 lowercase hex characters
+
+Lifecycle and transaction boundaries: ADR-FB-GEO-01 §4.4. In short:
+- The run row is written outside the import transaction. SUCCEEDED is
+  written inside it, so SUCCEEDED means the data was committed.
+- A failed import leaves no partial records. Its run is REJECTED (a
+  refusal) or FAILED (an unexpected error).
+
+**Read API** (implemented LOCALLY 2026-10-15, FB-GEO-01 Stage 2B; Staff
+only; read-only; ADR-FB-GEO-01 §8.1):
+
+```text
+GET   /gaza-locations/governorates           reference-data.view OR residence.update; active, north → south
+GET   /gaza-locations/search                 same; q (2–100, contains), level, parent_id (all descendants), per_page ≤ 50
+GET   /gaza-locations/{uuid}/children        same; active children of an active location
+GET   /gaza-locations/{uuid}                 same; any status, with its ancestor path
+```
+
+The responses never contain source codes, review flags, import runs,
+timestamps or family data.
+
+`family_residences` is unchanged.
+
 ---
 
 # 25. One Current Residence
@@ -4106,6 +4253,34 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-066
+Residence geographic linkage, implemented LOCALLY (2026-10-15, FB-GEO-01 Stage 3.2; Production NOT migrated; ADR-FB-GEO-01 §4.2; contract `docs/audits/FB-GEO-01-STAGE-3-RESIDENCE-LINKAGE-AUDIT.md`).
+- `family_residences` gains nullable UUID `original_location_id` and `current_location_id`, each FK `gaza_locations` RESTRICT with its own index, on the current row beside the text they describe. There is no `displacement_location_id`.
+- Additive only: no existing column, CHECK, index or row changed; no backfill; nothing inferred from text.
+- `down()` refuses while any reference exists; the PostgreSQL up uses `lock_timeout` 5s.
+- Integrity split: the FK guarantees existence and blocks deletion. "Active for a new selection" and "an unchanged inactive value may stay" are application rules (`SelectableGazaLocation` plus the action `FOR SHARE` re-check).
+
+### DB-ADR-065
+Gaza geographic import history, implemented LOCALLY (2026-10-15, FB-GEO-01 Stage 1C.1; Production NOT migrated; ADR-FB-GEO-01 §4.4). New `gaza_geography_import_runs`:
+- UUID; source authority, file name and actual SHA-256; nullable version; status RUNNING / SUCCEEDED / FAILED / REJECTED; start and finish times; source and outcome counts; sanitized error summary.
+- No foreign key to geographic data.
+- A partial unique index on RUNNING works on both drivers; PostgreSQL CHECKs cover status, finish time and checksum format.
+
+The run row is committed outside the import transaction; SUCCEEDED is written inside it. Concurrency: a PostgreSQL session advisory lock, backed by the single-RUNNING index. Additive; no existing table changed.
+
+### DB-ADR-064
+Gaza geographic reference, implemented LOCALLY (2026-10-15, FB-GEO-01 Stage 1C; Production NOT migrated; ADR-FB-GEO-01 §4.3, decision register §8). Supersedes the DB-ADR-063 draft identifiers:
+- `gaza_locations` has a UUID primary key (deterministic UUIDv5 of level + source code), the official MoSD code in `source_code` with `UNIQUE (level, source_code)` (codes repeat across levels), the source name stored byte-for-byte, and a composite parent key `(parent_id, parent_level) → (id, level)` RESTRICT.
+- Landmark type code and name are stored on landmark rows.
+- PostgreSQL CHECKs: level, parent level directly above, landmark type fields on landmarks only, non-empty code and name.
+- New `gaza_location_review_flags` (UUID; location FK RESTRICT; issue code, severity, source reference, review status, notes; `UNIQUE (gaza_location_id, issue_code)`) keeps audit findings apart from source data.
+- No `governorate_id` (deferred to reporting) and no residence columns. The future residence references will be UUID.
+
+Data comes only from the checksum-verified import command, which is not part of `DatabaseSeeder`. Local result: 2,139 records and 228 flags.
+
+### DB-ADR-063
+Unified Gaza geographic reference (2026-10-15, FB-GEO-01 Phase 0, approved design; NOT migrated; full design docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md §4; docs/02 DD-ADR-036). Preferred: one self-referencing `gaza_locations` table (§24a; GOVERNORATE → CITY → AREA → NEIGHBORHOOD → optional LANDMARK, five Gaza governorates, stable immutable codes, `governorate_id` on every node, deactivate never delete), subject to technical validation of parent-level integrity and SQLite test support; per-level tables are the fallback. `family_residences` gains nullable `original_location_id` and `current_location_id` (FK RESTRICT, deepest known node), with no displacement-only CHECK on `current_location_id` and no structured displacement column. Additive only: existing columns, CHECKs and `uq_family_current_residence` unchanged; no backfill or inference. Migrations and seeding are later, separately approved stages.
+
 ### DB-ADR-062
 Coordinator-submitted requests (2026-10-13, CO-02.2, approved design; NOT migrated — CO-02.3; full design docs/adr/CO-02-COORDINATOR-REQUESTS.md §5). One additive migration: `change_requests.family_id` becomes nullable, NULL exactly for the new type `REGISTER_FAMILY` (`chk_change_request_family_subject`); new `submission_channel` (FAMILY default / COORDINATOR, CHECK; existing rows FAMILY by the default, no backfill); `proposed_clan_id` (FK clans) and `proposed_branch_id` with a composite FK `(proposed_branch_id, proposed_clan_id)` → `branches (id, clan_id)`, present exactly for REGISTER_FAMILY (`chk_change_request_placement`); `created_family_id` (FK families, restrict) set exactly when a REGISTER_FAMILY request is APPLIED (`chk_change_request_created_family`); `chk_change_request_channel_type` limits REGISTER_FAMILY to the COORDINATOR channel; the type CHECK gains REGISTER_FAMILY; `workflow_events.chk_workflow_event_actor_side` gains COORDINATOR (append-only trigger and other CHECKs unchanged). The CONTACT_UPDATE-only actor relaxations (2026_10_18_090000) are kept verbatim. `registration_source` / residence `source` gain `COORDINATOR_REQUEST` in the application enum only (no DB CHECK exists). No Family, Person or identifier is created before APPLY; `family_activities` stays Family-bound. `down()` refuses while REGISTER_FAMILY or COORDINATOR-channel rows exist. **Implemented locally 2026-10-13 (CO-02.3a, not deployed)** as `2026_10_21_090000_add_coordinator_change_requests`, with one addition found by inspecting the live schema: `workflow_events.actor_side` was `varchar(10)` and `COORDINATOR` has eleven characters, so the column widens to `varchar(20)` (a length increase — no table rewrite, the append-only trigger does not fire; `down()` narrows it back once no COORDINATOR event exists). `SET LOCAL lock_timeout = '5s'` as in DB-ADR-061; the composite key is named `fk_change_request_proposed_branch_clan`; `down()` also refuses while a COORDINATOR workflow event or a NULL `family_id` exists.
 
@@ -4424,6 +4599,11 @@ Date: 2026-09-24
 | 1.2.44 | 2026-10-12 | Approved | CO-01D.4 (DB-ADR-061): `persons.national_id` NOT NULL, canonical nine-digit CHECK and UNIQUE over every row (soft-deleted included); pre-flight refuses dirty data, lock_timeout 5s, exact rollback; no Person changed |
 | 1.2.45 | 2026-10-13 | Approved | CO-02.2 (DB-ADR-062): approved, not migrated — coordinator-request schema: nullable `family_id` only for REGISTER_FAMILY, `submission_channel`, proposed Clan / Branch (composite FK), `created_family_id`, type and actor-side CHECKs extended; CONTACT_UPDATE relaxations preserved; guarded rollback |
 | 1.2.46 | 2026-10-13 | Approved | CO-02.3a (DB-ADR-062): coordinator-request schema implemented locally as `2026_10_21_090000_add_coordinator_change_requests` (not deployed); `workflow_events.actor_side` widened to varchar(20) for COORDINATOR; guarded rollback also refuses COORDINATOR events |
+| 1.2.47 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (DB-ADR-063): approved, NOT migrated — §24a `gaza_locations` reference table and §24 nullable `original_location_id` / `current_location_id`; PDD-006 architecturally resolved, implementation pending; no schema change in this version |
+| 1.2.48 | 2026-10-15 | Approved | FB-GEO-01 Stage 1C (DB-ADR-064): §24a `gaza_locations` (UUID, `UNIQUE (level, source_code)`, composite parent key, PostgreSQL CHECKs) and `gaza_location_review_flags` implemented LOCALLY as `2026_10_22_090000` / `2026_10_22_090001`; official workbook imported locally (2,139 records, 228 flags); §24 future residence references typed UUID (still not migrated); Production NOT migrated |
+| 1.2.49 | 2026-10-15 | Approved | FB-GEO-01 Stage 1C.1 (DB-ADR-065): §24a `gaza_geography_import_runs` (import history, single-RUNNING index, PostgreSQL CHECKs) implemented LOCALLY as `2026_10_22_090002`; only that migration applied locally; Production NOT migrated |
+| 1.2.50 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B: §24a read-only Staff API listed (`/gaza-locations/…`, AUTH-ADR-095); no schema change; local only |
+| 1.2.51 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2 (DB-ADR-066): §24 `original_location_id` / `current_location_id` on `family_residences` implemented LOCALLY as `2026_10_22_090003` (nullable UUID FK RESTRICT, indexed, guarded rollback, no backfill); Production NOT migrated |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
