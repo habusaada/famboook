@@ -12,7 +12,10 @@ export interface GazaLocation {
   parent_id: string | null;
   /** Whether the location has ACTIVE children. */
   has_children: boolean;
-  /** Landmark type name for a LANDMARK, otherwise null. Staff responses only: absent from the Family mirrors (API-D4). */
+  /**
+   * Landmark type name for a LANDMARK, otherwise null. Family mirrors (API-D4 as
+   * amended by FB-GEO-03): the family-safe type — null while an unusual-type review blocks it.
+   */
   landmark_type?: string | null;
 }
 
@@ -41,4 +44,10 @@ export interface GazaLocationSummary {
   name: string;
   is_active: boolean;
   path: GazaLocationPathItem[];
+  /**
+   * Family household profile only (FB-GEO-03): the family-safe landmark type
+   * name — null below LANDMARK or while an unusual-type review blocks it.
+   * Absent from the Staff summary.
+   */
+  landmark_type?: string | null;
 }

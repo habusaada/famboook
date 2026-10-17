@@ -597,20 +597,17 @@ describe("errors, stale responses and accessibility", () => {
 describe("Family PWA source", () => {
   const FAMILY = "/api/v1/family/change-requests/gaza-locations";
 
-  // The family mirrors serve the same data without landmark_type; any Staff
-  // path fails the test.
-  function mockFamilyApi() {
+  // The family mirrors serve the same data with the FAMILY-SAFE landmark_type
+  // (FB-GEO-03): the type name, or null while an unusual-type review blocks
+  // it — here L2's. Any Staff path fails the test.
+  function mockFamilyApi(blocked: string[] = [L2.id]) {
     const get = mockApi();
     const staffReply = get.getMockImplementation()!;
     get.mockImplementation(async (path: string) => {
       if (!path.startsWith(FAMILY)) throw new Error(`Staff path used: ${path}`);
       const reply = (await staffReply(BASE + path.slice(FAMILY.length))) as { data: GazaLocation[] | GazaLocation };
-      const strip = (item: GazaLocation) => {
-        const copy: Partial<GazaLocation> = { ...item };
-        delete copy.landmark_type;
-        return copy;
-      };
-      return { data: Array.isArray(reply.data) ? reply.data.map(strip) : strip(reply.data) } as never;
+      const safe = (item: GazaLocation) => (blocked.includes(item.id) ? { ...item, landmark_type: null } : item);
+      return { data: Array.isArray(reply.data) ? reply.data.map(safe) : safe(reply.data) } as never;
     });
     return get;
   }
@@ -623,12 +620,34 @@ describe("Family PWA source", () => {
     await pick(user, /^المدينة/, C1.name);
     await pick(user, /^المنطقة/, A1.name);
     await pick(user, /^الحي/, N1.name);
-    // No landmark type in family responses: the plain name is offered.
-    await pick(user, /^المعلم/, L1.name);
+    // A family-safe type is shown beside the name (FB-GEO-03).
+    await pick(user, /^المعلم/, `${L1.name} (مصلى)`);
 
     expect(spy.mock.calls.map(([id]) => id)).toEqual([G1.id, C1.id, A1.id, N1.id, L1.id]);
     expect(get.mock.calls.length).toBeGreaterThan(0);
     expect(get.mock.calls.every(([path]) => String(path).startsWith(FAMILY))).toBe(true);
+  });
+
+  it("FB-GEO-03: labels a landmark «name (type)» only when the family-safe type is provided, and selects by the original id", async () => {
+    mockFamilyApi();
+    const { user, spy } = setup({ source: "family" });
+    await pick(user, /^المحافظة/, G1.name);
+    await pick(user, /^المدينة/, C1.name);
+    await pick(user, /^المنطقة/, A1.name);
+    await pick(user, /^الحي/, N1.name);
+
+    const options = await optionNames(user, /^المعلم/);
+    // Safe type shown; the withheld (null) type of L2 never appears — only its unchanged name.
+    expect(options).toContain(`${L1.name} (مصلى)`);
+    expect(options).toContain(L2.name);
+    expect(options.join("|")).not.toContain("مدرسة");
+    expect(options.filter((o) => o.includes(L2.name))).toEqual([L2.name]);
+
+    await pick(user, /^المعلم/, L2.name);
+    await pick(user, /^المعلم/, `${L1.name} (مصلى)`);
+    // The original location ids are emitted, never a label.
+    expect(spy.mock.calls.map(([id]) => id).slice(-2)).toEqual([L2.id, L1.id]);
+    expect(value()).toBe(L1.id);
   });
 
   it("shows an inactive saved location read-only, and cancelling a replacement emits nothing", async () => {

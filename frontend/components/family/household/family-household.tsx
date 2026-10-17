@@ -21,6 +21,7 @@ import {
 export const NOT_RECORDED = "غير مسجّل";
 export const NO_RESIDENCE = "لا توجد بيانات سكن مسجّلة";
 export const NO_LOCATION = "لم يُحدَّد موقع جغرافي";
+export const LANDMARK_TYPE_LABEL = "نوع المعلم";
 /** Recorded displacement free text — never the approved current geography (FB-GEO-02 G2-7). */
 export const DISPLACEMENT_TEXT_LABEL = "مكان النزوح (نص مسجّل سابقًا)";
 export const DISPLACEMENT_TEXT_HISTORY_LABEL = "مكان النزوح السابق (نص تاريخي)";
@@ -163,6 +164,8 @@ function SubHeading({ id, children }: { id: string; children: string }) {
  * exactly as the API returns it (the ancestors, then the place itself) —
  * nothing added, merged or dropped. Two columns when they fit, one when
  * narrow; long names wrap. «لم يُحدَّد موقع جغرافي» when none is recorded.
+ * A landmark's type, when the API provides it (family-safe, FB-GEO-03), is
+ * one more tile «نوع المعلم»; the name itself is never changed.
  */
 function LocationRow({ label, location, field }: { label: string; location: GazaLocationSummary | null | undefined; field: string }) {
   const levels = location ? [...location.path, { id: location.id, level: location.level, name: location.name, is_active: location.is_active }] : [];
@@ -176,7 +179,7 @@ function LocationRow({ label, location, field }: { label: string; location: Gaza
             {levels.map((item) => (
               <div key={item.id} className="min-w-0 rounded-lg border border-stroke-subtle bg-surface-2 px-3 py-2" data-location-level={item.level}>
                 <dt className="text-xs text-muted-foreground">{GAZA_LOCATION_LEVEL_LABELS[item.level]}</dt>
-                <dd className="mt-0.5 font-medium text-foreground [overflow-wrap:anywhere]">
+                <dd className="mt-0.5 font-medium text-foreground wrap-anywhere">
                   <bdi>{item.name}</bdi>
                   {!item.is_active && (
                     <StatusBadge tone="warning" className="ms-1.5 align-middle">
@@ -186,6 +189,15 @@ function LocationRow({ label, location, field }: { label: string; location: Gaza
                 </dd>
               </div>
             ))}
+            {/* FB-GEO-03: the family-safe landmark type, as its own tile; absent → no tile. */}
+            {location.level === "LANDMARK" && location.landmark_type?.trim() && (
+              <div className="min-w-0 rounded-lg border border-stroke-subtle bg-surface-2 px-3 py-2" data-location-landmark-type>
+                <dt className="text-xs text-muted-foreground">{LANDMARK_TYPE_LABEL}</dt>
+                <dd className="mt-0.5 font-medium text-foreground wrap-anywhere">
+                  <bdi>{location.landmark_type}</bdi>
+                </dd>
+              </div>
+            )}
           </dl>
         ) : (
           <Missing>{NO_LOCATION}</Missing>

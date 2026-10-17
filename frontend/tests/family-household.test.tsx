@@ -6,6 +6,7 @@ import {
   DISPLACEMENT_TEXT_HISTORY_LABEL,
   DISPLACEMENT_TEXT_LABEL,
   FamilyHousehold,
+  LANDMARK_TYPE_LABEL,
   NO_LOCATION,
   NO_RESIDENCE,
   NOT_RECORDED,
@@ -258,6 +259,36 @@ describe("السكن", () => {
     expect(card.querySelector('[data-field="address_text"]')).toBeNull();
     // Never a raw identifier.
     expect(card.textContent).not.toMatch(/00000000-0000/);
+  });
+
+  it("FB-GEO-03: shows the landmark type as its own «نوع المعلم» tile, for the current and the original location", async () => {
+    const landmark = (name: string, type: string | null): GazaLocationSummary => ({ ...CURRENT, id: `${CURRENT.id.slice(0, -1)}9`, name, landmark_type: type });
+    renderHousehold(familyProfile({}, { original_location: landmark("مسجد الاختبار", "مسجد/جامع"), current_location: { ...CURRENT, landmark_type: "مدرسة حكومية" } }));
+    const card = await residenceCard();
+
+    for (const [name, levelName, type] of [
+      ["current_location", "نقطة المواصي", "مدرسة حكومية"],
+      ["original_location", "مسجد الاختبار", "مسجد/جامع"],
+    ] as const) {
+      // The type follows the landmark tile; the landmark name is exactly as before.
+      expect(levels(card, name).slice(-1)).toEqual([["المعلم", levelName]]);
+      const tile = card.querySelector(`[data-field="${name}"] [data-location-landmark-type]`) as HTMLElement;
+      expect(tile.querySelector("dt")?.textContent).toBe(LANDMARK_TYPE_LABEL);
+      expect(tile.querySelector("dd")?.textContent).toBe(type);
+      expect(tile.querySelector("bdi")).not.toBeNull();
+    }
+  });
+
+  it("FB-GEO-03: omits only the type tile when the type is withheld, keeping every level", async () => {
+    renderHousehold(familyProfile({}, { current_location: { ...CURRENT, landmark_type: null }, original_location: { ...ORIGINAL, landmark_type: "لا يُعرض" } }));
+    const card = await residenceCard();
+
+    expect(card.querySelector("[data-location-landmark-type]")).toBeNull();
+    expect(levels(card, "current_location")).toHaveLength(3);
+    expect(levels(card, "current_location").slice(-1)).toEqual([["المعلم", "نقطة المواصي"]]);
+    // Never a type below LANDMARK, whatever the payload says.
+    expect(card.textContent).not.toContain("لا يُعرض");
+    expect(card.textContent).not.toContain(LANDMARK_TYPE_LABEL);
   });
 
   it("never falls back to legacy text for a missing structured location", async () => {

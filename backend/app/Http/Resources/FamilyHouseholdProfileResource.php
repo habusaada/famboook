@@ -83,7 +83,8 @@ class FamilyHouseholdProfileResource extends JsonResource
                 ],
                 // FB-GEO-01 (RESIDENCE_UPDATE v2): the saved structured
                 // references as display summaries {id, level, name, is_active,
-                // path} — beside, never instead of, the text above. Never a
+                // path, landmark_type} — beside, never instead of, the text
+                // above. landmark_type is family-safe (FB-GEO-03). Never a
                 // source code or review flag. Null when not recorded.
                 ...$this->locations($residence),
             ],
@@ -93,7 +94,8 @@ class FamilyHouseholdProfileResource extends JsonResource
     /** @return array{original_location: ?array<string, mixed>, current_location: ?array<string, mixed>} */
     private function locations(FamilyResidence $residence): array
     {
-        $summaries = GazaLocationSummary::forResidence($residence);
+        // FB-GEO-03: with the family-safe landmark_type (FamilyLandmarkType).
+        $summaries = GazaLocationSummary::forResidence($residence, forFamily: true);
 
         return ['original_location' => $summaries['original'], 'current_location' => $summaries['current']];
     }

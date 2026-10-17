@@ -31,7 +31,8 @@ class FamilyGazaLocationApiTest extends TestCase
 
     private const URI = '/api/v1/family/change-requests/gaza-locations';
 
-    private const KEYS = ['has_children', 'id', 'level', 'name', 'parent_id'];
+    // FB-GEO-03 (API-D4 amended): the family-safe landmark_type, null below LANDMARK.
+    private const KEYS = ['has_children', 'id', 'landmark_type', 'level', 'name', 'parent_id'];
 
     private User $head;
 
@@ -130,7 +131,8 @@ class FamilyGazaLocationApiTest extends TestCase
             $children = $this->family("/{$parent}/children")->assertOk()->assertHeader('Cache-Control', 'no-store, private');
             $this->assertNotEmpty($children->json('data'));
             foreach ($children->json('data') as $child) {
-                $this->assertSame(self::KEYS, collect($child)->keys()->sort()->values()->all(), 'no landmark_type, code, flag or status');
+                $this->assertSame(self::KEYS, collect($child)->keys()->sort()->values()->all(), 'no type code, flag or status');
+                $level === 'LANDMARK' ? $this->assertNotNull($child['landmark_type']) : $this->assertNull($child['landmark_type']);
                 $this->assertSame($parent, $child['parent_id']);
                 $this->assertSame($level, $child['level']);
             }
@@ -148,7 +150,7 @@ class FamilyGazaLocationApiTest extends TestCase
         $details = $this->family("/{$nei}")->assertOk()->assertHeader('Cache-Control', 'no-store, private');
         $this->assertSame(['GOVERNORATE', 'CITY', 'AREA'], array_column($details->json('data.path'), 'level'));
         $this->assertTrue($details->json('data.is_active'));
-        $this->assertArrayNotHasKey('landmark_type', $details->json('data'));
+        $this->assertNull($details->json('data.landmark_type'), 'no type below LANDMARK');
 
         GazaLocation::whereKey($area)->update(['is_active' => false]);
 

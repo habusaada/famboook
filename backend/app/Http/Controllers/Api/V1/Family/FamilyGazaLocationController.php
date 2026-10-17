@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Family;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\GazaLocationResource;
 use App\Models\GazaLocation;
+use App\Support\Geography\FamilyLandmarkType;
 use App\Support\Geography\GazaLocationLookup;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -20,8 +21,10 @@ use Illuminate\Http\JsonResponse;
  * not. No permission was added: family-portal.access is FAMILY_USER's.
  *
  * The same queries and resource as the Staff lookups (GazaLocationLookup,
- * GazaLocationResource), without landmark_type (API-D4). Reference data
- * only: no family data, review flags or import metadata. Nothing is written.
+ * GazaLocationResource), with the family-safe landmark_type (API-D4 as
+ * amended by FB-GEO-03: FamilyLandmarkType, resolved for a whole list in one
+ * query). Reference data only: no family data, review flags or import
+ * metadata. Nothing is written.
  * no-store, like the other family reference routes.
  */
 class FamilyGazaLocationController extends Controller
@@ -48,6 +51,8 @@ class FamilyGazaLocationController extends Controller
 
     private function list(Collection $locations): JsonResponse
     {
+        FamilyLandmarkType::load($locations);
+
         return response()->json([
             'data' => $locations->map(fn (GazaLocation $location) => (new GazaLocationResource($location))->forFamily()->resolve())->values(),
         ])->header('Cache-Control', 'no-store, private');

@@ -594,7 +594,9 @@ following the existing `ReferenceController` union pattern.
 - `id`, `level`, `name` (edge-trimmed display value), `parent_id`;
 - `has_children` (active children only);
 - `landmark_type` (the type name for a LANDMARK, otherwise null; Staff
-  only);
+  only — *amended by ADR FB-GEO-03: family-facing responses carry the
+  family-safe type, withheld while an UNUSUAL_LANDMARK_TYPE flag is OPEN or
+  CORRECTION_REQUIRED*);
 - `path` (search and details): `[{id, level, name}]` from the governorate
   down to the parent.
 
@@ -798,7 +800,8 @@ tablet and mobile widths. The development database was not touched.
   - Same queries as the Staff lookups (new `GazaLocationLookup`, also used
     by `GazaLocationController`).
   - Same resource with `forFamily()`: no `landmark_type` (API-D4), and never
-    codes, flags or import metadata.
+    codes, flags or import metadata. *(Amended by ADR FB-GEO-03: the
+    family-safe `landmark_type` is now included.)*
   - Details carry `is_active`. `no-store, private`. GET only; nothing is
     written.
   - Search is not mirrored (the selector does not use it).

@@ -417,7 +417,7 @@ GET /api/v1/reference/gaza-locations   (FAMILY_USER)      → 403 {"message":"ه
 | API-D1 | Staff read authorization | `reference-data.view` **OR** `residence.update`, checked in the controller (existing pattern); no mapping change | (b) add `family.view` (all Staff roles); (c) grant `reference-data.view` to SOCIAL_WORKER (role-mapping change) |
 | API-D2 | When to build the Family PWA mirrors | With RESIDENCE_UPDATE v2 (Stage 5), under `/family/change-requests/gaza-locations…` | Build in 2B, unused until Stage 5 |
 | API-D3 | Coordinator access | None now (REGISTER_FAMILY keeps text, CO-02 D10) | A coordinator-scoped mirror with a structured original residence (a workflow change) |
-| API-D4 | Exposure of `landmark_type` and `source_code` | Expose `landmark_type` (name only) on staff responses only; never expose `source_code` or `landmark_type_code` | Expose the type to families too; or omit it everywhere |
+| API-D4 | Exposure of `landmark_type` and `source_code` | Expose `landmark_type` (name only) on staff responses only; never expose `source_code` or `landmark_type_code` — *amended 2026-10-17 by ADR FB-GEO-03: families see the type name too, except while an UNUSUAL_LANDMARK_TYPE flag is OPEN or CORRECTION_REQUIRED* | Expose the type to families too; or omit it everywhere |
 | API-D5 | Arabic search normalization | Accept PDD-003 behaviour (no normalization) for 2B | A normalized search column (schema change) |
 | API-D6 | Sorting | Governorates north → south by source code; others by name | Name only everywhere |
 | API-D7 | `within` filter on search | Include (cheap ancestor filter) | Defer |

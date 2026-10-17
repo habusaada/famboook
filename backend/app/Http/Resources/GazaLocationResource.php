@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Enums\GazaLocationLevel;
 use App\Models\GazaLocation;
+use App\Support\Geography\FamilyLandmarkType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,8 +18,10 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * - has_children: whether the node has ACTIVE children (always loaded by
  *   GazaLocationController).
  * - landmark_type: the landmark type name for a LANDMARK, otherwise null.
- *   Staff responses only (API-D4): the Family PWA mirrors call
- *   forFamily(), which omits the key.
+ *   For the Family PWA mirrors (forFamily(), API-D4 as amended by FB-GEO-03)
+ *   it is the family-safe type (FamilyLandmarkType): withheld (null) while
+ *   an UNUSUAL_LANDMARK_TYPE review flag is OPEN or CORRECTION_REQUIRED.
+ *   Never the type code or any review data.
  * - path: ancestors from the governorate down to the parent, each
  *   {id, level, name}; present only where loaded (search, details).
  * - is_active: ONLY on the details endpoint (withStatus()), for the node and
@@ -42,7 +45,7 @@ class GazaLocationResource extends JsonResource
         return $this;
     }
 
-    /** Family PWA mirrors (API-D2): the same whitelist without landmark_type. */
+    /** Family PWA mirrors (API-D2): the same whitelist, with the family-safe landmark_type. */
     public function forFamily(): static
     {
         $this->forFamily = true;
@@ -58,7 +61,9 @@ class GazaLocationResource extends JsonResource
             'name' => $this->displayName(),
             'parent_id' => $this->parent_id,
             'has_children' => (bool) $this->has_children,
-            'landmark_type' => $this->unless($this->forFamily, fn () => $this->level === GazaLocationLevel::LANDMARK ? trim((string) $this->landmark_type_name) : null),
+            'landmark_type' => $this->forFamily
+                ? FamilyLandmarkType::of($this->resource)
+                : ($this->level === GazaLocationLevel::LANDMARK ? trim((string) $this->landmark_type_name) : null),
             'is_active' => $this->when($this->withStatus, fn () => (bool) $this->is_active),
             'path' => $this->whenLoaded('path', fn () => $this->path->map(fn (GazaLocation $ancestor) => [
                 'id' => $ancestor->id,

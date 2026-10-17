@@ -4537,6 +4537,7 @@ Gaza geographic reference read API (2026-10-15, FB-GEO-01 Stage 2B; implemented 
 - **Routes:** four read-only Staff routes under `/gaza-locations` inside `auth:sanctum` + `staff.side`.
 - **Authorization (API-D1):** `reference-data.view` **or** `residence.update`, checked in the controller like the assessment-domain, need-category and assistance-category reference routes. SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY and SOCIAL_WORKER may read; REVIEWER and REPORTS_VIEWER may not; family-side and mixed accounts never reach the routes.
 - **Exposure (API-D4):** id, level, trimmed name, parent_id, has_children, landmark type name (Staff only) and ancestor path. Never source codes, review flags, import history, timestamps or family data.
+- **Amended 2026-10-17 (ADR FB-GEO-03):** the Family PWA location mirrors and the household profile's location summaries carry the family-safe landmark type name. It is withheld while an UNUSUAL_LANDMARK_TYPE review flag is OPEN or CORRECTION_REQUIRED, and never includes the type code or any review data. No permission, role or mapping changed.
 - No permission, role or mapping added or changed. Family PWA mirrors are deferred to Stage 5 (API-D2); no coordinator access (API-D3).
 
 ### AUTH-ADR-094

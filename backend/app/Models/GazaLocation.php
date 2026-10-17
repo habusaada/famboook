@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\GazaLocationLevel;
+use App\Support\Geography\FamilyLandmarkType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,6 +32,12 @@ class GazaLocation extends Model
         'id', 'level', 'source_code', 'name', 'parent_id', 'parent_level',
         'landmark_type_code', 'landmark_type_name', 'is_active', 'sort_order',
     ];
+
+    /**
+     * FB-GEO-03: the internal batch-loaded flag of FamilyLandmarkType is never
+     * serialized (toArray / toJson), whatever path renders a location.
+     */
+    protected $hidden = [FamilyLandmarkType::BLOCKED_ATTRIBUTE];
 
     protected function casts(): array
     {

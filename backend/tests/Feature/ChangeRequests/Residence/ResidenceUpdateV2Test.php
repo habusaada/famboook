@@ -248,7 +248,10 @@ class ResidenceUpdateV2Test extends TestCase
         $residence = $this->actingAs($this->context->user->fresh())->getJson('/api/v1/family/household/profile')
             ->assertOk()->json('data.residence');
 
-        $this->assertSame(['id', 'is_active', 'level', 'name', 'path'], collect($residence['original_location'])->keys()->sort()->values()->all());
+        $this->assertSame(['id', 'is_active', 'landmark_type', 'level', 'name', 'path'], collect($residence['original_location'])->keys()->sort()->values()->all());
+        // FB-GEO-03: the family-safe landmark type — null below LANDMARK.
+        $this->assertNull($residence['original_location']['landmark_type']);
+        $this->assertSame('مدرسة', $residence['current_location']['landmark_type']);
         $this->assertSame($inactive, $residence['original_location']['id']);
         $this->assertFalse($residence['original_location']['is_active']);
         $this->assertSame(['غزة الاختبار', 'مدينة الاختبار', 'شرق'], array_column($residence['original_location']['path'], 'name'));
@@ -257,7 +260,7 @@ class ResidenceUpdateV2Test extends TestCase
         $this->assertArrayNotHasKey('current_location_id', $residence);
         $this->assertSame('شارع التجربة 1', $residence['current_address']['address_text'], 'text unchanged beside it');
         $json = json_encode($residence, JSON_UNESCAPED_UNICODE);
-        foreach (['source_code', 'landmark_type', 'review', 'flag'] as $forbidden) {
+        foreach (['source_code', 'landmark_type_code', 'review', 'flag'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $json);
         }
 
