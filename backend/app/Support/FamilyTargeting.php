@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\AssessmentStatus;
+use App\Enums\DisplacementStatus;
 use App\Enums\FamilyStatus;
 use App\Enums\HealthRecordType;
 use App\Enums\LifeStatus;
@@ -55,6 +56,9 @@ class FamilyTargeting
                     $r->where('displacement_status', $c['displacement_status']);
                 }
                 if (isset($c['displacement_location_text'])) {
+                    // «مكان النزوح الحالي»: a non-displaced family's kept
+                    // historical text (FB-GEO-02) never matches.
+                    $r->where('displacement_status', DisplacementStatus::DISPLACED->value);
                     $r->whereRaw('LOWER(displacement_location_text) LIKE ?', ['%'.mb_strtolower($c['displacement_location_text']).'%']);
                 }
             });

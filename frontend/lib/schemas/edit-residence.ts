@@ -55,8 +55,9 @@ export function toDisplacementPayload(
   return {
     original_residence_text: values.originalResidenceText || null,
     displacement_status: status,
-    displacement_location_text:
-      status === "DISPLACED" ? values.displacementLocationText || null : null,
+    // FB-GEO-02: only a displaced family's location is sent; otherwise the key
+    // is omitted and the stored text is kept as historical data.
+    ...(status === "DISPLACED" ? { displacement_location_text: values.displacementLocationText || null } : {}),
     ...locationChange("original_location_id", values.originalLocationId, residence),
   };
 }

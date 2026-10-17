@@ -41,14 +41,17 @@ use Tests\TestCase;
 
 /**
  * RESIDENCE_UPDATE end to end (PWA-6.1) on the REAL Production registry,
- * through the Family and Staff APIs: submission, validation, isolation,
- * idempotency, open conflict, base fingerprint, approve / apply through
- * UpdateFamilyResidenceAction, rollback and retry, presentation and privacy.
- * Synthetic data only.
+ * through the Family and Staff APIs. Since FB-GEO-02 a NEW submission is
+ * payload v3 (submission, validation, isolation, idempotency and open-conflict
+ * tests below send v3 data); the review / approve / apply lifecycle — base
+ * fingerprint, UpdateFamilyResidenceAction, rollback and retry, presentation
+ * and privacy — runs on STORED v2 requests (StoresLegacyResidenceRequests), so
+ * requests submitted before v3 keep their full coverage. v3 specifics:
+ * ResidenceUpdateV3Test. Synthetic data only.
  */
 class ResidenceUpdateTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, StoresLegacyResidenceRequests;
 
     private const FAMILY_URI = '/api/v1/family/change-requests';
 
@@ -79,17 +82,6 @@ class ResidenceUpdateTest extends TestCase
         $this->reviewer = tap(User::factory()->create(), fn (User $u) => $u->assignRole(Role::findByName('REVIEWER', 'web')));
     }
 
-    /** The current residence as the family would send it, with overrides. */
-    private function proposal(array $overrides = []): array
-    {
-        return [
-            'governorate' => 'خانيونس', 'city' => 'خانيونس', 'area' => 'البلد', 'neighborhood' => 'حي الأمل',
-            'address_text' => 'شارع التجربة 1', 'original_residence_text' => 'بني سهيلا',
-            'displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => null,
-            ...$overrides,
-        ];
-    }
-
     private function family(string $method, string $uri = '', array $body = [], ?User $as = null): TestResponse
     {
         return $this->actingAs(($as ?? $this->context->user)->fresh())->json($method, self::FAMILY_URI.$uri, $body);
@@ -107,16 +99,23 @@ class ResidenceUpdateTest extends TestCase
         ], fn ($v) => $v !== null), $as);
     }
 
-    private function submitted(array $overrides = ['neighborhood' => 'حي النصر']): ChangeRequest
+    /** A NEW (v3) submission through the Family API. */
+    private function submittedV3(array $data = ['address_text' => 'شارع النصر 5']): ChangeRequest
     {
-        $id = $this->submit($this->proposal($overrides))->assertCreated()->json('data.id');
+        $id = $this->submit($data)->assertCreated()->json('data.id');
 
         return ChangeRequest::where('uuid', $id)->sole();
     }
 
-    private function approved(array $overrides = ['neighborhood' => 'حي النصر']): ChangeRequest
+    /** A v2 request as stored before v3 (its data: only the changed fields). */
+    private function submitted(array $data = ['neighborhood' => 'حي النصر']): ChangeRequest
     {
-        $request = $this->submitted($overrides);
+        return $this->legacyResidenceRequest(2, $data);
+    }
+
+    private function approved(array $data = ['neighborhood' => 'حي النصر']): ChangeRequest
+    {
+        $request = $this->submitted($data);
         $this->staff('POST', "/{$request->uuid}/start-review")->assertOk();
         $this->staff('POST', "/{$request->uuid}/approve")->assertOk()->assertJsonPath('data.status', 'APPROVED');
 
@@ -143,19 +142,20 @@ class ResidenceUpdateTest extends TestCase
     {
         $before = $this->residenceSnapshot();
 
-        $response = $this->submit($this->proposal(['neighborhood' => '  حي النصر  ', 'address_text' => 'شارع الشهداء 4']), reason: 'انتقلنا داخل المدينة')
+        // v3: the address detail changes; the status is sent unchanged.
+        $response = $this->submit(['address_text' => '  شارع الشهداء 4  ', 'displacement_status' => 'NOT_DISPLACED'], reason: 'انتقلنا داخل المدينة')
             ->assertCreated()->assertHeader('Cache-Control', 'no-store, private')
             ->assertJsonPath('data.status', 'SUBMITTED')->assertJsonPath('data.replayed', false);
         $request = ChangeRequest::where('uuid', $response->json('data.id'))->sole();
 
         $this->assertSame(ChangeRequestType::RESIDENCE_UPDATE, $request->type);
-        // jsonb does not keep key order; the presentation has its own fixed order.
-        $this->assertEquals(['neighborhood' => 'حي النصر', 'address_text' => 'شارع الشهداء 4'], $request->submitted_data);
+        // Only the changed field, trimmed; the unchanged status is not proposed.
+        $this->assertEquals(['address_text' => 'شارع الشهداء 4'], $request->submitted_data);
         $this->assertSame($this->context->family->id, $request->family_id);
         $this->assertNull($request->target_membership_id);
         $this->assertNull($request->person_id);
-        // New submissions are v2 since FB-GEO-01 (v1 requests stay readable).
-        $this->assertSame(2, $request->payload_version);
+        // New submissions are v3 since FB-GEO-02 (v1 / v2 requests stay readable).
+        $this->assertSame(3, $request->payload_version);
         $this->assertNotNull($request->base_fingerprint);
         $this->assertSame($before, $this->residenceSnapshot());
 
@@ -169,12 +169,11 @@ class ResidenceUpdateTest extends TestCase
     {
         $this->withoutMiddleware(ThrottleRequests::class);
         $cases = [
-            'missing field' => [array_diff_key($this->proposal(['city' => 'غزة']), ['area' => 1]), 'data.area'],
-            'too long' => [$this->proposal(['city' => str_repeat('أ', 256)]), 'data.city'],
-            'not a string' => [$this->proposal(['city' => ['nested' => 'x']]), 'data.city'],
-            'unknown status' => [$this->proposal(['displacement_status' => 'MAYBE']), 'data.displacement_status'],
-            'location while not displaced' => [$this->proposal(['displacement_location_text' => 'مواصي خانيونس']), 'data.displacement_location_text'],
-            'clearing a known status' => [$this->proposal(['displacement_status' => null, 'city' => 'غزة']), 'data.displacement_status'],
+            'too long' => [['address_text' => str_repeat('أ', 1001)], 'data.address_text'],
+            'not a string' => [['address_text' => ['nested' => 'x']], 'data.address_text'],
+            'unknown status' => [['displacement_status' => 'MAYBE'], 'data.displacement_status'],
+            'clearing a known status' => [['displacement_status' => null, 'address_text' => 'شارع جديد'], 'data.displacement_status'],
+            'malformed location' => [['current_location_id' => 'not-a-uuid'], 'data.current_location_id'],
         ];
         foreach ($cases as $label => [$data, $error]) {
             $response = $this->submit($data)->assertUnprocessable();
@@ -189,15 +188,19 @@ class ResidenceUpdateTest extends TestCase
         $this->withoutMiddleware(ThrottleRequests::class);
         foreach (['family_id' => 999, 'residence_id' => 1, 'residence_type' => 'خيمة', 'latitude' => '31.5', 'is_current' => false,
             'notes' => 'x', 'updated_by' => 1, 'status' => 'APPLIED', 'member_ref' => str_repeat('a', 64)] as $key => $value) {
-            $response = $this->submit([...$this->proposal(['city' => 'غزة']), $key => $value])->assertUnprocessable();
-            $this->assertArrayHasKey($key, $response->json('errors'), $key);
+            // With a valid v3 field, and alone (no v3 field at all).
+            foreach ([['address_text' => 'شارع جديد', $key => $value], [$key => $value]] as $data) {
+                $response = $this->submit($data)->assertUnprocessable();
+                $this->assertArrayHasKey($key, $response->json('errors'), $key);
+            }
         }
         $this->assertSame(0, ChangeRequest::count());
     }
 
     public function test_a_proposal_that_changes_nothing_is_refused(): void
     {
-        $this->submit($this->proposal(['city' => ' خانيونس ']))->assertUnprocessable()->assertJsonValidationErrors('data');
+        $this->submit(['address_text' => ' شارع التجربة 1 '])->assertUnprocessable()->assertJsonValidationErrors('data');
+        $this->submit([])->assertUnprocessable()->assertJsonValidationErrors('data');
         $this->assertSame(0, ChangeRequest::count());
     }
 
@@ -205,7 +208,7 @@ class ResidenceUpdateTest extends TestCase
     {
         $this->residence->forceFill(['is_current' => false, 'ended_at' => now()])->save();
 
-        $this->submit($this->proposal(['city' => 'غزة']))->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_PRECONDITION_FAILED');
+        $this->submit(['address_text' => 'شارع جديد'])->assertUnprocessable()->assertJsonPath('code', 'CHANGE_REQUEST_PRECONDITION_FAILED');
         $this->assertSame(0, ChangeRequest::count());
     }
 
@@ -228,22 +231,22 @@ class ResidenceUpdateTest extends TestCase
     public function test_the_target_is_always_the_context_family(): void
     {
         $other = Family::factory()->create();
-        $otherResidence = FamilyResidence::factory()->create(['family_id' => $other->id, 'city' => 'رفح']);
+        $otherResidence = FamilyResidence::factory()->create(['family_id' => $other->id, 'address_text' => 'عنوان أسرة أخرى']);
 
-        $request = $this->submitted(['city' => 'غزة']);
+        $request = $this->submittedV3(['address_text' => 'شارع غزة 2']);
         $this->assertSame($this->context->family->id, $request->family_id);
 
         $this->staff('POST', "/{$request->uuid}/start-review")->assertOk();
         $this->staff('POST', "/{$request->uuid}/approve")->assertOk();
         $this->staff('POST', "/{$request->uuid}/apply")->assertOk();
 
-        $this->assertSame('غزة', $this->residence->fresh()->city);
-        $this->assertSame('رفح', $otherResidence->fresh()->city);
+        $this->assertSame('شارع غزة 2', $this->residence->fresh()->address_text);
+        $this->assertSame('عنوان أسرة أخرى', $otherResidence->fresh()->address_text);
     }
 
     public function test_another_familys_request_is_not_found(): void
     {
-        $request = $this->submitted();
+        $request = $this->submittedV3();
         $stranger = $this->activatedHead('222222220')['user'];
 
         $this->family('GET', "/{$request->uuid}", as: $stranger)->assertNotFound()->assertJsonPath('code', 'CHANGE_REQUEST_NOT_FOUND');
@@ -255,7 +258,7 @@ class ResidenceUpdateTest extends TestCase
     {
         $this->context->family->forceFill(['status' => FamilyStatus::INACTIVE])->save();
 
-        $this->submit($this->proposal(['city' => 'غزة']))->assertForbidden();
+        $this->submit(['address_text' => 'شارع جديد'])->assertForbidden();
         $this->assertSame(0, ChangeRequest::count());
     }
 
@@ -264,10 +267,10 @@ class ResidenceUpdateTest extends TestCase
     public function test_the_same_client_reference_replays_and_a_different_proposal_conflicts(): void
     {
         $reference = (string) Str::uuid();
-        $first = $this->submit($this->proposal(['city' => 'غزة']), $reference)->assertCreated();
-        $this->submit($this->proposal(['city' => 'غزة']), $reference)->assertOk()
+        $first = $this->submit(['address_text' => 'شارع غزة 2'], $reference)->assertCreated();
+        $this->submit(['address_text' => 'شارع غزة 2'], $reference)->assertOk()
             ->assertJsonPath('data.id', $first->json('data.id'))->assertJsonPath('data.replayed', true);
-        $this->submit($this->proposal(['city' => 'رفح']), $reference)->assertConflict()
+        $this->submit(['address_text' => 'شارع رفح 3'], $reference)->assertConflict()
             ->assertJsonPath('code', 'CHANGE_REQUEST_IDEMPOTENCY_CONFLICT');
 
         $this->assertSame(1, ChangeRequest::count());
@@ -276,17 +279,17 @@ class ResidenceUpdateTest extends TestCase
 
     public function test_only_one_open_residence_update_per_family(): void
     {
-        $first = $this->submitted(['city' => 'غزة']);
-        $this->submit($this->proposal(['area' => 'الكتيبة']))->assertConflict()->assertJsonPath('code', 'CHANGE_REQUEST_ALREADY_OPEN');
+        $first = $this->submittedV3(['address_text' => 'شارع غزة 2']);
+        $this->submit(['address_text' => 'شارع الكتيبة 7'])->assertConflict()->assertJsonPath('code', 'CHANGE_REQUEST_ALREADY_OPEN');
 
         $this->family('POST', "/{$first->uuid}/cancel")->assertOk();
-        $this->submit($this->proposal(['area' => 'الكتيبة']))->assertCreated();
+        $this->submit(['address_text' => 'شارع الكتيبة 7'])->assertCreated();
         $this->assertSame(2, ChangeRequest::count());
     }
 
     public function test_a_new_head_sees_and_can_cancel_the_previous_heads_request(): void
     {
-        $request = $this->submitted();
+        $request = $this->submittedV3();
         $family = $this->context->family;
 
         FamilyMembership::query()->where('family_id', $family->id)->update(['is_household_head' => false]);
@@ -304,10 +307,10 @@ class ResidenceUpdateTest extends TestCase
         $this->family('GET', "/{$request->uuid}", as: $user)->assertOk()->assertJsonPath('data.available_actions', ['cancel']);
         $this->family('POST', "/{$request->uuid}/cancel", as: $user)->assertOk();
         $this->assertSame(S::CANCELLED, $request->fresh()->status);
-        $this->assertSame('حي الأمل', $this->residence->fresh()->neighborhood);
+        $this->assertSame('شارع التجربة 1', $this->residence->fresh()->address_text);
     }
 
-    // ---------------------------------------------------------------- approve and apply
+    // ---------------------------------------------------------------- approve and apply (stored v2 requests)
 
     public function test_approve_changes_nothing_and_apply_writes_only_the_proposal_through_the_domain_action(): void
     {

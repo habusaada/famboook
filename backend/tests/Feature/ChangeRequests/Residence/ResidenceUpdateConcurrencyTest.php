@@ -68,7 +68,7 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->context = app(FamilyAccessResolver::class)->familyContext($this->activatedHead()['user']);
         $this->residence = FamilyResidence::factory()->create([
-            'family_id' => $this->context->family->id, 'neighborhood' => 'حي الأمل',
+            'family_id' => $this->context->family->id, 'address_text' => 'شارع الأمل 1',
             'displacement_status' => DisplacementStatus::NOT_DISPLACED,
         ]);
         $this->reviewer = tap(User::factory()->create(), fn (User $u) => $u->assignRole(Role::findByName('REVIEWER', 'web')));
@@ -133,19 +133,11 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         $this->assertSame(self::LOCK_NOT_AVAILABLE, (string) $e->getCode());
     }
 
-    private function submit(string $neighborhood = 'حي النصر', ?FamilyAccessResult $context = null): ChangeRequest
+    private function submit(string $address = 'شارع النصر 5', ?FamilyAccessResult $context = null): ChangeRequest
     {
-        $context ??= $this->context;
-        $residence = FamilyResidence::query()->where('family_id', $context->family->id)->where('is_current', true)->firstOrFail();
-        $input = [
-            'governorate' => $residence->governorate, 'city' => $residence->city, 'area' => $residence->area,
-            'neighborhood' => $neighborhood, 'address_text' => $residence->address_text,
-            'original_residence_text' => $residence->original_residence_text,
-            'displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => null,
-        ];
-
-        return app(SubmitChangeRequestAction::class)->handle($context, new ChangeRequestSubmission(
-            ChangeRequestType::RESIDENCE_UPDATE, $input, null, (string) Str::uuid(),
+        // Payload v3 (FB-GEO-02): only the changed field is sent.
+        return app(SubmitChangeRequestAction::class)->handle($context ?? $this->context, new ChangeRequestSubmission(
+            ChangeRequestType::RESIDENCE_UPDATE, ['address_text' => $address], null, (string) Str::uuid(),
         ))->request;
     }
 
@@ -164,7 +156,7 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         $this->assertWaited($this->whileLocked('family_residences', $this->residence->id, fn () => app(ApproveChangeRequestAction::class)->handle($request, $this->reviewer)));
         $this->assertSame(S::UNDER_REVIEW, $request->fresh()->status);
 
-        $this->other()->table('family_residences')->where('id', $this->residence->id)->update(['neighborhood' => 'حي الزيتون']);
+        $this->other()->table('family_residences')->where('id', $this->residence->id)->update(['address_text' => 'شارع الزيتون 2']);
         try {
             app(ApproveChangeRequestAction::class)->handle($request, $this->reviewer);
             $this->fail('A stale base was approved.');
@@ -183,17 +175,17 @@ class ResidenceUpdateConcurrencyTest extends TestCase
         $waited = $this->whileLocked('family_residences', $this->residence->id, fn () => app(ApplyChangeRequestAction::class)->handle($request, $this->reviewer));
         $this->assertInstanceOf(ChangeRequestException::class, $waited);
         $this->assertSame(ChangeRequestException::APPLY_FAILED, $waited->reason);
-        $this->assertSame('حي الأمل', $this->residence->fresh()->neighborhood);
+        $this->assertSame('شارع الأمل 1', $this->residence->fresh()->address_text);
         $this->assertSame(S::APPROVED, $request->fresh()->status);
 
-        $this->other()->table('family_residences')->where('id', $this->residence->id)->update(['neighborhood' => 'حي الزيتون']);
+        $this->other()->table('family_residences')->where('id', $this->residence->id)->update(['address_text' => 'شارع الزيتون 2']);
         try {
             app(ApplyChangeRequestAction::class)->handle($request, $this->reviewer);
             $this->fail('A stale request was applied.');
         } catch (ChangeRequestException $e) {
             $this->assertSame(ChangeRequestException::BASE_CHANGED, $e->reason);
         }
-        $this->assertSame('حي الزيتون', $this->residence->fresh()->neighborhood);
+        $this->assertSame('شارع الزيتون 2', $this->residence->fresh()->address_text);
         $this->assertSame(S::APPROVED, $request->fresh()->status);
         $this->assertSame(1, $request->fresh()->apply_failure_count);
     }
@@ -205,7 +197,7 @@ class ResidenceUpdateConcurrencyTest extends TestCase
 
         $this->submit();
         try {
-            $this->submit('حي الكرامة');
+            $this->submit('شارع الكرامة 3');
             $this->fail('A second open RESIDENCE_UPDATE was created.');
         } catch (ChangeRequestException $e) {
             $this->assertSame(ChangeRequestException::ALREADY_OPEN, $e->reason);

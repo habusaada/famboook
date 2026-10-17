@@ -141,34 +141,43 @@ describe("availability comes from the server", () => {
 
 // =================================================================== the form
 
-describe("the residence update form", () => {
-  it("prefills the current residence, marks optional fields and explains the review", async () => {
+const ADDRESS = /العنوان التفصيلي/;
+
+describe("the residence update form (payload v3)", () => {
+  it("prefills the editable fields, shows the identity-card residence read-only and explains the review", async () => {
     mockGet();
     await renderForm();
 
     expect(screen.getByRole("heading", { level: 1, name: "تحديث بيانات السكن" })).toBeInTheDocument();
     expect(screen.getByText("سيُرسل طلبك للمراجعة، ولن تتغير بيانات السجل الرسمي إلا بعد اعتماد الطلب وتطبيقه.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/المحافظة/, { selector: "input" })).toHaveValue("خانيونس");
-    expect(screen.getByLabelText(/^الحي/, { selector: "input" })).toHaveValue("حي الأمل");
-    expect(screen.getByLabelText(/العنوان التفصيلي/)).toHaveValue("شارع التجربة 1");
-    expect(screen.getByLabelText(/السكن الأصلي قبل النزوح/)).toHaveValue("بني سهيلا");
+    expect(screen.getByLabelText(ADDRESS)).toHaveValue("شارع التجربة 1");
     expect(screen.getByRole("combobox", { name: /هل الأسرة نازحة حاليًا؟/ })).toHaveTextContent("لا، غير نازحة");
     expect(screen.getByRole("combobox", { name: /هل الأسرة نازحة حاليًا؟/ })).toHaveAttribute("aria-required", "true");
-    expect(screen.getAllByText("(اختياري)").length).toBeGreaterThanOrEqual(6);
-    // No location field unless displaced; no field outside the V1 set.
-    expect(screen.queryByLabelText(/مكان النزوح الحالي/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/نوع السكن/)).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /الموقع الجغرافي للسكن الحالي/ })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /الموقع الجغرافي للسكن الفعلي قبل النزوح/ })).toBeInTheDocument();
+
+    // The identity-card residence: displayed, never an input, never called "before displacement".
+    const identity = document.querySelector("[data-residence-update-readonly='identity-card']") as HTMLElement;
+    expect(identity).toHaveTextContent("السكن حسب بطاقة الهوية");
+    expect(identity).toHaveTextContent("بني سهيلا");
+    expect(within(identity).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByText(/السكن الأصلي قبل النزوح/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("textbox")).toHaveLength(2); // the detailed address and the reason only
+
+    // No legacy free-text field remains.
+    for (const label of [/^المحافظة/, /^المدينة/, /^المنطقة/, /^الحي/, /مكان النزوح الحالي/, /نوع السكن/]) {
+      expect(screen.queryByLabelText(label, { selector: "input, textarea" })).not.toBeInTheDocument();
+    }
   });
 
-  it("submits the whole proposed residence with a UUID client_reference and opens the new request", async () => {
+  it("submits only the changed v3 keys with a UUID client_reference and opens the new request", async () => {
     mockGet();
     const post = vi.spyOn(apiClient, "post").mockResolvedValue(outcome());
     const user = await renderForm();
 
-    await user.clear(screen.getByLabelText(/^الحي/, { selector: "input" }));
-    await user.type(screen.getByLabelText(/^الحي/, { selector: "input" }), "  حي النصر ");
+    await user.clear(screen.getByLabelText(ADDRESS));
+    await user.type(screen.getByLabelText(ADDRESS), "  شارع النصر 5 ");
     await chooseStatus(user, /نعم، نازحة/);
-    await user.type(await screen.findByLabelText(/مكان النزوح الحالي/), "مواصي خانيونس");
     await user.type(screen.getByLabelText(/سبب الطلب/), "انتقلنا داخل المدينة");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
@@ -180,38 +189,50 @@ describe("the residence update form", () => {
       type: "RESIDENCE_UPDATE",
       client_reference: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
       reason: "انتقلنا داخل المدينة",
-      data: {
-        governorate: "خانيونس",
-        city: "خانيونس",
-        area: "البلد",
-        neighborhood: "حي النصر",
-        address_text: "شارع التجربة 1",
-        original_residence_text: "بني سهيلا",
-        displacement_status: "DISPLACED",
-        displacement_location_text: "مواصي خانيونس",
-        // v2: the structured references, none recorded or chosen here.
-        original_location_id: null,
-        current_location_id: null,
-      },
+      // Untouched fields are omitted (unchanged) — never sent as null.
+      data: { address_text: "شارع النصر 5", displacement_status: "DISPLACED" },
     });
+    expect(JSON.stringify(body)).not.toMatch(/original_residence_text|governorate|neighborhood|displacement_location_text/);
     // Never a family, person, residence or member identifier.
     expect(JSON.stringify(body)).not.toMatch(/family_id|person|residence_id|member_ref|FAM-TEST/);
   });
 
-  it("clears the displacement location when the family is not displaced", async () => {
+  it("sends an emptied detailed address as an explicit null", async () => {
+    mockGet();
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue(outcome());
+    const user = await renderForm();
+
+    await user.clear(screen.getByLabelText(ADDRESS));
+    await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    expect((post.mock.calls[0][1] as { data: unknown }).data).toEqual({ address_text: null });
+  });
+
+  it("keeps the recorded displacement location when the family is no longer displaced, and never sends that text", async () => {
     mockGet({ prof: { data: profile(residence({ displacement_status: "DISPLACED", displacement_location_text: "مواصي خانيونس" })) } });
     const post = vi.spyOn(apiClient, "post").mockResolvedValue(outcome());
     const user = await renderForm();
 
-    expect(screen.getByLabelText(/مكان النزوح الحالي/)).toHaveValue("مواصي خانيونس");
+    const kept = document.querySelector("[data-residence-update-readonly='displacement-text']") as HTMLElement;
+    expect(kept).toHaveTextContent("مواصي خانيونس");
     await chooseStatus(user, /لا، غير نازحة/);
-    expect(screen.queryByLabelText(/مكان النزوح الحالي/)).not.toBeInTheDocument();
+    // No claim that anything will be deleted.
+    expect(document.body).not.toHaveTextContent(/سيُمسح|يُحذف|سيُحذف/);
+    expect(kept).toHaveTextContent("يبقى محفوظًا");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     await waitFor(() => expect(post).toHaveBeenCalled());
-    const body = post.mock.calls[0][1] as { data: Record<string, unknown> };
-    expect(body.data.displacement_status).toBe("NOT_DISPLACED");
-    expect(body.data.displacement_location_text).toBeNull();
+    expect((post.mock.calls[0][1] as { data: unknown }).data).toEqual({ displacement_status: "NOT_DISPLACED" });
+  });
+
+  it("labels a kept displacement text as historical for a family that is not displaced", async () => {
+    mockGet({ prof: { data: profile(residence({ displacement_status: "NOT_DISPLACED", displacement_location_text: "مواصي خانيونس" })) } });
+    await renderForm();
+
+    const kept = document.querySelector("[data-residence-update-readonly='displacement-text']") as HTMLElement;
+    expect(kept).toHaveTextContent("مكان النزوح السابق (نص تاريخي)");
+    expect(within(kept).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
   it("refuses an unchanged proposal without calling the server", async () => {
@@ -229,27 +250,27 @@ describe("the residence update form", () => {
     const post = vi.spyOn(apiClient, "post");
     const user = await renderForm();
 
-    await user.clear(screen.getByLabelText(/المدينة/, { selector: "input" }));
-    await user.click(screen.getByLabelText(/المدينة/, { selector: "input" }));
-    await user.paste("م".repeat(256));
+    await user.clear(screen.getByLabelText(ADDRESS));
+    await user.click(screen.getByLabelText(ADDRESS));
+    await user.paste("م".repeat(1001));
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     expect(await screen.findByText("النص طويل جدًا.")).toBeInTheDocument();
-    expect(screen.getByLabelText(/المدينة/, { selector: "input" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText(ADDRESS)).toHaveAttribute("aria-invalid", "true");
     expect(post).not.toHaveBeenCalled();
   });
 
   it("shows the server's field errors on their fields", async () => {
     mockGet();
     vi.spyOn(apiClient, "post").mockRejectedValue(
-      new ApiError(422, { message: "x", errors: { city: ["اسم المدينة غير صالح."] } })
+      new ApiError(422, { message: "x", errors: { address_text: ["العنوان غير صالح."] } })
     );
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), "!");
+    await user.type(screen.getByLabelText(ADDRESS), "!");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
-    expect(await screen.findByText("اسم المدينة غير صالح.")).toBeInTheDocument();
+    expect(await screen.findByText("العنوان غير صالح.")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("لم يُرسل الطلب");
     expect(router.push).not.toHaveBeenCalled();
   });
@@ -264,7 +285,7 @@ describe("the residence update form", () => {
     vi.spyOn(apiClient, "post").mockRejectedValue(new ApiError(status, { message: "SQLSTATE secret", code }));
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
+    await user.type(screen.getByLabelText(ADDRESS), " الجديد");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(text);
@@ -281,13 +302,13 @@ describe("the residence update form", () => {
     const user = await renderForm();
     const send = () => user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
-    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
+    await user.type(screen.getByLabelText(ADDRESS), " الجديد");
     await send();
     expect(await screen.findByRole("alert")).toHaveTextContent("لن يُكرَّر طلبك");
     await send();
     await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
 
-    await user.type(screen.getByLabelText(/المنطقة/, { selector: "input" }), " الغربية");
+    await user.type(screen.getByLabelText(ADDRESS), " الغربي");
     await send();
     await waitFor(() => expect(post).toHaveBeenCalledTimes(3));
 
@@ -303,12 +324,12 @@ describe("the residence update form", () => {
     const post = vi.spyOn(apiClient, "post").mockImplementation(() => new Promise((r) => (resolve = r)));
     const user = await renderForm();
 
-    await user.type(screen.getByLabelText(/المدينة/, { selector: "input" }), " الجديدة");
+    await user.type(screen.getByLabelText(ADDRESS), " الجديد");
     await user.click(screen.getByRole("button", { name: "إرسال الطلب للمراجعة" }));
 
     const button = await screen.findByRole("button", { name: "جارٍ الإرسال…" });
     expect(button).toBeDisabled();
-    expect(screen.getByLabelText(/المدينة/, { selector: "input" })).toBeDisabled();
+    expect(screen.getByLabelText(ADDRESS)).toBeDisabled();
     await user.click(button);
     expect(post).toHaveBeenCalledTimes(1);
     resolve(outcome());
@@ -319,14 +340,14 @@ describe("the residence update form", () => {
     mockGet();
     await renderForm();
 
-    for (const name of ["عنوان السكن الحالي", "النزوح"]) {
+    for (const name of ["السكن الحالي", "النزوح"]) {
       expect(screen.getByRole("group", { name })).toBeInTheDocument();
     }
     for (const input of screen.getAllByRole("textbox")) {
       expect(input).toHaveAccessibleName();
     }
     expect(screen.getByRole("link", { name: "طلب جديد" })).toHaveAttribute("href", "/family/requests/new");
-    expect(browserStorageDump()).not.toMatch(/خانيونس|حي الأمل/);
+    expect(browserStorageDump()).not.toMatch(/خانيونس|حي الأمل|بني سهيلا/);
   });
 });
 

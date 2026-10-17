@@ -450,7 +450,11 @@ export function AssistanceTargetingTab({
                       <TableCell className="tabular-nums">{r.member_count}</TableCell>
                       <TableCell className="text-xs">
                         {r.displacement?.status ? displacementStatusLabel(r.displacement.status) : "—"}
-                        {r.displacement?.location_text && <span className="block text-muted-foreground">{r.displacement.location_text}</span>}
+                        {r.displacement?.location_text && (
+                          <span className="block text-muted-foreground">
+                            {r.displacement.status === "DISPLACED" ? r.displacement.location_text : `سابقًا: ${r.displacement.location_text}`}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Indicators match={r} />

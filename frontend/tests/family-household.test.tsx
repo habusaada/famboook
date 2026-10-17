@@ -213,6 +213,16 @@ describe("السكن", () => {
     if (!hasLocation) expect(within(card).queryByText("مكان النزوح الحالي")).not.toBeInTheDocument();
   });
 
+  it("shows a kept displacement text of a non-displaced family as historical, never as current", async () => {
+    renderHousehold(familyProfile({}, { displacement_status: "NOT_DISPLACED", displacement_location_text: "مواصي" }));
+    const card = await residenceCard();
+
+    expect(card.querySelector('[data-field="displacement_location"]')).toBeNull();
+    expect(within(card).queryByText("مكان النزوح الحالي")).not.toBeInTheDocument();
+    expect(field(card, "displacement_location_history")?.textContent).toBe("مواصي");
+    expect(within(card).getByText("مكان النزوح السابق (نص تاريخي)")).toBeInTheDocument();
+  });
+
   it("says «غير مسجّل» for a displaced family without a location", async () => {
     renderHousehold(familyProfile({}, { displacement_status: "DISPLACED", displacement_location_text: null }));
     expect(field(await residenceCard(), "displacement_location")?.textContent).toBe(NOT_RECORDED);

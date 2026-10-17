@@ -99,23 +99,23 @@ class UpdateFamilyResidenceTest extends TestCase
             ->assertJsonPath('data.residence.displacement_location_text', null);
     }
 
-    public function test_switching_to_not_displaced_clears_stored_location(): void
+    public function test_switching_to_not_displaced_keeps_the_historical_location(): void
     {
         $this->residence->update([
             'displacement_status' => DisplacementStatus::DISPLACED,
             'displacement_location_text' => 'مواصي خانيونس',
         ]);
 
-        // Location omitted: the action still clears the stale value.
+        // FB-GEO-02: location omitted → the historical text is kept, never cleared.
         $this->patchResidence(['displacement_status' => 'NOT_DISPLACED'])
             ->assertOk()
             ->assertJsonPath('data.residence.displacement_status', 'NOT_DISPLACED')
-            ->assertJsonPath('data.residence.displacement_location_text', null);
+            ->assertJsonPath('data.residence.displacement_location_text', 'مواصي خانيونس');
 
-        $this->assertNull($this->residence->fresh()->displacement_location_text);
+        $this->assertSame('مواصي خانيونس', $this->residence->fresh()->displacement_location_text);
     }
 
-    public function test_switching_to_unknown_clears_stored_location(): void
+    public function test_switching_to_unknown_keeps_the_historical_location(): void
     {
         $this->residence->update([
             'displacement_status' => DisplacementStatus::DISPLACED,
@@ -125,7 +125,31 @@ class UpdateFamilyResidenceTest extends TestCase
         $this->patchResidence(['displacement_status' => null])
             ->assertOk()
             ->assertJsonPath('data.residence.displacement_status', null)
+            ->assertJsonPath('data.residence.displacement_location_text', 'مواصي خانيونس');
+    }
+
+    public function test_an_explicit_null_still_clears_the_location_text(): void
+    {
+        $this->residence->update([
+            'displacement_status' => DisplacementStatus::DISPLACED,
+            'displacement_location_text' => 'مواصي خانيونس',
+        ]);
+
+        $this->patchResidence(['displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => null])
+            ->assertOk()
             ->assertJsonPath('data.residence.displacement_location_text', null);
+    }
+
+    public function test_a_kept_historical_location_survives_unrelated_edits(): void
+    {
+        $this->residence->update([
+            'displacement_status' => DisplacementStatus::DISPLACED,
+            'displacement_location_text' => 'مواصي خانيونس',
+        ]);
+        $this->patchResidence(['displacement_status' => 'NOT_DISPLACED'])->assertOk();
+
+        $this->patchResidence(['city' => 'رفح', 'original_residence_text' => 'بني سهيلا'])->assertOk()
+            ->assertJsonPath('data.residence.displacement_location_text', 'مواصي خانيونس');
     }
 
     public function test_not_displaced_with_location_is_rejected(): void

@@ -55,26 +55,54 @@ use Illuminate\Validation\ValidationException;
  * v1 requests submitted before v2 are read unchanged (never migrated): their
  * data holds only the eight fields and their base is recomputed over exactly
  * those (ReadsEarlierPayloadVersions).
+ *
+ * Payload v3 (FB-GEO-02, owner-approved 2026-10-17) — the only version a NEW
+ * submission can take; v1 / v2 requests stay reviewable and applicable:
+ * - input: at most original_location_id, current_location_id, address_text
+ *   and displacement_status, each OPTIONAL (omitted = unchanged); any other
+ *   key — original_residence_text and the legacy free-text address fields
+ *   included — is refused, whichever fields are sent. null clears a reference;
+ *   a known displacement status cannot be cleared.
+ * - original_residence_text is the residence on the national identity card
+ *   (FB-GEO-02): read-only for families, never part of a v3 proposal, and
+ *   never written by a v3 APPLY. original_location_id is the ACTUAL residence
+ *   before displacement; current_location_id the current one.
+ * - proposal: only the submitted fields that differ; an omitted field is
+ *   never turned into null.
+ * - base: the residence and the four v3 fields.
+ * - displacement_location_text is historical data: a v3 request never
+ *   proposes, clears or overwrites it — not even when the status leaves
+ *   DISPLACED (FB-GEO-02 G2-6 as amended; UpdateFamilyResidenceAction no
+ *   longer clears it). A stored v1 / v2 request keeps its own semantics: its
+ *   handler stored an explicit displacement_location_text = null whenever it
+ *   cleared a text, and that stored value is what APPLY writes.
  */
 final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlierPayloadVersions
 {
-    /** The V1 field set, in presentation order, with its Arabic labels. */
+    /** The v1 field set (read for v1 / v2 requests), in presentation order, with its Arabic labels. */
     public const FIELDS = [
         'governorate' => 'المحافظة',
         'city' => 'المدينة',
         'area' => 'المنطقة',
         'neighborhood' => 'الحي',
         'address_text' => 'العنوان التفصيلي',
-        'original_residence_text' => 'السكن الأصلي قبل النزوح',
+        // FB-GEO-02: the identity-card residence — never "the home before displacement".
+        'original_residence_text' => 'السكن حسب بطاقة الهوية',
         'displacement_status' => 'حالة النزوح',
         'displacement_location_text' => 'مكان النزوح الحالي',
     ];
 
     /** v2: the structured references (any level), with their Arabic labels. */
     public const LOCATION_FIELDS = [
-        'original_location_id' => 'الموقع الجغرافي للسكن الأصلي',
-        'current_location_id' => 'الموقع الجغرافي الحالي / مكان النزوح',
+        'original_location_id' => 'الموقع الجغرافي للسكن الفعلي قبل النزوح',
+        'current_location_id' => 'الموقع الجغرافي للسكن الحالي',
     ];
+
+    /** v3: the only keys a new submission may carry. */
+    public const V3_FIELDS = ['original_location_id', 'current_location_id', 'address_text', 'displacement_status'];
+
+    /** Rule key holding the key whitelist, so it runs whichever fields are sent. */
+    private const KEYS_RULE = '__keys';
 
     private const SHORT_TEXT_MAX = 255;
 
@@ -87,29 +115,32 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlier
 
     public function payloadVersion(): int
     {
-        return 2;
+        return 3;
     }
 
     public function acceptedPayloadVersions(): array
     {
-        return [1, 2];
+        return [1, 2, 3];
     }
 
+    /** v3 input (new submissions only): four optional keys, nothing else. */
     public function inputRules(Family $family): array
     {
         $current = self::currentResidence($family);
         $statusKnown = $current?->displacement_status !== null;
 
-        $rules = [];
-        foreach (array_keys(self::FIELDS) as $field) {
-            $rules[$field] = ['present', 'nullable', 'string', 'max:'.self::maxLength($field)];
-        }
-        $rules['governorate'][] = new OnlyKeys([...array_keys(self::FIELDS), ...array_keys(self::LOCATION_FIELDS)]);
+        $rules = [
+            // Implicit and on its own key: unknown keys are refused even when
+            // every v3 field is omitted (a `sometimes` field would skip it).
+            self::KEYS_RULE => [new OnlyKeys(self::V3_FIELDS)],
+            'address_text' => ['sometimes', 'nullable', 'string', 'max:'.self::ADDRESS_TEXT_MAX],
+            // Optional; when sent and the registry already knows the status, it
+            // cannot be cleared back to "not collected".
+            'displacement_status' => ['sometimes', $statusKnown ? 'required' : 'nullable', Rule::enum(DisplacementStatus::class)],
+        ];
         foreach (array_keys(self::LOCATION_FIELDS) as $field) {
             $rules[$field] = ['sometimes', 'nullable', 'bail', 'uuid', new SelectableGazaLocation($current?->getAttribute($field))];
         }
-        $rules['displacement_status'] = [$statusKnown ? 'required' : 'present', 'nullable', Rule::enum(DisplacementStatus::class)];
-        $rules['displacement_location_text'][] = 'prohibited_unless:displacement_status,'.DisplacementStatus::DISPLACED->value;
 
         return $rules;
     }
@@ -141,21 +172,20 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlier
         $current = self::currentResidence($target->family)
             ?? throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
 
+        // v3: ONLY the submitted fields — an omitted field is never turned into
+        // null (and so never cleared). No legacy text field can be present
+        // (inputRules), and displacement_location_text is never proposed.
         $proposed = [];
-        foreach (array_keys(self::FIELDS) as $field) {
-            $value = $validated[$field] ?? null;
-            $value = is_string($value) ? trim($value) : $value;
-            $proposed[$field] = $value === '' ? null : $value;
-        }
-        // Mirrors UpdateFamilyResidenceAction: no location unless displaced.
-        if ($proposed['displacement_status'] !== DisplacementStatus::DISPLACED->value) {
-            $proposed['displacement_location_text'] = null;
-        }
-
-        // v2 references: only when sent (omitted = unchanged).
-        foreach (array_keys(self::LOCATION_FIELDS) as $field) {
-            if (array_key_exists($field, $validated)) {
-                $proposed[$field] = GazaLocationSelection::normalize($validated[$field]);
+        foreach (self::V3_FIELDS as $field) {
+            if (! array_key_exists($field, $validated)) {
+                continue;
+            }
+            $value = $validated[$field];
+            if (array_key_exists($field, self::LOCATION_FIELDS)) {
+                $proposed[$field] = GazaLocationSelection::normalize($value);
+            } else {
+                $value = is_string($value) ? trim($value) : $value;
+                $proposed[$field] = $value === '' ? null : $value;
             }
         }
 
@@ -173,7 +203,11 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlier
         return $this->baseValuesForVersion($this->payloadVersion(), $target, $data);
     }
 
-    /** v1: the residence and its eight fields (as taken at v1 submission); v2: plus both ids. */
+    /**
+     * v1: the residence and its eight fields (as taken at v1 submission);
+     * v2: plus both ids; v3: the four v3 fields (a v3 APPLY writes nothing
+     * else — the historical displacement_location_text is never touched).
+     */
     public function baseValuesForVersion(int $payloadVersion, ChangeRequestTarget $target, array $data): array
     {
         $current = FamilyResidence::query()
@@ -181,8 +215,20 @@ final class ResidenceUpdateHandler implements ChangeRequestHandler, ReadsEarlier
             ->where('is_current', true)
             ->lockForUpdate()
             ->first();
+        if ($current === null) {
+            return ['residence' => null];
+        }
 
-        return ['residence' => $current?->getKey(), ...($current === null ? [] : self::values($current, withLocations: $payloadVersion >= 2))];
+        if ($payloadVersion >= 3) {
+            $values = self::values($current, withLocations: true);
+
+            return [
+                'residence' => $current->getKey(),
+                ...array_intersect_key($values, array_flip(self::V3_FIELDS)),
+            ];
+        }
+
+        return ['residence' => $current->getKey(), ...self::values($current, withLocations: $payloadVersion >= 2)];
     }
 
     public function preconditions(ChangeRequestTarget $target, array $data): void

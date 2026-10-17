@@ -337,6 +337,20 @@ describe("Staff residence correction: geographic references", { timeout: 20_000 
     });
   });
 
+  it("never clears the displacement text or the current location when the family is no longer displaced (FB-GEO-02)", async () => {
+    const { patch, user } = setup(EditDisplacementDialog);
+    const dialog = await open(user);
+
+    await user.click(within(dialog).getByRole("combobox", { name: /هل الأسرة نازحة حاليًا؟/ }));
+    await user.click(await screen.findByRole("option", { name: "لا" }));
+    expect(within(dialog).getByText(/مكان النزوح السابق \(نص تاريخي\)/)).toHaveTextContent("نص مكان النزوح");
+
+    const payload = await save(user, patch);
+    expect(payload).toMatchObject({ displacement_status: "NOT_DISPLACED" });
+    expect(payload).not.toHaveProperty("displacement_location_text");
+    expect(payload).not.toHaveProperty("current_location_id");
+  });
+
   it("changes one reference while the other dialog's reference is never sent", async () => {
     const { patch, user } = setup(EditDisplacementDialog);
     await open(user);

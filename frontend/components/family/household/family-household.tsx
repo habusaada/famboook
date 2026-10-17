@@ -184,6 +184,11 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
                 <Text value={residence.displacement_location_text} />
               </Row>
             )}
+            {residence.displacement_status !== "DISPLACED" && residence.displacement_location_text && (
+              <Row label="مكان النزوح السابق (نص تاريخي)" field="displacement_location_history">
+                <Text value={residence.displacement_location_text} />
+              </Row>
+            )}
           </dl>
 
           <SubHeading id="residence-current-title">عنوان السكن الحالي</SubHeading>

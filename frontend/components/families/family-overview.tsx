@@ -144,6 +144,12 @@ export function ResidenceSummary({
             <span className="font-medium">{residence.displacement_location_text ?? <Missing />}</span>
           </span>
         )}
+        {!displaced && residence.displacement_location_text && (
+          <span className="flex flex-col gap-0.5" data-displacement-text-history>
+            <span className="text-xs text-muted-foreground">مكان النزوح السابق (نص تاريخي)</span>
+            <span>{residence.displacement_location_text}</span>
+          </span>
+        )}
       </ResidenceBlock>
 
       <ResidenceBlock icon={MapPin} tone="text-brand-700" title="السكن الحالي" action={residenceAction}>

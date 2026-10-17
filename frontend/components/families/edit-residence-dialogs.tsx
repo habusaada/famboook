@@ -101,7 +101,6 @@ export function EditDisplacementDialog({
     control,
     handleSubmit,
     reset,
-    setValue,
     setError,
     formState: { errors },
   } = useForm<EditDisplacementValues>({
@@ -189,13 +188,9 @@ export function EditDisplacementDialog({
               render={({ field }) => (
                 <Select
                   value={field.value}
-                  onValueChange={(value) => {
-                    field.onChange(value);
-                    // Not displaced / unknown → no displacement location.
-                    if (value !== "DISPLACED") {
-                      setValue("displacementLocationText", "");
-                    }
-                  }}
+                  // FB-GEO-02: a status change never clears the location text;
+                  // it is kept as history (not sent unless DISPLACED).
+                  onValueChange={field.onChange}
                 >
                   <SelectTrigger id="edit-displacementStatus">
                     <SelectValue />
@@ -223,6 +218,11 @@ export function EditDisplacementDialog({
               />
               <FieldError message={errors.displacementLocationText?.message} />
             </div>
+          )}
+          {!isDisplaced && residence.displacement_location_text && (
+            <p className="text-xs text-muted-foreground" data-displacement-text-history>
+              مكان النزوح السابق (نص تاريخي): {residence.displacement_location_text} — يبقى محفوظًا ولا يُحذف بتغيير الحالة.
+            </p>
           )}
         </form>
 

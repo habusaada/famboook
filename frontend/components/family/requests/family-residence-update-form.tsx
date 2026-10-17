@@ -3,12 +3,11 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, AlertTriangle, FileClock, Info, Loader2, RotateCw, Send } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,20 +75,13 @@ function submitErrorMessage(error: unknown): string {
   }
 }
 
-function TextField({
-  id,
-  label,
-  error,
-  placeholder,
-  ...input
-}: { id: string; label: string; error?: string; placeholder?: string } & React.ComponentProps<typeof Input>) {
+/** Recorded text shown for reference (identity-card residence, displacement text) — never editable by the family. */
+function ReadOnlyField({ label, value, hint, field }: { label: string; value: string | null; hint: string; field: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <FieldLabel htmlFor={id} optional>
-        {label}
-      </FieldLabel>
-      <Input id={id} className="h-11 rounded-xl" placeholder={placeholder} aria-invalid={Boolean(error)} {...input} />
-      <FieldError message={error} />
+    <div className="flex flex-col gap-1" data-residence-update-readonly={field}>
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      <p className="rounded-xl bg-surface-2 px-3.5 py-2.5 text-sm text-foreground">{value ?? "غير مسجّل"}</p>
+      <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -102,9 +94,8 @@ function ResidenceForm({ residence }: { residence: Residence }) {
     resolver: zodResolver(residenceUpdateSchemaFor(residence)),
     defaultValues: residenceUpdateFormValues(residence),
   });
-  const { register, control, setValue, setError, formState } = form;
+  const { register, control, setError, formState } = form;
   const errors = formState.errors;
-  const displaced = useWatch({ control, name: "displacementStatus" }) === "DISPLACED";
   const [submitError, setSubmitError] = useState<string | null>(null);
   // One client_reference per proposal: a retry of the SAME proposal re-sends
   // it (the server replays, never duplicates); any change starts a new one.
@@ -118,7 +109,7 @@ function ResidenceForm({ residence }: { residence: Residence }) {
       setSubmitError("لم تغيّر أي بيانات. عدّل الحقول التي تحتاج إلى تصحيح ثم أرسل الطلب.");
       return;
     }
-    const data = toResidenceUpdateData(values);
+    const data = toResidenceUpdateData(residence, values);
     const reason = values.reason.trim() === "" ? null : values.reason.trim();
     const key = JSON.stringify([data, reason]);
     if (attempt.current?.key !== key) attempt.current = { key, reference: crypto.randomUUID() };
@@ -154,18 +145,7 @@ function ResidenceForm({ residence }: { residence: Residence }) {
       </p>
 
       <fieldset className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-1 p-4" disabled={pending}>
-        <legend className="px-1 text-base font-semibold text-foreground">عنوان السكن الحالي</legend>
-        <TextField id="residence-governorate" label="المحافظة" error={errors.governorate?.message} {...register("governorate")} />
-        <TextField id="residence-city" label="المدينة" error={errors.city?.message} {...register("city")} />
-        <TextField id="residence-area" label="المنطقة" error={errors.area?.message} {...register("area")} />
-        <TextField id="residence-neighborhood" label="الحي" error={errors.neighborhood?.message} {...register("neighborhood")} />
-        <div className="flex flex-col gap-1.5">
-          <FieldLabel htmlFor="residence-address-text" optional>
-            العنوان التفصيلي
-          </FieldLabel>
-          <Textarea id="residence-address-text" rows={3} className="rounded-xl" aria-invalid={Boolean(errors.addressText)} {...register("addressText")} />
-          <FieldError message={errors.addressText?.message} />
-        </div>
+        <legend className="px-1 text-base font-semibold text-foreground">السكن الحالي</legend>
         <Controller
           control={control}
           name="currentLocationId"
@@ -173,7 +153,7 @@ function ResidenceForm({ residence }: { residence: Residence }) {
             <GazaLocationSelector
               id="residence-current-location"
               source="family"
-              label={displaced ? "الموقع الجغرافي الحالي / مكان النزوح (اختياري)" : "الموقع الجغرافي للسكن الحالي (اختياري)"}
+              label="الموقع الجغرافي للسكن الحالي (اختياري)"
               value={field.value}
               onChange={field.onChange}
               disabled={pending}
@@ -181,32 +161,17 @@ function ResidenceForm({ residence }: { residence: Residence }) {
             />
           )}
         />
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="residence-address-text" optional>
+            العنوان التفصيلي
+          </FieldLabel>
+          <Textarea id="residence-address-text" rows={3} className="rounded-xl" aria-invalid={Boolean(errors.addressText)} {...register("addressText")} />
+          <FieldError message={errors.addressText?.message} />
+        </div>
       </fieldset>
 
       <fieldset className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-1 p-4" disabled={pending}>
         <legend className="px-1 text-base font-semibold text-foreground">النزوح</legend>
-        <TextField
-          id="residence-original"
-          label="السكن الأصلي قبل النزوح"
-          placeholder="مثال: بني سهيلا – خانيونس"
-          error={errors.originalResidenceText?.message}
-          {...register("originalResidenceText")}
-        />
-        <Controller
-          control={control}
-          name="originalLocationId"
-          render={({ field }) => (
-            <GazaLocationSelector
-              id="residence-original-location"
-              source="family"
-              label="الموقع الجغرافي للسكن الأصلي (اختياري)"
-              value={field.value}
-              onChange={field.onChange}
-              disabled={pending}
-              error={errors.originalLocationId?.message}
-            />
-          )}
-        />
         <div className="flex flex-col gap-1.5">
           <FieldLabel htmlFor="residence-displacement-status" optional={!statusKnown}>
             هل الأسرة نازحة حاليًا؟
@@ -220,15 +185,7 @@ function ResidenceForm({ residence }: { residence: Residence }) {
             control={control}
             name="displacementStatus"
             render={({ field }) => (
-              <Select
-                value={field.value === "" ? undefined : field.value}
-                onValueChange={(value) => {
-                  field.onChange(value);
-                  // Not displaced → no displacement location (as the registry does).
-                  if (value !== "DISPLACED") setValue("displacementLocationText", "");
-                }}
-                disabled={pending}
-              >
+              <Select value={field.value === "" ? undefined : field.value} onValueChange={field.onChange} disabled={pending}>
                 <SelectTrigger
                   id="residence-displacement-status"
                   className="h-11! w-full rounded-xl"
@@ -246,15 +203,35 @@ function ResidenceForm({ residence }: { residence: Residence }) {
           />
           <FieldError message={errors.displacementStatus?.message} />
         </div>
-        {displaced && (
-          <TextField
-            id="residence-displacement-location"
-            label="مكان النزوح الحالي"
-            placeholder="مثال: مواصي خانيونس"
-            error={errors.displacementLocationText?.message}
-            {...register("displacementLocationText")}
+        <Controller
+          control={control}
+          name="originalLocationId"
+          render={({ field }) => (
+            <GazaLocationSelector
+              id="residence-original-location"
+              source="family"
+              label="الموقع الجغرافي للسكن الفعلي قبل النزوح (اختياري)"
+              value={field.value}
+              onChange={field.onChange}
+              disabled={pending}
+              error={errors.originalLocationId?.message}
+            />
+          )}
+        />
+        {residence.displacement_location_text !== null && (
+          <ReadOnlyField
+            field="displacement-text"
+            label={residence.displacement_status === "DISPLACED" ? "مكان النزوح المسجّل (نص)" : "مكان النزوح السابق (نص تاريخي)"}
+            value={residence.displacement_location_text}
+            hint="يبقى محفوظًا كما هو، ولا يتغيّر بتغيير حالة النزوح."
           />
         )}
+        <ReadOnlyField
+          field="identity-card"
+          label="السكن حسب بطاقة الهوية"
+          value={residence.original_residence_text}
+          hint="يُعرض كما هو مسجّل ولا يمكن تعديله من هنا. لتصحيحه تواصل مع فريق السجل."
+        />
       </fieldset>
 
       <div className="flex flex-col gap-1.5 rounded-2xl border border-border bg-surface-1 p-4">
@@ -342,7 +319,7 @@ export function FamilyResidenceUpdateForm() {
 
   return (
     <div className="flex flex-col gap-5">
-      <FamilyRequestsHeader back={BACK} title={TITLE} description="صحّح عنوان سكن أسرتك الحالي أو بيانات النزوح كما هي في الواقع." />
+      <FamilyRequestsHeader back={BACK} title={TITLE} description="حدّد الموقع الجغرافي لسكن أسرتك الحالي وسكنها الفعلي قبل النزوح، وحالة النزوح كما هي في الواقع." />
       {body}
     </div>
   );

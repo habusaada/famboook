@@ -7,10 +7,11 @@ import type { FamilyProfile } from "@/lib/api/family-household";
 import type { GazaLocation, GazaLocationDetails, GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import { renderWithClient } from "./helpers";
 
-// FB-GEO-01 RESIDENCE_UPDATE v2 in the Family PWA: the residence form's two
-// GazaLocationSelectors (source "family") — prefilled from the profile's
-// summaries, sending UUIDs in the v2 proposal, with the staged replace /
-// clear semantics. Only the family mirrors are ever read. Synthetic data.
+// RESIDENCE_UPDATE in the Family PWA (FB-GEO-01 v2, payload v3 since
+// FB-GEO-02): the residence form's two GazaLocationSelectors (source
+// "family") — prefilled from the profile's summaries, sending only CHANGED
+// references as UUIDs (or an explicit null), with the staged replace / clear
+// semantics. Only the family mirrors are ever read. Synthetic data.
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -93,8 +94,8 @@ async function renderForm() {
   return user;
 }
 
-const originalGroup = () => screen.getByRole("group", { name: /الموقع الجغرافي للسكن الأصلي/ });
-const currentGroup = () => screen.getByRole("group", { name: /الموقع الجغرافي (الحالي|للسكن الحالي)/ });
+const originalGroup = () => screen.getByRole("group", { name: /الموقع الجغرافي للسكن الفعلي قبل النزوح/ });
+const currentGroup = () => screen.getByRole("group", { name: /الموقع الجغرافي للسكن الحالي/ });
 
 async function pick(user: ReturnType<typeof userEvent.setup>, scope: HTMLElement, label: RegExp, option: string) {
   const trigger = await waitFor(() => {
@@ -123,14 +124,12 @@ describe("Family PWA residence form: geographic references", { timeout: 20_000 }
     const saved = await within(originalGroup()).findByRole("group", { name: "الموقع المحفوظ" });
     expect(within(saved).getByText(OLD.name)).toBeInTheDocument();
     expect(within(saved).getByText("غير مفعّلة")).toBeInTheDocument();
-    // DISPLACED: the current location is the displacement location.
-    expect(currentGroup()).toHaveAccessibleName(/مكان النزوح/);
     expect(within(currentGroup()).getByRole("combobox", { name: /^المحافظة/ })).toHaveTextContent("اختر المحافظة");
-    // The text stays beside the selectors.
-    expect(screen.getByLabelText(/السكن الأصلي قبل النزوح/)).toHaveValue("بني سهيلا");
+    // The identity-card residence is shown read-only beside the selectors.
+    expect(document.querySelector("[data-residence-update-readonly='identity-card']")).toHaveTextContent("بني سهيلا");
   });
 
-  it("sends a new current location as its UUID, keeps the unchanged inactive original, and reads only family endpoints", async () => {
+  it("sends only the new current location as its UUID, omits the unchanged inactive original, and reads only family endpoints", async () => {
     const { get, post } = mockApi();
     const user = await renderForm();
 
@@ -139,9 +138,7 @@ describe("Family PWA residence form: geographic references", { timeout: 20_000 }
     await pick(user, currentGroup(), /^المنطقة/, A1.name);
     const data = await submit(user, post);
 
-    expect(data.current_location_id).toBe(A1.id);
-    expect(data.original_location_id).toBe(OLD.id);
-    expect(data.address_text).toBe("شارع 1");
+    expect(data).toEqual({ current_location_id: A1.id });
     const geography = get.mock.calls.map(([path]) => String(path)).filter((path) => path.includes("gaza-locations"));
     expect(geography.length).toBeGreaterThan(0);
     expect(geography.every((path) => path.startsWith(FAMILY))).toBe(true);
@@ -172,8 +169,7 @@ describe("Family PWA residence form: geographic references", { timeout: 20_000 }
     await user.click(within(group).getByRole("button", { name: "تأكيد المسح" }));
     const data = await submit(user, post);
 
-    expect(data.original_location_id).toBeNull();
-    expect(data.current_location_id).toBeNull();
+    expect(data).toEqual({ original_location_id: null });
   });
 
   it("maps the server's location errors onto the selectors", async () => {

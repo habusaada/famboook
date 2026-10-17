@@ -17,7 +17,6 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Spatie\Permission\Models\Role;
 use Tests\Feature\Geography\BuildsGazaWorkbooks;
@@ -25,16 +24,18 @@ use Tests\Support\FamilyIdentityFixtures;
 use Tests\TestCase;
 
 /**
- * RESIDENCE_UPDATE payload v2 (FB-GEO-01 ADR §8.5): the two optional
- * structured references through submit → review → approve / reject → apply,
- * their validation, the base fingerprint, the reviewer presentation, and v1
- * requests submitted before v2 (never migrated). Synthetic data only.
+ * RESIDENCE_UPDATE payload v2 (FB-GEO-01 ADR §8.5) and v1 — LEGACY requests
+ * since FB-GEO-02 (new submissions are v3: ResidenceUpdateV3Test). Requests
+ * stored as v2 / v1 (StoresLegacyResidenceRequests, never migrated) still go
+ * through review → approve / reject → apply with their own base fingerprint
+ * and presentation. Synthetic data only.
  */
 class ResidenceUpdateV2Test extends TestCase
 {
     use BuildsGazaWorkbooks;
     use FamilyIdentityFixtures;
     use RefreshDatabase;
+    use StoresLegacyResidenceRequests;
 
     private const FAMILY_URI = '/api/v1/family/change-requests';
 
@@ -76,30 +77,10 @@ class ResidenceUpdateV2Test extends TestCase
         return GazaLocation::idFor($level, $code);
     }
 
-    /** The current residence as the family form sends it (all ten fields), with overrides. */
-    private function proposal(array $overrides = []): array
+    /** A v2 request as stored before v3 (its data: only the changed fields). */
+    private function submitted(array $data): ChangeRequest
     {
-        $r = $this->residence->fresh();
-
-        return [
-            'governorate' => $r->governorate, 'city' => $r->city, 'area' => $r->area, 'neighborhood' => $r->neighborhood,
-            'address_text' => $r->address_text, 'original_residence_text' => $r->original_residence_text,
-            'displacement_status' => $r->displacement_status?->value, 'displacement_location_text' => $r->displacement_location_text,
-            'original_location_id' => $r->original_location_id, 'current_location_id' => $r->current_location_id,
-            ...$overrides,
-        ];
-    }
-
-    private function submit(array $data): TestResponse
-    {
-        return $this->actingAs($this->context->user->fresh())->postJson(self::FAMILY_URI, [
-            'type' => 'RESIDENCE_UPDATE', 'client_reference' => (string) Str::uuid(), 'data' => $data,
-        ]);
-    }
-
-    private function submitted(array $overrides): ChangeRequest
-    {
-        return ChangeRequest::where('uuid', $this->submit($this->proposal($overrides))->assertCreated()->json('data.id'))->sole();
+        return $this->legacyResidenceRequest(2, $data);
     }
 
     private function staff(string $method, string $uri, array $body = []): TestResponse
@@ -129,60 +110,6 @@ class ResidenceUpdateV2Test extends TestCase
         return $this->residence->fresh()->only(['governorate', 'city', 'area', 'neighborhood', 'address_text', 'original_residence_text', 'displacement_location_text']);
     }
 
-    // ---------------------------------------------------------------- submission
-
-    public function test_a_v2_submission_carries_both_references_and_changes_nothing_canonical(): void
-    {
-        $original = $this->loc(GazaLocationLevel::AREA, '1');
-        $current = $this->loc(GazaLocationLevel::LANDMARK, '7');
-        $before = $this->residence->fresh()->toArray();
-
-        // Upper case is the same value (normalized like the Staff path).
-        $request = $this->submitted(['original_location_id' => strtoupper($original), 'current_location_id' => $current]);
-
-        $this->assertSame(2, $request->payload_version);
-        $this->assertEquals(['original_location_id' => $original, 'current_location_id' => $current], $request->submitted_data);
-        $this->assertSame($before, $this->residence->fresh()->toArray(), 'nothing applied before approval');
-    }
-
-    public function test_references_are_optional_omitted_keeps_and_null_clears(): void
-    {
-        $saved = $this->loc(GazaLocationLevel::NEIGHBORHOOD, '10');
-        $this->residence->forceFill(['current_location_id' => $saved])->save();
-
-        // A client sending only the eight v1 fields: references untouched.
-        $eight = array_diff_key($this->proposal(['neighborhood' => 'حي النصر']), array_flip(['original_location_id', 'current_location_id']));
-        $id = $this->submit($eight)->assertCreated()->json('data.id');
-        $this->assertEquals(['neighborhood' => 'حي النصر'], ChangeRequest::where('uuid', $id)->sole()->submitted_data);
-        $this->actingAs($this->context->user->fresh())->postJson(self::FAMILY_URI."/{$id}/cancel")->assertOk();
-
-        // Unchanged references are not part of the proposal; nothing else → refused.
-        $this->submit($this->proposal())->assertUnprocessable();
-
-        // null clears a saved reference.
-        $request = $this->submitted(['current_location_id' => null]);
-        $this->assertEquals(['current_location_id' => null], $request->submitted_data);
-        $this->approveAndApply($request);
-        $this->assertNull($this->residence->fresh()->current_location_id);
-    }
-
-    public function test_an_unchanged_inactive_reference_is_kept_and_new_inactive_invalid_or_unknown_ones_are_refused(): void
-    {
-        $inactive = $this->loc(GazaLocationLevel::NEIGHBORHOOD, '12');
-        $this->residence->forceFill(['original_location_id' => $inactive])->save();
-        GazaLocation::whereKey($inactive)->update(['is_active' => false]);
-
-        // Sent back unchanged with a text change: accepted, reference not in the proposal.
-        $request = $this->submitted(['address_text' => 'شارع جديد 9']);
-        $this->assertEquals(['address_text' => 'شارع جديد 9'], $request->submitted_data);
-        $this->approveAndApply($request);
-        $this->assertSame($inactive, $this->residence->fresh()->original_location_id);
-
-        foreach ([$inactive => 'current_location_id', 'not-a-uuid' => 'current_location_id', '00000000-0000-4000-8000-00000000abcd' => 'current_location_id'] as $value => $field) {
-            $this->submit($this->proposal([$field => $value]))->assertUnprocessable()->assertJsonValidationErrors($field);
-        }
-    }
-
     // ---------------------------------------------------------------- review, approval, rejection
 
     public function test_approval_persists_the_references_and_keeps_every_text_field(): void
@@ -198,6 +125,59 @@ class ResidenceUpdateV2Test extends TestCase
         $this->assertSame($original, $fresh->original_location_id);
         $this->assertSame($current, $fresh->current_location_id);
         $this->assertSame($text, $this->text(), 'no text field rewritten');
+    }
+
+    public function test_a_stored_v2_null_reference_clears_it_at_apply(): void
+    {
+        $saved = $this->loc(GazaLocationLevel::NEIGHBORHOOD, '10');
+        $this->residence->forceFill(['current_location_id' => $saved])->save();
+
+        $request = $this->submitted(['current_location_id' => null]);
+        $this->approveAndApply($request);
+
+        $this->assertNull($this->residence->fresh()->current_location_id);
+        $this->assertSame(2, $request->fresh()->payload_version, 'never migrated');
+    }
+
+    /**
+     * FB-GEO-02 compatibility: v1 / v2 normalize() stored an explicit
+     * displacement_location_text = null whenever it cleared a text, so a stored
+     * request still clears exactly what its reviewer approved — although the
+     * Action no longer clears anything implicitly.
+     */
+    public function test_a_stored_legacy_explicit_null_still_clears_the_displacement_text(): void
+    {
+        foreach ([2, 1] as $version) {
+            $this->residence->refresh()->forceFill(['displacement_status' => DisplacementStatus::DISPLACED, 'displacement_location_text' => 'مواصي خانيونس'])->save();
+            $request = $this->legacyResidenceRequest($version, ['displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => null]);
+
+            $this->staff('GET', "/{$request->uuid}")->assertOk()->assertJsonPath('data.presentation.rows', [
+                ['label' => 'حالة النزوح', 'current' => 'نازحة', 'proposed' => 'غير نازحة'],
+                ['label' => 'مكان النزوح الحالي', 'current' => 'مواصي خانيونس', 'proposed' => null],
+            ]);
+            $this->approveAndApply($request);
+
+            $fresh = $this->residence->fresh();
+            $this->assertSame(DisplacementStatus::NOT_DISPLACED, $fresh->displacement_status, "v{$version}");
+            $this->assertNull($fresh->displacement_location_text, "v{$version}: the stored null is applied");
+        }
+    }
+
+    /**
+     * A stored v1 / v2 status change WITHOUT a text key was taken while the
+     * text was already null; the legacy base includes the text, so a later
+     * Staff text can never be silently kept or cleared by it.
+     */
+    public function test_a_stored_legacy_status_change_without_text_is_guarded_by_its_base(): void
+    {
+        $this->residence->forceFill(['displacement_location_text' => null])->save();
+        $request = $this->submitted(['displacement_status' => 'NOT_DISPLACED']);
+        $this->review($request);
+        $this->staffCorrects(['displacement_location_text' => 'مكان أضافه الطاقم']);
+
+        $this->staff('POST', "/{$request->uuid}/approve")->assertConflict()->assertJsonPath('code', 'CHANGE_REQUEST_BASE_CHANGED');
+        $this->assertSame(DisplacementStatus::DISPLACED, $this->residence->fresh()->displacement_status);
+        $this->assertSame('مكان أضافه الطاقم', $this->residence->fresh()->displacement_location_text);
     }
 
     public function test_rejection_changes_nothing(): void
@@ -245,8 +225,9 @@ class ResidenceUpdateV2Test extends TestCase
         $request = $this->submitted(['original_location_id' => $this->loc(GazaLocationLevel::AREA, '1'), 'current_location_id' => $current]);
 
         $expected = [
-            ['label' => 'الموقع الجغرافي للسكن الأصلي', 'current' => 'غزة الاختبار ‹ مدينة الاختبار ‹ شرق ‹ حي الشجاعية (غير مفعّلة)', 'proposed' => 'غزة الاختبار ‹ مدينة الاختبار ‹ غرب'],
-            ['label' => 'الموقع الجغرافي الحالي / مكان النزوح', 'current' => null, 'proposed' => 'خان الاختبار ‹ مدينة الساحل ‹ منطقة الساحل ‹ حي المواصي ‹ نقطة'],
+            // FB-GEO-02 labels: the actual home before displacement, and the current residence.
+            ['label' => 'الموقع الجغرافي للسكن الفعلي قبل النزوح', 'current' => 'غزة الاختبار ‹ مدينة الاختبار ‹ شرق ‹ حي الشجاعية (غير مفعّلة)', 'proposed' => 'غزة الاختبار ‹ مدينة الاختبار ‹ غرب'],
+            ['label' => 'الموقع الجغرافي للسكن الحالي', 'current' => null, 'proposed' => 'خان الاختبار ‹ مدينة الساحل ‹ منطقة الساحل ‹ حي المواصي ‹ نقطة'],
         ];
         $staffView = $this->staff('GET', "/{$request->uuid}")->assertOk()->assertJsonPath('data.presentation.rows', $expected);
         $familyView = $this->actingAs($this->context->user->fresh())->getJson(self::FAMILY_URI."/{$request->uuid}")->assertOk()

@@ -465,14 +465,17 @@ fingerprints were identical before and after.
 
 | Field | Meaning |
 |---|---|
-| `original_location_id` | The Family's residence **before displacement** (structured). Same meaning as `original_residence_text`; never a birthplace. |
+| `original_location_id` | The Family's residence **before displacement** (structured); never a birthplace. *Amended by ADR FB-GEO-02 G2-2: decoupled from `original_residence_text`, which is the identity-card residence.* |
 | `current_location_id` | Where the Family lives **now**. |
 | `displacement_status = DISPLACED` | `current_location_id` **is the displacement location** (D4). |
 | `displacement_status = NOT_DISPLACED` | `current_location_id` is the ordinary current accommodation (D5). |
 | `displacement_status = NULL` | Status not collected; `current_location_id` is still the current place if recorded. Never read as NOT_DISPLACED. |
 
 There is **no** `displacement_location_id` (D4). A change of
-`displacement_status` never clears `current_location_id`; switching away
+`displacement_status` never clears `current_location_id`. *(Amended by ADR
+FB-GEO-02 G2-6: switching away from DISPLACED no longer clears
+`displacement_location_text`; it is kept as historical text. The original
+wording follows.)* Switching away
 from DISPLACED still clears the legacy `displacement_location_text` as it
 does today.
 
@@ -527,6 +530,10 @@ eight fields.
   and APPLY transitions (APPROVED ≠ APPLIED) are unchanged.
 - Coordinator REGISTER_FAMILY is unchanged (D12); adding a structured
   original residence to it would be a separate, approved change.
+
+*Superseded for new submissions by ADR FB-GEO-02 (payload v3, 2026-10-17):
+v3 carries only the two references, `address_text` and
+`displacement_status`; v1 and v2 stay readable and applicable.*
 
 ---
 

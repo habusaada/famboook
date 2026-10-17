@@ -82,10 +82,14 @@ class AssistanceTargetingTest extends TestCase
         $camp = $this->family(3, ['displacement' => 'DISPLACED', 'location' => 'مخيم الشاطئ']);
         $school = $this->family(3, ['displacement' => 'DISPLACED', 'location' => 'مدرسة الإيواء']);
         $home = $this->family(3, ['displacement' => 'NOT_DISPLACED']);
+        // FB-GEO-02: a family that returned home keeps its historical displacement text.
+        $returned = $this->family(3, ['displacement' => 'NOT_DISPLACED', 'location' => 'مخيم الشاطئ القديم']);
 
         $this->assertSame($this->codes($camp, $school), $this->matching($this->assistance, ['displacement_status' => 'DISPLACED']));
-        $this->assertSame($this->codes($home), $this->matching($this->assistance, ['displacement_status' => 'NOT_DISPLACED']));
+        $this->assertSame($this->codes($home, $returned), $this->matching($this->assistance, ['displacement_status' => 'NOT_DISPLACED']));
+        // «مكان النزوح الحالي»: the historical text of a non-displaced family never matches.
         $this->assertSame($this->codes($camp), $this->matching($this->assistance, ['displacement_location_text' => 'الشاطئ']));
+        $this->assertSame([], $this->matching($this->assistance, ['displacement_status' => 'NOT_DISPLACED', 'displacement_location_text' => 'الشاطئ']));
         $this->assertSame($this->codes($school), $this->matching($this->assistance, ['displacement_status' => 'DISPLACED', 'displacement_location_text' => 'مدرسة']));
 
         $this->preview($this->assistance, ['displacement_status' => 'MOVED'])->assertUnprocessable();

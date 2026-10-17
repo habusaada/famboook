@@ -862,6 +862,14 @@ CHECK (displacement_location_text IS NULL
 
 `displacement_status` stays nullable: `NULL` = not collected.
 
+**Amended 2026-10-17 (ADR FB-GEO-02 G2-6):** the second CHECK
+(`chk_residence_displacement_location`) is dropped by the schema-only
+migration `2026_10_23_090000_drop_residence_displacement_location_check`.
+`displacement_location_text` is historical and kept when the status leaves
+DISPLACED. Entering a NEW text still requires DISPLACED (application
+validation). No row is changed. `down()` restores the CHECK and refuses while
+a non-displaced residence keeps a text.
+
 **Approved future columns — NOT migrated (2026-10-15, DB-ADR-063,
 ADR-FB-GEO-01 §4.2).** The columns above are the current implementation.
 The approved design adds two nullable references to §24a:

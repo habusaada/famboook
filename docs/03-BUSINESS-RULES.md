@@ -3167,6 +3167,17 @@ geography. Labels distinguish:
 مكان النزوح الحالي           displacement_location_text (DISPLACED only)
 ```
 
+**Amended 2026-10-17 (ADR FB-GEO-02):** `original_residence_text` is
+labelled «السكن حسب بطاقة الهوية» (identity-card residence);
+`original_location_id` is «الموقع الجغرافي للسكن الفعلي قبل النزوح» and
+`current_location_id` «الموقع الجغرافي للسكن الحالي» (the latest approved
+actual residence, for every displacement status). The Family PWA shows
+the identity-card residence read-only. A change of displacement status never
+clears `displacement_location_text` or `current_location_id`. A kept text of
+a non-displaced family is labelled «مكان النزوح السابق (نص تاريخي)» (ADR
+FB-GEO-02 G2-6/G2-7). Remaining Staff / export labels are a
+follow-up (ADR FB-GEO-02 §4).
+
 **Current implementation:** no geographic hierarchy or maps; every
 location above is free text.
 

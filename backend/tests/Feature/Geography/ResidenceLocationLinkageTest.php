@@ -213,9 +213,10 @@ class ResidenceLocationLinkageTest extends TestCase
         $current = $this->loc(GazaLocationLevel::NEIGHBORHOOD, '102');
         $this->patchResidence(['displacement_status' => 'DISPLACED', 'displacement_location_text' => 'نص النزوح', 'current_location_id' => $current])->assertOk();
 
+        // FB-GEO-02: neither the reference nor the historical text is cleared.
         $this->patchResidence(['displacement_status' => 'NOT_DISPLACED'])->assertOk()
             ->assertJsonPath('data.residence.current_location_id', $current)
-            ->assertJsonPath('data.residence.displacement_location_text', null);
+            ->assertJsonPath('data.residence.displacement_location_text', 'نص النزوح');
 
         $this->patchResidence(['displacement_status' => null])->assertOk()->assertJsonPath('data.residence.current_location_id', $current);
     }

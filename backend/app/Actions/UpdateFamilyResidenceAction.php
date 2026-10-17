@@ -2,7 +2,6 @@
 
 namespace App\Actions;
 
-use App\Enums\DisplacementStatus;
 use App\Enums\FamilyActivityType;
 use App\Models\Family;
 use App\Models\FamilyResidence;
@@ -74,13 +73,12 @@ class UpdateFamilyResidenceAction
                 }
             }
 
-            // A displacement location only exists for a displaced family:
-            // switching to NOT_DISPLACED or unknown never leaves a stale one.
-            // current_location_id is NOT cleared: it is the current residence
-            // for every displacement status (ADR-FB-GEO-01 §5).
-            if ($residence->displacement_status !== DisplacementStatus::DISPLACED) {
-                $residence->displacement_location_text = null;
-            }
+            // FB-GEO-02 (G2-6 as amended): a change of displacement status
+            // clears NOTHING. displacement_location_text is kept as the
+            // historical displacement place (only an explicit value in $data
+            // changes it), and current_location_id stays the current residence
+            // for every displacement status (ADR-FB-GEO-01 §5). Entering a NEW
+            // location text still requires DISPLACED (UpdateFamilyResidenceRequest).
 
             // Which group of fields changed decides the event; values are
             // never recorded. One request touching both writes both events.

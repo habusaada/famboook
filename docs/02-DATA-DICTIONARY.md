@@ -1044,6 +1044,12 @@ in the head's section.
 "مكان السكن الأصلي": the Family's residence **before displacement**. It is
 not the head's birthplace. Optional, short free text (e.g. "بني سهيلا – خانيونس").
 
+**Amended 2026-10-17 (ADR FB-GEO-02 G2-1):** this field is the residence on
+the **national identity card** («السكن حسب بطاقة الهوية»), not the residence
+before displacement. The actual pre-displacement residence is
+`original_location_id`. Stored values are kept as they are (no migration or
+rewrite); the field is read-only in the Family PWA.
+
 ### displacement_status
 
 "هل الأسرة نازحة حاليًا؟". V1 values:
@@ -1062,6 +1068,15 @@ created before this field existed). It must not be read or back-filled as
 "مكان النزوح الحالي". Optional short free text (e.g. "مواصي خانيونس").
 It may be set only when `displacement_status = DISPLACED`; otherwise it is
 `NULL`.
+
+**Amended 2026-10-17 (ADR FB-GEO-02 G2-6/G2-7):** a NEW value may still be
+entered only while DISPLACED, but a stored value is **historical** and is
+kept when the status changes to NOT_DISPLACED or unknown. Nothing clears it
+implicitly; only an explicit value changes it. For a family that is not
+displaced it is shown as «مكان النزوح السابق (نص تاريخي)». It never matches
+«مكان النزوح الحالي» targeting. `current_location_id` is the authoritative
+reference for the latest approved actual residence and is never cleared by a
+status change.
 
 **Current implementation:** V1 uses free text for both location fields.
 There are no governorate/city reference data for them, and the current
@@ -2542,6 +2557,13 @@ target membership or person (the Family is the target). Details: docs/11
 version 2 adds optional `original_location` / `current_location` (Gaza
 location codes, nullable). Version 1 stays accepted unchanged, and open v1
 requests apply as before.
+
+**Payload version 3 (ADR FB-GEO-02, 2026-10-17; the only version of a new
+submission):** the changed keys only, from `original_location_id`,
+`current_location_id` (Gaza location UUIDs, nullable), `address_text`
+(nullable) and `displacement_status`; every other key, including
+`original_residence_text` and the legacy free-text fields, is refused.
+Stored v1 / v2 requests still apply with their own base.
 
 **ADD_FAMILY_MEMBER `submitted_data` (payload version 1, FP-ADR-076):**
 `full_name`, `national_id` (nine ASCII digits), `gender`, `relationship`
