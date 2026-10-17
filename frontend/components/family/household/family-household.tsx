@@ -5,7 +5,9 @@ import { AlertCircle, ChevronLeft, HandHeart, RotateCw, UsersRound } from "lucid
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
+import { GazaLocationPathLine } from "@/components/geography/gaza-location-selector";
 import { type FamilyProfile, isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyProfileQuery } from "@/lib/api/family-household";
+import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import { formatDateLong } from "@/lib/utils/date";
 import {
   HEALTH_REGISTERED,
@@ -17,7 +19,10 @@ import {
 
 export const NOT_RECORDED = "غير مسجّل";
 export const NO_RESIDENCE = "لا توجد بيانات سكن مسجّلة";
-export const NO_CURRENT_ADDRESS = "لم يُسجَّل عنوان السكن الحالي";
+export const NO_LOCATION = "لم يُحدَّد موقع جغرافي";
+/** Recorded displacement free text — never the approved current geography (FB-GEO-02 G2-7). */
+export const DISPLACEMENT_TEXT_LABEL = "مكان النزوح (نص مسجّل سابقًا)";
+export const DISPLACEMENT_TEXT_HISTORY_LABEL = "مكان النزوح السابق (نص تاريخي)";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 
@@ -137,8 +142,8 @@ function Declaration({ declaration }: { declaration: FamilyProfile["declaration"
   );
 }
 
-/** The populated parts of the current address, most local first; never an empty label. */
-function currentAddressParts(address: NonNullable<FamilyProfile["residence"]>["current_address"]): string[] {
+/** The populated parts of the recorded (legacy) address text, most local first; never an empty label. */
+function legacyAddressParts(address: NonNullable<FamilyProfile["residence"]>["current_address"]): string[] {
   return [address.neighborhood, address.area, address.city, address.governorate].filter(
     (part): part is string => part !== null && part.trim() !== ""
   );
@@ -152,9 +157,27 @@ function SubHeading({ id, children }: { id: string; children: string }) {
   );
 }
 
+/** A structured Gaza location as its full path (ancestors, then the place itself), or «لم يُحدَّد موقع جغرافي». */
+function LocationValue({ location }: { location: GazaLocationSummary | null | undefined }) {
+  if (!location) return <Missing>{NO_LOCATION}</Missing>;
+  return (
+    <span className="inline-flex justify-end" data-location-path>
+      <GazaLocationPathLine items={[...location.path, { id: location.id, name: location.name, is_active: location.is_active }]} showStatus />
+    </span>
+  );
+}
+
+/**
+ * The CURRENT residence (FB-GEO-02). The structured references are the
+ * approved geography: current_location is the latest approved actual
+ * residence (the displacement place when DISPLACED) and original_location
+ * the actual home before displacement. Recorded free text is never shown as
+ * if it were that geography: the identity-card residence, the displacement
+ * text and the old address text each keep their own, clearly labelled row.
+ */
 function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
-  const parts = residence ? currentAddressParts(residence.current_address) : [];
-  const hasAddress = parts.length > 0 || Boolean(residence?.current_address.address_text?.trim());
+  const legacyParts = residence ? legacyAddressParts(residence.current_address) : [];
+  const displaced = residence?.displacement_status === "DISPLACED";
 
   return (
     <section className={card} aria-labelledby="household-residence-title" data-household-residence>
@@ -167,10 +190,17 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
         </p>
       ) : (
         <>
-          <SubHeading id="residence-original-title">السكن الأصلي</SubHeading>
-          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-original-title">
-            <Row label="السكن الأصلي" field="original_residence">
+          <SubHeading id="residence-identity-title">السكن حسب بطاقة الهوية</SubHeading>
+          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-identity-title">
+            <Row label="السكن حسب بطاقة الهوية" field="original_residence">
               <Text value={residence.original_residence_text} />
+            </Row>
+          </dl>
+
+          <SubHeading id="residence-original-title">السكن قبل النزوح</SubHeading>
+          <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-original-title">
+            <Row label="الموقع الجغرافي للسكن الفعلي قبل النزوح" field="original_location">
+              <LocationValue location={residence.original_location} />
             </Row>
           </dl>
 
@@ -179,41 +209,31 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
             <Row label="حالة النزوح" field="displacement_status">
               {residence.displacement_status === null ? <Missing /> : familyDisplacementLabel(residence.displacement_status)}
             </Row>
-            {residence.displacement_status === "DISPLACED" && (
-              <Row label="مكان النزوح الحالي" field="displacement_location">
-                <Text value={residence.displacement_location_text} />
-              </Row>
-            )}
-            {residence.displacement_status !== "DISPLACED" && residence.displacement_location_text && (
-              <Row label="مكان النزوح السابق (نص تاريخي)" field="displacement_location_history">
-                <Text value={residence.displacement_location_text} />
+            {residence.displacement_location_text?.trim() && (
+              <Row label={displaced ? DISPLACEMENT_TEXT_LABEL : DISPLACEMENT_TEXT_HISTORY_LABEL} field="displacement_location_text">
+                <bdi>{residence.displacement_location_text}</bdi>
               </Row>
             )}
           </dl>
 
-          <SubHeading id="residence-current-title">عنوان السكن الحالي</SubHeading>
+          <SubHeading id="residence-current-title">السكن الحالي</SubHeading>
           <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-current-title">
-            {hasAddress ? (
-              <>
-                {parts.length > 0 && (
-                  <Row label="العنوان الحالي" field="current_address">
-                    {parts.map((part, i) => (
-                      <span key={i} data-address-part>
-                        {i > 0 && "، "}
-                        <bdi>{part}</bdi>
-                      </span>
-                    ))}
-                  </Row>
-                )}
-                {residence.current_address.address_text?.trim() && (
-                  <Row label="تفاصيل العنوان" field="address_text">
-                    <bdi>{residence.current_address.address_text}</bdi>
-                  </Row>
-                )}
-              </>
-            ) : (
-              <Row label="العنوان الحالي" field="current_address">
-                <span className="font-normal text-muted-foreground">{NO_CURRENT_ADDRESS}</span>
+            <Row label="الموقع الجغرافي للسكن الحالي" field="current_location">
+              <LocationValue location={residence.current_location} />
+            </Row>
+            {residence.current_address.address_text?.trim() && (
+              <Row label="العنوان التفصيلي" field="address_text">
+                <bdi>{residence.current_address.address_text}</bdi>
+              </Row>
+            )}
+            {legacyParts.length > 0 && (
+              <Row label="العنوان المسجّل (نص سابق)" field="current_address">
+                {legacyParts.map((part, i) => (
+                  <span key={i} data-address-part>
+                    {i > 0 && "، "}
+                    <bdi>{part}</bdi>
+                  </span>
+                ))}
               </Row>
             )}
             {residence.residence_type?.trim() && (

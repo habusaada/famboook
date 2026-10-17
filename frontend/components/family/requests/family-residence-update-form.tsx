@@ -221,7 +221,7 @@ function ResidenceForm({ residence }: { residence: Residence }) {
         {residence.displacement_location_text !== null && (
           <ReadOnlyField
             field="displacement-text"
-            label={residence.displacement_status === "DISPLACED" ? "مكان النزوح المسجّل (نص)" : "مكان النزوح السابق (نص تاريخي)"}
+            label={residence.displacement_status === "DISPLACED" ? "مكان النزوح (نص مسجّل سابقًا)" : "مكان النزوح السابق (نص تاريخي)"}
             value={residence.displacement_location_text}
             hint="يبقى محفوظًا كما هو، ولا يتغيّر بتغيير حالة النزوح."
           />

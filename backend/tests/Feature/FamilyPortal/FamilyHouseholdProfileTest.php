@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\FamilyPortal;
 
+use App\Actions\ImportGazaGeographyAction;
 use App\Enums\AuthIdentityStatus;
 use App\Enums\FamilyStatus;
+use App\Enums\GazaLocationLevel;
 use App\Enums\LifeStatus;
 use App\Enums\UserPersonLinkStatus;
 use App\Http\Middleware\EnsureFamilyContext;
@@ -12,6 +14,7 @@ use App\Models\Family;
 use App\Models\FamilyHouseholdDeclaration;
 use App\Models\FamilyMembership;
 use App\Models\FamilyResidence;
+use App\Models\GazaLocation;
 use App\Models\Person;
 use App\Models\User;
 use App\Support\StaffRoles;
@@ -22,6 +25,7 @@ use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Feature\Geography\BuildsGazaWorkbooks;
 use Tests\Support\CoordinatorFixtures;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\TestCase;
@@ -34,7 +38,7 @@ use Tests\TestCase;
  */
 class FamilyHouseholdProfileTest extends TestCase
 {
-    use CoordinatorFixtures, FamilyIdentityFixtures, RefreshDatabase;
+    use BuildsGazaWorkbooks, CoordinatorFixtures, FamilyIdentityFixtures, RefreshDatabase;
 
     private const URI = '/api/v1/family/household/profile';
 
@@ -270,6 +274,44 @@ class FamilyHouseholdProfileTest extends TestCase
         $this->assertSame($status, $response->json('data.residence.displacement_status'));
         $this->assertSame($location, $response->json('data.residence.displacement_location_text'));
         $this->assertTrue(array_key_exists('displacement_status', $response->json('data.residence')));
+    }
+
+    /**
+     * FB-GEO-02 regression (an applied RESIDENCE_UPDATE): both structured
+     * references are set, the family is DISPLACED, the legacy displacement
+     * and address text CONFLICT with them and address_text is null. The
+     * profile returns the structured locations as resolved names and paths,
+     * beside the unchanged legacy text — never a raw id, never merged.
+     */
+    public function test_structured_locations_are_returned_resolved_beside_conflicting_legacy_text(): void
+    {
+        app(ImportGazaGeographyAction::class)->handle($this->geoSource($this->geoWorkbook([
+            $this->geoRow([42, 'غزة الاختبار'], [213, 'مدينة الاختبار'], [1, 'غرب'], [10, 'حي الهدى'], [2, 76, 'مصلى', 'بلال']),
+            $this->geoRow([44, 'خان الاختبار'], [217, 'مدينة الساحل'], [14, 'منطقة الساحل'], [40, 'حي المواصي'], [7, 78, 'مدرسة', 'نقطة']),
+        ]), []));
+        $original = GazaLocation::idFor(GazaLocationLevel::NEIGHBORHOOD, '10');
+        $current = GazaLocation::idFor(GazaLocationLevel::LANDMARK, '7');
+
+        $head = $this->activatedHead();
+        $this->residence($head['family'], [
+            'original_residence_text' => 'بني سهيلا', 'displacement_status' => 'DISPLACED',
+            'displacement_location_text' => 'نص نزوح قديم مخالف', 'governorate' => 'رفح', 'city' => 'رفح', 'address_text' => null,
+            'original_location_id' => $original, 'current_location_id' => $current,
+        ]);
+
+        $response = $this->fetch($head['user'])->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+        $residence = $response->json('data.residence');
+
+        $this->assertSame('نقطة', $residence['current_location']['name']);
+        $this->assertSame(['خان الاختبار', 'مدينة الساحل', 'منطقة الساحل', 'حي المواصي'], array_column($residence['current_location']['path'], 'name'));
+        $this->assertSame('حي الهدى', $residence['original_location']['name']);
+        $this->assertSame(['غزة الاختبار', 'مدينة الاختبار', 'غرب'], array_column($residence['original_location']['path'], 'name'));
+        // The legacy text is returned unchanged, separately.
+        $this->assertSame('نص نزوح قديم مخالف', $residence['displacement_location_text']);
+        $this->assertSame(['رفح', 'رفح', null], [$residence['current_address']['governorate'], $residence['current_address']['city'], $residence['current_address']['address_text']]);
+        $this->assertSame('بني سهيلا', $residence['original_residence_text']);
+        $this->assertArrayNotHasKey('original_location_id', $residence);
+        $this->assertArrayNotHasKey('current_location_id', $residence);
     }
 
     public function test_only_the_current_residence_is_used_and_a_historical_row_is_ignored(): void

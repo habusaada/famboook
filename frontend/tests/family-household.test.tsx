@@ -2,10 +2,18 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyGate } from "@/components/family/family-gate";
-import { FamilyHousehold, NO_CURRENT_ADDRESS, NO_RESIDENCE, NOT_RECORDED } from "@/components/family/household/family-household";
+import {
+  DISPLACEMENT_TEXT_HISTORY_LABEL,
+  DISPLACEMENT_TEXT_LABEL,
+  FamilyHousehold,
+  NO_LOCATION,
+  NO_RESIDENCE,
+  NOT_RECORDED,
+} from "@/components/family/household/family-household";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_PROFILE_QUERY_KEY, type FamilyProfile } from "@/lib/api/family-household";
+import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import { browserStorageDump, familyGet, familyProfile, renderWithClient } from "./helpers";
 
 // PWA-3A Step 4, completed by PWA-3B.3: /family/household («أسرتي») on GET
@@ -164,27 +172,84 @@ describe("الإقرار الأسري الحالي", () => {
 });
 
 describe("السكن", () => {
-  it("shows a complete residence: original, displacement, location and the address most local first", async () => {
-    renderHousehold();
+  // Synthetic Gaza references (FB-GEO-02): ancestors in `path`, the place itself beside it.
+  const ORIGINAL: GazaLocationSummary = {
+    id: "00000000-0000-4000-8000-000000000201", level: "NEIGHBORHOOD", name: "حي الهدى", is_active: true,
+    path: [
+      { id: "00000000-0000-4000-8000-000000000202", level: "GOVERNORATE", name: "غزة الاختبار", is_active: true },
+      { id: "00000000-0000-4000-8000-000000000203", level: "CITY", name: "مدينة الاختبار", is_active: true },
+    ],
+  };
+  const CURRENT: GazaLocationSummary = {
+    id: "00000000-0000-4000-8000-000000000301", level: "LANDMARK", name: "نقطة المواصي", is_active: true,
+    path: [
+      { id: "00000000-0000-4000-8000-000000000302", level: "GOVERNORATE", name: "خان الاختبار", is_active: true },
+      { id: "00000000-0000-4000-8000-000000000303", level: "AREA", name: "منطقة الساحل", is_active: false },
+    ],
+  };
+
+  it("shows the identity-card residence, both structured locations, the status and the address in their own rows", async () => {
+    renderHousehold(familyProfile({}, { original_location: ORIGINAL, current_location: CURRENT }));
     const card = await residenceCard();
 
     expect(field(card, "original_residence")?.textContent).toBe("بني سهيلا – خانيونس");
     expect(field(card, "original_residence")?.querySelector("bdi")).not.toBeNull();
+    expect(field(card, "original_location")?.textContent).toBe("غزة الاختبارمدينة الاختبارحي الهدى");
     expect(field(card, "displacement_status")?.textContent).toBe("نازحة");
-    expect(field(card, "displacement_location")?.textContent).toBe("مواصي خانيونس");
-    expect(field(card, "current_address")?.textContent).toBe("حي الاختبار، المواصي، خانيونس، خانيونس");
-    expect(field(card, "current_address")?.querySelectorAll("bdi")).toHaveLength(4);
+    expect(field(card, "current_location")?.textContent).toContain("نقطة المواصي");
     expect(field(card, "address_text")?.textContent).toBe("قرب مسجد الاختبار");
     expect(field(card, "residence_type")?.textContent).toBe("خيمة");
     expect(field(card, "residence_started_at")?.textContent).toBe("2 يناير 2024");
-    // The approved label, without the old "(قبل النزوح)".
-    expect(within(card).getAllByText("السكن الأصلي").length).toBeGreaterThan(0);
     expect(within(card).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
-      "السكن الأصلي",
+      "السكن حسب بطاقة الهوية",
+      "السكن قبل النزوح",
       "حالة النزوح",
-      "عنوان السكن الحالي",
+      "السكن الحالي",
     ]);
-    expect(card.textContent).not.toContain("قبل النزوح");
+    // An inactive item in the path is flagged, never hidden.
+    expect(within(field(card, "current_location") as HTMLElement).getByText("غير مفعّلة")).toBeInTheDocument();
+    // The identity-card residence is display-only.
+    expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("FB-GEO-02 regression: the approved structured locations win over conflicting legacy text, which stays separate", async () => {
+    // As after an applied RESIDENCE_UPDATE: both references set, DISPLACED,
+    // old displacement / address text that disagrees, no detailed address.
+    renderHousehold(
+      familyProfile({}, {
+        original_location: ORIGINAL,
+        current_location: CURRENT,
+        displacement_status: "DISPLACED",
+        displacement_location_text: "نص نزوح قديم مخالف",
+        current_address: { governorate: "رفح", city: "رفح", area: null, neighborhood: null, address_text: null },
+      })
+    );
+    const card = await residenceCard();
+
+    const current = field(card, "current_location") as HTMLElement;
+    expect(within(current).getByRole("list", { name: "المسار الجغرافي" })).toBeInTheDocument();
+    expect(current.textContent).toContain("نقطة المواصي");
+    expect(current.textContent).not.toContain("نص نزوح قديم مخالف");
+    expect(current.textContent).not.toContain("رفح");
+
+    // The legacy text is kept, in its own clearly labelled rows — never "current".
+    expect(field(card, "displacement_location_text")?.textContent).toBe("نص نزوح قديم مخالف");
+    expect(within(card).getByText(DISPLACEMENT_TEXT_LABEL)).toBeInTheDocument();
+    expect(within(card).queryByText("مكان النزوح الحالي")).not.toBeInTheDocument();
+    expect(field(card, "current_address")?.textContent).toBe("رفح، رفح");
+    expect(within(card).getByText("العنوان المسجّل (نص سابق)")).toBeInTheDocument();
+    expect(card.querySelector('[data-field="address_text"]')).toBeNull();
+    // Never a raw identifier.
+    expect(card.textContent).not.toMatch(/00000000-0000/);
+  });
+
+  it("never falls back to legacy text for a missing structured location", async () => {
+    renderHousehold(familyProfile({}, { original_location: null, current_location: null, displacement_location_text: "مواصي خانيونس" }));
+    const card = await residenceCard();
+
+    expect(field(card, "current_location")?.textContent).toBe(NO_LOCATION);
+    expect(field(card, "original_location")?.textContent).toBe(NO_LOCATION);
+    expect(field(card, "displacement_location_text")?.textContent).toBe("مواصي خانيونس");
   });
 
   it("shows one neutral message, and no rows, when there is no residence", async () => {
@@ -195,40 +260,31 @@ describe("السكن", () => {
     expect(card.querySelector("[data-field]")).toBeNull();
   });
 
-  it("says «غير مسجّل» when the original residence is missing", async () => {
+  it("says «غير مسجّل» when the identity-card residence is missing", async () => {
     renderHousehold(familyProfile({}, { original_residence_text: null }));
     expect(field(await residenceCard(), "original_residence")?.textContent).toBe(NOT_RECORDED);
   });
 
   it.each([
-    ["DISPLACED", "نازحة", true],
-    ["NOT_DISPLACED", "غير نازحة", false],
-    [null, "غير مسجّل", false],
-  ] as const)("labels %s as «%s», with the location row only for DISPLACED", async (status, label, hasLocation) => {
-    renderHousehold(familyProfile({}, { displacement_status: status, displacement_location_text: status === "DISPLACED" ? "مواصي" : null }));
+    ["DISPLACED", "نازحة", DISPLACEMENT_TEXT_LABEL],
+    ["NOT_DISPLACED", "غير نازحة", DISPLACEMENT_TEXT_HISTORY_LABEL],
+    [null, "غير مسجّل", DISPLACEMENT_TEXT_HISTORY_LABEL],
+  ] as const)("labels %s as «%s» and its recorded displacement text as «%s»", async (status, label, textLabel) => {
+    renderHousehold(familyProfile({}, { displacement_status: status, displacement_location_text: "مواصي" }));
     const card = await residenceCard();
 
     expect(field(card, "displacement_status")?.textContent).toBe(label);
-    expect(card.querySelector('[data-field="displacement_location"]') !== null).toBe(hasLocation);
-    if (!hasLocation) expect(within(card).queryByText("مكان النزوح الحالي")).not.toBeInTheDocument();
-  });
-
-  it("shows a kept displacement text of a non-displaced family as historical, never as current", async () => {
-    renderHousehold(familyProfile({}, { displacement_status: "NOT_DISPLACED", displacement_location_text: "مواصي" }));
-    const card = await residenceCard();
-
-    expect(card.querySelector('[data-field="displacement_location"]')).toBeNull();
+    expect(field(card, "displacement_location_text")?.textContent).toBe("مواصي");
+    expect(within(card).getByText(textLabel)).toBeInTheDocument();
     expect(within(card).queryByText("مكان النزوح الحالي")).not.toBeInTheDocument();
-    expect(field(card, "displacement_location_history")?.textContent).toBe("مواصي");
-    expect(within(card).getByText("مكان النزوح السابق (نص تاريخي)")).toBeInTheDocument();
   });
 
-  it("says «غير مسجّل» for a displaced family without a location", async () => {
+  it("shows no displacement text row when none is recorded", async () => {
     renderHousehold(familyProfile({}, { displacement_status: "DISPLACED", displacement_location_text: null }));
-    expect(field(await residenceCard(), "displacement_location")?.textContent).toBe(NOT_RECORDED);
+    expect((await residenceCard()).querySelector('[data-field="displacement_location_text"]')).toBeNull();
   });
 
-  it("shows only the populated parts of a partial address — no empty labels", async () => {
+  it("shows only the populated parts of the recorded address text — no empty labels", async () => {
     renderHousehold(
       familyProfile({}, { current_address: { governorate: "غزة", city: null, area: "  ", neighborhood: "الرمال", address_text: null } })
     );
@@ -250,15 +306,14 @@ describe("السكن", () => {
     expect(card.textContent).not.toMatch(/latitude|longitude|إحداثيات|\d+\.\d{4,}/);
   });
 
-  it("says «لم يُسجَّل عنوان السكن الحالي» for an empty address, as in an imported family", async () => {
+  it("shows no address rows for an empty address, as in an imported family, and never the identity-card text as current", async () => {
     renderHousehold(familyProfile({}, { original_residence_text: "بيت لاهيا", displacement_status: null, displacement_location_text: null, current_address: EMPTY_ADDRESS }));
     const card = await residenceCard();
 
-    expect(field(card, "current_address")?.textContent).toBe(NO_CURRENT_ADDRESS);
-    expect(field(card, "current_address")?.querySelector("[data-address-part]")).toBeNull();
-    // The original residence is never presented as the current address.
+    expect(field(card, "current_location")?.textContent).toBe(NO_LOCATION);
+    expect(card.querySelector('[data-field="current_address"]')).toBeNull();
     expect(field(card, "original_residence")?.textContent).toBe("بيت لاهيا");
-    expect(field(card, "current_address")?.textContent).not.toContain("بيت لاهيا");
+    expect(field(card, "current_location")?.textContent).not.toContain("بيت لاهيا");
   });
 
   it("renders free text as stored, isolated for mixed directions", async () => {
