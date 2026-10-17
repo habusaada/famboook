@@ -35,8 +35,13 @@ Not adopted: Fluent's blue brand, Segoe typography, Microsoft 365 visuals.
 
 ## 3. Brand adaptations
 
-- Teal brand scale `brand-900 … brand-50`; primary action `#176B63`
-  (`brand-700`).
+- **Unified Kingfisher brand scale (ADR FB-UI-01, 2026-10-17)** for the
+  Staff application and the Family Portal: `brand-900 #42047E` …
+  `brand-50 #F9F5FF`; primary action `#751BD5` (`brand-700`); focus ring
+  `brand-600 #892CF1`. One definition in `:root`
+  (`frontend/app/globals.css`); portal scopes never repeat a color.
+  *(Until 2026-10-17 the Staff application used a teal scale, primary
+  `#176B63`; superseded.)*
 - IBM Plex Sans Arabic (self-hosted via `next/font`).
 - Light shell only: white sidebar and top bar on a light canvas.
 
@@ -44,15 +49,19 @@ Not adopted: Fluent's blue brand, Segoe typography, Microsoft 365 visuals.
 
 | Token | Use |
 |---|---|
-| `canvas` `#F4F6F5` | page background |
+| `canvas` `#F7F7FA` | page background |
 | `surface-1` `#FFFFFF` | cards, sidebar, top bar |
-| `surface-2` `#F8FAF9` | nested groups inside a card, filter fields, chips |
+| `surface-2` `#FAFAFC` | nested groups inside a card, filter fields, chips |
 | `surface-3` `#FFFFFF` + elevation 2 | emphasized / elevated surfaces |
 | `surface-hover` / `surface-pressed` | interactive feedback |
 | `surface-selected` (`brand-50`) | selected navigation item |
-| `stroke-subtle` `#E9EDEB` | card edges and dividers |
-| `foreground` / `muted-foreground` / `subtle-foreground` | primary / secondary / metadata text |
-| `success` `warning` `danger` `info` (+ `-soft`) | **meaning only** |
+| `stroke-subtle` `#F0F0F2` | card edges and dividers |
+| `foreground` `#18181B` / `muted-foreground` `#52525B` / `subtle-foreground` `#71717A` | primary / secondary / metadata text |
+| `border` `#E4E4E7` / `input` `#D4D4D8` | control borders |
+| `success` `warning` `danger` `info` (+ `-soft`) | **meaning only** — never brand purple; success `#09724D` / `#EEFFF8`, the others unchanged |
+
+Values are the unified palette of ADR FB-UI-01 (light mode). Dark mode is
+not active and is out of that decision: the `.dark` block is unchanged.
 
 Never write raw hex in components; add a token instead.
 
@@ -194,14 +203,13 @@ Approved 2026-10-02 as direction; not implemented. Full text:
 - Same brand, not a sub-brand: formal, trusted, clean, digital, modern,
   mobile-first. Not a playful consumer app and not a shrunken admin
   dashboard.
-- **Palette amendment (scoped).** §3 documents — and the Staff application
-  implements — a teal brand scale (`#176B63`). The Family Portal is
-  approved with the kingfisher / spring palette: UI primary `#751BD5`,
-  hover `#651CAD`, brand purple `#892CF1`; spring (`#07F49E`, strong
-  `#00BB76`) is semantic only. Kingfisher Purple is the Family Portal
-  identity (docs/11 FP-ADR-022). §3 is not changed: the Staff UI keeps its
-  teal scale during the Family PWA program, and no Staff palette migration
-  is started unless separately authorized.
+- **Palette.** The kingfisher / spring palette (UI primary `#751BD5`,
+  hover `#651CAD`, brand purple `#892CF1`; spring `#07F49E`, strong
+  `#00BB76`, semantic only) was approved for the Family Portal in 2026-10
+  (FP-ADR-022) while the Staff UI kept its teal scale. **Superseded by ADR
+  FB-UI-01 (2026-10-17):** Kingfisher is now the one Famboook palette for
+  both portals (§3, §4). The Family scope keeps only its radius, lighter
+  elevation and Family-only tokens (`--family-primary-hover`, spring).
 - Neutrals: background `#F7F7FA`, surface `#FFFFFF`, text `#18181B` /
   `#52525B` / `#71717A`, border `#E4E4E7` / `#F0F0F2`. About 80% neutral,
   15% purple, 5% semantic.
@@ -228,3 +236,4 @@ These become tokens in PWA-3; no raw hex in components (§4).
 | 1.2 | 2026-10-11 | §7a Brand assets (FB-BRAND-01): official full logo and icon, `BrandLogo`, generated favicon / PWA icons (`/icons/v2`), `SiteFooter`; the brand's colours stay inside the assets — no palette change |
 | 1.3 | 2026-10-12 | §7a FB-BRAND-02: light / dark full-logo variants through the existing `.dark` mechanism (no theme enabled); the logo alone on the Family auth pages and portal header; footer on public pages only |
 | 1.4 | 2026-10-12 | §7a FB-BRAND-02 final: the logo alone on the Family Card and public verification too; the Family Card PDF and Filament use the final light logo |
+| 1.5 | 2026-10-17 | ADR FB-UI-01: the Kingfisher palette becomes the unified color system for Staff and Family (§3, §4, §11a); semantic colors, Staff/Family radius and shadows unchanged; dark mode out of scope |

@@ -81,50 +81,57 @@
 }
 
 :root {
-    /* Calm Institutional palette. Surfaces stay white; the app canvas is a
-       separate token so inputs/outline buttons keep a white background. */
-    --brand-900: #123C3A;
-    --brand-800: #17504C;
-    --brand-700: #176B63;
-    --brand-600: #16877A;
-    --brand-500: #20A08F;
-    --brand-100: #DDF3EF;
-    --brand-50: #F0FAF8;
+    /* Unified Famboook color system (ADR FB-UI-01): the Kingfisher palette,
+       shared by the Staff and Family portals. The ONLY definition of the
+       brand, neutral and interaction colors — portal scopes below never
+       repeat them. Surfaces stay white; the app canvas is a separate token
+       so inputs/outline buttons keep a white background. */
+    --brand-900: #42047E;
+    --brand-800: #53188B;
+    --brand-700: #751BD5;
+    --brand-600: #892CF1;
+    --brand-500: #9F4FFD;
+    --brand-100: #F2E7FF;
+    --brand-50: #F9F5FF;
 
     /* Surfaces (lightest → most prominent) and elevation. */
-    --canvas: #F4F6F5;
+    --canvas: #F7F7FA;
     --surface-1: #FFFFFF;
-    --surface-2: #F8FAF9;
+    --surface-2: #FAFAFC;
     --surface-3: #FFFFFF;
-    --surface-hover: #F2F5F4;
-    --surface-pressed: #EAEFED;
+    --surface-hover: #F4F4F7;
+    --surface-pressed: #ECECF0;
     --surface-selected: var(--brand-50);
-    --stroke-subtle: #E7ECEA;
+    --stroke-subtle: #F0F0F2;
+    /* Staff elevation (the Family Portal overrides 1 and 2 in its scope). */
     --elevation-1: 0 1px 2px rgb(18 32 30 / 0.04), 0 2px 8px -2px rgb(18 32 30 / 0.06);
     --elevation-2: 0 2px 4px rgb(18 32 30 / 0.04), 0 6px 16px rgb(18 32 30 / 0.07);
     --elevation-3: 0 4px 8px rgb(18 32 30 / 0.06), 0 16px 32px rgb(18 32 30 / 0.12);
     --background: #FFFFFF;
-    --foreground: #17201E;
+    --foreground: #18181B;
     --card: #FFFFFF;
-    --card-foreground: #17201E;
+    --card-foreground: #18181B;
     --popover: #FFFFFF;
-    --popover-foreground: #17201E;
+    --popover-foreground: var(--foreground);
     --primary: var(--brand-700);
     --primary-foreground: #FFFFFF;
-    --secondary: #F3F5F4;
-    --secondary-foreground: #17201E;
-    --muted: #F3F5F4;
-    --muted-foreground: #66716E;
-    --subtle-foreground: #737E7B;
+    --secondary: #F4F4F5;
+    --secondary-foreground: #18181B;
+    --muted: #F4F4F5;
+    --muted-foreground: #52525B;
+    --subtle-foreground: #71717A;
     --accent: var(--brand-50);
     --accent-foreground: var(--brand-900);
-    --destructive: #B42318;
-    --border: #E5E9E7;
-    --input: #D5DCD9;
-    --ring: var(--brand-500);
+    --border: #E4E4E7;
+    --input: #D4D4D8;
+    --ring: var(--brand-600);
 
-    --success: #1E7A4C;
-    --success-soft: #E6F4EC;
+    /* Semantic colors: meaning only, never brand (docs/10 §4). Success is the
+       Kingfisher spring step; warning, danger, info and destructive keep
+       their established values. */
+    --destructive: #B42318;
+    --success: #09724D;
+    --success-soft: #EEFFF8;
     --warning: #9A5B06;
     --warning-soft: #FDF3E1;
     --danger: #B42318;
@@ -139,15 +146,18 @@
     --chart-5: #1D5F8C;
     --radius: 0.5rem;
     --sidebar: #FFFFFF;
-    --sidebar-foreground: #17201E;
+    --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--brand-700);
     --sidebar-primary-foreground: #FFFFFF;
     --sidebar-accent: var(--brand-50);
     --sidebar-accent-foreground: var(--brand-800);
-    --sidebar-border: #E5E9E7;
+    --sidebar-border: var(--border);
     --sidebar-ring: var(--brand-500);
 }
 
+/* Dark mode: NOT active (nothing sets .dark) and outside ADR FB-UI-01 — these
+   are the earlier values, kept unchanged. A dark palette for the unified
+   system needs its own architectural decision. */
 .dark {
     --brand-900: #DDF3EF;
     --brand-800: #BFE8E0;
@@ -231,52 +241,17 @@
   }
 }
 
-/* Family Portal (docs/11 §24): Kingfisher purple, scoped to the /family
-   layout wrapper. It only re-points the tokens above, so the same shadcn
-   primitives render purple inside the portal and the Staff teal is
-   untouched. Spring green is semantic (verified / success) only. */
+/* Family Portal (docs/11 §24), scoped to the /family layout wrapper. Its
+   colors are the shared :root palette (ADR FB-UI-01); this scope holds only
+   what is genuinely Family-specific: geometry, lighter elevation and the
+   Family-only tokens. Spring green is semantic (verified / success) only. */
 [data-portal="family"] {
-    --brand-900: #42047E;
-    --brand-800: #53188B;
-    --brand-700: #751BD5;
-    --brand-600: #892CF1;
-    --brand-500: #9F4FFD;
-    --brand-100: #F2E7FF;
-    --brand-50: #F9F5FF;
     --family-primary-hover: #651CAD;
-
-    --canvas: #F7F7FA;
-    --surface-1: #FFFFFF;
-    --surface-2: #FAFAFC;
-    --surface-3: #FFFFFF;
-    --surface-hover: #F4F4F7;
-    --surface-pressed: #ECECF0;
-    --surface-selected: var(--brand-50);
-    --stroke-subtle: #F0F0F2;
     --elevation-1: 0 1px 2px rgb(24 24 27 / 0.04);
     --elevation-2: 0 1px 3px rgb(24 24 27 / 0.06);
-
-    --background: #FFFFFF;
-    --foreground: #18181B;
-    --card: #FFFFFF;
-    --card-foreground: #18181B;
-    --primary: var(--brand-700);
-    --primary-foreground: #FFFFFF;
-    --secondary: #F4F4F5;
-    --secondary-foreground: #18181B;
-    --muted: #F4F4F5;
-    --muted-foreground: #52525B;
-    --subtle-foreground: #71717A;
-    --accent: var(--brand-50);
-    --accent-foreground: var(--brand-900);
-    --border: #E4E4E7;
-    --input: #D4D4D8;
-    --ring: var(--brand-600);
     --radius: 0.75rem;
 
-    /* Spring: #07F49E / #00BB76 for marks; the darker step for text. */
-    --success: #09724D;
-    --success-soft: #EEFFF8;
+    /* Spring: #07F49E / #00BB76 for marks; the darker step (--success) for text. */
     --family-spring: #00BB76;
     --family-spring-bright: #07F49E;
 

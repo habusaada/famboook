@@ -1459,11 +1459,11 @@ Spring Strong    #00BB76
 Spring is semantic: verified, success, active, completed. It is not a
 competing primary interface color.
 
-Kingfisher Purple is the approved Family Portal visual identity (UI
-primary `#751BD5`, brand purple `#892CF1`). The Staff application keeps
-its current teal scale (docs/10 §3) for the whole Family PWA program
-unless a migration is separately authorized. No Staff palette migration is
-started, and the teal Staff palette does not block PWA-1 (FP-ADR-022).
+Kingfisher Purple is the approved Famboook visual identity (UI primary
+`#751BD5`, brand purple `#892CF1`). Since ADR FB-UI-01 (2026-10-17) it is
+the unified color system of both the Family Portal and the Staff
+application (docs/10 §3–§4). *(Until then FP-ADR-022 kept the Staff
+application on its teal scale.)*
 
 ## Typography
 
@@ -2254,7 +2254,9 @@ default** (`FAMILY_ACTIVATION_ENABLED=false`).
 - Staff routes moved into the `(staff)` route group; URLs unchanged. The
   Family Portal never mounts or queries the Staff gate.
 - Family theme: the approved palette as scoped CSS variables under
-  `[data-portal="family"]`; the Staff teal tokens are untouched.
+  `[data-portal="family"]`; the Staff teal tokens are untouched. *(Since ADR
+  FB-UI-01 the palette lives in the shared `:root`; the Family scope keeps
+  only its radius, elevation and Family-only tokens.)*
 - `/family/activate`: one route, three internal steps (National ID, code,
   password). State lives in React memory only — nothing in the URL,
   `localStorage`, `sessionStorage` or a cookie — so a refresh restarts.
@@ -3895,7 +3897,7 @@ also annotated at its original location.
 | A-05 | docs/06 §123: health data is hidden by default in the Family Portal | Family Users may **submit** health and disability information for review | **Amended.** Reading canonical health data stays minimum-necessary until PFP-006; submission is permitted through review |
 | A-06 | docs/03 §68, docs/02 §47: eleven approved Change Request types | Health, need, family-data and declaration submissions are required | **Not amended yet.** New types are proposals (§14, PFP-008) |
 | A-07 | docs/03 §90, docs/05 §85: notifications originate from backend workflow/domain events | Manual announcements from Administration and coordinators are added | **Extended.** System notifications keep the rule; announcements are a distinct kind with their own audit |
-| A-08 | docs/10 §3: teal brand scale, primary `#176B63` | Family Portal uses the kingfisher / spring palette | **Scoped amendment.** Applies to the Family Portal only. The Staff UI is unchanged during the program unless separately authorized (FP-ADR-022) |
+| A-08 | docs/10 §3: teal brand scale, primary `#176B63` | Family Portal uses the kingfisher / spring palette | **Amended (ADR FB-UI-01, 2026-10-17).** Originally a scoped amendment for the Family Portal only; the kingfisher palette is now the unified color system of both portals (docs/10 §3–§4) |
 | A-09 | docs/07 Phases 16–19 order; docs/05 §125 | Program sequence PWA-1 … PWA-10 | **Refined.** Phases 16–19 are delivered through the PWA phases (docs/07 §31a) |
 | A-10 | docs/01 PPD-015, docs/00 CTX-PENDING-022, docs/01 PPD-019 | One Next.js application hosts Staff, Family and public verification; PWA is in the program | **Decided** |
 | A-11 | docs/03 PBD-028: exact login identifier policy | Family Users type their National ID to log in; Staff stays email | **Decided (PWA-1B).** Strict nine-digit normalization and a dedicated `family_auth_identities` key; no UNIQUE on `persons.national_id` (§30a) |
@@ -4013,6 +4015,9 @@ FP-ADR-022
 Kingfisher Purple is the Family Portal visual identity (UI primary
 #751BD5, brand purple #892CF1). The Staff UI is unchanged during the
 Family PWA program unless separately authorized.
+Amended 2026-10-17 by ADR FB-UI-01 (that separate authorization): the
+Kingfisher palette is the unified color system of the Family Portal and
+the Staff application. Dark mode is out of scope.
 
 FP-ADR-023
 The Family PWA lives inside the existing Next.js frontend application, not
@@ -5042,10 +5047,12 @@ PFP-012  (after V1)
 Marriage, divorce, widowhood, member transfer and household-head change
 workflows and their Domain Actions.
 
-PFP-013  — DECIDED 2026-10-02 (FP-ADR-022)
+PFP-013  — DECIDED 2026-10-02 (FP-ADR-022); SUPERSEDED 2026-10-17 (ADR FB-UI-01)
 Kingfisher Purple is the Family Portal identity. The Staff UI keeps its
 teal scale during the Family PWA program; no migration is started. A
 future Staff migration needs separate authorization. Not a blocker.
+The separate authorization was given 2026-10-17: the Staff UI uses the
+unified Kingfisher palette (ADR FB-UI-01).
 
 PFP-014  (PWA-10)
 Session lifetime for the installed PWA.
@@ -5212,3 +5219,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.51 | 2026-10-14 | Approved | FP-ADR-080 CO-02.6a: Coordinator form reference APIs (relationship options, placements in the current scope) implemented locally (not deployed) |
 | 1.52 | 2026-10-14 | Approved | FP-ADR-080 CO-02.6b: Coordinator request workspace UI implemented locally (not deployed) — server-driven types, placements and actions; text-only clarification reply |
 | 1.53 | 2026-10-14 | Approved | FP-ADR-080 CO-02.7b: D8 coordinator name in the household history (read-only), Staff rejection of returned requests, Coordinator Space read throttle |
+| 1.54 | 2026-10-17 | Approved | ADR FB-UI-01: FP-ADR-022, PFP-013 and A-08 amended — the Kingfisher palette is the unified Famboook color system for both portals; Family overlays (Select, Dialog, Sheet, DropdownMenu) align with it |
