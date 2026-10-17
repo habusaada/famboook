@@ -5,7 +5,8 @@ import { AlertCircle, ChevronLeft, HandHeart, RotateCw, UsersRound } from "lucid
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
-import { GazaLocationPathLine } from "@/components/geography/gaza-location-selector";
+import { GAZA_LOCATION_LEVEL_LABELS } from "@/components/geography/gaza-location-selector";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { type FamilyProfile, isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyProfileQuery } from "@/lib/api/family-household";
 import type { GazaLocationSummary } from "@/lib/types/api/gaza-location";
 import { formatDateLong } from "@/lib/utils/date";
@@ -157,13 +158,40 @@ function SubHeading({ id, children }: { id: string; children: string }) {
   );
 }
 
-/** A structured Gaza location as its full path (ancestors, then the place itself), or «لم يُحدَّد موقع جغرافي». */
-function LocationValue({ location }: { location: GazaLocationSummary | null | undefined }) {
-  if (!location) return <Missing>{NO_LOCATION}</Missing>;
+/**
+ * A structured Gaza location: one compact labelled field per hierarchy level,
+ * exactly as the API returns it (the ancestors, then the place itself) —
+ * nothing added, merged or dropped. Two columns when they fit, one when
+ * narrow; long names wrap. «لم يُحدَّد موقع جغرافي» when none is recorded.
+ */
+function LocationRow({ label, location, field }: { label: string; location: GazaLocationSummary | null | undefined; field: string }) {
+  const levels = location ? [...location.path, { id: location.id, level: location.level, name: location.name, is_active: location.is_active }] : [];
+
   return (
-    <span className="inline-flex justify-end" data-location-path>
-      <GazaLocationPathLine items={[...location.path, { id: location.id, name: location.name, is_active: location.is_active }]} showStatus />
-    </span>
+    <div className="py-2.5" data-field={field}>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="mt-2 text-sm">
+        {location ? (
+          <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2" data-location-levels>
+            {levels.map((item) => (
+              <div key={item.id} className="min-w-0 rounded-lg border border-stroke-subtle bg-surface-2 px-3 py-2" data-location-level={item.level}>
+                <dt className="text-xs text-muted-foreground">{GAZA_LOCATION_LEVEL_LABELS[item.level]}</dt>
+                <dd className="mt-0.5 font-medium text-foreground [overflow-wrap:anywhere]">
+                  <bdi>{item.name}</bdi>
+                  {!item.is_active && (
+                    <StatusBadge tone="warning" className="ms-1.5 align-middle">
+                      غير مفعّلة
+                    </StatusBadge>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <Missing>{NO_LOCATION}</Missing>
+        )}
+      </dd>
+    </div>
   );
 }
 
@@ -199,9 +227,7 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
 
           <SubHeading id="residence-original-title">السكن قبل النزوح</SubHeading>
           <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-original-title">
-            <Row label="الموقع الجغرافي للسكن الفعلي قبل النزوح" field="original_location">
-              <LocationValue location={residence.original_location} />
-            </Row>
+            <LocationRow label="الموقع الجغرافي للسكن الفعلي قبل النزوح" field="original_location" location={residence.original_location} />
           </dl>
 
           <SubHeading id="residence-displacement-title">حالة النزوح</SubHeading>
@@ -218,9 +244,7 @@ function Residence({ residence }: { residence: FamilyProfile["residence"] }) {
 
           <SubHeading id="residence-current-title">السكن الحالي</SubHeading>
           <dl className="divide-y divide-stroke-subtle" aria-labelledby="residence-current-title">
-            <Row label="الموقع الجغرافي للسكن الحالي" field="current_location">
-              <LocationValue location={residence.current_location} />
-            </Row>
+            <LocationRow label="الموقع الجغرافي للسكن الحالي" field="current_location" location={residence.current_location} />
             {residence.current_address.address_text?.trim() && (
               <Row label="العنوان التفصيلي" field="address_text">
                 <bdi>{residence.current_address.address_text}</bdi>

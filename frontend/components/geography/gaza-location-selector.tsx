@@ -57,13 +57,15 @@ import type { GazaLocation, GazaLocationLevel } from "@/lib/types/api/gaza-locat
 
 const LEVELS: GazaLocationLevel[] = ["GOVERNORATE", "CITY", "AREA", "NEIGHBORHOOD", "LANDMARK"];
 
-const LABELS: Record<GazaLocationLevel, string> = {
+/** The Arabic name of each hierarchy level (shared with the Family PWA residence card). */
+export const GAZA_LOCATION_LEVEL_LABELS: Record<GazaLocationLevel, string> = {
   GOVERNORATE: "المحافظة",
   CITY: "المدينة",
   AREA: "المنطقة",
   NEIGHBORHOOD: "الحي",
   LANDMARK: "المعلم",
 };
+const LABELS = GAZA_LOCATION_LEVEL_LABELS;
 
 // Radix Select cannot use "" as an item value.
 const NONE = "__none__";

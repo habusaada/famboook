@@ -48,6 +48,12 @@ const info = () => screen.findByRole("region", { name: "بيانات الأسر�
 const declarationCard = () => screen.findByRole("region", { name: "الإقرار الأسري الحالي" });
 const residenceCard = () => screen.findByRole("region", { name: "السكن" });
 const field = (container: HTMLElement, name: string) => container.querySelector(`[data-field="${name}"] dd`) as HTMLElement | null;
+/** A structured location's levels as [hierarchy label, value] pairs, in display order. */
+const levels = (container: HTMLElement, name: string) =>
+  Array.from(container.querySelectorAll(`[data-field="${name}"] [data-location-level]`)).map((level) => [
+    level.querySelector("dt")?.textContent,
+    level.querySelector("dd")?.textContent?.replace("غير مفعّلة", " غير مفعّلة").trim(),
+  ]);
 
 beforeEach(() => {
   router.replace.mockReset();
@@ -194,7 +200,11 @@ describe("السكن", () => {
 
     expect(field(card, "original_residence")?.textContent).toBe("بني سهيلا – خانيونس");
     expect(field(card, "original_residence")?.querySelector("bdi")).not.toBeNull();
-    expect(field(card, "original_location")?.textContent).toBe("غزة الاختبارمدينة الاختبارحي الهدى");
+    expect(levels(card, "original_location")).toEqual([
+      ["المحافظة", "غزة الاختبار"],
+      ["المدينة", "مدينة الاختبار"],
+      ["الحي", "حي الهدى"],
+    ]);
     expect(field(card, "displacement_status")?.textContent).toBe("نازحة");
     expect(field(card, "current_location")?.textContent).toContain("نقطة المواصي");
     expect(field(card, "address_text")?.textContent).toBe("قرب مسجد الاختبار");
@@ -206,8 +216,15 @@ describe("السكن", () => {
       "حالة النزوح",
       "السكن الحالي",
     ]);
-    // An inactive item in the path is flagged, never hidden.
-    expect(within(field(card, "current_location") as HTMLElement).getByText("غير مفعّلة")).toBeInTheDocument();
+    // Every level exactly as returned, each with its hierarchy label; no separators.
+    expect(levels(card, "current_location")).toEqual([
+      ["المحافظة", "خان الاختبار"],
+      ["المنطقة", "منطقة الساحل غير مفعّلة"],
+      ["المعلم", "نقطة المواصي"],
+    ]);
+    // An inactive level is flagged, never hidden.
+    expect(card.querySelector('[data-location-level="AREA"]')?.textContent).toContain("غير مفعّلة");
+    expect(card.querySelector('[data-field="current_location"] ol, [data-field="current_location"] svg')).toBeNull();
     // The identity-card residence is display-only.
     expect(within(card).queryByRole("textbox")).not.toBeInTheDocument();
   });
@@ -227,7 +244,7 @@ describe("السكن", () => {
     const card = await residenceCard();
 
     const current = field(card, "current_location") as HTMLElement;
-    expect(within(current).getByRole("list", { name: "المسار الجغرافي" })).toBeInTheDocument();
+    expect(current.querySelectorAll("[data-location-level]")).toHaveLength(3);
     expect(current.textContent).toContain("نقطة المواصي");
     expect(current.textContent).not.toContain("نص نزوح قديم مخالف");
     expect(current.textContent).not.toContain("رفح");
