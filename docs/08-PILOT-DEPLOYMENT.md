@@ -395,7 +395,21 @@ commands (OTP purge, contact-update expiry; see §16a). FB-NOTIFY-01 makes a
 **managed queue worker** and the **scheduler cron** (`schedule:run`)
 prerequisites: manual publication (single-family and bulk alike, one
 queued path) stays disabled until the worker is operational, and follow-up
-deadlines, reminders, expiration and archiving need the scheduler. Local development and testing come first; the
+deadlines, reminders, expiration and archiving need the scheduler.
+*Aligned 2026-10-18 (FB-NOTIFY-01B.1):* dependencies by function —
+
+| Function | Scheduler | Queue worker |
+|---|---|---|
+| Manual publication (single-family and bulk) | — | required |
+| Automatic SYSTEM notifications: discovery of eligible workflow events | required | — |
+| Automatic SYSTEM notifications: publication | — | required |
+| Follow-up generation, reminders, expiration and archiving | required | — |
+
+Publication never falls back to synchronous execution: with
+`QUEUE_CONNECTION=sync` (the current Production template) or no operational
+worker, publication stays refused. Production readiness of the worker and
+the scheduler is unverified and needs separate verification and approval.
+Local development and testing come first; the
 Production configuration must be verified independently, and activating
 the worker and the scheduler needs a separate deployment plan and explicit
 approval. Nothing in this amendment changes the Pilot servers.
@@ -1507,6 +1521,7 @@ Never do this once real data has been entered.
 | 1.1.26 | 2026-10-12 | Approved | §16c National ID uniqueness release (CO-01D.4, docs/04 DB-ADR-061): audit gate, maintenance-window migration with lock_timeout, verification and exact rollback |
 | 1.1.27 | 2026-10-14 | Ready for Review | §16d Coordinator requests release (CO-02): content, dependency migrations (CO-01C / CO-01D.4 first), gates, read-only state step, deployment with the coordinator mode OFF, permission seeding and readiness check, smoke checks, monitoring, feature shutdown, rollback / fix-forward |
 | 1.1.28 | 2026-10-18 | Approved | §16 amended (ADR FB-NOTIFY-01): queue worker and scheduler cron recorded as FB-NOTIFY-01 prerequisites; no server change |
+| 1.1.29 | 2026-10-18 | Approved | §16 (ADR FB-NOTIFY-01, 01B.1 alignment): scheduler and worker dependencies per function (manual publication, SYSTEM discovery and publication, follow-up / expiry); no synchronous fallback; Production readiness unverified; documentation only, no server change |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

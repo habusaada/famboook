@@ -718,12 +718,17 @@ finalized separately and moved to §22b.
 | `family-verification.view` | Authorized Staff | PWA-4 |
 | `family-verification.review` | Authorized Staff | PWA-4 |
 | `family-verification.approve` | Authorized Staff | PWA-4 |
-| `announcement.view` | Senders and authorized Staff | PWA-9 |
-| `announcement.create` | Administration; COORDINATOR (scope-bound) | PWA-9 |
-| `announcement.send` | Administration; COORDINATOR (scope-bound) | PWA-9 |
+| `announcement.view` | Authorized Staff (administration) — *coordinators use `coordinator-announcement.view` (ADR FB-NOTIFY-01, aligned 2026-10-18)* | PWA-9 |
+| `announcement.create` | Administration — *coordinators use `coordinator-announcement.create`* | PWA-9 |
+| `announcement.send` | Administration — *coordinators use `coordinator-announcement.send`* | PWA-9 |
 | `announcement.send-all` (all eligible family users) | Administration only | PWA-9 |
 | `notification-followup.view` | Authorized Staff responsible for follow-up — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `notification-followup.manage` (record manual follow-up actions) | Authorized Staff — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `coordinator-announcement.view` | COORDINATOR (own messages; current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `coordinator-announcement.create` | COORDINATOR (current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `coordinator-announcement.send` | COORDINATOR (current scope, revalidated before publication) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `coordinator-notification-followup.view` | COORDINATOR (families in the current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `coordinator-notification-followup.manage` | COORDINATOR (current scope; never their own family) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `family-card.view` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER | PWA-8 |
 | `family-card.issue` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR (the Family Portal lazy issuance is a system process) | PWA-8 |
 | `family-card.revoke` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR | PWA-8 |
@@ -4573,7 +4578,8 @@ The context is never taken from client input.
 ### AUTH-ADR-097
 Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; documentation only, NOT implemented; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)).
 - **Senders:** authorized administrators and coordinators. Coordinators send individual and bulk messages directly (no preapproval) strictly within their CURRENT scope (`CoordinatorScopes`); global sending needs an explicit permission. Follow-up actions also need the current scope.
-- **Proposed permissions (not seeded):** `announcement.view`, `.create`, `.send`, `.send-all`, `notification-followup.view`, `.manage`. No role is added (COORDINATOR exists); no existing mapping changes.
+- **Proposed permissions (not seeded):** Staff `announcement.view`, `.create`, `.send`, `.send-all`, `notification-followup.view`, `.manage`; COORDINATOR `coordinator-announcement.view`, `.create`, `.send`, `coordinator-notification-followup.view`, `.manage` (the existing `coordinator-*` convention; aligned 2026-10-18). No role is added (COORDINATOR exists); no existing mapping changes. SOCIAL_WORKER has no follow-up access until a Staff assignment model is approved.
+- **Current scope:** revalidated by the worker immediately before publication and on every follow-up operation. A coordinator never acknowledges for a family and never manually closes a follow-up for their own family. Spatie role / permission revocation is not claimed to be serialized with publication.
 - **Family side:** reads, viewing and acknowledgement only through `family.context`; never recordable by staff or coordinators. Rate limits on sending and acknowledgement; append-only audit with safe metadata.
 
 ### AUTH-ADR-096
@@ -5069,6 +5075,7 @@ Date: 2026-09-24
 | 1.2.69 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (AUTH-ADR-094): §46 and §56 notes for the approved, not implemented Gaza geographic reference; no permission, role or mapping change |
 | 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B (AUTH-ADR-095): read-only Staff `/gaza-locations` API implemented locally with `reference-data.view` OR `residence.update` (controller union check); §56 note; no permission, role or mapping change |
 | 1.2.73 | 2026-10-18 | Approved | FB-NOTIFY-01A (AUTH-ADR-097): notification authorization recorded; `notification-followup.view` / `.manage` added to the PROPOSED permissions; §126 clarified; nothing seeded, no role or mapping change |
+| 1.2.74 | 2026-10-18 | Approved | FB-NOTIFY-01B.1 alignment (AUTH-ADR-097): coordinator-specific PROPOSED names `coordinator-announcement.*` / `coordinator-notification-followup.*`; current-scope revalidation; own-family closure excluded; nothing seeded, no role or mapping change |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |

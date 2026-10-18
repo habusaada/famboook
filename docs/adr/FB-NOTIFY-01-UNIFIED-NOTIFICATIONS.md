@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Approved by the owner 2026-10-18 (architecture and business rules). **Documentation only (FB-NOTIFY-01A); nothing implemented** |
+| Status | Approved by the owner 2026-10-18 (architecture and business rules). **Documentation only (FB-NOTIFY-01A); nothing implemented**. Aligned 2026-10-18 with the FB-NOTIFY-01B.1 schema and authorization design (§2a; documentation only) |
 | Supersedes / amends | FP-ADR-018 and docs/11 §21 ("two kinds"); docs/02 §59 and docs/04 §56 (Laravel database notifications as the default store); the "Notifications and announcements" rules of docs/03 and the Announcements flow of docs/05; docs/08 §16 (no worker, no cron) for this feature; docs/06 proposed `announcement.*` permissions (still proposed) |
 | Keeps | docs/03 §90–§92, docs/05 §85–§87, docs/06 §126–§127 (backend-originated, after commit, minimal content, own-identity reads); docs/11 §22 (coordinator sending rules, preserved unchanged); "audiences resolved on the server"; the family-visible sources «إدارة Famboook» / «منسق العائلة» |
 | Schema / data change | None in this phase. Logical entities only; the physical schema is reviewed in FB-NOTIFY-01B |
@@ -72,7 +72,20 @@ The approved product needs things Laravel's notification table cannot express on
 - **RBAC unchanged:** existing roles and unrelated permission mappings stay as they are, and no new role is introduced (COORDINATOR already exists).
 - **Coordinators:** may send individual and bulk messages directly, without preapproval, strictly within their **current** assignment scope (`CoordinatorScopes`).
 - **Administrators:** global sending requires an explicit permission.
-- **Proposed permissions** (not seeded; reviewed in the implementation phase): `announcement.view`, `announcement.create`, `announcement.send`, `announcement.send-all`, `notification-followup.view`, `notification-followup.manage`.
+- **Proposed permissions** (not seeded; reviewed in the implementation phase). Coordinator permissions follow the existing `coordinator-*` naming convention, which keeps the family-side coordinator permission set separate from Staff permissions (as `coordinator-request.*` is from `change-request.*`):
+
+| Holder | Proposed permissions |
+|---|---|
+| Staff (administration) | `announcement.view`, `announcement.create`, `announcement.send`, `announcement.send-all`, `notification-followup.view`, `notification-followup.manage` |
+| COORDINATOR (existing role) | `coordinator-announcement.view`, `coordinator-announcement.create`, `coordinator-announcement.send`, `coordinator-notification-followup.view`, `coordinator-notification-followup.manage` |
+| FAMILY_USER | none new: the inbox, viewing and acknowledgement use the existing `family-portal.access` + `family.context` |
+
+- **Revalidation before publication:** the coordinator's permission and CURRENT assignment scope (and, for Staff, the sending permission) are revalidated by the publication worker immediately before the recipient snapshot is written, in the publication transaction (ADR-08 rule 2). A sender who is no longer authorized gets `PUBLISH_FAILED`, never a publication.
+- **Follow-ups:** every follow-up operation (list, view, record a contact, close) re-checks the permission and, for a coordinator, that the family is in the CURRENT scope (`CoordinatorScopes`). Revoking an assignment removes access on the next request.
+- **Own family:** a coordinator cannot manually close a follow-up for their own family, even when it is in their scope.
+- **No acting for the family:** coordinators, like Staff, cannot view-record or acknowledge a message for any family (ADR-05).
+- **SOCIAL_WORKER:** no follow-up access until a separately approved Staff assignment model exists (none exists in the repository).
+- **Revocation is not serialized:** the coordinator's assignment rows can be locked against a concurrent scope revocation during publication. Spatie role and permission revocation is NOT claimed to be transactionally serialized with publication: the permission tables are not locked, so publication is ordered at the moment of the check. A stronger guarantee needs the revocation writes to use compatible locking, which is not part of this design.
 
 ### ADR-05 — Levels, viewing and acknowledgement
 | Level | Viewing | Acknowledgement | Follow-up |
@@ -89,7 +102,10 @@ The approved product needs things Laravel's notification table cannot express on
 - **Opening:** the system finds families that haven't met the level's condition and opens follow-up records after the deadlines in ADR-05.
 - **Alerting:** it alerts the **currently** responsible authorized staff member or coordinator in-app.
 - **No duplicates:** at most one follow-up per recipient and stage, and no duplicate reminders.
-- **Manual actions:** authorized staff may record manual follow-up actions. A staff contact attempt stays distinct from a family acknowledgement, and never impersonates a viewing or acknowledgement event.
+- **Manual actions:** authorized staff (and coordinators within their current scope, ADR-04) may record manual follow-up actions. A staff contact attempt stays distinct from a family acknowledgement, and never impersonates a viewing or acknowledgement event.
+- **Closing outcomes stay distinct:** satisfied by the family, expired, or closed manually by an authorized user with a reason code. A manual closure never sets viewing or acknowledgement and never changes delivery or acknowledgement metrics, which come only from the recipient timestamps.
+- **Reason codes before notes:** manual actions and closures use structured reason codes. A free-text note is optional, short and visible only to authorized follow-up users (never to families). Sensitive personal information (health, identity documents, national IDs, contact data) must not be entered in follow-up notes, and the interface says so.
+- **Note correction:** an incorrect or sensitive note is never edited or deleted. An authorized administrator records a `NOTE_CORRECTION` event that references it; application views then suppress the corrected note. This is audit-preserving suppression in application views, not physical database erasure.
 - **Closing:** a follow-up closes automatically once its condition is met. History is kept.
 
 ### ADR-07 — Expiration, archiving and late acknowledgement
@@ -100,7 +116,13 @@ The approved product needs things Laravel's notification table cannot express on
   - keeps recipient, viewing, acknowledgement and follow-up history.
 - **After expiry:** archived messages stay viewable, and acknowledgement remains possible but is marked **late**. A follow-up closed as expired is never reopened by a late acknowledgement.
 - **Archived is not acknowledged:** an archived message does not count as successfully acknowledged.
-- **Retention:** the retention period needs separate confirmation against the existing data-retention policy. docs/08 records 24 months for authentication and security events; no permanent retention is decided here.
+- **Expiry is effective at `expires_at`:** `expires_at` is an absolute time chosen by the sender and is never shifted. From that moment, read models treat the message as expired even before the scheduler runs:
+  - it leaves the active inbox and the active unread count immediately;
+  - it appears in the family archive view even while its stored status is still `PUBLISHED`;
+  - an IMPORTANT message can still be acknowledged, marked late;
+  - no new follow-up is ever opened for an expired message.
+- **The scheduler remains authoritative:** it performs the persistent `PUBLISHED → ARCHIVED` transition and closes incomplete follow-ups as expired. It is the only way to archive in this release (no manual archive).
+- **Retention:** the retention period needs separate confirmation against the existing data-retention policy. docs/08 records 24 months for authentication and security events; no permanent retention is decided here. No automatic deletion of the immutable notification audit history is authorized. Operational failed-job records are separate from that history (30 days recommended, §2a).
 
 ### ADR-08 — Queue, worker and scheduler
 - **Target architecture:**
@@ -119,12 +141,12 @@ The approved product needs things Laravel's notification table cannot express on
 | `PUBLISHING` | the worker is processing it |
 | `PUBLISHED` | the full recipient snapshot is committed; `published_at` set |
 | `PUBLISH_FAILED` | publication did not complete; no recipient visible; retryable |
-| `ARCHIVED` | a published message archived (e.g. at expiry) |
-| `CANCELLED` | withdrawn before publication (from `DRAFT` or `QUEUED`); never published |
+| `ARCHIVED` | a published message archived automatically at expiry (no manual archive in this release) |
+| `CANCELLED` | withdrawn before publication (from `DRAFT`, `QUEUED` or `PUBLISH_FAILED`, the failure history kept); never published. A published message is never cancelled |
 
 Rules:
 1. A sender may prepare a `DRAFT` and request publication (`QUEUED`); the request is idempotent (client reference).
-2. The worker moves the message to `PUBLISHING` and, through an idempotent workflow, re-checks on the backend the sender's authorization and CURRENT scope and resolves the target families.
+2. The worker moves the message to `PUBLISHING` and, through an idempotent workflow, re-checks on the backend the sender's authorization and CURRENT scope — immediately before writing the snapshot, inside the publication transaction — and resolves the target families.
 3. **Initial implementation: one database transaction** writes the whole recipient snapshot (deduplicated: one row per family) and sets `PUBLISHED` with `published_at`. Either all of it commits, or none of it does.
 4. `published_at` is set only when publication completes successfully. All follow-up deadlines and expiry are measured from it.
 5. A family sees a message only once it is `PUBLISHED` (or later `ARCHIVED`). Sender-facing published lists and published dashboard counts exclude `QUEUED`, `PUBLISHING` and `PUBLISH_FAILED`; a sender may see their own pending and failed attempts in a separate operational view.
@@ -132,7 +154,7 @@ Rules:
 7. `CANCELLED`, `ARCHIVED` and `PUBLISH_FAILED` are distinct: never published, published then archived, and not (yet) published.
 8. If chunked publication is ever needed for very large audiences, the `PUBLISHED` transition (and `published_at`) happens only after every chunk is verified complete; until then nothing is visible. Not part of the initial implementation.
 
-SYSTEM messages (ADR-09) are created by the same workflow with their single recipient in one transaction; they never pass through `DRAFT`.
+SYSTEM messages (ADR-09) are discovered and created asynchronously, enter the lifecycle at `QUEUED` (never `DRAFT`), and are published by the same queued workflow: their single recipient row and the `PUBLISHED` transition are written atomically in one transaction (rule 3).
 - **Order of work:** local development and testing come first. Production configuration must be verified independently, and activating the worker and the scheduler needs a separate deployment plan and explicit approval. No Production change is authorized here.
 - **Computed counts:** dashboard follow-up counts may be computed from the authoritative timestamps so they stay correct if a scheduled task is late. This never replaces the persistent follow-up and audit records.
 
@@ -141,6 +163,26 @@ SYSTEM messages (ADR-09) are created by the same workflow with their single reci
 - **Idempotency:** ONE system message per unique origin event; the origin (the `workflow_events` row) is unique on the message, so a replay or retry never creates a second message. Its recipient is the family associated with the originating request. It is not "one message per origin event per family" in general.
 - **Access:** system messages use the same family inbox and the same family-side access controls (`family.context`) as announcements.
 - **Candidate types:** the supported event types are the nine listed in §1. The initial family-facing mapping is decided in FB-NOTIFY-01B; candidates are RETURNED (clarification needed), APPROVED (approved, not yet applied — APPROVED ≠ APPLIED), APPLIED, REJECTED and SUBMITTED (receipt).
+- **Initial mapping (FB-NOTIFY-01B.1):** `RETURNED`, `REJECTED` and `APPLIED` only. No other workflow event is notified automatically.
+- **Asynchronous generation:** nothing is added to the change-request actions or to `WorkflowEventRecorder`:
+  - **discovery:** a scheduled command finds eligible `workflow_events` that have no message yet, so events recorded before it runs are picked up later;
+  - **creation:** one transaction per event creates the SYSTEM message as `QUEUED` (the unique origin makes a replay a no-op) and dispatches the publication job after commit;
+  - **publication:** the ADR-08 queued workflow writes the recipient and `PUBLISHED` atomically; nothing is visible before;
+  - **reconciliation:** re-dispatches stalled `QUEUED` messages and recovers stale `PUBLISHING` ones.
+  No queue worker ever runs inside an HTTP or workflow transaction.
+- **Activation cutoff:** events recorded before the feature's activation cutoff are never backfilled.
+- **Content:** fixed, safe templates per event type with a family-relative link to the authorized request view. The `internal_note` is never copied.
+- **Recipient eligibility (this release):**
+  1. A SYSTEM notification needs a valid originating `workflow_events` row (an eligible type, after the activation cutoff) and a resolvable recipient: the originating change request's own `family_id`.
+  2. Requests with `family_id = null` are skipped — `REGISTER_FAMILY` requests from coordinators (whose new family is recorded only in `created_family_id` at APPLY) and any other family-less request. No recipient is fabricated, and none is inferred from `created_family_id`, from the coordinator's own family or from anything else.
+  3. Coordinator-submitted requests about an existing family are eligible when the request has a valid `family_id` and the event is RETURNED, REJECTED or APPLIED.
+  4. A notification grants no access. The `action_path` is set only when the family is authorized to open the destination under the existing family-side rules. Today the family request view is scoped to the context family's `family_id`, which includes coordinator-submitted requests about it; otherwise the notification is sent without an action link. Opening the link is always re-authorized by that endpoint, and a notification never enables a family action on a coordinator's request.
+  5. A skipped event never interrupts, delays or modifies the change-request workflow, its transitions or `workflow_events`.
+- **Skipped events are not failures:**
+  - Eligibility is part of the discovery query (eligible type, after the cutoff, a non-null `family_id`, no existing message), so an ineligible event is never selected. It does not fail, does not retry, and is not re-processed as an error on each run.
+  - Skips are reported only as non-sensitive operational diagnostics: per-run counts by reason code (e.g. `NO_FAMILY`) in the structured application log, and the count of skipped events since the cutoff in the notifications health command. These contain counts and codes only — no request, family or person identifiers.
+  - No fifth notification table and no message row are created for a skipped event.
+  - The decision is deterministic and idempotent: a request's `family_id` is not assigned later by APPLY, so a skipped event stays skipped.
 - **Not covered:** docs/02 §60 also lists ACCOUNT_ACTIVATED / ACCOUNT_SUSPENDED. These are authentication events, not `workflow_events`, and are deferred.
 - **No workflow change:** change-request transitions, reviewer permissions and workflow rules don't change.
 - **Shared inbox:** system messages and announcements share the same family inbox.
@@ -154,8 +196,36 @@ SYSTEM messages (ADR-09) are created by the same workflow with their single reci
 - **Audit:** append-only audit events, server-generated timestamps only, and safe metadata (codes and counts; never message bodies, identifiers or contact data in metadata).
 - **Integrity:**
   - publication is idempotent (a client reference, as for change requests);
-  - acknowledgement and expiration are race-safe (row locks);
+  - acknowledgement and expiration are race-safe (row locks); Spatie permission and role revocation is not serialized with publication (ADR-04);
   - per-user rate limits apply to sending and acknowledgement.
+
+## 2a. Design alignment (FB-NOTIFY-01B.1, 2026-10-18)
+
+The owner provisionally approved the physical design directions below. They refine ADR-01 to ADR-10 without changing them; the physical schema is implemented only in FB-NOTIFY-01B.2 after final approval.
+
+| ID | Direction |
+|---|---|
+| D1 | A human-readable notice code (`NTF-000001`) |
+| D2 | `recipient_count` stored as a historical fact of successful publication |
+| D3 | `PUBLISH_FAILED → CANCELLED` allowed, failure history kept |
+| D4 | No manual archive; automatic archive at expiry only |
+| D5 | SYSTEM messages default to NORMAL and are not exempt from follow-up rules |
+| D6 | Administrators and coordinators (current scope) manage follow-ups; SOCIAL_WORKER only under a separately approved assignment model |
+| D7 | Initial automatic events: RETURNED, REJECTED, APPLIED |
+| D8 | SYSTEM generation asynchronous through the queue, idempotent (ADR-09) |
+| D9 | 30-day retention for operational failed-job records, separate from the immutable audit history |
+| D10 | Coordinator permissions named `coordinator-*` (ADR-04) |
+| D11 | ARCHIVED and expired messages excluded from the active unread count, kept in the archive |
+| D12 | FIRST and SECOND follow-up stages may coexist; a valid family acknowledgement closes both |
+| R1 | A coordinator cannot manage follow-ups for their own family |
+| R2 | Minimum lead of 1 h for `expires_at` when publication is requested |
+| R3 | Length limits: title 150, body 2000, follow-up note 1000 characters |
+| R4 | Three automatic publication attempts, then manual retry or cancel |
+| R5 | A `PUBLISHING` message older than 10 minutes, with no live worker lock, is recovered as stale |
+| R6 | `NOTE_CORRECTION` suppression for incorrect or sensitive notes (ADR-06) |
+| R7 | This alignment of ADR-04, ADR-08 and ADR-09 |
+| R8 | A SYSTEM message to a family that is not ACTIVE is published and recorded, but opens no follow-up |
+| E1 | SYSTEM recipient eligibility: the request's own non-null `family_id` only; family-less requests skipped as diagnostics, never failures; the action link only where the family is already authorized (ADR-09) |
 
 ## 3. Rationale and alternatives
 | Alternative | Why not |
@@ -184,7 +254,7 @@ SYSTEM messages (ADR-09) are created by the same workflow with their single reci
 
 ## 7. Implementation prerequisites
 1. Owner review of this ADR and of the physical schema (FB-NOTIFY-01B).
-2. Approval and seeding of the proposed permissions (docs/06 AUTH-ADR-097).
+2. Approval and seeding of the proposed permissions, Staff and `coordinator-*` (docs/06 AUTH-ADR-097).
 3. A queue worker and a scheduler cron verified locally, then a separate, approved Production deployment plan (docs/08 §16).
-4. The confirmed family-facing `workflow_events` mapping (ADR-09).
+4. The family-facing `workflow_events` mapping (ADR-09: RETURNED, REJECTED, APPLIED; provisionally approved).
 5. A retention confirmation (ADR-07).

@@ -1381,8 +1381,13 @@ late acknowledgement still possible, never reopening them
 stay distinct. Families, published lists and published counts never include
 `QUEUED`, `PUBLISHING` or `PUBLISH_FAILED`. `SYSTEM` messages (derived from
 `workflow_events`, one per unique origin event, recipient = the request's
-family) are written with their recipient in one transaction. "read /
-unread" above becomes viewing and, where required, acknowledgement.
+family) are discovered and created asynchronously, enter at `QUEUED`, and
+are published by the same queued workflow: recipient row and `PUBLISHED`
+in one transaction; change-request workflows are unchanged (ADR-09,
+aligned 2026-10-18). From `expires_at` a message leaves the active inbox
+and unread count and shows in the archive even before the scheduler
+archives it. "read / unread" above becomes viewing and, where required,
+acknowledgement.
 
 ---
 
@@ -3673,3 +3678,4 @@ Date: 2026-09-24
 | 1.2.29 | 2026-10-14 | Approved | CO-02.7a: Staff review workspace compatible with Coordinator requests and proposed Families (family = null); wording by channel; no workflow change |
 | 1.2.30 | 2026-10-14 | Approved | CO-02.7b (approved): Staff RETURNED_FOR_CLARIFICATION → REJECTED with change-request.reject and a required reason, both channels; no other transition changed |
 | 1.2.31 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): Announcements flow amended to the unified publication, snapshot, viewing / acknowledgement and follow-up workflow; §85 derivation from `workflow_events`; documentation only |
+| 1.2.32 | 2026-10-18 | Approved | FB-NOTIFY-01B.1 design alignment (ADR FB-NOTIFY-01): SYSTEM messages discovered and created asynchronously and published through the queued lifecycle; expiry effective at `expires_at` in read models; documentation only |
