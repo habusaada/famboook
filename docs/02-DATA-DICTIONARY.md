@@ -2921,6 +2921,10 @@ entities: `notification_messages`, `notification_recipients`,
 `notification_recipient_events` (append-only), `notification_followups`. No
 table is named `notifications` (it would collide with Laravel's `Notifiable`
 on `users`). Physical schema: FB-NOTIFY-01B. Not implemented.
+*Updated 2026-10-18 (FB-NOTIFY-01B.2a): the four tables are now implemented
+in the repository (local commit `29a0b12`) — see "Implemented data
+dictionary" below. The feature is not operational, and the logical list
+that follows is kept for history.*
 
 Logical notification information includes:
 
@@ -2935,6 +2939,171 @@ created_at
 ```
 
 Sensitive information should be minimized in notification payloads.
+
+## Implemented data dictionary (FB-NOTIFY-01B.2a)
+
+**Status (2026-10-18).** Implemented in the repository (commit `29a0b12`)
+and verified on the isolated test database `famboook_test`. **Not migrated**
+on the local development database `famboook`, **not deployed** to
+Production, and **not operational**: no publication, follow-up processing,
+endpoint, permission or interface exists yet. Physical details (indexes,
+CHECK names, trigger, sequence): docs/04 §56 and DB-ADR-067. Business
+intent: ADR FB-NOTIFY-01.
+
+Legend: **DB** — enforced by PostgreSQL (CHECKs, keys, trigger; on SQLite
+only keys, unique / partial indexes and NOT NULL). **App** — deferred to the
+application layer (models and the future Domain Actions).
+
+### notification_messages
+
+Purpose: one notification message — a SYSTEM notice derived from a
+workflow event, or an ANNOUNCEMENT written by Staff or a coordinator — and
+its publication lifecycle.
+
+| Column | Type | Null | Default | Values / reference |
+|---|---|---|---|---|
+| `id` | bigint | no | auto | internal key; never leaves the server |
+| `uuid` | uuid | no | generated | **unique**; public identifier |
+| `notice_code` | varchar(20) | no | generated | **unique**; `NTF-000001` (six or more digits) |
+| `kind` | varchar(20) | no | — | `SYSTEM`, `ANNOUNCEMENT` |
+| `sender_side` | varchar(20) | no | — | `SYSTEM`, `STAFF`, `COORDINATOR` |
+| `level` | varchar(20) | no | `NORMAL` | `NORMAL`, `IMPORTANT` |
+| `status` | varchar(20) | no | `DRAFT` | `DRAFT`, `QUEUED`, `PUBLISHING`, `PUBLISHED`, `PUBLISH_FAILED`, `ARCHIVED`, `CANCELLED` |
+| `title` | varchar(150) | no | — | non-blank |
+| `body` | text | no | — | non-blank, at most 2000 characters |
+| `action_path` | varchar(255) | yes | — | a family-relative path `/family/...` |
+| `sender_user_id` | bigint | yes | — | → `users` |
+| `sender_scope` | jsonb | yes | — | coordinator scope snapshot (JSON object) |
+| `audience` | jsonb | no | `{}` | requested audience criteria (JSON object) |
+| `client_reference` | uuid | yes | — | publication idempotency key; **unique per sender** |
+| `origin_workflow_event_id` | bigint | yes | — | → `workflow_events`; **unique** |
+| `recipient_count` | integer | yes | — | set by a successful publication; ≥ 1 |
+| `queued_at` | timestamp | yes | — | |
+| `publishing_started_at` | timestamp | yes | — | |
+| `publishing_token` | uuid | yes | — | worker fencing token |
+| `publish_attempts` | smallint | no | 0 | ≥ 0 |
+| `publish_failed_at` | timestamp | yes | — | latest failure |
+| `publish_failure_code` | varchar(50) | yes | — | a code (`^[A-Z][A-Z0-9_]+$`), never exception text |
+| `published_at` | timestamp | yes | — | |
+| `expires_at` | timestamp | yes | — | absolute time chosen by the sender |
+| `archived_at` | timestamp | yes | — | |
+| `cancelled_at` | timestamp | yes | — | |
+| `cancelled_by_user_id` | bigint | yes | — | → `users` |
+| `cancellation_reason_code` | varchar(50) | yes | — | a code |
+| `created_at`, `updated_at` | timestamp | yes | — | |
+
+Invariants:
+- **DB** — exactly three sender shapes: SYSTEM (system side, no user, no
+  scope, an origin event, no client reference, never DRAFT), STAFF
+  announcement (a user, no scope, no origin), COORDINATOR announcement (a
+  user and a scope snapshot, no origin). The family-visible source label
+  («إدارة Famboook» / «منسق العائلة») is derived from `sender_side`, never
+  stored.
+- **DB** — one message per origin workflow event; one publication request
+  per sender and client reference.
+- **DB** — `published_at` and `recipient_count` exist exactly when PUBLISHED
+  or ARCHIVED; `expires_at` is after `published_at`; ARCHIVED only with a
+  reached `expires_at` (no manual archive); CANCELLED only before
+  publication and always by a user; a DRAFT was never queued, attempted or
+  failed; PUBLISHING carries a start time and a token; the failure time
+  and code go together and stay after a retry, a later success or a
+  cancellation.
+- **DB** — `audience` and a present `sender_scope` are JSON objects.
+- **App** — the allowed transitions (ADR-08), the sender's current
+  permission and scope, the `expires_at` minimum lead, audience resolution
+  and the recipient snapshot, the `notice_code` on any write that bypasses
+  the model.
+
+### notification_recipients
+
+Purpose: one family recipient of a published message — the family is the
+recipient, with publication-time snapshots that are never rewritten.
+
+| Column | Type | Null | Default | Values / reference |
+|---|---|---|---|---|
+| `id` | bigint | no | auto | internal key |
+| `message_id` | bigint | no | — | → `notification_messages` |
+| `family_id` | bigint | no | — | → `families`; **unique with `message_id`** |
+| `family_status_at_publication` | varchar(20) | no | — | `ACTIVE`, `INACTIVE`, `ARCHIVED` |
+| `head_person_id` | bigint | yes | — | → `persons`; household head at publication |
+| `had_family_account` | boolean | no | — | an activated family account at publication |
+| `viewed_at` | timestamp | yes | — | first opening of the details |
+| `viewed_by_user_id` | bigint | yes | — | → `users` |
+| `acknowledged_at` | timestamp | yes | — | explicit acknowledgement |
+| `acknowledged_by_user_id` | bigint | yes | — | → `users` |
+| `acknowledged_late` | boolean | no | false | acknowledged at or after expiry |
+| `created_at`, `updated_at` | timestamp | yes | — | |
+
+Invariants:
+- **DB** — one row per message and family; a view time and its user go
+  together, as do an acknowledgement and its user; an acknowledgement
+  implies a view at or before it; `acknowledged_late` only when
+  acknowledged.
+- **App** — acknowledgement only for IMPORTANT; the viewing or
+  acknowledging user is the family's own context user (never Staff or a
+  coordinator acting for it); the snapshot columns are written once by
+  publication; the late flag is computed from `expires_at`.
+
+### notification_followups
+
+Purpose: one follow-up stage of a recipient that did not meet its level's
+condition in time.
+
+| Column | Type | Null | Default | Values / reference |
+|---|---|---|---|---|
+| `id` | bigint | no | auto | internal key |
+| `uuid` | uuid | no | generated | **unique**; public identifier |
+| `recipient_id` | bigint | no | — | → `notification_recipients`; **unique with `stage`** |
+| `stage` | varchar(10) | no | — | `FIRST`, `SECOND` |
+| `trigger_reason` | varchar(20) | no | — | `UNVIEWED`, `UNACKNOWLEDGED` |
+| `due_at` | timestamp | no | — | deadline measured from `published_at` |
+| `status` | varchar(10) | no | `OPEN` | `OPEN`, `CLOSED` |
+| `outcome` | varchar(20) | yes | — | `SATISFIED`, `EXPIRED`, `CLOSED_MANUALLY` |
+| `closed_at` | timestamp | yes | — | |
+| `closed_by_user_id` | bigint | yes | — | → `users` (manual closure only) |
+| `close_reason_code` | varchar(50) | yes | — | a code (manual closure only) |
+| `created_at`, `updated_at` | timestamp | yes | — | `created_at` = when it opened |
+
+Invariants:
+- **DB** — at most one row per recipient and stage (FIRST and SECOND may
+  coexist); SECOND only for UNACKNOWLEDGED; CLOSED exactly when a closing
+  time and an outcome exist; a closing user and reason code exactly for
+  CLOSED_MANUALLY. No column records a view or an acknowledgement here.
+- **App** — the deadlines (NORMAL 72 h unviewed; IMPORTANT 24 h and 72 h
+  unacknowledged), the reason matching the message level, never reopening
+  a closed follow-up (also a model guard), responsibility from the CURRENT
+  permission and scope (no assignee column).
+
+### notification_recipient_events
+
+Purpose: the append-only history of messages, recipients and follow-ups.
+
+| Column | Type | Null | Default | Values / reference |
+|---|---|---|---|---|
+| `id` | bigint | no | auto | internal key; chronology |
+| `message_id` | bigint | no | — | → `notification_messages` |
+| `recipient_id` | bigint | yes | — | → the recipient **of the same message** |
+| `followup_id` | bigint | yes | — | → the follow-up **of the same recipient** |
+| `event_type` | varchar(30) | no | — | message-level: `QUEUED`, `PUBLISHING_STARTED`, `PUBLISHED`, `PUBLISH_FAILED`, `REQUEUED`, `CANCELLED`, `EXPIRED_ARCHIVED`; recipient-level: `VIEWED`, `ACKNOWLEDGED`, `ACKNOWLEDGED_LATE`; follow-up-level: `FOLLOWUP_OPENED`, `CONTACT_RECORDED`, `FOLLOWUP_CLOSED`, `NOTE_CORRECTION` |
+| `actor_user_id` | bigint | yes | — | → `users` |
+| `actor_side` | varchar(20) | no | — | `FAMILY`, `STAFF`, `COORDINATOR`, `SYSTEM` |
+| `reason_code` | varchar(50) | yes | — | a code |
+| `internal_note` | text | yes | — | Staff / coordinator note, 1..1000 characters; never shown to families |
+| `corrects_event_id` | bigint | yes | — | → an earlier event of the same follow-up |
+| `metadata` | jsonb | no | `{}` | JSON object; codes and counts only |
+| `created_at` | timestamp | no | current time | no `updated_at` |
+
+Invariants:
+- **DB** — never updated or deleted (trigger); each type has its scope
+  (no recipient for message-level, a recipient for recipient-level, both
+  for follow-up-level); a user acts unless the side is SYSTEM; the FAMILY
+  side writes exactly the view and acknowledgement events, and nobody else
+  writes them; notes only on CONTACT_RECORDED / FOLLOWUP_CLOSED by Staff or
+  a coordinator; a NOTE_CORRECTION references an earlier event of the same
+  follow-up and is written by Staff; `metadata` is a JSON object.
+- **App** — the corrected event carries a note; corrected notes are
+  suppressed in application views (never erased); metadata content stays
+  free of bodies, names, identifiers and contact data.
 
 ---
 
@@ -4370,6 +4539,7 @@ Date: 2026-09-24
 | 1.2.39 | 2026-10-13 | Approved | CO-02.3a (DD-ADR-035): §52 nullable `family_id` for `REGISTER_FAMILY` only, `submission_channel`, `proposed_clan_id`, `proposed_branch_id`, `created_family_id`; §57 REGISTER_FAMILY type and COORDINATOR workflow actor; §7 `registration_source` COORDINATOR_REQUEST. Schema foundation only |
 | 1.2.40 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (DD-ADR-036, ADR-FB-GEO-01): PDD-006 architecturally resolved, implementation pending — unified Gaza geographic reference for original and current residence (§19 current vs future), RESIDENCE_UPDATE v2 noted as future (§47). Documentation only; no schema change |
 | 1.2.41 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §59 custom notification model (logical entities), §60 derivation from `workflow_events`, "Announcement and recipient" unified with system notifications; documentation only |
+| 1.2.42 | 2026-10-18 | Approved | FB-NOTIFY-01B.2a: §59 implemented data dictionary for `notification_messages`, `notification_recipients`, `notification_followups`, `notification_recipient_events` (commit `29a0b12`; DB vs application rules); verified on `famboook_test` only; local `famboook` and Production NOT migrated; not operational |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

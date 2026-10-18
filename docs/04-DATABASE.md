@@ -2652,6 +2652,10 @@ family), `notification_recipient_events` (append-only, the
 `workflow_events` trigger pattern) and `notification_followups` (one row
 per recipient and stage). No table named `notifications` (collision with
 `Notifiable` on `users`). Retention needs separate confirmation.
+*Updated 2026-10-18 (FB-NOTIFY-01B.2a, DB-ADR-067): the four tables are now
+implemented in the repository — see "Implemented physical schema" below.
+The Laravel-notifications logical list that follows is superseded for
+Famboook's in-app notifications and kept for history.*
 
 Logical data includes:
 
@@ -2667,6 +2671,234 @@ updated_at
 ```
 
 Notification payloads should contain minimal sensitive data.
+
+## Implemented physical schema (FB-NOTIFY-01B.2a, DB-ADR-067)
+
+Status, 2026-10-18:
+
+| Level | State |
+|---|---|
+| Repository | **Implemented** — local commit `29a0b12` (four migrations, models, enums, tests) |
+| Isolated test database `famboook_test` (127.0.0.1:5433) | **Verified** — migrated from scratch by the PostgreSQL suite; notification schema and model tests pass |
+| Local development database `famboook` | **NOT migrated** — it is behind on earlier pending migrations (including `workflow_events`); see DB-ADR-067 |
+| Production | **NOT deployed, NOT migrated** |
+
+The notification feature is **not operational**: no publication action,
+queue job, scheduler command, endpoint, permission or interface exists
+yet. Business intent: ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`) and its §2a
+design alignment. The migrations and models are authoritative for the
+details below.
+
+Migrations, in order (each runs in its own transaction on PostgreSQL):
+
+1. `2026_10_24_090000_create_notification_messages_table`
+2. `2026_10_24_090001_create_notification_recipients_table`
+3. `2026_10_24_090002_create_notification_followups_table`
+4. `2026_10_24_090003_create_notification_recipient_events_table`
+
+Dependencies: `users`, `families`, `persons` and `workflow_events`
+(`2026_10_17_090001_create_workflow_events_table`) must exist — the SYSTEM
+origin is a foreign key to `workflow_events`. No existing table is altered.
+
+```text
+notification_messages
+
+id                        BIGINT PK (auto-increment)
+uuid                      UUID UNIQUE                -- public identifier
+notice_code               VARCHAR(20) UNIQUE         -- NTF-000001
+kind                      VARCHAR(20)                -- SYSTEM | ANNOUNCEMENT
+sender_side               VARCHAR(20)                -- SYSTEM | STAFF | COORDINATOR
+level                     VARCHAR(20) DEFAULT 'NORMAL'   -- NORMAL | IMPORTANT
+status                    VARCHAR(20) DEFAULT 'DRAFT'    -- DRAFT | QUEUED | PUBLISHING | PUBLISHED
+                                                     --   | PUBLISH_FAILED | ARCHIVED | CANCELLED
+title                     VARCHAR(150)
+body                      TEXT                       -- 1..2000 characters
+action_path               VARCHAR(255) NULL          -- /family/... only
+sender_user_id            BIGINT NULL FK users RESTRICT
+sender_scope              JSONB NULL                 -- coordinator scope snapshot (object)
+audience                  JSONB DEFAULT '{}'         -- requested audience criteria (object)
+client_reference          UUID NULL                  -- publication idempotency key
+origin_workflow_event_id  BIGINT NULL UNIQUE FK workflow_events RESTRICT
+recipient_count           INTEGER NULL               -- set only by a successful publication
+queued_at                 TIMESTAMP NULL
+publishing_started_at     TIMESTAMP NULL
+publishing_token          UUID NULL                  -- worker fencing token
+publish_attempts          SMALLINT DEFAULT 0
+publish_failed_at         TIMESTAMP NULL             -- latest failure; kept after retry / cancel
+publish_failure_code      VARCHAR(50) NULL
+published_at              TIMESTAMP NULL
+expires_at                TIMESTAMP NULL             -- absolute, chosen by the sender
+archived_at               TIMESTAMP NULL
+cancelled_at              TIMESTAMP NULL
+cancelled_by_user_id      BIGINT NULL FK users RESTRICT
+cancellation_reason_code  VARCHAR(50) NULL
+created_at, updated_at
+
+UNIQUE (sender_user_id, client_reference)            -- NULLs distinct
+INDEX (sender_user_id, created_at), (status, published_at),
+      (status, expires_at), (status, queued_at)
+```
+
+```text
+notification_recipients
+
+id                            BIGINT PK (auto-increment)
+message_id                    BIGINT FK notification_messages RESTRICT
+family_id                     BIGINT FK families RESTRICT
+family_status_at_publication  VARCHAR(20)        -- ACTIVE | INACTIVE | ARCHIVED (snapshot)
+head_person_id                BIGINT NULL FK persons RESTRICT   -- head at publication
+had_family_account            BOOLEAN            -- activated account at publication
+viewed_at                     TIMESTAMP NULL     -- first opening of the details
+viewed_by_user_id             BIGINT NULL FK users RESTRICT
+acknowledged_at               TIMESTAMP NULL
+acknowledged_by_user_id       BIGINT NULL FK users RESTRICT
+acknowledged_late             BOOLEAN DEFAULT FALSE
+created_at, updated_at
+
+UNIQUE (message_id, family_id)
+UNIQUE (id, message_id)                              -- target of the events' composite FK
+INDEX (family_id, message_id)
+INDEX notification_recipients_unviewed_index (family_id) WHERE viewed_at IS NULL
+INDEX notification_recipients_unacknowledged_index (message_id) WHERE acknowledged_at IS NULL
+```
+
+```text
+notification_followups
+
+id                 BIGINT PK (auto-increment)
+uuid               UUID UNIQUE
+recipient_id       BIGINT FK notification_recipients RESTRICT
+stage              VARCHAR(10)                 -- FIRST | SECOND
+trigger_reason     VARCHAR(20)                 -- UNVIEWED | UNACKNOWLEDGED
+due_at             TIMESTAMP
+status             VARCHAR(10) DEFAULT 'OPEN'  -- OPEN | CLOSED
+outcome            VARCHAR(20) NULL            -- SATISFIED | EXPIRED | CLOSED_MANUALLY
+closed_at          TIMESTAMP NULL
+closed_by_user_id  BIGINT NULL FK users RESTRICT
+close_reason_code  VARCHAR(50) NULL
+created_at, updated_at                         -- created_at = when it opened
+
+UNIQUE (recipient_id, stage)
+UNIQUE (id, recipient_id)                      -- target of the events' composite FK
+INDEX notification_followups_open_due_index (due_at) WHERE status = 'OPEN'
+```
+
+```text
+notification_recipient_events                  -- append-only
+
+id                 BIGINT PK (auto-increment)
+message_id         BIGINT FK notification_messages RESTRICT
+recipient_id       BIGINT NULL
+followup_id        BIGINT NULL
+event_type         VARCHAR(30)
+actor_user_id      BIGINT NULL FK users RESTRICT
+actor_side         VARCHAR(20)                 -- FAMILY | STAFF | COORDINATOR | SYSTEM
+reason_code        VARCHAR(50) NULL
+internal_note      TEXT NULL                   -- 1..1000 characters
+corrects_event_id  BIGINT NULL
+metadata           JSONB DEFAULT '{}'          -- object; codes and counts only
+created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP   -- no updated_at
+
+UNIQUE (id, followup_id)
+FK (recipient_id, message_id)      → notification_recipients (id, message_id) RESTRICT
+FK (followup_id, recipient_id)     → notification_followups (id, recipient_id) RESTRICT
+FK (corrects_event_id, followup_id) → notification_recipient_events (id, followup_id) RESTRICT
+INDEX (message_id, id), (recipient_id, id), (followup_id, id),
+      (event_type, created_at), (actor_user_id)
+```
+
+Every one of the 15 foreign keys is RESTRICT: no history is cascaded
+away. The composite keys guarantee that an event's recipient belongs to
+its message, its follow-up to its recipient, and a correction to the same
+follow-up (MATCH SIMPLE: when `recipient_id` / `followup_id` is NULL the
+composite key is not checked; `chk_nre_scope` then decides on
+PostgreSQL).
+
+PostgreSQL CHECK constraints (52, all verified present on `famboook_test`):
+
+- `notification_messages` (29):
+  - values: `chk_nm_kind`, `chk_nm_sender_side`, `chk_nm_level`,
+    `chk_nm_status`, `chk_nm_notice_code` (`^NTF-[0-9]{6,}$`),
+    `chk_nm_codes` (failure and cancellation codes `^[A-Z][A-Z0-9_]{1,49}$`);
+  - content: `chk_nm_title` (non-blank), `chk_nm_body` (non-blank, ≤ 2000),
+    `chk_nm_action_path` (`^/family(/[A-Za-z0-9_-]+)+$`: no scheme, host,
+    query or `..`), `chk_nm_json` (`audience` and a present `sender_scope`
+    are JSON **objects**);
+  - sender shape: `chk_nm_kind_side`, `chk_nm_sender_user`,
+    `chk_nm_sender_scope`, `chk_nm_origin`, `chk_nm_system_reference`,
+    `chk_nm_system_no_draft` — exactly three valid shapes: SYSTEM
+    (system side, no user, no scope, an origin event, no client reference,
+    never DRAFT), STAFF announcement (a user, no scope, no origin) and
+    COORDINATOR announcement (a user and a scope, no origin);
+  - lifecycle: `chk_nm_draft` (a DRAFT was never queued, attempted or
+    failed), `chk_nm_attempts` (≥ 0), `chk_nm_queued`, `chk_nm_publishing`
+    (start time and token), `chk_nm_failure` (failure time and code
+    together), `chk_nm_failed`, `chk_nm_published` (`published_at` iff
+    PUBLISHED or ARCHIVED), `chk_nm_recipient_count` (iff published, ≥ 1),
+    `chk_nm_expiry` (`expires_at > published_at`), `chk_nm_archived`,
+    `chk_nm_archive_on_expiry` (ARCHIVED only with a reached `expires_at`:
+    no manual archive), `chk_nm_cancelled`, `chk_nm_cancel_actor` (always
+    by a user; never after publication, via `chk_nm_published`).
+    Failure columns may stay populated after a retry, a later success or a
+    cancellation.
+- `notification_recipients` (5): `chk_nr_family_status`,
+  `chk_nr_view_actor`, `chk_nr_ack_actor`, `chk_nr_ack_requires_view`
+  (acknowledgement implies a view at or before it), `chk_nr_late` (late
+  only when acknowledged).
+- `notification_followups` (8): `chk_nf_stage`, `chk_nf_trigger_reason`,
+  `chk_nf_stage_reason` (SECOND only for UNACKNOWLEDGED), `chk_nf_status`,
+  `chk_nf_outcome`, `chk_nf_closed` (CLOSED iff closing time and outcome),
+  `chk_nf_manual` (a closing user and reason code iff CLOSED_MANUALLY),
+  `chk_nf_close_reason`.
+- `notification_recipient_events` (10): `chk_nre_event_type`,
+  `chk_nre_scope` (message-level types without recipient or follow-up;
+  VIEWED / ACKNOWLEDGED / ACKNOWLEDGED_LATE with a recipient only;
+  follow-up types with both), `chk_nre_actor_side`, `chk_nre_actor` (a
+  user unless SYSTEM), `chk_nre_family_actor` (FAMILY actor iff a
+  view / acknowledgement event — no one acts for the family),
+  `chk_nre_correction` (NOTE_CORRECTION iff a reference, to an earlier
+  event), `chk_nre_correction_actor` (Staff only),
+  `chk_nre_internal_note` (Staff / coordinator, on CONTACT_RECORDED or
+  FOLLOWUP_CLOSED, 1..1000 characters), `chk_nre_reason_code`,
+  `chk_nre_metadata` (JSON object).
+
+Append-only audit: the function
+`famboook_notification_recipient_events_append_only()` and the trigger
+`trg_notification_recipient_events_append_only` (BEFORE UPDATE OR DELETE,
+FOR EACH ROW) reject every update and delete, raw SQL included; INSERT is
+allowed. The other three tables are mutable state.
+
+Notice code: the PostgreSQL sequence `notification_message_code_seq`
+(owned by `notice_code`) feeds `App\Support\Notifications\NotificationCodes`,
+called from the model's `creating` hook: `NTF-` plus at least six digits,
+growing past `NTF-999999`. Gaps after a rollback are expected and numbers
+are never reused; the unique index is the final guard. An insert that
+bypasses the model must call `NotificationCodes::next()` itself —
+otherwise NOT NULL refuses it.
+
+JSON: `audience`, `sender_scope` and `metadata` are JSON objects in the
+database (CHECKs above); the models use the `JsonObject` cast, which
+writes an empty array as `{}` and refuses a list or a scalar instead of
+storing it.
+
+Rollback: every `down()` refuses while its table holds rows (the events
+migration says "notification audit history exists"); the messages `down()`
+also drops the sequence and the events `down()` the trigger function. After
+any real use the rollback is a code rollback.
+
+PostgreSQL vs SQLite: the sequence, the 52 CHECKs and the trigger exist
+on PostgreSQL only (repository convention). SQLite (test suite) enforces
+the keys, the unique and partial indexes, the composite foreign keys and
+NOT NULL; the models add an event immutability guard, a family-only
+view / acknowledgement guard, a closed-follow-up guard and no-delete
+guards. On SQLite, notice codes follow the highest issued code (test only).
+
+Deferred to the application layer (01B.2b and later): acknowledgement
+only for IMPORTANT; follow-up trigger reason matching the level; the
+viewing / acknowledging user being the family's own context user;
+current-scope and permission checks; the corrected event carrying a note;
+`expires_at` minimum lead; safe metadata content (codes and counts only);
+retention.
 
 ---
 
@@ -4271,6 +4503,14 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-067
+Unified notifications database foundation, implemented in the repository (2026-10-18, FB-NOTIFY-01B.2a; local commit `29a0b12`; ADR FB-NOTIFY-01 and its §2a design alignment). Schema: §56 "Implemented physical schema".
+- Four additive tables: `notification_messages`, `notification_recipients`, `notification_followups`, `notification_recipient_events`. No table named `notifications`; no existing table changed.
+- Integrity: 52 PostgreSQL CHECKs, unique and partial indexes, three composite foreign keys, 15 RESTRICT foreign keys, an append-only trigger on the events, the `notification_message_code_seq` sequence (`NTF-`), JSON-object columns.
+- Rollback refuses while any row exists.
+- Verified on the isolated `famboook_test` only. The local development database `famboook` is NOT migrated: it lacks `workflow_events` and other earlier migrations, and `2026_10_20_090000_enforce_unique_person_national_id` refuses its current data. Production is NOT migrated or deployed.
+- Not operational: publication, follow-up processing, endpoints, permissions and interfaces are later phases.
+
 ### DB-ADR-066
 Residence geographic linkage, implemented LOCALLY (2026-10-15, FB-GEO-01 Stage 3.2; Production NOT migrated; ADR-FB-GEO-01 §4.2; contract `docs/audits/FB-GEO-01-STAGE-3-RESIDENCE-LINKAGE-AUDIT.md`).
 - `family_residences` gains nullable UUID `original_location_id` and `current_location_id`, each FK `gaza_locations` RESTRICT with its own index, on the current row beside the text they describe. There is no `displacement_location_id`.
@@ -4623,6 +4863,7 @@ Date: 2026-09-24
 | 1.2.50 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B: §24a read-only Staff API listed (`/gaza-locations/…`, AUTH-ADR-095); no schema change; local only |
 | 1.2.51 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2 (DB-ADR-066): §24 `original_location_id` / `current_location_id` on `family_residences` implemented LOCALLY as `2026_10_22_090003` (nullable UUID FK RESTRICT, indexed, guarded rollback, no backfill); Production NOT migrated |
 | 1.2.52 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §56 — custom notification model justified; proposed logical tables; no migration; documentation only |
+| 1.2.53 | 2026-10-18 | Approved | FB-NOTIFY-01B.2a (DB-ADR-067): §56 implemented physical schema recorded — four notification migrations `2026_10_24_090000`–`090003` (commit `29a0b12`), keys, indexes, 52 PostgreSQL CHECKs, append-only trigger, `NTF-` sequence, JSON objects, guarded rollback; verified on `famboook_test` only; local `famboook` and Production NOT migrated; not operational |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
