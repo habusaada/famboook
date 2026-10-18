@@ -5,9 +5,10 @@ import { CalendarClock, History } from "lucide-react";
 import type { FamilyUser } from "@/lib/api/family-auth";
 
 // FB-FAMILY-DASHBOARD-01: the compact greeting of the Family home — the
-// user's name, the current local date and time, and the previous successful
-// sign-in the server resolved for THIS session. Arabic words with Latin
-// digits, as elsewhere in the portal; the device's own time zone.
+// user's name, today's date with a live clock (seconds), and the previous
+// successful sign-in the server resolved for THIS session (static). Arabic
+// words with Latin digits, as elsewhere in the portal; the device's own time
+// zone (no timeZone option); 12-hour time with the Arabic ص / م.
 
 const DATE_TIME = new Intl.DateTimeFormat("ar-u-nu-latn", {
   weekday: "long",
@@ -18,16 +19,32 @@ const DATE_TIME = new Intl.DateTimeFormat("ar-u-nu-latn", {
   minute: "2-digit",
 });
 
+const DATE = new Intl.DateTimeFormat("ar-u-nu-latn", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+const CLOCK = new Intl.DateTimeFormat("ar-u-nu-latn", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+
+/** A date and time to the minute, e.g. the previous sign-in. */
 export function formatLocalDateTime(date: Date): string {
   return DATE_TIME.format(date);
+}
+
+/** Today's date in words, e.g. «الأحد، 18 أكتوبر 2026». */
+export function formatLocalDate(date: Date): string {
+  return DATE.format(date);
+}
+
+/** The live clock, e.g. «4:13:05 م». */
+export function formatLocalClock(date: Date): string {
+  return CLOCK.format(date);
 }
 
 export const FIRST_SIGN_IN_TEXT = "هذا أول دخول لك إلى بوابة الأسرة.";
 export const UNKNOWN_SIGN_IN_TEXT = "لا تتوفر معلومات عن الدخول السابق.";
 
 /**
- * The current time, updated on each minute boundary while mounted. null
- * until mounted, so the server render and the first client render match.
+ * The current time, updated on each second boundary while mounted (both
+ * timers cleared on unmount). null until mounted, so the server render and
+ * the first client render match — no hydration mismatch.
  */
 function useNow(): Date | null {
   const [now, setNow] = useState<Date | null>(null);
@@ -36,11 +53,11 @@ function useNow(): Date | null {
     let interval: ReturnType<typeof setInterval> | undefined;
     const tick = () => setNow(new Date());
     tick();
-    const toNextMinute = 60_000 - (Date.now() % 60_000);
+    const toNextSecond = 1000 - (Date.now() % 1000);
     const timeout = setTimeout(() => {
       tick();
-      interval = setInterval(tick, 60_000);
-    }, toNextMinute);
+      interval = setInterval(tick, 1000);
+    }, toNextSecond);
 
     return () => {
       clearTimeout(timeout);
@@ -73,7 +90,18 @@ export function WelcomeHeader({ user }: { user: FamilyUser }) {
       </h1>
       <dl className="mt-2 flex flex-col gap-1 text-[13px] leading-relaxed text-muted-foreground">
         <Line icon={CalendarClock} label="الوقت الحالي" field="now">
-          {now ? <time dateTime={now.toISOString()}>{formatLocalDateTime(now)}</time> : <span aria-hidden>&nbsp;</span>}
+          {now ? (
+            <time dateTime={now.toISOString()}>
+              {formatLocalDate(now)}
+              <span aria-hidden> · </span>
+              {/* Tabular digits: the clock never shifts as the seconds change. Not a live region. */}
+              <span className="font-medium text-foreground tabular-nums" data-welcome-clock>
+                {formatLocalClock(now)}
+              </span>
+            </time>
+          ) : (
+            <span aria-hidden>&nbsp;</span>
+          )}
         </Line>
         <Line icon={History} label="الدخول السابق" field="previous-sign-in">
           {previous ? (

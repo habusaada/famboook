@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyGate } from "@/components/family/family-gate";
 import { FamilyHome } from "@/components/family/family-home";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
-import { FIRST_SIGN_IN_TEXT, UNKNOWN_SIGN_IN_TEXT, WelcomeHeader, formatLocalDateTime } from "@/components/family/home/welcome-header";
+import { FIRST_SIGN_IN_TEXT, UNKNOWN_SIGN_IN_TEXT, WelcomeHeader, formatLocalClock, formatLocalDate, formatLocalDateTime } from "@/components/family/home/welcome-header";
+import { renderToString } from "react-dom/server";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_HOUSEHOLD_QUERY_KEY } from "@/lib/api/family-household";
 import { browserStorageDump, coordinatorContext, coordinatorSummary, familyGet, familyHousehold, familyUser, renderWithClient } from "./helpers";
@@ -75,7 +76,10 @@ describe("the household summary", () => {
     renderHome();
     await summary();
 
-    const text = document.body.textContent ?? "";
+    // The live clock shows the real time (it may contain a 5): it is not a household figure.
+    const page = document.body.cloneNode(true) as HTMLElement;
+    page.querySelector('[data-welcome="now"]')?.remove();
+    const text = page.textContent ?? "";
     expect(text).not.toMatch(/(^|\D)5(\D|$)/); // 7 − 2
     expect(text).not.toMatch(/غير مسجل|غير المسجل|ناقص|مفقود|متبقي|المتبقين|الفرق/);
   });
@@ -238,19 +242,70 @@ describe("the order of the home (FB-FAMILY-DASHBOARD-01)", () => {
 describe("the welcome header", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("shows the current local date and time in accessible markup and updates it every minute", () => {
+  const clock = () => document.querySelector("[data-welcome-clock]") as HTMLElement;
+  const nowTime = () => document.querySelector('[data-welcome="now"] time') as HTMLElement;
+
+  it("shows today's date and a live 12-hour clock with seconds, updated every second", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-10-18T09:05:30Z"));
+    vi.setSystemTime(new Date("2026-10-18T09:05:30.400Z"));
 
     render(<WelcomeHeader user={familyUser()} />);
-    const now = document.querySelector('[data-welcome="now"] time') as HTMLElement;
-    expect(now).toHaveAttribute("dateTime", "2026-10-18T09:05:30.000Z");
-    expect(now).toHaveTextContent(formatLocalDateTime(new Date("2026-10-18T09:05:30Z")));
+    expect(nowTime()).toHaveAttribute("dateTime", "2026-10-18T09:05:30.400Z");
+    expect(nowTime()).toHaveTextContent(formatLocalDate(new Date("2026-10-18T09:05:30.400Z")));
+    expect(clock()).toHaveTextContent(formatLocalClock(new Date("2026-10-18T09:05:30.400Z")));
+    expect(clock().textContent).toMatch(/^\d{1,2}:\d{2}:\d{2} (ص|م)$/);
+    expect(clock()).toHaveClass("tabular-nums");
 
-    act(() => vi.advanceTimersByTime(30_000));
-    expect(document.querySelector('[data-welcome="now"] time')).toHaveAttribute("dateTime", "2026-10-18T09:06:00.000Z");
-    act(() => vi.advanceTimersByTime(60_000));
-    expect(document.querySelector('[data-welcome="now"] time')).toHaveAttribute("dateTime", "2026-10-18T09:07:00.000Z");
+    // Aligned to the next second boundary, then once per second.
+    act(() => vi.advanceTimersByTime(600));
+    expect(nowTime()).toHaveAttribute("dateTime", "2026-10-18T09:05:31.000Z");
+    for (const second of ["32", "33", "34"]) {
+      act(() => vi.advanceTimersByTime(1000));
+      expect(nowTime()).toHaveAttribute("dateTime", `2026-10-18T09:05:${second}.000Z`);
+    }
+    expect(clock()).toHaveTextContent(formatLocalClock(new Date("2026-10-18T09:05:34Z")));
+    // The clock is not a live region: screen readers are not interrupted every second.
+    expect(document.querySelector("[aria-live]")).toBeNull();
+  });
+
+  it("clears its timers when unmounted", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-18T09:05:30.400Z"));
+    const before = vi.getTimerCount();
+
+    const { unmount } = render(<WelcomeHeader user={familyUser()} />);
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(vi.getTimerCount()).toBe(before + 1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(before);
+  });
+
+  it("formats in the device's own time zone, 12-hour with the Arabic AM / PM", () => {
+    const morning = new Date(2026, 9, 18, 8, 5, 7);
+    const evening = new Date(2026, 9, 18, 20, 5, 7);
+    // Local wall-clock hours whatever the runner's time zone.
+    expect(formatLocalClock(morning)).toBe("8:05:07 ص");
+    expect(formatLocalClock(evening)).toBe("8:05:07 م");
+    expect(new Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("keeps the previous sign-in static while the clock runs", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-18T09:05:30Z"));
+    render(<WelcomeHeader user={familyUser({ previous_sign_in_at: "2026-10-17T18:42:00+00:00" })} />);
+    const before = document.querySelector('[data-welcome="previous-sign-in"]')?.textContent;
+
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(document.querySelector('[data-welcome="previous-sign-in"]')?.textContent).toBe(before);
+    expect(before).toContain(formatLocalDateTime(new Date("2026-10-17T18:42:00Z")));
+  });
+
+  it("renders no clock on the server, so hydration cannot mismatch", () => {
+    const html = renderToString(<WelcomeHeader user={familyUser()} />);
+
+    expect(html).not.toContain("<time");
+    expect(html).not.toContain("data-welcome-clock");
+    expect(html).toContain("سالم الاختبار");
   });
 
   it("shows the previous successful sign-in in local time, from the server's UTC timestamp", () => {
