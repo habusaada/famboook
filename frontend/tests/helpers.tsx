@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { vi } from "vitest";
 import { apiClient } from "@/lib/api/client";
-import type { CoordinatorContext } from "@/lib/api/coordinator";
+import type { CoordinatorContext, CoordinatorSummary } from "@/lib/api/coordinator";
 import type { FamilyAccount } from "@/lib/api/family-account";
 import type { FamilyAuthCapabilities, FamilyUser } from "@/lib/api/family-auth";
 import type {
@@ -212,6 +212,16 @@ export function coordinatorContext(overrides: Partial<CoordinatorContext> = {}):
   };
 }
 
+/** Synthetic coordinator summary (FB-FAMILY-DASHBOARD-01): server aggregates. */
+export function coordinatorSummary(overrides: Partial<CoordinatorSummary> = {}): CoordinatorSummary {
+  return {
+    family_count: 12,
+    person_count: 48,
+    requests: { in_progress: 3, completed: 5, closed: 0 },
+    ...overrides,
+  };
+}
+
 /** Synthetic household health (PWA-3B.6); by default nothing is registered. */
 export function familyHealth(members: FamilyHouseholdHealth["members"] = []): FamilyHouseholdHealth {
   return { members };
@@ -268,6 +278,9 @@ export function familyGet({
   self = familySelf(),
   account = familyAccount(),
   coordinator = coordinatorContext(),
+  summary = coordinatorSummary(),
+  // Coordinator request types: closed unless a test opens them.
+  coordinatorRequestTypes = { data: [], meta: { submission_enabled: false } } as unknown,
   health = familyHealth(),
   needs = [] as unknown,
   assistance = [] as unknown,
@@ -283,6 +296,8 @@ export function familyGet({
   self?: Answer;
   account?: Answer;
   coordinator?: Answer;
+  summary?: Answer;
+  coordinatorRequestTypes?: Answer;
   health?: Answer;
   needs?: Answer;
   assistance?: Answer;
@@ -324,6 +339,10 @@ export function familyGet({
     if (path === "/api/v1/family/coordinator/context") {
       return typeof coordinator === "function" || coordinator instanceof Error ? answer(coordinator) : { data: coordinator };
     }
+    if (path === "/api/v1/family/coordinator/summary") {
+      return typeof summary === "function" || summary instanceof Error ? answer(summary) : { data: summary };
+    }
+    if (path === "/api/v1/family/coordinator/requests/types") return answer(coordinatorRequestTypes);
     if (path === "/api/v1/family/change-requests/types") return answer(requestTypes);
     if (path === "/api/v1/family/auth/capabilities") {
       return typeof capabilities === "function" || capabilities instanceof Error ? answer(capabilities) : { data: capabilities };

@@ -165,6 +165,19 @@ class FamilyPasswordResetCompleteTest extends TestCase
         $this->assertSame(MobileTrustStatus::TRUSTED, PersonMobileTrust::sole()->status);
     }
 
+    /** FB-FAMILY-DASHBOARD-01: a reset signs in, so it reports the sign-in before it — never a first sign-in. */
+    public function test_a_reset_reports_the_previous_sign_in(): void
+    {
+        $this->login(self::OLD_PASSWORD)->assertOk();
+        $loggedInAt = AuthSecurityEvent::where('event_type', 'LOGIN_SUCCEEDED')->where('outcome', 'SUCCESS')->sole()->created_at;
+        $this->postJson('/api/v1/family/auth/logout')->assertNoContent();
+
+        $this->travel(3)->minutes();
+        $this->complete($this->verified())->assertOk()
+            ->assertJsonPath('user.previous_sign_in_at', $loggedInAt->utc()->toIso8601String())
+            ->assertJsonPath('user.first_sign_in', false);
+    }
+
     public function test_after_a_reset_the_old_password_fails_and_the_new_one_logs_in(): void
     {
         $this->complete($this->verified())->assertOk();

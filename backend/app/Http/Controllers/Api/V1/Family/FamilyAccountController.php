@@ -51,6 +51,7 @@ class FamilyAccountController extends Controller
 
         $user = $change->handle($context, (string) $request->input('current_password'), (string) $request->input('password'));
 
-        return FamilySessionController::signIn($request, $user)->header('Cache-Control', 'no-store, private');
+        // A session refresh, not a sign-in: the previous sign-in shown stays the same.
+        return FamilySessionController::signIn($request, $user, refresh: true)->header('Cache-Control', 'no-store, private');
     }
 }

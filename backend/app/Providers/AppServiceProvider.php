@@ -16,6 +16,7 @@ use App\Models\Person;
 use App\Models\PersonHealthRecord;
 use App\Support\ChangeRequests\ChangeRequestTypes;
 use App\Support\FamilyAuth\FamilyAccessResolver;
+use App\Support\FamilyAuth\SignInHistory;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
@@ -56,6 +57,8 @@ class AppServiceProvider extends ServiceProvider
         // One dispatcher per request lifecycle: it holds a deferred OTP SMS in
         // memory until the response has been sent (docs/11 §30a, A′).
         $this->app->scoped(SmsDispatcher::class);
+        // FB-FAMILY-DASHBOARD-01: the request's own successful sign-in event.
+        $this->app->scoped(SignInHistory::class);
 
         // The Change Request type registry (PWA-5b): the Production handlers
         // only — EMPTY in PWA-5. Tests replace it with ChangeRequestTypes::fake().

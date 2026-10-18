@@ -168,6 +168,23 @@ class FamilyActivationCompleteTest extends TestCase
         $this->assertSame($user->id, AuthSecurityEvent::where('event_type', 'ACTIVATION_COMPLETED')->sole()->user_id);
     }
 
+    /** FB-FAMILY-DASHBOARD-01: activation creates a NEW account, so it is certainly the first sign-in. */
+    public function test_the_activation_is_reported_as_the_first_sign_in_and_the_next_login_shows_it(): void
+    {
+        config(['family_auth.login_enabled' => true]);
+        $this->complete($this->verified())->assertCreated()
+            ->assertJsonPath('user.first_sign_in', true)
+            ->assertJsonPath('user.previous_sign_in_at', null);
+        $activatedAt = AuthSecurityEvent::where('event_type', 'ACTIVATION_COMPLETED')->where('outcome', 'SUCCESS')->sole()->created_at;
+        $this->postJson('/api/v1/family/auth/logout')->assertNoContent();
+
+        $this->travel(5)->minutes();
+        $this->app['auth']->forgetGuards();
+        $this->postJson('/api/v1/family/auth/login', ['national_id' => self::NATIONAL_ID, 'password' => self::PASSWORD], self::BROWSER)->assertOk()
+            ->assertJsonPath('user.first_sign_in', false)
+            ->assertJsonPath('user.previous_sign_in_at', $activatedAt->utc()->toIso8601String());
+    }
+
     public function test_nothing_sensitive_is_returned_recorded_or_logged(): void
     {
         $response = $this->complete($this->verified())->assertCreated();

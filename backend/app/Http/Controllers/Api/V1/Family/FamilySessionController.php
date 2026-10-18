@@ -13,6 +13,7 @@ use App\Http\Resources\FamilyCurrentUserResource;
 use App\Models\User;
 use App\Support\FamilyAuth\AuthSecurityLog;
 use App\Support\FamilyAuth\FamilyLogin;
+use App\Support\FamilyAuth\SignInHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -64,9 +65,15 @@ class FamilySessionController extends Controller
      * representation. One browser session is either Staff or Family:
      * whatever was signed in here is replaced, and the session id and the
      * CSRF token are new. No token and no "remember me".
+     *
+     * FB-FAMILY-DASHBOARD-01: a new sign-in resolves its previous successful
+     * sign-in once and keeps it in the session (SignInHistory). A refresh —
+     * the password change, which is not a sign-in — carries over what the
+     * session already knew.
      */
-    public static function signIn(Request $request, User $user, int $status = 200): JsonResponse
+    public static function signIn(Request $request, User $user, int $status = 200, bool $refresh = false): JsonResponse
     {
+        $carried = $refresh ? SignInHistory::snapshot($request) : null;
         $guard = Auth::guard('web');
         if ($guard->check()) {
             $guard->logout();
@@ -75,6 +82,8 @@ class FamilySessionController extends Controller
         $guard->login($user);
         $request->session()->regenerate();
         $request->session()->regenerateToken();
+        $history = app(SignInHistory::class);
+        $refresh ? $history->store($request, $carried) : $history->start($request, $user);
 
         return self::current($request, $status);
     }

@@ -1167,6 +1167,40 @@ Update Data
 Less frequent actions live in the new-action flow. Home does not list
 every service.
 
+**Amended 2026-10-18 (FB-FAMILY-DASHBOARD-01) — the unified home as
+implemented** (local; the slots above without an implementation —
+notifications, Profile Completion / Verification status, recent requests —
+stay future):
+
+```text
+1. Welcome header      name · current local date and time (device time zone,
+                       updated each minute) · previous successful sign-in
+                       (/family/me previous_sign_in_at, first_sign_in;
+                       "unknown" when not certain)
+2. Install suggestion  (unchanged)
+3. Family              identity card (clan, branch, family code) and the
+                       household summary — declared size and registered
+                       members as two separate facts (unchanged)
+4. Shortcuts           family card · أسرتي · طلباتي · حسابي (existing routes)
+5. Services            from GET /family/change-requests/types only: a type is
+                       a link when submission is enabled and this client has
+                       its form; a listed type without a form is shown as
+                       unavailable and is never clickable
+6. Coordinator         only when /family/me coordinator_space is true: the
+                       server scope, four figures from
+                       GET /family/coordinator/summary (families, registered
+                       persons, own requests in progress, completed = APPLIED;
+                       rejected / cancelled shown apart), and actions — browse
+                       families, new family registration and add member (only
+                       when the server lists them), my coordinator requests.
+                       A failure here never hides the family content.
+7. Bottom navigation   (unchanged)
+```
+
+The standalone Coordinator Space (`/family/coordinator`) is unchanged.
+Every figure is a server aggregate, never a list length; the colors are the
+unified Kingfisher tokens (ADR FB-UI-01).
+
 ## Family Portal structure (approved direction 2026-10-04)
 
 ```text
@@ -5220,3 +5254,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.52 | 2026-10-14 | Approved | FP-ADR-080 CO-02.6b: Coordinator request workspace UI implemented locally (not deployed) — server-driven types, placements and actions; text-only clarification reply |
 | 1.53 | 2026-10-14 | Approved | FP-ADR-080 CO-02.7b: D8 coordinator name in the household history (read-only), Staff rejection of returned requests, Coordinator Space read throttle |
 | 1.54 | 2026-10-17 | Approved | ADR FB-UI-01: FP-ADR-022, PFP-013 and A-08 amended — the Kingfisher palette is the unified Famboook color system for both portals; Family overlays (Select, Dialog, Sheet, DropdownMenu) align with it |
+| 1.55 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01: §23 amended — the unified Family home (welcome header with current time and previous sign-in, shortcuts, server-driven services, Coordinator section for open Coordinator Space); docs/06 AUTH-ADR-096 |

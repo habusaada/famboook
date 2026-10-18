@@ -1,13 +1,13 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyGate } from "@/components/family/family-gate";
 import { FamilyHome } from "@/components/family/family-home";
 import { SUMMARY_CAPTION } from "@/components/family/home/household-cards";
-import { QUICK_ACTIONS } from "@/components/family/home/quick-actions";
+import { FIRST_SIGN_IN_TEXT, UNKNOWN_SIGN_IN_TEXT, WelcomeHeader, formatLocalDateTime } from "@/components/family/home/welcome-header";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_HOUSEHOLD_QUERY_KEY } from "@/lib/api/family-household";
-import { browserStorageDump, familyGet, familyHousehold, familyUser, renderWithClient } from "./helpers";
+import { browserStorageDump, coordinatorContext, coordinatorSummary, familyGet, familyHousehold, familyUser, renderWithClient } from "./helpers";
 
 // PWA-3A Step 2: the Family Portal home on GET /api/v1/family/household.
 // Synthetic data only.
@@ -148,49 +148,38 @@ describe("the family identity card", () => {
     await summary();
 
     expect(screen.getAllByRole("heading", { level: 1 }).map((h) => h.textContent)).toEqual(["سالم الاختبار"]);
-    for (const name of ["الأسرة", "ملخص الأسرة", "الخدمات السريعة"]) {
+    for (const name of ["الأسرة", "ملخص الأسرة", "الوصول السريع", "الخدمات"]) {
       expect(screen.getByRole("heading", { level: 2, name })).toBeInTheDocument();
     }
   });
 });
 
 describe("Coordinator Space and the quick actions", () => {
-  it("shows the coordinator entry only when /me says the space is open, apart from the household", async () => {
-    vi.spyOn(apiClient, "get").mockImplementation(
+  it("shows the coordinator section only when /me says the space is open, below and apart from the household", async () => {
+    const get = vi.spyOn(apiClient, "get").mockImplementation(
       familyGet({ user: familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true }) })
     );
 
     renderHome();
     const card = await summary();
+    const section = await screen.findByRole("region", { name: "مساحة التنسيق" });
 
-    expect(screen.getByRole("link", { name: /مساحة التنسيق/ })).toHaveAttribute("href", "/family/coordinator");
+    expect(within(section).getByRole("link", { name: /استعراض الأسر في النطاق/ })).toHaveAttribute("href", "/family/coordinator");
     expect(within(card).queryByText(/مساحة التنسيق/)).not.toBeInTheDocument();
     expect(stat(card, "registered")).toHaveTextContent(/^2$/);
+    // Family content first, the Coordinator section last.
+    expect(card.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(get.mock.calls.map(([path]) => String(path))).toContain("/api/v1/family/coordinator/summary");
   });
 
-  it("has no coordinator entry for an ordinary household head", async () => {
-    vi.spyOn(apiClient, "get").mockImplementation(familyGet());
+  it("has no coordinator section, and never asks for coordinator data, for an ordinary household head", async () => {
+    const get = vi.spyOn(apiClient, "get").mockImplementation(familyGet());
 
     renderHome();
     await summary();
 
     expect(screen.queryByText("مساحة التنسيق")).not.toBeInTheDocument();
-  });
-
-  it("lists the four approved quick actions, all disabled and marked coming soon", async () => {
-    vi.spyOn(apiClient, "get").mockImplementation(familyGet());
-
-    renderHome();
-    const section = await screen.findByRole("region", { name: "الخدمات السريعة" });
-
-    expect(QUICK_ACTIONS.map((a) => a.label)).toEqual(["إضافة مولود", "تحديث بيانات الأسرة", "الصحة والإعاقة", "تسجيل احتياج"]);
-    for (const { label } of QUICK_ACTIONS) {
-      const action = within(section).getByRole("button", { name: new RegExp(label) });
-      expect(action).toBeDisabled();
-      expect(action).toHaveAttribute("aria-disabled", "true");
-      expect(action).toHaveTextContent("قريبًا");
-    }
-    expect(within(section).queryByRole("link")).not.toBeInTheDocument();
+    expect(get.mock.calls.map(([path]) => String(path)).some((path) => path.includes("/coordinator/"))).toBe(false);
   });
 
   it("keeps the bottom navigation: الرئيسية (current), أسرتي, طلباتي and حسابي are links, «+» disabled while closed", async () => {
@@ -213,6 +202,231 @@ describe("Coordinator Space and the quick actions", () => {
     await summary();
 
     expect(container.querySelector("[data-install-famboook]")).not.toBeNull();
+  });
+});
+
+describe("the order of the home (FB-FAMILY-DASHBOARD-01)", () => {
+  it("greets first, then the family, the shortcuts, the services and the coordinator section", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({ user: familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true }) })
+    );
+
+    const { container } = renderHome();
+    await summary();
+    await screen.findByRole("region", { name: "مساحة التنسيق" });
+
+    const order = ["[data-welcome-header]", "[data-family-card]", "[data-household-summary]", "[data-home-shortcuts]", "[data-home-services-section]", "[data-coordinator-dashboard]"].map(
+      (selector) => container.querySelector(selector) as HTMLElement
+    );
+    order.forEach((element, i) => {
+      expect(element, String(i)).not.toBeNull();
+      if (i > 0) expect(order[i - 1].compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
+  it("links the four shortcuts to the existing portal routes", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(familyGet());
+
+    renderHome();
+    await summary();
+
+    const nav = screen.getByRole("navigation", { name: "الوصول السريع" });
+    expect(within(nav).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/family/card", "/family/household", "/family/requests", "/family/account"]);
+  });
+});
+
+describe("the welcome header", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("shows the current local date and time in accessible markup and updates it every minute", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-18T09:05:30Z"));
+
+    render(<WelcomeHeader user={familyUser()} />);
+    const now = document.querySelector('[data-welcome="now"] time') as HTMLElement;
+    expect(now).toHaveAttribute("dateTime", "2026-10-18T09:05:30.000Z");
+    expect(now).toHaveTextContent(formatLocalDateTime(new Date("2026-10-18T09:05:30Z")));
+
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(document.querySelector('[data-welcome="now"] time')).toHaveAttribute("dateTime", "2026-10-18T09:06:00.000Z");
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(document.querySelector('[data-welcome="now"] time')).toHaveAttribute("dateTime", "2026-10-18T09:07:00.000Z");
+  });
+
+  it("shows the previous successful sign-in in local time, from the server's UTC timestamp", () => {
+    render(<WelcomeHeader user={familyUser({ previous_sign_in_at: "2026-10-17T18:42:00+00:00", first_sign_in: false })} />);
+
+    const line = document.querySelector('[data-welcome="previous-sign-in"]') as HTMLElement;
+    expect(line).toHaveTextContent("آخر دخول سابق:");
+    expect(line.querySelector("time")).toHaveAttribute("dateTime", "2026-10-17T18:42:00+00:00");
+    expect(line).toHaveTextContent(formatLocalDateTime(new Date("2026-10-17T18:42:00Z")));
+    // Latin digits, as elsewhere in the portal.
+    expect(line.textContent).toMatch(/2026/);
+  });
+
+  it("says first sign-in only when the server is certain, and unknown otherwise", () => {
+    const { rerender } = render(<WelcomeHeader user={familyUser({ previous_sign_in_at: null, first_sign_in: true })} />);
+    expect(screen.getByText(FIRST_SIGN_IN_TEXT)).toBeInTheDocument();
+
+    rerender(<WelcomeHeader user={familyUser({ previous_sign_in_at: null, first_sign_in: false })} />);
+    expect(screen.getByText(UNKNOWN_SIGN_IN_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_SIGN_IN_TEXT)).not.toBeInTheDocument();
+
+    // An older server without the fields: unknown, never "first".
+    rerender(<WelcomeHeader user={familyUser()} />);
+    expect(screen.getByText(UNKNOWN_SIGN_IN_TEXT)).toBeInTheDocument();
+  });
+});
+
+describe("the services (from the server only)", () => {
+  it("links each available type to its form and shows a listed type without a form as unavailable", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({
+        requestTypes: { data: [{ type: "RESIDENCE_UPDATE" }, { type: "CONTACT_UPDATE" }, { type: "BIRTH_REPORT" }], meta: { submission_enabled: true } },
+      })
+    );
+
+    renderHome();
+    const section = await screen.findByRole("region", { name: "الخدمات" });
+    const available = await within(section).findByRole("list", { name: "خدمات متاحة" });
+
+    expect(within(available).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual([
+      "/family/requests/new/residence-update",
+      "/family/requests/new/contact-update",
+    ]);
+    const unavailable = within(section).getByRole("list", { name: "خدمات غير متاحة حاليًا" });
+    expect(within(unavailable).getByText("تسجيل مولود")).toBeInTheDocument();
+    expect(within(unavailable).queryByRole("link")).not.toBeInTheDocument();
+    expect(unavailable.querySelector('[data-home-service-unavailable="BIRTH_REPORT"]')).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("offers nothing clickable while submission is closed (the Production default)", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(familyGet());
+
+    renderHome();
+    const section = await screen.findByRole("region", { name: "الخدمات" });
+
+    expect(await within(section).findByText(/لا تتوفر خدمات للتقديم حاليًا/)).toBeInTheDocument();
+    expect(within(section).queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByText("قريبًا", { selector: "[data-home-services-section] *" })).not.toBeInTheDocument();
+  });
+
+  it("shows a services failure inline without hiding the family", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(familyGet({ requestTypes: new ApiError(500, null) }));
+
+    renderHome();
+    const card = await summary();
+    const section = screen.getByRole("region", { name: "الخدمات" });
+
+    expect(await within(section).findByRole("alert")).toHaveTextContent("تعذّر تحميل الخدمات");
+    expect(stat(card, "registered")).toHaveTextContent(/^2$/);
+  });
+});
+
+describe("the coordinator section", () => {
+  const COORDINATOR = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true });
+  const section = () => screen.findByRole("region", { name: "مساحة التنسيق" });
+
+  it("shows the server's scope and four statistics, never a list length", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({
+        user: COORDINATOR,
+        coordinator: coordinatorContext({
+          scopes: [
+            { type: "CLAN", code: "C1", name: "عشيرة أولى", clan_name: "عشيرة أولى" },
+            { type: "BRANCH_GROUP", code: "G1", name: "مجموعة الشمال", clan_name: "عشيرة ثانية" },
+            { type: "BRANCH", code: "B1", name: "فرع الوادي", clan_name: "عشيرة ثالثة" },
+          ],
+        }),
+        summary: coordinatorSummary({ family_count: 37, person_count: 151, requests: { in_progress: 4, completed: 9, closed: 2 } }),
+      })
+    );
+
+    renderHome();
+    const card = await section();
+    await within(card).findByText("37");
+
+    const scopes = card.querySelector("[data-coordinator-dashboard-scopes]") as HTMLElement;
+    expect(within(scopes).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["عشيرة: عشيرة أولى", "مجموعة فروع: مجموعة الشمال", "فرع: فرع الوادي"]);
+    const value = (field: string) => card.querySelector(`[data-coordinator-stat="${field}"] dd`)?.textContent;
+    expect([value("families"), value("persons"), value("in-progress"), value("completed")]).toEqual(["37", "151", "4", "9"]);
+    // Closed requests are shown apart, never as completed.
+    expect(card.querySelector("[data-coordinator-closed]")).toHaveTextContent("2");
+    expect(within(card).getByText("طلبات مكتملة")).toBeInTheDocument();
+  });
+
+  it("offers the request actions only when the server enables them", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(familyGet({ user: COORDINATOR }));
+
+    renderHome();
+    const card = await section();
+    await within(card).findByText("12");
+
+    expect(within(card).getByRole("link", { name: /طلبات التنسيق التي قدّمتها/ })).toHaveAttribute("href", "/family/coordinator/requests");
+    for (const field of ["register-family", "add-family-member"]) {
+      expect(card.querySelector(`[data-coordinator-action-unavailable="${field}"]`)).toHaveAttribute("aria-disabled", "true");
+    }
+    expect(within(card).queryByRole("link", { name: /طلب تسجيل أسرة جديدة/ })).not.toBeInTheDocument();
+  });
+
+  it("links register-family and add-member when the server lists them", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({
+        user: COORDINATOR,
+        coordinatorRequestTypes: { data: [{ type: "REGISTER_FAMILY" }, { type: "ADD_FAMILY_MEMBER" }], meta: { submission_enabled: true } },
+      })
+    );
+
+    renderHome();
+    const card = await section();
+
+    expect(await within(card).findByRole("link", { name: /طلب تسجيل أسرة جديدة/ })).toHaveAttribute("href", "/family/coordinator/requests/new/register-family");
+    expect(within(card).getByRole("link", { name: /طلب إضافة فرد إلى أسرة/ })).toHaveAttribute("href", "/family/coordinator/requests/new/add-family-member");
+  });
+
+  it("explains an empty scope with zeros", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({ user: COORDINATOR, summary: coordinatorSummary({ family_count: 0, person_count: 0, requests: { in_progress: 0, completed: 0, closed: 0 } }) })
+    );
+
+    renderHome();
+    const card = await section();
+
+    expect(await within(card).findByText("لا توجد أسر ضمن نطاقك حاليًا.")).toBeInTheDocument();
+    expect(card.querySelector("[data-coordinator-closed]")).toBeNull();
+  });
+
+  it("keeps a coordinator failure inside its section, with a retry, and the family dashboard intact", async () => {
+    let calls = 0;
+    vi.spyOn(apiClient, "get").mockImplementation(
+      familyGet({
+        user: COORDINATOR,
+        summary: async () => {
+          calls++;
+          if (calls === 1) throw new ApiError(500, null);
+          return { data: coordinatorSummary() };
+        },
+      })
+    );
+
+    renderHome();
+    const card = await summary();
+    const coordinator = await section();
+
+    expect(await within(coordinator).findByRole("alert")).toHaveTextContent("تعذّر تحميل بيانات التنسيق");
+    expect(stat(card, "registered")).toHaveTextContent(/^2$/);
+    await userEvent.click(within(coordinator).getByRole("button", { name: "إعادة المحاولة" }));
+    expect(await within(coordinator).findByText("48")).toBeInTheDocument();
+  });
+
+  it("shows a loading state while the coordinator figures arrive", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(familyGet({ user: COORDINATOR, summary: () => new Promise(() => undefined) }));
+
+    renderHome();
+    const card = await section();
+
+    expect(card).toHaveAttribute("aria-busy", "true");
+    expect(card.querySelector("[data-coordinator-dashboard-loading]")).not.toBeNull();
   });
 });
 

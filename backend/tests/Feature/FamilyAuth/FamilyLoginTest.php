@@ -101,6 +101,9 @@ class FamilyLoginTest extends TestCase
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
             'coordinator_space' => false,
+            // FB-FAMILY-DASHBOARD-01: no earlier sign-in is recorded for this fixture account: unknown.
+            'previous_sign_in_at' => null,
+            'first_sign_in' => false,
             'context' => ['available' => true, 'family' => [
                 'code' => $this->head['family']->family_code,
                 'name' => $this->head['family']->branch?->name ?? $this->head['family']->clan?->name,

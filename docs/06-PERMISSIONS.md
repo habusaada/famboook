@@ -983,6 +983,19 @@ GET  /api/v1/family/me
   `family` is null; the reason is not sent. Never a National ID, a mobile,
   an internal id, a permission list or a fingerprint. `Cache-Control:
   no-store`.
+- **Previous sign-in (FB-FAMILY-DASHBOARD-01, AUTH-ADR-096).** `/family/me`
+  also returns `previous_sign_in_at` (UTC ISO 8601, or null) and
+  `first_sign_in`. A successful sign-in is `LOGIN_SUCCEEDED`,
+  `ACTIVATION_COMPLETED` or `PASSWORD_RESET_COMPLETED` with outcome SUCCESS
+  (never `PASSWORD_CHANGED`, never a failure). When a session starts, the
+  server takes the user's newest such event BEFORE this session's own
+  event (identified exactly, so a concurrent sign-in on another device is
+  never mistaken for it) and keeps its time in the session; a password
+  change carries it over. `first_sign_in` is true only for an activation
+  (always a new account). Otherwise null / false means unknown — the event
+  log may not reach back far enough, or the session started before this
+  feature. Only the user's own timestamp: never an IP, a device or another
+  user's event.
 - **Full Data Visibility (PWA-3B, AUTH-ADR-078, docs/11 §23a).** Family
   data read routes stay behind `family.context`, take no Family or Person
   identifier for the household itself, and carry masked National ID and
@@ -1140,6 +1153,7 @@ GET /api/v1/family/auth/capabilities               (none)
 ```text
 FAMILY SIDE — auth:sanctum + family.side + coordinator.space
 GET  /api/v1/family/coordinator/context
+GET  /api/v1/family/coordinator/summary               + coordinator-family.view-summary   (FB-FAMILY-DASHBOARD-01)
 GET  /api/v1/family/coordinator/families              + coordinator-family.view-summary
 GET  /api/v1/family/coordinator/families/{code}       + coordinator-family.view-summary
 GET  /api/v1/family/coordinator/families/{code}/members                    + coordinator-family.view-summary + coordinator-member.view   (CO-01C)
@@ -1179,6 +1193,22 @@ POST /api/v1/coordinator-scopes/{uuid}/revoke         coordinator-scope.manage
   resolver as the boundary; scope details are only in
   `/family/coordinator/context` (scope type, public code, names, family
   count).
+- **`GET /family/coordinator/summary`** (FB-FAMILY-DASHBOARD-01, AUTH-ADR-096):
+  scope-wide counts for the Family home, `throttle:coordinator-read`,
+  `no-store, private`. Database aggregates over the SAME authorized queries
+  (`CoordinatorScopes`), three queries whatever the scope:
+  - `family_count`: the Families in scope (distinct; overlapping
+    assignments never count twice);
+  - `person_count`: ACTIVE memberships of those Families — the
+    registered-member definition;
+  - `requests`: the Coordinator's OWN requests in scope —
+    `in_progress` = SUBMITTED, UNDER_REVIEW, RETURNED_FOR_CLARIFICATION,
+    RESUBMITTED, APPROVED; `completed` = APPLIED only; `closed` = REJECTED,
+    CANCELLED (never counted as completed).
+
+  Counts only, never a family, person or request. Behind
+  `coordinator-family.view-summary` because the person count is the sum of
+  the per-family summaries that permission already shows.
 - **Administration** is Staff-side only: SUPER_ADMIN and ADMINISTRATOR
   through `coordinator-scope.view` / `.manage`. Never REVIEWER,
   COORDINATOR, FAMILY_USER, REPORTS_VIEWER, DATA_ENTRY or SOCIAL_WORKER. A
@@ -4532,6 +4562,12 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-096
+Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).
+- **Coordinator summary:** `GET /api/v1/family/coordinator/summary` behind `coordinator.space` + `coordinator-family.view-summary` + `throttle:coordinator-read`. Counts only, over `CoordinatorScopes`; request groups in_progress / completed (APPLIED only) / closed (REJECTED, CANCELLED).
+- **Previous sign-in:** `/family/me` adds `previous_sign_in_at` and `first_sign_in`, resolved once per session from `auth_security_events` (no migration); the user's own timestamp only.
+- No permission, role or mapping added or changed; the coordinator context and request-list contracts are unchanged.
+
 ### AUTH-ADR-095
 Gaza geographic reference read API (2026-10-15, FB-GEO-01 Stage 2B; implemented LOCALLY, Production not deployed; contract and decisions `docs/audits/FB-GEO-01-STAGE-2A-API-AUTHORIZATION-AUDIT.md` §12; ADR-FB-GEO-01 §8.1).
 - **Routes:** four read-only Staff routes under `/gaza-locations` inside `auth:sanctum` + `staff.side`.
@@ -5018,6 +5054,7 @@ Date: 2026-09-24
 | 1.2.68 | 2026-10-14 | Approved | CO-02.7b: RETURNED → REJECTED under the existing change-request.reject; coordinator-read throttle on the Coordinator Space reads; Staff queue channel / submitter filters; no permission, role or mapping change |
 | 1.2.69 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (AUTH-ADR-094): §46 and §56 notes for the approved, not implemented Gaza geographic reference; no permission, role or mapping change |
 | 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B (AUTH-ADR-095): read-only Staff `/gaza-locations` API implemented locally with `reference-data.view` OR `residence.update` (controller union check); §56 note; no permission, role or mapping change |
+| 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |
 | 1.2.29 | 2026-10-02 | Approved | PWA-1D (AUTH-ADR-065): §22b `AccountSide`, role checks without role order, `staff.side` Staff API boundary, Staff administration and Filament closed to family-side accounts, verifier check for invalid accounts |

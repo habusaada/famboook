@@ -82,8 +82,9 @@ describe("the entry point", () => {
       </FamilyGate>
     );
 
-    const entry = await screen.findByRole("link", { name: /مساحة التنسيق/ });
-    expect(entry).toHaveAttribute("href", "/family/coordinator");
+    // FB-FAMILY-DASHBOARD-01: the home's Coordinator section leads to the standalone space.
+    const section = await screen.findByRole("region", { name: "مساحة التنسيق" });
+    expect(within(section).getByRole("link", { name: /استعراض الأسر في النطاق/ })).toHaveAttribute("href", "/family/coordinator");
   });
 
   it.each([

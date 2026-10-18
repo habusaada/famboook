@@ -214,6 +214,12 @@ Route::prefix('family')->group(function () {
             // Family SUMMARIES inside the scope. No route-model binding: the
             // code is looked up inside the authorized query only.
             Route::middleware('can:coordinator-family.view-summary')->group(function () {
+                // FB-FAMILY-DASHBOARD-01: scope-wide aggregates for the Family
+                // home (counts only; the person count is the sum of the
+                // per-family summaries this permission already shows).
+                Route::get('/summary', [CoordinatorSpaceController::class, 'summary'])
+                    ->middleware('throttle:coordinator-read');
+
                 // CO-02.7b: per-user read throttle.
                 Route::get('/families', [CoordinatorFamilyController::class, 'index'])
                     ->middleware('throttle:coordinator-read');

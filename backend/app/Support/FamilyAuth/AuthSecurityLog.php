@@ -55,7 +55,7 @@ final class AuthSecurityLog
         $request = app()->bound('request') ? request() : null;
         $agent = $request?->userAgent();
 
-        return AuthSecurityEvent::create([
+        $event = AuthSecurityEvent::create([
             'event_type' => $type,
             'outcome' => $outcome,
             'reason_code' => $reasonCode,
@@ -72,5 +72,10 @@ final class AuthSecurityLog
             'user_agent_hash' => is_string($agent) && $agent !== '' ? hash('sha256', $agent) : null,
             'metadata' => $metadata === [] ? null : $metadata,
         ]);
+        // FB-FAMILY-DASHBOARD-01: lets the session that starts in this request
+        // tell its own sign-in event from earlier ones.
+        app(SignInHistory::class)->remember($event);
+
+        return $event;
     }
 }

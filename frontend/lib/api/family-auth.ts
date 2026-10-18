@@ -20,6 +20,14 @@ export type FamilyUser = {
    * Coordinator Space still asks the server.
    */
   coordinator_space: boolean;
+  /**
+   * FB-FAMILY-DASHBOARD-01: the previous successful sign-in before THIS
+   * session (UTC ISO 8601), resolved once by the server when the session
+   * started; null when unknown or on a first sign-in.
+   */
+  previous_sign_in_at?: string | null;
+  /** True only when the server is certain this session is the account's first sign-in (activation). */
+  first_sign_in?: boolean;
   context: {
     /** False when no Family context exists right now; the reason is not sent. */
     available: boolean;

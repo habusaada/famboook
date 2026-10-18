@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Support\AccountSide;
 use App\Support\FamilyAuth\CoordinatorScopes;
 use App\Support\FamilyAuth\FamilyAccessResolver;
+use App\Support\FamilyAuth\SignInHistory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,6 +24,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Never a National ID, a mobile, an internal id, a permission list or any
  * fingerprint. UX only: every family-data endpoint authorizes on its own.
+ *
+ * FB-FAMILY-DASHBOARD-01: previous_sign_in_at (UTC ISO 8601 or null) and
+ * first_sign_in come from THIS session (SignInHistory): null / false means
+ * unknown unless first_sign_in is true. Never an IP, a device or another
+ * user's event.
  *
  * @mixin User
  */
@@ -46,6 +52,7 @@ class FamilyCurrentUserResource extends JsonResource
             'coordinator' => in_array(AccountSide::COORDINATOR, $roles, true),
             'coordinator_space' => in_array(AccountSide::COORDINATOR, $roles, true)
                 && app(CoordinatorScopes::class)->context($this->resource)->allowed(),
+            ...SignInHistory::forSession($request),
             'context' => [
                 'available' => $family !== null,
                 'family' => $family === null ? null : [

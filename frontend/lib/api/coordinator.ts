@@ -21,6 +21,18 @@ export type CoordinatorContext = {
   family_count: number;
 };
 
+/**
+ * FB-FAMILY-DASHBOARD-01: GET /family/coordinator/summary — server aggregates
+ * over the authorized scope; never computed from a list in the client.
+ * requests are the Coordinator's own: in_progress (open), completed
+ * (APPLIED only), closed (REJECTED, CANCELLED).
+ */
+export type CoordinatorSummary = {
+  family_count: number;
+  person_count: number;
+  requests: { in_progress: number; completed: number; closed: number };
+};
+
 /** A Family as a Coordinator may see it: summary fields only. */
 export type CoordinatorFamily = {
   family_code: string;
@@ -44,6 +56,15 @@ export function useCoordinatorContextQuery() {
   return useQuery({
     queryKey: [...COORDINATOR_QUERY_KEY, "context"],
     queryFn: async () => (await apiClient.get<{ data: CoordinatorContext }>(`${BASE}/context`)).data,
+    retry: false,
+  });
+}
+
+export function useCoordinatorSummaryQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...COORDINATOR_QUERY_KEY, "summary"],
+    queryFn: async () => (await apiClient.get<{ data: CoordinatorSummary }>(`${BASE}/summary`)).data,
+    enabled,
     retry: false,
   });
 }

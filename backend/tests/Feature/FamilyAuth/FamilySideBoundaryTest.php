@@ -46,6 +46,9 @@ class FamilySideBoundaryTest extends TestCase
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
             'coordinator_space' => false,
+            // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
+            'previous_sign_in_at' => null,
+            'first_sign_in' => false,
             'context' => [
                 'available' => true,
                 'family' => [
@@ -141,6 +144,9 @@ class FamilySideBoundaryTest extends TestCase
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
             'coordinator_space' => false,
+            // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
+            'previous_sign_in_at' => null,
+            'first_sign_in' => false,
             'context' => ['available' => false, 'family' => null],
         ]]);
     }
@@ -273,7 +279,8 @@ class FamilySideBoundaryTest extends TestCase
         // directory and reveal (CO-01C, AUTH-ADR-092) + the six Coordinator
         // request routes (CO-02.4, AUTH-ADR-093) + the FAMILY_ADD proposal
         // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a)
-        // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2).
-        $this->assertSame(54, $checked);
+        // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2)
+        // + the Coordinator summary (FB-FAMILY-DASHBOARD-01).
+        $this->assertSame(55, $checked);
     }
 }

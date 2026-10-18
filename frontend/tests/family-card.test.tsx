@@ -236,7 +236,8 @@ describe("the home entry", () => {
       </FamilyGate>
     );
 
-    const entry = await screen.findByRole("link", { name: /بطاقة الأسرة الرقمية/ });
-    expect(entry).toHaveAttribute("href", "/family/card");
+    // FB-FAMILY-DASHBOARD-01: the card is one of the home shortcuts.
+    const shortcuts = await screen.findByRole("navigation", { name: "الوصول السريع" });
+    expect(within(shortcuts).getByRole("link", { name: /بطاقة الأسرة/ })).toHaveAttribute("href", "/family/card");
   });
 });
