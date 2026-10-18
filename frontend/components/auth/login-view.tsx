@@ -5,17 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertCircle, Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
+import { Loader2, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { useQueryClient } from "@tanstack/react-query";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+// FB-UI-02: the Family Portal's authentication field patterns, reused as is.
+import { FieldError, FormAlert, fieldClass } from "@/components/family/auth/auth-parts";
+import { PasswordField } from "@/components/family/auth/password-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
 import { ME_QUERY_KEY, login, useMeQuery } from "@/lib/api/auth";
 import { safeNext } from "@/lib/navigation";
+import { cn } from "@/lib/utils";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "البريد الإلكتروني مطلوب").email("صيغة البريد الإلكتروني غير صحيحة"),
@@ -32,20 +35,14 @@ function loginErrorMessage(error: unknown): string {
   return "تعذّر الاتصال بالخادم. الرجاء المحاولة مرة أخرى.";
 }
 
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <p id={id} className="flex items-center gap-1 text-xs text-danger" role="alert">
-      <AlertCircle className="size-3.5 shrink-0" aria-hidden />
-      {message}
-    </p>
-  );
-}
-
 /**
  * Staff login (docs/06 §59c): Sanctum session — the CSRF cookie is
  * initialised by the API client, the session cookie is HttpOnly, and no
  * token reaches JavaScript. Credentials are never put in the URL.
+ *
+ * FB-UI-02: the fields, errors and password control are the Family
+ * Portal's (auth-parts, PasswordField); the heading, description and
+ * ShieldCheck keep the Staff entrance distinguishable.
  */
 export function LoginView() {
   const router = useRouter();
@@ -84,77 +81,76 @@ export function LoginView() {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center bg-canvas px-4 py-8">
       <div className="flex w-full max-w-[400px] flex-col">
-        {/* Brand identity, as in the Staff Portal sidebar. */}
-        <div className="mb-5 flex flex-col items-center gap-2.5" data-brand-lockup>
+        {/* The official logo alone (FB-UI-02: no separate portal label). */}
+        <div className="mb-5 flex flex-col items-center" data-brand-lockup>
           <BrandLogo className="h-12" />
-          <span className="text-[13px] leading-none font-medium text-brand-700">بوابة الطاقم</span>
         </div>
 
         <section className="rounded-widget border border-stroke-subtle bg-surface-1 p-6 shadow-e2 sm:p-7" aria-labelledby="login-title">
-          <div className="mb-4 flex flex-col gap-0.5">
-            <h1 id="login-title" className="text-xl leading-tight font-bold text-foreground">
-              تسجيل الدخول
+          <div className="mb-5 flex flex-col gap-1.5">
+            <h1 id="login-title" className="flex items-center gap-2 text-[22px] leading-snug font-bold text-foreground">
+              <ShieldCheck className="size-[22px] shrink-0 text-brand-700" aria-hidden data-staff-heading-icon />
+              دخول الطاقم
             </h1>
-            <p className="text-sm text-muted-foreground">سجّل الدخول بحساب الطاقم للمتابعة.</p>
+            <p className="text-[15px] leading-relaxed text-muted-foreground">الوصول الإداري إلى نظام فامبوك</p>
           </div>
 
-          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4" method="post" aria-busy={isSubmitting}>
-            {error && (
-              <Alert variant="destructive" data-login-error>
-                <AlertCircle className="size-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+          {/* The Family authentication geometry (its --radius) for the fields, alert, toggle and button;
+              the Staff card frame keeps its own. */}
+          <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4 [--radius:0.75rem]" method="post" aria-busy={isSubmitting} data-auth-geometry="family">
+            <FormAlert message={error} />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="login-email" className="text-[13px] font-medium">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="login-email" className="text-sm font-medium">
                 البريد الإلكتروني
               </Label>
-              <Input
-                id="login-email"
-                type="email"
-                dir="ltr"
-                autoComplete="username"
-                autoFocus
-                className="h-11 bg-surface-2 text-[15px] focus-visible:bg-surface-1"
-                aria-invalid={errors.email ? true : undefined}
-                aria-describedby={errors.email ? "login-email-error" : undefined}
-                {...register("email")}
-              />
+              {/* The value is LTR; the icon sits on the right (physical sides, as in the Family Portal). */}
+              <div className="relative">
+                <Input
+                  id="login-email"
+                  type="email"
+                  inputMode="email"
+                  dir="ltr"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  autoFocus
+                  className={cn(fieldClass, "pr-11 text-start")}
+                  aria-invalid={errors.email ? true : undefined}
+                  aria-describedby={errors.email ? "login-email-error" : undefined}
+                  {...register("email")}
+                />
+                <Mail
+                  className="pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                  data-field-icon="email"
+                />
+              </div>
               <FieldError id="login-email-error" message={errors.email?.message} />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="login-password" className="text-[13px] font-medium">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="login-password" className="text-sm font-medium">
                 كلمة المرور
               </Label>
-              <div className="relative">
-                <Input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  dir="ltr"
-                  autoComplete="current-password"
-                  className="h-11 bg-surface-2 ps-11 text-[15px] focus-visible:bg-surface-1"
-                  aria-invalid={errors.password ? true : undefined}
-                  aria-describedby={errors.password ? "login-password-error" : undefined}
-                  {...register("password")}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                  aria-pressed={showPassword}
-                  aria-controls="login-password"
-                  className="absolute start-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-control text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-                  data-password-toggle
-                >
-                  {showPassword ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
-                </button>
-              </div>
+              <PasswordField
+                id="login-password"
+                autoComplete="current-password"
+                dir="ltr"
+                withLockIcon
+                // One show/hide control only: no browser-native reveal button (as the Family scope does in globals.css).
+                className="[&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
+                visible={showPassword}
+                onToggle={() => setShowPassword((v) => !v)}
+                aria-invalid={errors.password ? true : undefined}
+                aria-describedby={errors.password ? "login-password-error" : undefined}
+                {...register("password")}
+              />
               <FieldError id="login-password-error" message={errors.password?.message} />
             </div>
 
-            <Button type="submit" disabled={isSubmitting} className="mt-1 h-11 text-[15px]">
+            {/* The Family field and button sizes; the default primary hover (the Family-only hover token is not defined here). */}
+            <Button type="submit" disabled={isSubmitting} className="mt-1 h-12 w-full rounded-xl text-[15px] font-semibold">
               {isSubmitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" aria-hidden />

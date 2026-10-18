@@ -89,7 +89,9 @@ describe("the official logo", () => {
     renderWithClient(<LoginView />);
     const lockup = document.querySelector("[data-brand-lockup]") as HTMLElement;
     expect(lockup.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
-    expect(lockup).toHaveTextContent("بوابة الطاقم");
+    // FB-UI-02: the logo alone — the separate «بوابة الطاقم» label is gone; the card heading says «دخول الطاقم».
+    expect(lockup).not.toHaveTextContent("بوابة الطاقم");
+    expect(screen.getByRole("heading", { level: 1, name: "دخول الطاقم" })).toBeInTheDocument();
     expect(lockup.querySelector("svg")).toBeNull();
     expect(document.querySelector("[data-site-footer]")).not.toBeNull();
 
