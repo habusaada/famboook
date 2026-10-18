@@ -722,6 +722,8 @@ finalized separately and moved to §22b.
 | `announcement.create` | Administration; COORDINATOR (scope-bound) | PWA-9 |
 | `announcement.send` | Administration; COORDINATOR (scope-bound) | PWA-9 |
 | `announcement.send-all` (all eligible family users) | Administration only | PWA-9 |
+| `notification-followup.view` | Authorized Staff responsible for follow-up — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| `notification-followup.manage` (record manual follow-up actions) | Authorized Staff — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `family-card.view` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER | PWA-8 |
 | `family-card.issue` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR (the Family Portal lazy issuance is a system process) | PWA-8 |
 | `family-card.revoke` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR | PWA-8 |
@@ -4009,6 +4011,12 @@ Users may only retrieve notifications addressed to their own authenticated ident
 
 A user cannot request another user's notifications by ID.
 
+*Clarified 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`) (AUTH-ADR-097):
+the recipient is the family; a household head reads only their own
+family's messages through `family.context`, and anything outside it is not
+found. Viewing and acknowledgement are recorded only by the family side;
+staff and coordinators can never record them on the family's behalf.*
+
 ---
 
 # 127. Notification Content
@@ -4562,6 +4570,12 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-097
+Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; documentation only, NOT implemented; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)).
+- **Senders:** authorized administrators and coordinators. Coordinators send individual and bulk messages directly (no preapproval) strictly within their CURRENT scope (`CoordinatorScopes`); global sending needs an explicit permission. Follow-up actions also need the current scope.
+- **Proposed permissions (not seeded):** `announcement.view`, `.create`, `.send`, `.send-all`, `notification-followup.view`, `.manage`. No role is added (COORDINATOR exists); no existing mapping changes.
+- **Family side:** reads, viewing and acknowledgement only through `family.context`; never recordable by staff or coordinators. Rate limits on sending and acknowledgement; append-only audit with safe metadata.
+
 ### AUTH-ADR-096
 Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).
 - **Coordinator summary:** `GET /api/v1/family/coordinator/summary` behind `coordinator.space` + `coordinator-family.view-summary` + `throttle:coordinator-read`. Counts only, over `CoordinatorScopes`; request groups in_progress / completed (APPLIED only) / closed (REJECTED, CANCELLED).
@@ -5054,6 +5068,7 @@ Date: 2026-09-24
 | 1.2.68 | 2026-10-14 | Approved | CO-02.7b: RETURNED → REJECTED under the existing change-request.reject; coordinator-read throttle on the Coordinator Space reads; Staff queue channel / submitter filters; no permission, role or mapping change |
 | 1.2.69 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (AUTH-ADR-094): §46 and §56 notes for the approved, not implemented Gaza geographic reference; no permission, role or mapping change |
 | 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B (AUTH-ADR-095): read-only Staff `/gaza-locations` API implemented locally with `reference-data.view` OR `residence.update` (controller union check); §56 note; no permission, role or mapping change |
+| 1.2.73 | 2026-10-18 | Approved | FB-NOTIFY-01A (AUTH-ADR-097): notification authorization recorded; `notification-followup.view` / `.manage` added to the PROPOSED permissions; §126 clarified; nothing seeded, no role or mapping change |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |

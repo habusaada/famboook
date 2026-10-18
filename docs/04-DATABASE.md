@@ -2643,6 +2643,16 @@ index) and never touches existing rows.
 
 V1 should use Laravel's standard database notification infrastructure unless implementation requirements justify a custom model.
 
+**Amended 2026-10-18 (ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`), ADR-02):** the
+requirements justify a custom model. Proposed logical tables (physical
+schema, constraints and indexes reviewed in FB-NOTIFY-01B; nothing
+migrated): `notification_messages` (unique publication key; unique origin
+for SYSTEM messages), `notification_recipients` (one row per message and
+family), `notification_recipient_events` (append-only, the
+`workflow_events` trigger pattern) and `notification_followups` (one row
+per recipient and stage). No table named `notifications` (collision with
+`Notifiable` on `users`). Retention needs separate confirmation.
+
 Logical data includes:
 
 ```text
@@ -4612,6 +4622,7 @@ Date: 2026-09-24
 | 1.2.49 | 2026-10-15 | Approved | FB-GEO-01 Stage 1C.1 (DB-ADR-065): §24a `gaza_geography_import_runs` (import history, single-RUNNING index, PostgreSQL CHECKs) implemented LOCALLY as `2026_10_22_090002`; only that migration applied locally; Production NOT migrated |
 | 1.2.50 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B: §24a read-only Staff API listed (`/gaza-locations/…`, AUTH-ADR-095); no schema change; local only |
 | 1.2.51 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2 (DB-ADR-066): §24 `original_location_id` / `current_location_id` on `family_residences` implemented LOCALLY as `2026_10_22_090003` (nullable UUID FK RESTRICT, indexed, guarded rollback, no backfill); Production NOT migrated |
+| 1.2.52 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §56 — custom notification model justified; proposed logical tables; no migration; documentation only |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

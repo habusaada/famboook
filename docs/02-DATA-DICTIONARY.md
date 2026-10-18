@@ -2301,6 +2301,13 @@ Coordinator), a title, a body, an optional action, an audience definition,
 resolved recipients, a sent time and per-recipient read state. Distinct
 from system notifications (§59).
 
+*Amended 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`) (ADR-01, ADR-03): announcements
+and system notifications are one unified system with one family inbox; an
+announcement is a message of kind `ANNOUNCEMENT` (a system notification is
+kind `SYSTEM`), and the source «إدارة Famboook» / «منسق العائلة» stays
+visible. The recipient is the FAMILY (a snapshot taken at publication), and
+viewing is distinct from explicit acknowledgement.*
+
 ### Authentication and security event
 
 An append-only record of activation, OTP, login, reset, Link and card
@@ -2906,6 +2913,15 @@ Famboook requires notifications.
 
 V1 may use Laravel's standard database notification infrastructure rather than a custom domain table.
 
+**Amended 2026-10-18 (ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`), ADR-02):** Famboook uses a
+dedicated notification model, not Laravel's database notifications alone —
+levels, viewing vs explicit acknowledgement, family recipient snapshots,
+follow-ups, expiration and late acknowledgement need it. Proposed logical
+entities: `notification_messages`, `notification_recipients`,
+`notification_recipient_events` (append-only), `notification_followups`. No
+table is named `notifications` (it would collide with Laravel's `Notifiable`
+on `users`). Physical schema: FB-NOTIFY-01B. Not implemented.
+
 Logical notification information includes:
 
 ```text
@@ -2925,6 +2941,13 @@ Sensitive information should be minimized in notification payloads.
 # 60. Notification Events
 
 Examples:
+
+*Clarified 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`) (ADR-09): automatic
+notifications are derived from the existing append-only `workflow_events`
+(`WorkflowEventType`: SUBMITTED, REVIEW_STARTED, RETURNED, RESUBMITTED,
+APPROVED, REJECTED, APPLIED, APPLY_FAILED, CANCELLED) with an idempotent
+origin mapping; ACCOUNT_ACTIVATED / ACCOUNT_SUSPENDED are authentication
+events, not workflow events, and are deferred.*
 
 ```text
 CHANGE_REQUEST_SUBMITTED
@@ -4346,6 +4369,7 @@ Date: 2026-09-24
 | 1.2.38 | 2026-10-09 | Approved | §47 ADD_FAMILY_MEMBER submitted_data and APPROVED attestation metadata recorded (docs/11 FP-ADR-076) |
 | 1.2.39 | 2026-10-13 | Approved | CO-02.3a (DD-ADR-035): §52 nullable `family_id` for `REGISTER_FAMILY` only, `submission_channel`, `proposed_clan_id`, `proposed_branch_id`, `created_family_id`; §57 REGISTER_FAMILY type and COORDINATOR workflow actor; §7 `registration_source` COORDINATOR_REQUEST. Schema foundation only |
 | 1.2.40 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (DD-ADR-036, ADR-FB-GEO-01): PDD-006 architecturally resolved, implementation pending — unified Gaza geographic reference for original and current residence (§19 current vs future), RESIDENCE_UPDATE v2 noted as future (§47). Documentation only; no schema change |
+| 1.2.41 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §59 custom notification model (logical entities), §60 derivation from `workflow_events`, "Announcement and recipient" unified with system notifications; documentation only |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

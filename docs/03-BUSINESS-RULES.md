@@ -2494,6 +2494,18 @@ Family Card**: its subject is the Family, not the household head.
 - Audiences are resolved on the server; a client-supplied audience is
   never trusted beyond the sender's scope.
 - A coordinator's message never appears as an administrative decision.
+- **Amended 2026-10-18 (ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)):** one unified
+  in-app system — kinds `SYSTEM` / `ANNOUNCEMENT` in ONE family inbox, the
+  source «إدارة Famboook» / «منسق العائلة» kept. The recipient is the
+  family (snapshot at publication; ACTIVE families by default). Levels:
+  NORMAL (opening the details records the view; follow-up 72 h after
+  publication if unviewed) and IMPORTANT (explicit acknowledgement
+  required; follow-up at 24 h, a second staff reminder at 72 h). Opening is
+  never acknowledgement; staff and coordinators never view or acknowledge
+  for the family. Optional expiry archives the message, closes open
+  follow-ups as expired and stops reminders; a later acknowledgement is
+  recorded as late and never reopens an expired follow-up. Follow-up is
+  in-app only (no SMS, Push or email in this feature).
 
 ## Audit
 
@@ -5251,6 +5263,7 @@ Date: 2026-09-24
 | 1.2.60 | 2026-10-14 | Approved | CO-02.5: FAMILY_ADD (REGISTER_FAMILY) as implemented locally — both attestations (relationship = household and placement verified), free head National ID, exact placement at APPLY, COORDINATOR_REQUEST registration and residence source, one answer for an unusable placement |
 | 1.2.61 | 2026-10-14 | Approved | CO-02.7d: meaning of the FAMILY_ADD (REGISTER_FAMILY) approval attestations — identity against an official document; the person is genuinely the household head and the Family belongs to the selected Clan / Branch (Clan membership without a Branch); no social, health or assistance information certified (docs/adr/CO-02 §21) |
 | 1.2.62 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (ADR-FB-GEO-01): "Residence decision" amended — PDD-006 architecturally resolved, implementation pending; current residence is the displacement location when DISPLACED; free text kept, no inference or backfill; reporting, workflows and RBAC unchanged. Documentation only |
+| 1.2.63 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): "Notifications and announcements" amended — unified system, family recipient, NORMAL / IMPORTANT, follow-up, expiration and late acknowledgement; §90–§92 unchanged; documentation only |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

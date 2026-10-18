@@ -1118,6 +1118,20 @@ One family
   Production currently runs without a queue worker; announcements require
   a queue and worker before they are enabled (PWA-9).
 
+**Amended 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`).** The "two kinds"
+above become ONE unified system with ONE family inbox: `SYSTEM` (derived
+from `workflow_events`) and `ANNOUNCEMENT` are classification and
+presentation attributes, and the two sources stay distinguishable. The
+recipient is the FAMILY — a snapshot at publication (ACTIVE families by
+default), kept when the family's account is not yet activated and read
+later by an eligible household head through `family.context`. Levels
+NORMAL / IMPORTANT distinguish viewing (opening the details) from explicit
+acknowledgement; follow-up is in-app only; optional expiry archives and
+allows a late acknowledgement. The queue-and-worker requirement above
+stands. Audiences: single family, selected families, branch / branch group
+/ clan within the sender's scope, filtered groups; "all eligible family
+users" needs the explicit administrative permission.
+
 ---
 
 # 22. Coordinator Notifications
@@ -3930,7 +3944,7 @@ also annotated at its original location.
 | A-04 | docs/06 §59c, AUTH-ADR-057: a Staff user holds exactly one Staff role; FAMILY_USER is never a Staff Portal user | One user may hold FAMILY_USER + COORDINATOR | **Amended for COORDINATOR only.** The six Staff roles keep "exactly one". Staff Portal login rules for those roles are unchanged. Single-role code assumptions are removed in PWA-1 |
 | A-05 | docs/06 §123: health data is hidden by default in the Family Portal | Family Users may **submit** health and disability information for review | **Amended.** Reading canonical health data stays minimum-necessary until PFP-006; submission is permitted through review |
 | A-06 | docs/03 §68, docs/02 §47: eleven approved Change Request types | Health, need, family-data and declaration submissions are required | **Not amended yet.** New types are proposals (§14, PFP-008) |
-| A-07 | docs/03 §90, docs/05 §85: notifications originate from backend workflow/domain events | Manual announcements from Administration and coordinators are added | **Extended.** System notifications keep the rule; announcements are a distinct kind with their own audit |
+| A-07 | docs/03 §90, docs/05 §85: notifications originate from backend workflow/domain events | Manual announcements from Administration and coordinators are added | **Extended.** System notifications keep the rule; announcements are a distinct kind with their own audit. *Amended 2026-10-18 (ADR FB-NOTIFY-01): one unified system; "kind" is an attribute of a message, not a separate module* |
 | A-08 | docs/10 §3: teal brand scale, primary `#176B63` | Family Portal uses the kingfisher / spring palette | **Amended (ADR FB-UI-01, 2026-10-17).** Originally a scoped amendment for the Family Portal only; the kingfisher palette is now the unified color system of both portals (docs/10 §3–§4) |
 | A-09 | docs/07 Phases 16–19 order; docs/05 §125 | Program sequence PWA-1 … PWA-10 | **Refined.** Phases 16–19 are delivered through the PWA phases (docs/07 §31a) |
 | A-10 | docs/01 PPD-015, docs/00 CTX-PENDING-022, docs/01 PPD-019 | One Next.js application hosts Staff, Family and public verification; PWA is in the program | **Decided** |
@@ -4030,6 +4044,9 @@ FP-ADR-018
 In-app notification records are the source of truth; announcements are
 distinguished from system notifications; coordinator audiences are always
 within scope and resolved server-side.
+Amended 2026-10-18 by ADR FB-NOTIFY-01: one unified system and inbox; the
+distinction between announcements and system notifications is kept as the
+message kind and the family-visible source, not as separate modules.
 
 FP-ADR-019
 V1 stores no sensitive family data offline and never caches authenticated
@@ -5255,3 +5272,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.53 | 2026-10-14 | Approved | FP-ADR-080 CO-02.7b: D8 coordinator name in the household history (read-only), Staff rejection of returned requests, Coordinator Space read throttle |
 | 1.54 | 2026-10-17 | Approved | ADR FB-UI-01: FP-ADR-022, PFP-013 and A-08 amended — the Kingfisher palette is the unified Famboook color system for both portals; Family overlays (Select, Dialog, Sheet, DropdownMenu) align with it |
 | 1.55 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01: §23 amended — the unified Family home (welcome header with current time and previous sign-in, shortcuts, server-driven services, Coordinator section for open Coordinator Space); docs/06 AUTH-ADR-096 |
+| 1.56 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §21 amended — unified notifications, family recipient, levels, follow-up, expiry; FP-ADR-018 and A-07 amended; documentation only |

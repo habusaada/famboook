@@ -1351,6 +1351,39 @@ Send (queued fan-out, after commit)
 Per-recipient in-app record → read / unread
 ```
 
+*Amended 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`, ADR-08):* one
+queued publication workflow for kind `ANNOUNCEMENT` — single-family and bulk
+alike, with no synchronous HTTP publication fallback, enabled only once the
+queue worker is operational:
+
+```text
+DRAFT (sender) → request publication → QUEUED (job dispatched after commit)
+   ↓
+PUBLISHING — the worker re-checks authorization and the CURRENT scope,
+             resolves the audience on the server (recipient count shown
+             to the sender beforehand)
+   ↓
+one transaction: full family recipient snapshot (one row per family)
+                 + PUBLISHED + published_at
+   ↓ (failure: rollback → PUBLISH_FAILED, nothing visible; idempotent retry)
+visible to the recipient families → first viewing (opening the details)
+   ↓
+NORMAL:    follow-up 72 h after published_at if unviewed (viewing satisfies it)
+IMPORTANT: follow-up 24 h after published_at if unacknowledged; a second
+           responsible-staff reminder 72 h after published_at if still
+           unacknowledged (viewing alone never satisfies it)
+   ↓ (scheduler)
+optional expiry: PUBLISHED → ARCHIVED; open follow-ups closed as expired;
+late acknowledgement still possible, never reopening them
+```
+
+`CANCELLED` (withdrawn before publication), `ARCHIVED` and `PUBLISH_FAILED`
+stay distinct. Families, published lists and published counts never include
+`QUEUED`, `PUBLISHING` or `PUBLISH_FAILED`. `SYSTEM` messages (derived from
+`workflow_events`, one per unique origin event, recipient = the request's
+family) are written with their recipient in one transaction. "read /
+unread" above becomes viewing and, where required, acknowledgement.
+
 ---
 
 # 53b. Family Portal Identity Workflows (PWA-1B)
@@ -2395,6 +2428,10 @@ Account Activated
 ```
 
 ---
+
+*Clarified 2026-10-18 by ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`) (ADR-09): these are
+derived from the existing append-only `workflow_events` with an idempotent
+origin mapping; no change-request transition changes.*
 
 # 86. After-Commit Notifications
 
@@ -3635,3 +3672,4 @@ Date: 2026-09-24
 | 1.2.28 | 2026-10-14 | Approved | CO-02.5 (WF-ADR-054): REGISTER_FAMILY submission and APPLY implemented locally (not deployed); exact-placement check at APPLY |
 | 1.2.29 | 2026-10-14 | Approved | CO-02.7a: Staff review workspace compatible with Coordinator requests and proposed Families (family = null); wording by channel; no workflow change |
 | 1.2.30 | 2026-10-14 | Approved | CO-02.7b (approved): Staff RETURNED_FOR_CLARIFICATION → REJECTED with change-request.reject and a required reason, both channels; no other transition changed |
+| 1.2.31 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): Announcements flow amended to the unified publication, snapshot, viewing / acknowledgement and follow-up workflow; §85 derivation from `workflow_events`; documentation only |
