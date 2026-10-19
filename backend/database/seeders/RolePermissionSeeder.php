@@ -305,6 +305,21 @@ class RolePermissionSeeder extends Seeder
         'coordinator-request.submit',
         'coordinator-request.resubmit',
         'coordinator-request.cancel',
+
+        // §22b Unified notifications (ADR FB-NOTIFY-01, AUTH-ADR-097;
+        // FB-NOTIFY-01B.2b.6d). Staff announcements (announcement.*) and the
+        // Coordinator's own, scope-bound announcements
+        // (coordinator-announcement.*) — never interchangeable. Sending to
+        // every ACTIVE family needs announcement.send-all (SUPER_ADMIN only).
+        // Publication is also gated by NOTIFICATIONS_MODE (OFF by default).
+        // notification-followup.* stays unseeded (follow-ups not built).
+        'announcement.view',
+        'announcement.create',
+        'announcement.send',
+        'announcement.send-all',
+        'coordinator-announcement.view',
+        'coordinator-announcement.create',
+        'coordinator-announcement.send',
     ];
 
     /**
@@ -323,6 +338,12 @@ class RolePermissionSeeder extends Seeder
      */
     public const ROLE_PERMISSIONS = [
         'SUPER_ADMIN' => [
+            // Unified notifications (AUTH-ADR-097, FB-NOTIFY-01B.2b.6d): own
+            // announcements, and the only holder of send-all (every ACTIVE family).
+            'announcement.view',
+            'announcement.create',
+            'announcement.send',
+            'announcement.send-all',
             // Family Portal identity administration (§22b, AUTH-ADR-063/064).
             // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
             'person-mobile-trust.view',
@@ -458,6 +479,11 @@ class RolePermissionSeeder extends Seeder
             'system.reference-data.manage',
         ],
         'ADMINISTRATOR' => [
+            // Unified notifications (AUTH-ADR-097, FB-NOTIFY-01B.2b.6d): own
+            // announcements to selected families — never send-all.
+            'announcement.view',
+            'announcement.create',
+            'announcement.send',
             // Family Portal identity administration (§22b, AUTH-ADR-063/064).
             // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
             'person-mobile-trust.view',
@@ -739,6 +765,14 @@ class RolePermissionSeeder extends Seeder
             'coordinator-request.submit',
             'coordinator-request.resubmit',
             'coordinator-request.cancel',
+            // Unified notifications (AUTH-ADR-097, FB-NOTIFY-01B.2b.6d): own
+            // announcements — effective only with the coordinator.space context
+            // and the CURRENT scope (preview, draft, publish, retry); the own
+            // history and withdrawal stay while the role is held. Never
+            // announcement.*.
+            'coordinator-announcement.view',
+            'coordinator-announcement.create',
+            'coordinator-announcement.send',
         ],
     ];
 

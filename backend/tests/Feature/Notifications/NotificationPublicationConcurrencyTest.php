@@ -207,7 +207,9 @@ class NotificationPublicationConcurrencyTest extends TestCase
         $this->assertSame('INSERTED', $this->lineOf($worker));
 
         // T2 holds the assignment FOR SHARE: the revocation must wait.
-        $revoke = fn () => app(RevokeCoordinatorScopeAction::class)->handle($this->staff, $assignment, CoordinatorRevokeReason::ADMINISTRATIVE);
+        // coordinator-scope.manage: an ADMINISTRATOR, not the announcement sender.
+        $administrator = $this->administrator();
+        $revoke = fn () => app(RevokeCoordinatorScopeAction::class)->handle($administrator, $assignment, CoordinatorRevokeReason::ADMINISTRATIVE);
         $this->assertWaitedForALock($this->withShortLockTimeout($revoke));
 
         $this->go($worker);

@@ -98,6 +98,9 @@ class CoordinatorAnnouncementApiTest extends TestCase
 
     public function test_only_a_coordinator_with_coordinator_announcement_permissions_reaches_the_api(): void
     {
+        // Coordinators WITHOUT the permissions (the seeded role holds them; the
+        // seeded baseline itself is NotificationPermissionsTest's).
+        $this->withoutCoordinatorRoleAnnouncementPermissions();
         $this->getJson(self::URI)->assertUnauthorized();
         $this->as($this->staffSender(), 'GET')->assertForbidden();
         // A household head who is no coordinator: no permission to read the history,

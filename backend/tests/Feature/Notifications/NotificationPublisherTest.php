@@ -372,8 +372,9 @@ class NotificationPublisherTest extends TestCase
 
     public function test_the_job_reloads_the_permission_map_a_long_running_worker_holds(): void
     {
-        // The send permission comes from the ADMINISTRATOR role (test database only).
-        $role = Role::findByName('ADMINISTRATOR', 'web');
+        // The send permission comes from the sender's ROLE (REPORTS_VIEWER, the
+        // fixture's base role; granted here in the test database only).
+        $role = Role::findByName('REPORTS_VIEWER', 'web');
         $role->givePermissionTo(Permission::findOrCreate('announcement.send', 'web'));
         $staff = $this->staffSender('announcement.create');
         $message = $this->queued([Family::factory()->create()], $staff);

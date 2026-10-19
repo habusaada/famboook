@@ -41,17 +41,23 @@ class VerifyPermissions extends Command
         'DATA_ENTRY' => [
             'has' => ['family-membership.update'],
             'lacks' => ['family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic',
-                'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
+                'family-card.issue', 'family-card.revoke', 'family-card.reissue', ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT],
         ],
+        // Notifications (AUTH-ADR-097): ADMINISTRATOR sends to selected families,
+        // never to every ACTIVE family (send-all is SUPER_ADMIN only).
         'ADMINISTRATOR' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant', 'family-card.reissue'],
-            'lacks' => ['person.national-id.view'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant', 'family-card.reissue',
+                'announcement.view', 'announcement.create', 'announcement.send'],
+            'lacks' => ['person.national-id.view', 'announcement.send-all', ...self::COORDINATOR_ANNOUNCEMENT],
         ],
         'SUPER_ADMIN' => [
-            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant', 'family-card.reissue'],
+            'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant', 'family-card.reissue',
+                ...self::ANNOUNCEMENT],
             // import.apply is gated: see the explicit check in handle().
-            'lacks' => ['person.national-id.view'],
+            'lacks' => ['person.national-id.view', ...self::COORDINATOR_ANNOUNCEMENT],
         ],
+        'SOCIAL_WORKER' => ['has' => [], 'lacks' => [...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT]],
+        'REPORTS_VIEWER' => ['has' => [], 'lacks' => [...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT]],
         // Family Portal identity (docs/06 §22b). Mobile trust is granted by
         // SUPER_ADMIN and ADMINISTRATOR only; the COORDINATOR role must not
         // hold assist before coordinator scope authorization exists (PWA-1H).
@@ -61,7 +67,7 @@ class VerifyPermissions extends Command
             'has' => ['change-request.view', 'change-request.review', 'change-request.return', 'change-request.reject',
                 'change-request.approve', 'change-request.apply'],
             'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist',
-                'family-card.issue', 'family-card.revoke', 'family-card.reissue'],
+                'family-card.issue', 'family-card.revoke', 'family-card.reissue', ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT],
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
@@ -72,7 +78,9 @@ class VerifyPermissions extends Command
                 // Family reads use family.context, never the Staff queue; a
                 // family never reviews its own request (WF-INV-026).
                 'change-request.view', 'change-request.review', 'change-request.return', 'change-request.approve',
-                'change-request.reject', 'change-request.apply', 'change-request.view-internal-notes'],
+                'change-request.reject', 'change-request.apply', 'change-request.view-internal-notes',
+                // Notifications: an ordinary household head never sends (AUTH-ADR-097).
+                ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT],
         ],
         // A Coordinator is family-side and scope-bound (PWA-1H): summaries and
         // (CO-01C, AUTH-ADR-092) the members directory with its audited reveal
@@ -80,8 +88,10 @@ class VerifyPermissions extends Command
         'COORDINATOR' => [
             'has' => ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive',
                 // CO-02.3b (AUTH-ADR-093): own requests in the scope.
-                'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel'],
-            'lacks' => ['person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
+                'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel',
+                // AUTH-ADR-097: own scope-bound announcements, never announcement.*.
+                ...self::COORDINATOR_ANNOUNCEMENT],
+            'lacks' => [...self::ANNOUNCEMENT, 'person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
                 'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
@@ -92,6 +102,12 @@ class VerifyPermissions extends Command
                 'change-request.approve', 'change-request.reject', 'change-request.apply'],
         ],
     ];
+
+    /** Staff announcement permissions (AUTH-ADR-097): SUPER_ADMIN and ADMINISTRATOR; send-all SUPER_ADMIN only. */
+    public const ANNOUNCEMENT = ['announcement.view', 'announcement.create', 'announcement.send', 'announcement.send-all'];
+
+    /** Coordinator announcement permissions (AUTH-ADR-097): the COORDINATOR role only. */
+    public const COORDINATOR_ANNOUNCEMENT = ['coordinator-announcement.view', 'coordinator-announcement.create', 'coordinator-announcement.send'];
 
     /** The single gated permission and the only role that may ever hold it. */
     public const APPLY_PERMISSION = 'import.apply';
@@ -156,6 +172,16 @@ class VerifyPermissions extends Command
             ->count();
         if ($directApplyGrants > 0) {
             $problems[] = 'CRITICAL: '.self::APPLY_PERMISSION.' is granted directly to a model; it may only come from the '.self::APPLY_ROLE.' role';
+        }
+
+        // Notification permissions only ever come from their roles (AUTH-ADR-097):
+        // a direct grant — send-all above all — would bypass the role baseline.
+        $directNotificationGrants = DB::table(config('permission.table_names.model_has_permissions'))
+            ->join(config('permission.table_names.permissions').' as p', 'p.id', '=', config('permission.column_names.permission_pivot_key') ?? 'permission_id')
+            ->whereIn('p.name', [...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT])
+            ->count();
+        if ($directNotificationGrants > 0) {
+            $problems[] = "CRITICAL: {$directNotificationGrants} notification permission grant(s) made directly to a model; they may only come from their roles";
         }
 
         // Account sides are disjoint (docs/06 §22b): no account mixes a Staff

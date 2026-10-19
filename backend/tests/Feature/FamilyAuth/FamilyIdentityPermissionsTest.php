@@ -99,8 +99,10 @@ class FamilyIdentityPermissionsTest extends TestCase
         // The whole role, not just the PWA-1 names: nothing else at all
         // (PWA-1H added the scoped family summaries, AUTH-ADR-070; CO-01C the
         // members directory and its audited reveal, AUTH-ADR-092; CO-02.3b its
-        // own requests, AUTH-ADR-093).
-        $requests = ['coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel'];
+        // own requests, AUTH-ADR-093; FB-NOTIFY-01B.2b.6d its own announcements,
+        // AUTH-ADR-097).
+        $requests = ['coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel',
+            'coordinator-announcement.view', 'coordinator-announcement.create', 'coordinator-announcement.send'];
         $this->assertEqualsCanonicalizing(
             ['coordinator-space.access', 'coordinator-family.view-summary', 'coordinator-member.view', 'coordinator-member.view-sensitive', ...$requests],
             Role::findByName('COORDINATOR', 'web')->permissions->pluck('name')->all(),

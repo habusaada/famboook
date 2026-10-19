@@ -271,6 +271,8 @@ class CancelPublicationActionTest extends TestCase
 
     public function test_withdrawing_grants_no_drafting_publication_or_retry(): void
     {
+        // Per-account grants only, so the send permission can be taken away below.
+        $this->withoutCoordinatorRoleAnnouncementPermissions();
         [$coordinator, $draft, , $failed] = $this->coordinatorMessages();
         $other = $this->draft($coordinator, ['type' => 'COORDINATOR_SCOPE']);
         $this->revokeAllAssignments($coordinator);

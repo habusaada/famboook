@@ -49,13 +49,40 @@ trait NotificationActionFixtures
         return $user;
     }
 
-    /** A Staff-side ADMINISTRATOR holding the given announcement permissions. */
+    /**
+     * A Staff-side account holding EXACTLY the given announcement permissions.
+     * Its role is REPORTS_VIEWER, a Staff role that holds no notification
+     * permission in the seeded baseline (FB-NOTIFY-01B.2b.6d), so each test
+     * controls the permissions itself. The seeded role grants are covered by
+     * NotificationPermissionsTest, with role-only accounts.
+     */
     protected function staffSender(string ...$permissions): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole(Role::findByName('REPORTS_VIEWER', 'web'));
+
+        return $this->grant($user, ...($permissions ?: [NotificationActors::STAFF_CREATE, NotificationActors::STAFF_SEND]));
+    }
+
+    /**
+     * The seeded COORDINATOR role holds coordinator-announcement.* (AUTH-ADR-097).
+     * A test that needs coordinators WITHOUT them (permissions then granted
+     * per account) removes them from the role in its own test database.
+     */
+    protected function withoutCoordinatorRoleAnnouncementPermissions(): void
+    {
+        Role::findByName('COORDINATOR', 'web')->revokePermissionTo([
+            NotificationActors::COORDINATOR_CREATE, NotificationActors::COORDINATOR_SEND, 'coordinator-announcement.view',
+        ]);
+    }
+
+    /** A Staff-side ADMINISTRATOR (the seeded role, no direct grant). */
+    protected function administrator(): User
     {
         $user = User::factory()->create();
         $user->assignRole(Role::findByName('ADMINISTRATOR', 'web'));
 
-        return $this->grant($user, ...($permissions ?: [NotificationActors::STAFF_CREATE, NotificationActors::STAFF_SEND]));
+        return $user;
     }
 
     /** A Coordinator assigned to $target, holding the given coordinator-announcement permissions. */
