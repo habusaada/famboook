@@ -19,10 +19,11 @@ use App\Http\Controllers\Api\V1\Family\FamilyAuthCapabilitiesController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardController;
 use App\Http\Controllers\Api\V1\Family\FamilyCardPdfController;
 use App\Http\Controllers\Api\V1\Family\FamilyChangeRequestController;
-use App\Http\Controllers\Api\V1\Family\FamilyGazaLocationController;
 use App\Http\Controllers\Api\V1\Family\FamilyContactUpdateController;
+use App\Http\Controllers\Api\V1\Family\FamilyGazaLocationController;
 use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
+use App\Http\Controllers\Api\V1\Family\FamilyNotificationController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
 use App\Http\Controllers\Api\V1\Family\FamilySelfController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
@@ -189,6 +190,22 @@ Route::prefix('family')->group(function () {
                 ->middleware(['can:change-request.resubmit', 'throttle:family-change-request-action']);
             Route::post('/change-requests/{changeRequest}/cancel', [FamilyChangeRequestController::class, 'cancel'])
                 ->middleware(['can:change-request.cancel', 'throttle:family-change-request-action']);
+
+            // Notifications (FB-NOTIFY-01B.2b.6b; ADR FB-NOTIFY-01): this Family's
+            // inbox, archive and details through its OWN recipient rows — never
+            // route-model bound; another family's notification is 404. Reading
+            // never records a view: /view and /acknowledge are explicit POSTs.
+            // /archive before {notification}.
+            Route::get('/notifications', [FamilyNotificationController::class, 'index'])
+                ->middleware('throttle:family-notification-read');
+            Route::get('/notifications/archive', [FamilyNotificationController::class, 'archive'])
+                ->middleware('throttle:family-notification-read');
+            Route::get('/notifications/{notification}', [FamilyNotificationController::class, 'show'])
+                ->middleware('throttle:family-notification-read');
+            Route::post('/notifications/{notification}/view', [FamilyNotificationController::class, 'view'])
+                ->middleware('throttle:family-notification-action');
+            Route::post('/notifications/{notification}/acknowledge', [FamilyNotificationController::class, 'acknowledge'])
+                ->middleware('throttle:family-notification-action');
 
             // Mobile CONTACT_UPDATE (docs/11 FP-ADR-079): its own OTP flow on
             // the Change Request engine — change-request.submit, its own gate

@@ -23,6 +23,10 @@
  *                                        (and T3 if T2 refuses)
  *   reconcile <limit>                    NotificationPublicationReconciler::run;
  *                                        prints "OK <counters as JSON>"
+ *   hold-recipient <recipient_id>        hold a notification_recipients row FOR UPDATE
+ *   family-view <user_id> <uuid>         RecordNotificationViewAction as that head
+ *   family-acknowledge <user_id> <uuid>  AcknowledgeNotificationAction as that head
+ *                                        (both print "OK recorded" or "OK replayed")
  *
  * Synchronization: after READY each actor waits for one STDIN line
  * "<milliseconds>", waits that long and proceeds (holders then commit).
@@ -31,10 +35,13 @@
  * Never a value.
  */
 
+use App\Actions\Notifications\AcknowledgeNotificationAction;
+use App\Actions\Notifications\RecordNotificationViewAction;
 use App\Actions\RevokeCoordinatorScopeAction;
 use App\Enums\CoordinatorRevokeReason;
 use App\Models\CoordinatorScopeAssignment;
 use App\Models\User;
+use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\Notifications\NotificationHeartbeat;
 use App\Support\Notifications\NotificationPublicationFailure;
 use App\Support\Notifications\NotificationPublicationReconciler;
@@ -139,6 +146,27 @@ try {
             $out('READY');
             $wait();
             $out('OK '.json_encode(app(NotificationPublicationReconciler::class)->run((int) $limit)->toArray()));
+            break;
+
+        case 'hold-recipient':
+            [, , $recipientId] = $argv;
+            DB::transaction(function () use ($recipientId, $out, $wait) {
+                DB::select('SELECT id FROM notification_recipients WHERE id = ? FOR UPDATE', [(int) $recipientId]);
+                $out('READY');
+                $wait();
+            });
+            $out('OK');
+            break;
+
+        case 'family-view':
+        case 'family-acknowledge':
+            [, , $userId, $uuid] = $argv;
+            $context = app(FamilyAccessResolver::class)->familyContext(User::findOrFail((int) $userId));
+            $action = app($command === 'family-view' ? RecordNotificationViewAction::class : AcknowledgeNotificationAction::class);
+            $out('READY');
+            $wait();
+            [, $recorded] = $action->handle($context, $uuid);
+            $out('OK '.($recorded ? 'recorded' : 'replayed'));
             break;
 
         default:

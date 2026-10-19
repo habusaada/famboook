@@ -271,6 +271,15 @@ class FamilySideBoundaryTest extends TestCase
                 };
                 $this->assertSame($expected, $middleware, $route->uri());
             }
+            // Notifications (FB-NOTIFY-01B.2b.6b): the Family boundary, then a
+            // per-user throttle — read for GETs, action for /view and /acknowledge.
+            if (str_starts_with($route->uri(), 'api/v1/family/notifications')) {
+                $boundary = ['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context'];
+                $expected = in_array('GET', $route->methods(), true)
+                    ? [...$boundary, 'throttle:family-notification-read']
+                    : [...$boundary, 'throttle:family-notification-action'];
+                $this->assertSame($expected, $middleware, $route->uri());
+            }
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
@@ -280,7 +289,8 @@ class FamilySideBoundaryTest extends TestCase
         // request routes (CO-02.4, AUTH-ADR-093) + the FAMILY_ADD proposal
         // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a)
         // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2)
-        // + the Coordinator summary (FB-FAMILY-DASHBOARD-01).
-        $this->assertSame(55, $checked);
+        // + the Coordinator summary (FB-FAMILY-DASHBOARD-01) + the five
+        // notification routes (FB-NOTIFY-01B.2b.6b).
+        $this->assertSame(60, $checked);
     }
 }

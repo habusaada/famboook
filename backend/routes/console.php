@@ -30,3 +30,8 @@ Schedule::job(new NotificationHeartbeatJob)->everyMinute();
 // rely on the shared cache store's atomic locks (the database store in
 // Production). Not active without the cron (separate approval).
 Schedule::command('famboook:notifications-reconcile')->everyMinute()->withoutOverlapping(10)->onOneServer();
+
+// Notification expiry (FB-NOTIFY-01B.2b.6b, ADR-07): PUBLISHED → ARCHIVED once
+// expires_at is reached. Read models treat it as expired from that moment
+// already; this makes it persistent. Runs whatever the feature mode.
+Schedule::command('famboook:notifications-expire')->everyMinute()->withoutOverlapping(10)->onOneServer();

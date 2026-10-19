@@ -294,5 +294,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('family-card', fn (Request $request) => Limit::perMinute((int) config('credentials.family_card_limits.user_minute'))
             ->by("family-card|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
+        // Family notifications (FB-NOTIFY-01B.2b.6b): per signed-in user — the
+        // inbox, archive and details; the explicit view / acknowledge writes.
+        RateLimiter::for('family-notification-read', fn (Request $request) => Limit::perMinute((int) config('notifications.family_limits.read_user_minute'))
+            ->by("family-notification-read|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        RateLimiter::for('family-notification-action', fn (Request $request) => Limit::perMinute((int) config('notifications.family_limits.action_user_minute'))
+            ->by("family-notification-action|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
     }
 }
