@@ -94,8 +94,10 @@ final class NotificationReadiness
     }
 
     /**
-     * The scheduler and worker: an asynchronous queue and a fresh heartbeat
-     * (dispatched by the scheduler, run by a worker on the notifications queue).
+     * The scheduler and worker: an asynchronous queue whose retry_after fits
+     * the publication job's timeout and the stale threshold, and a fresh
+     * heartbeat (dispatched by the scheduler, run by a worker on the
+     * notifications queue).
      *
      * @return list<Reason>
      */
@@ -104,6 +106,8 @@ final class NotificationReadiness
         $reasons = [];
         if (! self::queueIsAsynchronous()) {
             $reasons[] = Reason::QUEUE_NOT_ASYNC;
+        } elseif (! NotificationConfig::queueTimingValid()) {
+            $reasons[] = Reason::QUEUE_TIMING_INVALID;
         }
         $reasons[] = match (NotificationHeartbeat::state()) {
             NotificationHeartbeatState::FRESH => null,

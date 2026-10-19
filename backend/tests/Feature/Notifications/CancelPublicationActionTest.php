@@ -11,6 +11,7 @@ use App\Enums\NotificationEventType;
 use App\Enums\NotificationFailureCode;
 use App\Enums\NotificationStatus;
 use App\Exceptions\NotificationPublicationException;
+use App\Jobs\PublishNotificationJob;
 use App\Models\Family;
 use App\Models\NotificationMessage;
 use App\Models\NotificationRecipientEvent;
@@ -19,7 +20,7 @@ use App\Support\FamilyAuth\CoordinatorScopes;
 use App\Support\Notifications\NotificationActors;
 use App\Support\Notifications\NotificationLifecycle;
 use App\Support\Notifications\NotificationOutcome;
-use App\Support\Notifications\PendingPublicationDispatcher;
+use App\Support\Notifications\QueueNotificationPublicationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -289,17 +290,19 @@ class CancelPublicationActionTest extends TestCase
         $this->assertRefused(NotificationPublicationException::ACTOR_NOT_ALLOWED, fn () => $this->cancel($coordinator->fresh(), $failed));
     }
 
-    public function test_the_placeholder_dispatcher_is_bound_and_hands_off_nothing(): void
+    public function test_the_queue_dispatcher_is_bound_and_only_queues_the_job(): void
     {
         $this->assertSame('OFF', (require config_path('notifications.php'))['mode']);
         $this->app->forgetInstance(NotificationPublicationDispatcher::class);
         $bound = $this->app->make(NotificationPublicationDispatcher::class);
-        $this->assertInstanceOf(PendingPublicationDispatcher::class, $bound);
+        $this->assertInstanceOf(QueueNotificationPublicationDispatcher::class, $bound);
 
         Queue::fake();
         $message = app(RequestPublicationAction::class)->handle($this->staff, $this->staffDraft())->message;
 
-        Queue::assertNothingPushed();
+        // A job on the notifications queue — no publication in this process.
+        Queue::assertPushedOn('notifications', PublishNotificationJob::class, fn (PublishNotificationJob $job) => $job->messageId === (int) $message->id);
+        Queue::assertCount(1);
         $this->assertSame(NotificationStatus::QUEUED, $message->fresh()->status);
         $this->assertNull($message->fresh()->published_at);
         $this->assertSame(0, DB::table('notification_recipients')->count());

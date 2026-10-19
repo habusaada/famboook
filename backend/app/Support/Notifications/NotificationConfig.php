@@ -16,6 +16,14 @@ final class NotificationConfig
 {
     public const DEFAULT_QUEUE = 'notifications';
 
+    /**
+     * The publication job's hard time limit (PublishNotificationJob). Must
+     * stay below the queue's retry_after (or a running job is delivered a
+     * second time) and the stale threshold below which a PUBLISHING claim is
+     * never recovered (R5) — see queueTimingValid().
+     */
+    public const PUBLICATION_JOB_TIMEOUT_SECONDS = 60;
+
     /** The keys every notification operation depends on (the SYSTEM cutoff is SYSTEM-only). */
     public const REQUIRED_KEYS = [
         'mode',
@@ -96,6 +104,31 @@ final class NotificationConfig
     public static function manualPublishRetries(): ?int
     {
         return self::integer('manual_publish_retries', 0, 1);
+    }
+
+    /** The default queue connection's retry_after in seconds, or NULL when it has none. */
+    public static function queueRetryAfterSeconds(): ?int
+    {
+        $connection = config('queue.default');
+        $retryAfter = is_string($connection) ? config("queue.connections.{$connection}.retry_after") : null;
+
+        return is_int($retryAfter) && $retryAfter > 0 ? $retryAfter : null;
+    }
+
+    /**
+     * The job timeout, the queue's retry_after and the stale threshold are
+     * compatible: timeout < retry_after < stale_publishing_seconds (60 < 90 <
+     * 600 by default). Otherwise a running job could be redelivered, or a
+     * live claim recovered as stale: fail closed.
+     */
+    public static function queueTimingValid(): bool
+    {
+        $retryAfter = self::queueRetryAfterSeconds();
+        $stale = self::stalePublishingSeconds();
+
+        return $retryAfter !== null && $stale !== null
+            && $retryAfter > self::PUBLICATION_JOB_TIMEOUT_SECONDS
+            && $stale > $retryAfter;
     }
 
     /** Whether the replaced total-attempts key is still configured (it changes nothing). */

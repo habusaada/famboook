@@ -10,6 +10,8 @@ enum NotificationReadinessReason: string
     case MODE_OFF = 'MODE_OFF';
     case SENDER_NOT_IN_PILOT = 'SENDER_NOT_IN_PILOT';
     case QUEUE_NOT_ASYNC = 'QUEUE_NOT_ASYNC';
+    // retry_after not above the job timeout, or not below the stale threshold.
+    case QUEUE_TIMING_INVALID = 'QUEUE_TIMING_INVALID';
     case HEARTBEAT_ABSENT = 'HEARTBEAT_ABSENT';
     case HEARTBEAT_STALE = 'HEARTBEAT_STALE';
     case SYSTEM_DISCOVERY_REQUIRES_ON = 'SYSTEM_DISCOVERY_REQUIRES_ON';

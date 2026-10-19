@@ -17,10 +17,9 @@ use App\Models\NotificationMessage;
  * (NotificationLifecycle::mayStartPublishing), so a cancelled message is
  * never published whatever was dispatched.
  *
- * Bound in AppServiceProvider. FB-NOTIFY-01B.2b.4 binds
- * PendingPublicationDispatcher (nothing is handed off: the worker does not
- * exist yet); FB-NOTIFY-01B.2b.5 replaces the binding with the queued
- * publication job on the `notifications` queue.
+ * Bound in AppServiceProvider to QueueNotificationPublicationDispatcher
+ * (FB-NOTIFY-01B.2b.5c): PublishNotificationJob on the `notifications`
+ * queue. The 2b.4 placeholder that handed nothing off is retired.
  */
 interface NotificationPublicationDispatcher
 {

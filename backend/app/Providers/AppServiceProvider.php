@@ -21,7 +21,7 @@ use App\Support\FamilyAuth\SignInHistory;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
-use App\Support\Notifications\PendingPublicationDispatcher;
+use App\Support\Notifications\QueueNotificationPublicationDispatcher;
 use App\Support\Sms\LogSmsSender;
 use App\Support\Sms\SmsDispatcher;
 use App\Support\Sms\TweetsSmsSender;
@@ -66,10 +66,10 @@ class AppServiceProvider extends ServiceProvider
         // only — EMPTY in PWA-5. Tests replace it with ChangeRequestTypes::fake().
         $this->app->singleton(ChangeRequestTypes::class, fn () => ChangeRequestTypes::production());
 
-        // The notification publication hand-off (FB-NOTIFY-01B.2b.4): nothing is
-        // handed off until the worker exists; FB-NOTIFY-01B.2b.5 binds the
-        // queued publication job here. Never a synchronous publication.
-        $this->app->bind(NotificationPublicationDispatcher::class, PendingPublicationDispatcher::class);
+        // The notification publication hand-off (FB-NOTIFY-01B.2b.5c): the queued
+        // PublishNotificationJob on the notifications queue, after commit.
+        // Never a synchronous publication (refused on sync / null queues).
+        $this->app->bind(NotificationPublicationDispatcher::class, QueueNotificationPublicationDispatcher::class);
     }
 
     /**
