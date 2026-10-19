@@ -5,37 +5,54 @@ import { Check, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Code } from "@/components/shared/page-layout";
-import { ANNOUNCEMENT_MAX_FAMILIES, useStaffFamilySearch } from "@/lib/api/announcements";
+import { ANNOUNCEMENT_MAX_FAMILIES, useCoordinatorFamilySearch, useStaffFamilySearch } from "@/lib/api/announcements";
 import { ApiError } from "@/lib/api/client";
 
 const fmt = (n: number) => n.toLocaleString("ar");
 
-/**
- * The Staff selected-family picker (FB-NOTIFY-01C.3c): searches the existing
- * registry (ACTIVE families) and keeps PUBLIC family codes only — the same
- * pattern as the assistance nominee picker. Never an internal id. At most
- * ANNOUNCEMENT_MAX_FAMILIES distinct families.
- */
-export function StaffFamilyCodePicker({
-  value,
-  onChange,
-  invalid,
-  describedBy,
-}: {
+export type FamilyCodePickerProps = {
   value: string[];
   onChange: (codes: string[]) => void;
   invalid?: boolean;
   describedBy?: string;
-}) {
-  const [text, setText] = useState("");
+};
+
+type SearchResult = {
+  families: { code: string; head: string | null }[] | undefined;
+  pending: boolean;
+  error: unknown;
+};
+
+/** The search term, settled 350 ms after the last keystroke. */
+function useSettledTerm(text: string): string {
   const [term, setTerm] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => setTerm(text.trim()), 350);
     return () => clearTimeout(timer);
   }, [text]);
-  const search = useStaffFamilySearch(term);
+  return term;
+}
+
+/**
+ * The selected-family picker (FB-NOTIFY-01C.3c / 3d), presentation only:
+ * results come from the side's own directory; only PUBLIC family codes are
+ * kept — never an internal id. At most ANNOUNCEMENT_MAX_FAMILIES distinct
+ * families.
+ */
+function FamilyCodePickerView({
+  text,
+  onText,
+  term,
+  result,
+  placeholder,
+  value,
+  onChange,
+  invalid,
+  describedBy,
+}: FamilyCodePickerProps & { text: string; onText: (text: string) => void; term: string; result: SearchResult; placeholder: string }) {
   const selected = new Set(value);
   const full = selected.size >= ANNOUNCEMENT_MAX_FAMILIES;
+  const forbidden = result.error instanceof ApiError && result.error.status === 403;
 
   const add = (code: string) => {
     if (selected.has(code) || full) return;
@@ -50,8 +67,9 @@ export function StaffFamilyCodePicker({
         <Input
           type="search"
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="ابحث برمز الأسرة أو اسم رب الأسرة"
+          maxLength={100}
+          onChange={(e) => onText(e.target.value)}
+          placeholder={placeholder}
           aria-label="البحث عن أسرة"
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
@@ -62,29 +80,29 @@ export function StaffFamilyCodePicker({
 
       {term.length >= 2 && (
         <ul className="max-h-60 divide-y overflow-y-auto rounded-lg border" aria-label="نتائج البحث عن الأسر" data-family-results>
-          {search.isPending && <li className="p-3 text-sm text-muted-foreground">جارٍ البحث…</li>}
-          {search.isError && (
+          {result.pending && <li className="p-3 text-sm text-muted-foreground">جارٍ البحث…</li>}
+          {Boolean(result.error) && (
             <li className="p-3 text-sm text-danger" role="alert">
-              {search.error instanceof ApiError && search.error.status === 403 ? "لا تملك صلاحية البحث في سجل الأسر." : "تعذّر البحث. حاول مرة أخرى."}
+              {forbidden ? "لا تملك صلاحية البحث عن الأسر." : "تعذّر البحث. حاول مرة أخرى."}
             </li>
           )}
-          {search.data?.data.length === 0 && <li className="p-3 text-sm text-muted-foreground">لا توجد أسر نشطة مطابقة.</li>}
-          {search.data?.data.map((family) => {
-            const chosen = selected.has(family.family_code);
+          {result.families?.length === 0 && <li className="p-3 text-sm text-muted-foreground">لا توجد أسر نشطة مطابقة.</li>}
+          {result.families?.map((family) => {
+            const chosen = selected.has(family.code);
             return (
-              <li key={family.family_code} className="flex items-center justify-between gap-2 px-3 py-2">
+              <li key={family.code} className="flex items-center justify-between gap-2 px-3 py-2">
                 <span className="flex min-w-0 flex-col">
-                  <Code className="text-sm">{family.family_code}</Code>
-                  {family.household_head_name && <span className="truncate text-xs text-muted-foreground">{family.household_head_name}</span>}
+                  <Code className="text-sm">{family.code}</Code>
+                  {family.head && <span className="truncate text-xs text-muted-foreground">{family.head}</span>}
                 </span>
                 <Button
                   type="button"
                   size="sm"
                   variant={chosen ? "ghost" : "outline"}
                   disabled={chosen || full}
-                  onClick={() => add(family.family_code)}
-                  aria-label={chosen ? `${family.family_code} مضافة` : `إضافة ${family.family_code}`}
-                  data-family-add={family.family_code}
+                  onClick={() => add(family.code)}
+                  aria-label={chosen ? `${family.code} مضافة` : `إضافة ${family.code}`}
+                  data-family-add={family.code}
                 >
                   {chosen ? <Check className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
                   {chosen ? "مضافة" : "إضافة"}
@@ -122,4 +140,34 @@ export function StaffFamilyCodePicker({
       </div>
     </div>
   );
+}
+
+/** Staff: the registry (GET /api/v1/families, family.view), ACTIVE families only. */
+export function StaffFamilyCodePicker(props: FamilyCodePickerProps) {
+  const [text, setText] = useState("");
+  const term = useSettledTerm(text);
+  const search = useStaffFamilySearch(term);
+  const result: SearchResult = {
+    families: search.data?.data.map((f) => ({ code: f.family_code, head: f.household_head_name })),
+    pending: search.isPending,
+    error: search.error,
+  };
+  return <FamilyCodePickerView {...props} text={text} onText={setText} term={term} result={result} placeholder="ابحث برمز الأسرة أو اسم رب الأسرة" />;
+}
+
+/**
+ * Coordinator: the Coordinator family directory (GET
+ * /api/v1/family/coordinator/families) — the ACTIVE families of the CURRENT
+ * scope only; nothing outside it is ever shown.
+ */
+export function CoordinatorFamilyCodePicker(props: FamilyCodePickerProps) {
+  const [text, setText] = useState("");
+  const term = useSettledTerm(text);
+  const search = useCoordinatorFamilySearch(term);
+  const result: SearchResult = {
+    families: search.data?.data.map((f) => ({ code: f.family_code, head: f.head_name })),
+    pending: search.isPending,
+    error: search.error,
+  };
+  return <FamilyCodePickerView {...props} text={text} onText={setText} term={term} result={result} placeholder="ابحث برمز الأسرة أو اسم رب الأسرة في نطاقك" />;
 }

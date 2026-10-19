@@ -287,6 +287,8 @@ describe("composing a draft", () => {
   it("offers every ACTIVE family only with announcement.send-all", async () => {
     const { unmount } = withAuth(<StaffAnnouncementCompose />);
     expect(screen.queryByLabelText("جميع الأسر النشطة")).toBeNull();
+    // Never a Coordinator audience on the Staff side.
+    expect(screen.queryByLabelText(/نطاقي/)).toBeNull();
     unmount();
 
     const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { recipient_count: 340 } } as never);

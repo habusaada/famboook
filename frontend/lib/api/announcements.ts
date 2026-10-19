@@ -1,7 +1,9 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/client";
+import { type QueryClient, keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, apiClient } from "@/lib/api/client";
+import type { CoordinatorFamily } from "@/lib/api/coordinator";
+import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
 import type { FamiliesListResponse, PaginatedResponse } from "@/lib/types/api/family";
 
 // Announcement management (FB-NOTIFY-01C.3c; backend FB-NOTIFY-01B.2b.6c /
@@ -162,6 +164,18 @@ export function announcementPollInterval(detail: AnnouncementDetail | undefined,
   return lastReadFailed ? Math.max(tier.everyMs, ANNOUNCEMENT_POLL_ERROR_BACKOFF_MS) : tier.everyMs;
 }
 
+/**
+ * A coordinator operation refused with COORDINATOR_SPACE_UNAVAILABLE (the
+ * scope was revoked meanwhile): /family/me is re-read so the coordinator
+ * flags catch up. The session and the Family context are NOT touched — the
+ * account keeps its household and its announcement history.
+ */
+function refreshCoordinatorFlags(queryClient: QueryClient, side: AnnouncementSide, error: unknown) {
+  if (side !== "coordinator" || !(error instanceof ApiError) || error.status !== 403) return;
+  const code = error.payload && typeof error.payload === "object" ? (error.payload as { code?: unknown }).code : null;
+  if (code === "COORDINATOR_SPACE_UNAVAILABLE") void queryClient.invalidateQueries({ queryKey: FAMILY_ME_QUERY_KEY });
+}
+
 export function useAnnouncementsQuery(side: AnnouncementSide, filters: AnnouncementFilters) {
   return useQuery({
     queryKey: announcementKeys.list(side, filters),
@@ -185,10 +199,12 @@ export function useAnnouncementQuery(side: AnnouncementSide, id: string) {
 
 /** POST …/audience-preview: how many families the audience reaches now (counts only). */
 export function useAudiencePreview(side: AnnouncementSide) {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (audience: PublicAudience) =>
       (await apiClient.post<{ data: { recipient_count: number } }>(`${BASES[side]}/audience-preview`, { audience })).data.recipient_count,
     retry: false,
+    onError: (error) => refreshCoordinatorFlags(queryClient, side, error),
   });
 }
 
@@ -206,6 +222,7 @@ export function useCreateAnnouncement(side: AnnouncementSide) {
       queryClient.setQueryData(announcementKeys.detail(side, outcome.announcement.id), outcome.announcement);
       void queryClient.invalidateQueries({ queryKey: [...announcementKeys.all(side), "list"] });
     },
+    onError: (error) => refreshCoordinatorFlags(queryClient, side, error),
   });
 }
 
@@ -232,12 +249,32 @@ export function useAnnouncementAction(side: AnnouncementSide, id: string) {
     onSuccess: (outcome) => {
       queryClient.setQueryData(announcementKeys.detail(side, id), outcome.announcement);
     },
-    onError: () => {
+    onError: (error) => {
       void queryClient.invalidateQueries({ queryKey: announcementKeys.detail(side, id) });
+      refreshCoordinatorFlags(queryClient, side, error);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: [...announcementKeys.all(side), "list"] });
     },
+  });
+}
+
+/**
+ * Coordinator family search for the audience picker: the existing Coordinator
+ * family directory (GET /api/v1/family/coordinator/families, behind
+ * coordinator.space) — the ACTIVE families of the CURRENT scope only, from
+ * two characters. Only family_code and the head's display name are used.
+ */
+export function useCoordinatorFamilySearch(term: string) {
+  const q = term.trim();
+  return useQuery({
+    queryKey: ["announcements", "coordinator", "family-search", q],
+    queryFn: () =>
+      apiClient.get<{ data: CoordinatorFamily[] }>(`/api/v1/family/coordinator/families?${new URLSearchParams({ page: "1", q }).toString()}`),
+    enabled: q.length >= 2,
+    placeholderData: keepPreviousData,
+    retry: false,
+    staleTime: 30 * 1000,
   });
 }
 

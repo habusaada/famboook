@@ -48,9 +48,13 @@ function urlOf(page: string): string {
   return ["/family/coordinator", ...segments].join("/");
 }
 
-// The public Coordinator URLs before the refactor (8f47715), unchanged.
+// The public Coordinator URLs before the refactor (8f47715), unchanged, plus
+// the FB-NOTIFY-01C.3d announcement routes.
 const PUBLIC_URLS = [
   "/family/coordinator",
+  "/family/coordinator/announcements",
+  "/family/coordinator/announcements/[id]",
+  "/family/coordinator/announcements/new",
   "/family/coordinator/families/[code]",
   "/family/coordinator/requests",
   "/family/coordinator/requests/[id]",
@@ -80,11 +84,18 @@ describe("the Coordinator route tree", () => {
     expect(pages().map(urlOf).sort()).toEqual([...PUBLIC_URLS].sort());
   });
 
-  it("places every existing page in the scope-protected (space) group", () => {
+  it("places every scope-dependent page in the (space) group; only the announcement history is role-only", () => {
+    const roleOnly = ["announcements/page.tsx", "announcements/[id]/page.tsx"];
     for (const page of pages()) {
+      if (roleOnly.includes(page)) continue;
       expect(page.startsWith("(space)/"), page).toBe(true);
     }
+    expect(pages()).toEqual(expect.arrayContaining([...roleOnly, "(space)/announcements/new/page.tsx"]));
     expect(readFileSync(join(ROOT, "(space)", "layout.tsx"), "utf8")).toContain("<CoordinatorGate>");
+    // The role-only history: CoordinatorRoleGate, never the current-scope gate.
+    const history = readFileSync(join(ROOT, "announcements", "layout.tsx"), "utf8");
+    expect(history).toContain("<CoordinatorRoleGate>");
+    expect(history).not.toContain("<CoordinatorGate>");
   });
 
   it("has no layout above the group that could bypass or replace the gate", () => {
