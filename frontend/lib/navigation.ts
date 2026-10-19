@@ -6,6 +6,7 @@ import {
   ClipboardPen,
   HeartHandshake,
   HandHeart,
+  Megaphone,
   BarChart3,
   Settings,
   type LucideIcon,
@@ -42,6 +43,9 @@ export const navItems: NavItem[] = [
   { href: "/needs", label: "الاحتياجات", icon: HeartHandshake, permissions: ["need.view"], group: "cases" },
   { href: "/assistances", label: "المساعدات", icon: HandHeart, permissions: ["assistance.view"], group: "cases" },
   { href: "/reports", label: "التقارير", icon: BarChart3, permissions: ["report.view"], group: "follow-up" },
+  // FB-NOTIFY-01C.3c: the sender's own announcements (announcement.view —
+  // SUPER_ADMIN, ADMINISTRATOR). Also guards /announcements/* in AuthGate.
+  { href: "/announcements", label: "الإعلانات", icon: Megaphone, permissions: ["announcement.view"], group: "follow-up" },
   {
     href: "/administration",
     label: "الإدارة",
