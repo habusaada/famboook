@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\NotificationPublicationDispatcher;
 use App\Contracts\SmsSender;
 use App\Enums\FamilyAuthError;
 use App\Exceptions\FamilyAuthException;
@@ -20,6 +21,7 @@ use App\Support\FamilyAuth\SignInHistory;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
+use App\Support\Notifications\PendingPublicationDispatcher;
 use App\Support\Sms\LogSmsSender;
 use App\Support\Sms\SmsDispatcher;
 use App\Support\Sms\TweetsSmsSender;
@@ -63,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
         // The Change Request type registry (PWA-5b): the Production handlers
         // only — EMPTY in PWA-5. Tests replace it with ChangeRequestTypes::fake().
         $this->app->singleton(ChangeRequestTypes::class, fn () => ChangeRequestTypes::production());
+
+        // The notification publication hand-off (FB-NOTIFY-01B.2b.4): nothing is
+        // handed off until the worker exists; FB-NOTIFY-01B.2b.5 binds the
+        // queued publication job here. Never a synchronous publication.
+        $this->app->bind(NotificationPublicationDispatcher::class, PendingPublicationDispatcher::class);
     }
 
     /**
