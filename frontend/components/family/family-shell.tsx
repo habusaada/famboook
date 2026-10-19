@@ -6,6 +6,7 @@ import { ArrowRight, Loader2, LogOut, Network, ShieldAlert } from "lucide-react"
 import { FamilyBottomNav } from "@/components/family/bottom-nav";
 import { FamilyBrand } from "@/components/family/family-brand";
 import { useFamilyUser } from "@/components/family/family-context";
+import { NotificationBell } from "@/components/family/notifications/notification-bell";
 import { useFamilySignOut } from "@/components/family/use-family-sign-out";
 
 function LogoutButton() {
@@ -93,7 +94,11 @@ export function FamilyShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-10 border-b border-border bg-surface-1">
         <div className="mx-auto flex h-14 max-w-md items-center justify-between gap-3 px-4">
           <FamilyBrand />
-          <LogoutButton />
+          <div className="flex items-center gap-1">
+            {/* The household's notifications: never in Coordinator Space or without a Family context. */}
+            {available && !coordinatorMode && <NotificationBell />}
+            <LogoutButton />
+          </div>
         </div>
         {coordinatorMode && <CoordinatorModeStrip />}
       </header>

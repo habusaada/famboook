@@ -268,7 +268,7 @@ Stack: `auth:sanctum` + `family.side` + `can:family-portal.access` + `family.con
 
 ### 5.4 Flows
 
-1. **Inbox:** load `GET /notifications`. Show an unread dot where `viewed_at` is null, an IMPORTANT badge, and «بانتظار التأكيد» where `ACKNOWLEDGE` is in `available_actions`. Use the same query on the Home "recent notifications" and header badge (`meta.unread_count`), with `per_page` small.
+1. **Inbox:** load `GET /notifications`. Show an unread dot where `viewed_at` is null, an IMPORTANT badge, and «بانتظار التأكيد» where `ACKNOWLEDGE` is in `available_actions`. The header badge (`meta.unread_count`) reuses the inbox's first page: the same request and cache entry, with no query string. *As built in FB-NOTIFY-01C.2:* it refreshes at most once a minute, every 2 minutes while visible, and on focus. The Home "recent notifications" slot is not built yet.
 2. **Detail screen:** `GET /notifications/{id}`. If `available_actions` contains `VIEW`, send **one** `POST /{id}/view` **after the detail has rendered**, from the detail screen only. Never send it from a list, hover, prefetch or service-worker fetch: viewing is an explicit act (ADR-05). Replace the cached item with the POST response, and invalidate the inbox query so `unread_count` drops.
 3. **Acknowledge (IMPORTANT):** show a primary button «تأكيد الاطلاع» only when `ACKNOWLEDGE` is present; opening the message is **not** acknowledgement. Ask for confirmation, then `POST /{id}/acknowledge`. That call also records the view if missing. On success, show `acknowledged_at`.
 4. **Expired or archived:**
@@ -412,7 +412,7 @@ Use TanStack Query mutations with `retry: 0` for writes; the idempotency above m
   - never hide or delete the draft, and never retry automatically.
 - **Navigation is by permission only** (B2). Staff: show «الإعلانات» when `/me.permissions` includes `announcement.view`. Coordinator: per B3.
 - **Family:** the inbox, badge and Home section are always present for an authorized household; while nothing is published they show the empty state. **Treat a failure as "not available", never as zero unread.**
-- **Frontend kill switch:** if a client-side flag is wanted, add it as a build-time environment variable that only hides entries (default visible in development, hidden in Production until the PILOT starts). It must never be used for authorization.
+- **Frontend kill switch:** *none in FB-NOTIFY-01C.2.* The family screens follow the portal's server-driven convention and no client environment flag. If one is ever wanted, it may only hide entries and must never be used for authorization.
 
 ---
 
