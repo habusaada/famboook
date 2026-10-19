@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureCoordinatorSpace;
 use App\Http\Middleware\EnsureFamilyContext;
 use App\Http\Middleware\EnsureFamilyLoginEnabled;
 use App\Http\Middleware\EnsureFamilySideAccount;
+use App\Http\Middleware\EnsureNotificationPublicationReady;
 use App\Http\Middleware\EnsurePasswordChangeEnabled;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
 use App\Http\Middleware\EnsureStaffSideAccount;
@@ -52,6 +53,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'family.context' => EnsureFamilyContext::class,
             // OTP SMS after the response, same process, no queue (A′).
             'sms.after-response' => SendSmsAfterResponse::class,
+            // Notification publication readiness (FB-NOTIFY-01B.2b): after
+            // auth, never instead of the route's permission or policy.
+            'notifications.publication-ready' => EnsureNotificationPublicationReady::class,
         ]);
         // FU-16: the password-change gate runs BEFORE the route limiter (which
         // the priority list would otherwise move ahead of `can:`), so a closed

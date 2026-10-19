@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\NotificationHeartbeatJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -16,3 +17,9 @@ Schedule::command('famboook:purge-otp-challenges')->daily();
 // Abandoned mobile contact updates (docs/11 FP-ADR-079): closed once their
 // verification window passed.
 Schedule::command('famboook:close-expired-contact-updates')->everyFiveMinutes();
+
+// Notification worker heartbeat (FB-NOTIFY-01B.2b): queued on the dedicated
+// notifications queue; a worker running it proves scheduler and worker alike.
+// Records a timestamp only — publishes nothing. Not active without the cron
+// and a `queue:work --queue=notifications` worker (separate approval).
+Schedule::job(new NotificationHeartbeatJob)->everyMinute();
