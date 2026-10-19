@@ -1,0 +1,30 @@
+# Famboook — Laravel scheduler (FB-NOTIFY-01E.1 TEMPLATE, /etc/cron.d format).
+#
+# NOT INSTALLED by any script. Installing it is a separate, approved
+# Production step (docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md
+# §7) — it starts EVERY task in backend/routes/console.php at once, not only
+# the notification ones:
+#
+#   famboook:purge-otp-challenges            daily 00:00 UTC — DELETES finished
+#                                            OTP challenges older than
+#                                            FAMILY_OTP_RETENTION_DAYS (90)
+#   famboook:close-expired-contact-updates   every 5 min — closes SUBMITTED
+#                                            CONTACT_UPDATE requests past their
+#                                            verification window
+#   NotificationHeartbeatJob                 every minute — queued on `notifications`
+#   famboook:notifications-reconcile         every minute, withoutOverlapping, onOneServer
+#   famboook:notifications-expire            every minute, withoutOverlapping, onOneServer
+#
+# Install (as root):  cp deploy/cron/famboook-scheduler /etc/cron.d/famboook-scheduler
+#                     chmod 644 /etc/cron.d/famboook-scheduler
+# Remove (rollback):  rm /etc/cron.d/famboook-scheduler
+#
+# Runs as www-data (the PHP-FPM account, as the worker). <PHP_BINARY> must be
+# replaced with the server's PHP 8.3+ CLI. Output is discarded: the tasks log
+# through Laravel (backend/storage/logs) and the heartbeat / notifications-check
+# prove the scheduler runs. cron.d requires the trailing newline below.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+* * * * * www-data cd /var/www/famboook/backend && <PHP_BINARY> artisan schedule:run --no-interaction >> /dev/null 2>&1

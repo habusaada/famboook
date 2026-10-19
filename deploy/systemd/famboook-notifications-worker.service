@@ -1,0 +1,66 @@
+# Famboook — dedicated notification queue worker (FB-NOTIFY-01E.1 TEMPLATE).
+#
+# Runs PublishNotificationJob and NotificationHeartbeatJob from the
+# `notifications` queue (config/notifications.php `queue`). Contains no
+# secrets: Laravel reads backend/.env (640 deploy:www-data) itself.
+#
+# NOT INSTALLED, NOT ENABLED, NOT STARTED by any script. Installing it is a
+# separate, approved Production step (docs/deployment/
+# FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md §6):
+#
+#   sudo cp deploy/systemd/famboook-notifications-worker.service /etc/systemd/system/
+#   sudo systemd-analyze verify /etc/systemd/system/famboook-notifications-worker.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now famboook-notifications-worker
+#
+# Timing invariant (enforced by NotificationConfig::queueTimingValid — the
+# readiness gate stays closed otherwise):
+#   job/worker timeout 60 s  <  queue retry_after 90 s (DB_QUEUE_RETRY_AFTER)
+#                            <  stale-publication threshold 600 s
+#                               (NOTIFICATIONS_STALE_PUBLISHING_SECONDS)
+#
+# Paths follow docs/08 (§10, nginx root /var/www/famboook/backend/public) and
+# PHP-FPM's account (www-data): adjust <PHP_BINARY> to the server's PHP 8.3+
+# CLI (e.g. /usr/bin/php8.3) before installing.
+#
+# REQUIRED: the CLI's `pcntl` extension (`<PHP_BINARY> -m | grep -x pcntl`).
+# Without it `queue:work` cannot enforce --timeout (no SIGALRM) and cannot
+# finish the current job on SIGTERM: the timing invariant above would not hold.
+
+[Unit]
+Description=Famboook notification queue worker (notifications queue)
+Documentation=file:///var/www/famboook/docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Non-root: the PHP-FPM account. It can read backend/.env (group www-data)
+# and write backend/storage (logs) — nothing else is needed.
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/famboook/backend
+# One try, 60 s, never a Laravel retry (retries are NotificationRetryPolicy's).
+# --max-time / --memory make the worker exit cleanly so systemd starts a fresh
+# process with the current code and configuration; `php artisan queue:restart`
+# (deploy-backend.sh) asks it to exit after the current job.
+ExecStart=<PHP_BINARY> artisan queue:work database --queue=notifications --tries=1 --timeout=60 --sleep=3 --max-time=3600 --memory=256 --no-interaction
+Restart=always
+RestartSec=5
+# Let a running publication (≤ 60 s) finish on stop / restart.
+KillSignal=SIGTERM
+TimeoutStopSec=75
+# Output goes to the journal (journalctl -u famboook-notifications-worker);
+# the application's own logs stay in backend/storage/logs.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=famboook-notifications-worker
+# Hardening: nothing beyond the backend directory needs to be writable.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/famboook/backend/storage /var/www/famboook/backend/bootstrap/cache
+
+[Install]
+WantedBy=multi-user.target
