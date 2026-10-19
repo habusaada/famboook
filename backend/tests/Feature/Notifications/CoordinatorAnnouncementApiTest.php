@@ -129,15 +129,19 @@ class CoordinatorAnnouncementApiTest extends TestCase
     {
         $this->as($this->coordinator, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SCOPE']])->assertOk()
             ->assertExactJson(['data' => ['recipient_count' => 2]]);
-        $this->as($this->coordinator, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SELECTION', 'branch_ids' => [$this->first->id]]])
+        $this->as($this->coordinator, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SELECTION', 'family_codes' => [$this->inFirst->family_code]]])
             ->assertOk()->assertExactJson(['data' => ['recipient_count' => 1]]);
 
+        // Structure selection is not public (FB-NOTIFY-01B.2b.8a): internal ids are refused.
+        foreach (['branch_ids' => [$this->first->id], 'branch_group_ids' => [1], 'clan_ids' => [$this->clan->id], 'family_ids' => [$this->inFirst->id]] as $key => $ids) {
+            $this->as($this->coordinator, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SELECTION', $key => $ids]])
+                ->assertUnprocessable()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_INVALID']);
+        }
+
         // Outside the scope: refused as a whole, never narrowed or widened.
-        $this->as($this->coordinator, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SELECTION', 'clan_ids' => [$this->clan->id]]])
-            ->assertForbidden()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_NOT_AUTHORIZED']);
-        $this->as($this->coordinator, 'POST', '', $this->draftBody(['type' => 'COORDINATOR_SELECTION', 'family_ids' => [$this->outside->id]]))
+        $this->as($this->coordinator, 'POST', '', $this->draftBody(['type' => 'COORDINATOR_SELECTION', 'family_codes' => [$this->inFirst->family_code, $this->outside->family_code]]))
             ->assertUnprocessable()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE']);
-        $this->as($this->coordinator, 'POST', '', $this->draftBody(['type' => 'STAFF_FAMILIES', 'family_ids' => [$this->inFirst->id]]))
+        $this->as($this->coordinator, 'POST', '', $this->draftBody(['type' => 'STAFF_FAMILIES', 'family_codes' => [$this->inFirst->family_code]]))
             ->assertUnprocessable()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_INVALID']);
         $this->as($this->coordinator, 'POST', '', $this->draftBody(['type' => 'STAFF_ALL_ACTIVE']))->assertForbidden();
 
@@ -180,7 +184,7 @@ class CoordinatorAnnouncementApiTest extends TestCase
         $theirs = $this->draftVia($peer);
         $staff = $this->staffSender(NotificationActors::STAFF_CREATE, 'announcement.view');
         $staffMessage = $this->actingAs($staff)->postJson('/api/v1/notifications', [
-            'title' => 'إعلان الإدارة', 'body' => 'نص.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [$this->inFirst->id]],
+            'title' => 'إعلان الإدارة', 'body' => 'نص.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [$this->inFirst->family_code]],
         ])->assertCreated()->json('data.id');
 
         $this->assertSame([$mine], array_column($this->as($this->coordinator, 'GET')->assertHeader('Cache-Control', 'no-store, private')->json('data'), 'id'));

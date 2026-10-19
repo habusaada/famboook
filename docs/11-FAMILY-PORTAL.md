@@ -1186,9 +1186,16 @@ Family (family.side + family.context)    GET  /family/notifications           ac
 
 *Audiences as built:*
 - Staff: `STAFF_FAMILIES` (selected ACTIVE families) and `STAFF_ALL_ACTIVE` (`announcement.send-all`).
-- Coordinator: `COORDINATOR_SCOPE` (the current scope) and `COORDINATOR_SELECTION` (families, branches, branch groups or clans, intersected with the current scope).
+- Coordinator: `COORDINATOR_SCOPE` (the current scope) and `COORDINATOR_SELECTION` (selected families, intersected with the current scope).
 
-The Staff clan / branch criteria and the "filtered groups" listed above are **not implemented**. Selections take canonical integer ids that no API exposes yet (handoff §1, B1).
+**Public family references** (*updated FB-NOTIFY-01B.2b.8a; implemented in the local code baseline only, not deployed*):
+- **Request form:** the API names selected families by their public `family_code`, `{"type": "STAFF_FAMILIES" | "COORDINATOR_SELECTION", "family_codes": ["FAM-…"]}`. The server maps the codes to its internal audience.
+- **Never an internal id:** internal id keys are refused (`422 NOTIFICATION_AUDIENCE_INVALID`).
+- **One refusal for every bad code:** an unknown, inactive, deleted or out-of-scope family refuses the whole audience with `NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE`.
+
+**Not implemented:**
+- Branch, branch-group and clan selection is **deferred**. The internal coordinator selection by structure exists, but has no public reference.
+- The Staff clan and branch criteria and the "filtered groups" listed above.
 
 ---
 

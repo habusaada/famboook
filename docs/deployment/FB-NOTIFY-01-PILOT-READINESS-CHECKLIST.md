@@ -19,7 +19,7 @@ Like docs/08 §16b–§16d, this checklist needs its own deployment plan with co
 | Schema | 4 migrations `2026_10_24_090000`–`090003`; 52 PostgreSQL CHECKs, an append-only trigger and the `NTF-` sequence. Verified on `famboook_test` only | **Not migrated**: neither the local `famboook` database nor Production |
 | RBAC | 7 permissions + role grants in `RolePermissionSeeder`; `famboook:verify-permissions` checks them exactly | **Not seeded** in Production |
 | Domain / API | Lifecycle actions, worker (T1 / T2 / T3), reconciler, expiry sweep, Staff / Coordinator / Family APIs. SQLite and PostgreSQL suites green at `022acc8` | Not deployed |
-| Frontend | **None.** Handoff written; blockers B1–B3 open | Not built |
+| Frontend | **None.** Handoff written. B1 resolved for families in FB-NOTIFY-01B.2b.8a (`family_codes`; structure references deferred); B2–B3 open | Not built |
 | Queue | `PublishNotificationJob`: 1 try, 60 s timeout; refuses `sync` / `null` | Production template has `QUEUE_CONNECTION=sync`, so it is **not ready** |
 | Worker | Heartbeat job plus a readiness gate | **No worker exists** (docs/08 §16) |
 | Scheduler | Heartbeat (every minute); reconcile and expire (every minute, `withoutOverlapping(10)`, `onOneServer()`) | **No cron exists** (docs/08 §16) |
@@ -31,7 +31,7 @@ Like docs/08 §16b–§16d, this checklist needs its own deployment plan with co
 
 ## 2. Prerequisites before a PILOT can be proposed
 
-1. **Frontend:** the B1 audience-reference decision is implemented. Without it ADMINISTRATOR cannot send at all, and only SUPER_ADMIN `STAFF_ALL_ACTIVE` and coordinator `COORDINATOR_SCOPE` are possible. The Staff, Coordinator and Family screens are built and reviewed (handoff §12).
+1. **Frontend:** the B1 public family references (`family_codes`, FB-NOTIFY-01B.2b.8a) are in the local code baseline only; they must be merged and deployed with the rest. Branch, branch-group and clan selection stays deferred. The Staff, Coordinator and Family screens are built and reviewed (handoff §12).
 2. **Merge:** the branch is merged and released through the normal process, with this feature's commits reviewed.
 3. **Production configuration decision:** queue connection, worker supervisor, cron, and the cache store for heartbeat and locks (§5–§7).
 4. **Retention** of the notification audit history is confirmed (ADR-07). No deletion job exists, and none may be added without approval.
@@ -150,7 +150,7 @@ The `notifications.publication-ready` middleware (publish and retry), the Domain
 
 1. `famboook:verify-permissions` exits 0; `famboook:notifications-check` reports no warnings.
 2. A role-only REVIEWER gets 403 on `GET /api/v1/notifications`; a family-side account gets 403 there.
-3. A PILOT ADMINISTRATOR creates a draft for one approved test family through the public family reference. **This requires B1 to be implemented.** Internal database ids are never used, typed or exposed, even for a smoke test. Until B1 exists, this and the following family-level steps cannot be run, and the PILOT is not ready. `audience-preview` returns 1.
+3. A PILOT ADMINISTRATOR creates a draft for one approved test family through the public family reference. **This requires the B1 family references (`family_codes`, FB-NOTIFY-01B.2b.8a) to be deployed.** Internal database ids are never used, typed or exposed, even for a smoke test. Until they are deployed, this and the following family-level steps cannot be run, and the PILOT is not ready. `audience-preview` returns 1.
 4. Publish returns 202. Within about a minute the detail shows `PUBLISHED` with `recipient_count_at_publication = 1`.
 5. The test household sees it in the inbox (`unread_count` 1). Opening the detail and its view POST brings the count to 0. For an IMPORTANT test message, acknowledge and check that the sender's `statistics` show 1 acknowledged.
 6. Cancel a second draft, and check that it never appears to the family.
@@ -177,7 +177,7 @@ The `notifications.publication-ready` middleware (publish and retry), the Domain
 ## 12. Sign-off
 
 - [ ] Code readiness confirmed (merged commit, suites green on PostgreSQL)
-- [ ] B1 (public audience references) implemented; frontend built; B2–B3 resolved or explicitly accepted
+- [ ] B1 public family references deployed (structure references deferred); frontend built; B2–B3 resolved or explicitly accepted
 - [ ] Backup verified; migrations applied; check reports tables present
 - [ ] RBAC seeded; verifier exits 0
 - [ ] Queue asynchronous; dedicated worker supervised; `queue:restart` in the deploy procedure

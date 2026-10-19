@@ -152,7 +152,7 @@ class NotificationPermissionsTest extends TestCase
         $this->staffJson($administrator, 'POST', '', $global)->assertForbidden();
         $this->staffJson($administrator, 'POST', '/audience-preview', ['audience' => ['type' => 'STAFF_ALL_ACTIVE']])->assertForbidden();
         // Selected families: yes.
-        $this->staffJson($administrator, 'POST', '', [...$global, 'audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [Family::factory()->create()->id]]])
+        $this->staffJson($administrator, 'POST', '', [...$global, 'audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [Family::factory()->create()->family_code]]])
             ->assertCreated();
     }
 
@@ -161,7 +161,7 @@ class NotificationPermissionsTest extends TestCase
         $administrator = $this->withRole('ADMINISTRATOR');
         $superAdmin = $this->withRole('SUPER_ADMIN');
         $uuid = $this->staffJson($administrator, 'POST', '', [
-            'title' => 'إعلان', 'body' => 'نص.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [Family::factory()->create()->id]],
+            'title' => 'إعلان', 'body' => 'نص.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [Family::factory()->create()->family_code]],
         ])->assertCreated()->json('data.id');
 
         $this->staffJson($superAdmin, 'GET', "/{$uuid}")->assertNotFound();

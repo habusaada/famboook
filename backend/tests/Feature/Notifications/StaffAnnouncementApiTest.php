@@ -54,7 +54,7 @@ class StaffAnnouncementApiTest extends TestCase
     /** @return array<string, mixed> */
     private function draftBody(array $o = []): array
     {
-        return ['title' => 'إعلان الإدارة', 'body' => 'نص إعلان الإدارة.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [$this->family->id]], ...$o];
+        return ['title' => 'إعلان الإدارة', 'body' => 'نص إعلان الإدارة.', 'audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [$this->family->family_code]], ...$o];
     }
 
     private function draftVia(User $user, array $o = []): string
@@ -126,7 +126,7 @@ class StaffAnnouncementApiTest extends TestCase
         $this->as($this->staff, 'POST', '', $this->draftBody(['audience' => ['type' => 'COORDINATOR_SCOPE']]))->assertUnprocessable()
             ->assertJson(['code' => 'NOTIFICATION_AUDIENCE_INVALID']);
         $inactive = Family::factory()->create(['status' => 'INACTIVE']);
-        $this->as($this->staff, 'POST', '', $this->draftBody(['audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [$inactive->id]]]))
+        $this->as($this->staff, 'POST', '', $this->draftBody(['audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [$inactive->family_code]]]))
             ->assertUnprocessable()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE']);
         $this->assertSame(0, NotificationMessage::query()->count());
     }
@@ -152,9 +152,9 @@ class StaffAnnouncementApiTest extends TestCase
     public function test_the_audience_preview_counts_without_writing(): void
     {
         $other = Family::factory()->create();
-        $this->as($this->staff, 'POST', '/audience-preview', ['audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [$this->family->id, $other->id]]])
+        $this->as($this->staff, 'POST', '/audience-preview', ['audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => [$this->family->family_code, $other->family_code]]])
             ->assertOk()->assertExactJson(['data' => ['recipient_count' => 2]])->assertHeader('Cache-Control', 'no-store, private');
-        $this->as($this->staff, 'POST', '/audience-preview', ['audience' => ['type' => 'STAFF_FAMILIES', 'family_ids' => [999999]]])
+        $this->as($this->staff, 'POST', '/audience-preview', ['audience' => ['type' => 'STAFF_FAMILIES', 'family_codes' => ['FAM-999999']]])
             ->assertUnprocessable()->assertJson(['code' => 'NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE']);
         $this->as($this->staff, 'POST', '/audience-preview', ['audience' => ['type' => 'COORDINATOR_SCOPE']])->assertUnprocessable();
         $this->assertSame(0, NotificationMessage::query()->count());

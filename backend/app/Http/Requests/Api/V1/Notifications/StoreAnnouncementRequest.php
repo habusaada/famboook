@@ -9,9 +9,10 @@ use Illuminate\Validation\Rule;
 /**
  * A new announcement draft (FB-NOTIFY-01B.2b.6c): the allow-listed keys and
  * their shape. CreateAnnouncementDraftAction is the authoritative validation
- * (trimmed lengths, future expiry, the audience grammar, eligibility and
- * scope); nothing else — kind, side, sender, scope, status — is ever read
- * from the request.
+ * (trimmed lengths, future expiry, eligibility and scope); the PUBLIC
+ * audience grammar — families by family_code, never an internal id — is
+ * NotificationAudienceReferences' (FB-NOTIFY-01B.2b.8a). Nothing else —
+ * kind, side, sender, scope, status — is ever read from the request.
  */
 class StoreAnnouncementRequest extends FormRequest
 {

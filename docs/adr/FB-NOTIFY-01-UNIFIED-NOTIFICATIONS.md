@@ -290,7 +290,11 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 - **Any frontend.**
 
 **Known gaps** (`docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md` §1):
-- **Audience ids:** audiences take canonical integer ids, and no API exposes them. Only `STAFF_ALL_ACTIVE` and `COORDINATOR_SCOPE` can be built by a client. A server-side mapping from public references is needed.
+- **Audience references:** the stored audience keeps canonical integer ids, and no API exposes them.
+  - *Families resolved in FB-NOTIFY-01B.2b.8a (local code baseline only, not deployed):* the HTTP API takes public `family_codes` for `STAFF_FAMILIES` and `COORDINATOR_SELECTION`. `NotificationAudienceReferences` maps them in one query over the families the sender may address now (ACTIVE for Staff; `CoordinatorScopes::families()` for a coordinator) before the preview and the draft action.
+  - **Refusals:** internal id keys are refused (`NOTIFICATION_AUDIENCE_INVALID`). An unknown, inactive, deleted or out-of-scope code refuses the whole audience with `NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE`.
+  - **Unchanged:** the stored audience, the publication request, the worker's T2 re-validation and idempotency.
+  - **Deferred:** structure references (branch, branch group, clan).
 - **No discovery:** neither publication availability nor the coordinator's notification permission is discoverable.
 
 **Contracts:**
@@ -329,4 +333,4 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 3. A queue worker and a scheduler cron verified locally, then a separate, approved Production deployment plan (docs/08 §16). *Open: checklist in `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`; no plan approved.*
 4. The family-facing `workflow_events` mapping (ADR-09: RETURNED, REJECTED, APPLIED; provisionally approved). *Open: SYSTEM discovery not implemented.*
 5. A retention confirmation (ADR-07). *Open.*
-6. *Added 2026-10-19:* a server-side mapping of public audience references (family code, structure uuid) to canonical ids, before any frontend can address selected families (§2b). *Open.*
+6. *Added 2026-10-19:* a server-side mapping of public audience references (family code, structure uuid) to canonical ids, before any frontend can address selected families (§2b). *Families done (FB-NOTIFY-01B.2b.8a, `family_codes`, local code baseline only); structure references deferred.*

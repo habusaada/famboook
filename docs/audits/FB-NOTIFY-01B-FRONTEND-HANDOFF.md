@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Audience | Next.js engineers building the Staff, Coordinator and Family notification screens |
-| Backend baseline | `feature/fb-geo-02` at `022acc8` (FB-NOTIFY-01B.2b.2 … 2b.6d), committed locally, **not deployed** |
+| Backend baseline | `feature/fb-geo-02` at `022acc8` (FB-NOTIFY-01B.2b.2 … 2b.6d), committed locally, **not deployed**. *Updated for FB-NOTIFY-01B.2b.8a:* public `family_code` audience references (local code baseline only, not deployed) |
 | Architecture | `docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md` (ADR-01 … ADR-10, §2a, §2b) |
 | Permissions | `docs/06-PERMISSIONS.md` §22b "Unified notifications", AUTH-ADR-097 |
 | Product rules | `docs/11-FAMILY-PORTAL.md` §21–§22 |
@@ -17,7 +17,7 @@ Everything below was read from the code: routes (`backend/routes/api.php`), Form
 
 | # | Gap | Effect on the frontend | Backend decision needed |
 |---|---|---|---|
-| **B1** | **The audience accepts canonical integer database ids only** (`family_ids`, `branch_ids`, `branch_group_ids`, `clan_ids`). No API returns those ids: Staff and Coordinator family resources expose `family_code`; clans, branch groups, branches and coordinator assignments expose `uuid` or codes. The `NotificationAudience` docblock expects "a request layer that maps public references to them", and that layer does not exist. | A client can build only `STAFF_ALL_ACTIVE` (needs `announcement.send-all`, SUPER_ADMIN only) and `COORDINATOR_SCOPE`. **ADMINISTRATOR cannot address any audience from a UI**, because `STAFF_FAMILIES` needs ids. `COORDINATOR_SELECTION` cannot be built either. | Accept public references (`family_code`, structure `uuid`) and map them on the server, or approve exposing ids. Exposing internal ids contradicts the existing "never an internal id" resource convention, so the mapping is the recommended option. **Do not work around this in the client.** |
+| **B1** | ***Families resolved in FB-NOTIFY-01B.2b.8a*** (local code baseline only). Audiences name families by their public **`family_code`** (`family_codes`); the server maps them to internal ids (`NotificationAudienceReferences`). Internal id keys (`family_ids`, `branch_ids`, `branch_group_ids`, `clan_ids`) are **refused** at the HTTP boundary. **Still open:** selecting a branch, branch group or clan. Coordinator Space exposes structure codes only (no uuid), and branch codes repeat across clans. | `STAFF_FAMILIES` (ADMINISTRATOR included) and `COORDINATOR_SELECTION` of families are usable through `family_codes` taken from the existing family lists (§3.2, §4.2). There is no structure-level selection; use `COORDINATOR_SCOPE` for the whole scope. | Structure references are deferred: they need coordinator-visible structure uuids and a mapping, which need approval. **Never send internal ids.** |
 | **B2** | **No readiness or capability endpoint for notifications.** Publication availability (mode OFF / PILOT allow-list / queue / worker heartbeat) is learned only from `503 NOTIFICATION_PUBLICATION_UNAVAILABLE` on `/publish` or `/retry`. | Compose and draft work while the feature is OFF, and the user discovers the outage only when publishing. | Optional: a boolean `publication_available` (no reasons), for example in a capabilities response. Until then, handle the 503 as in §8. |
 | **B3** | **The family-side `/family/me` returns no permissions.** Whether a coordinator holds `coordinator-announcement.*` is not discoverable. | The Coordinator notifications entry cannot be shown or hidden from data. | Optional: a flag on `/family/me` or `/family/coordinator/context`. Until then, probe `GET /family/coordinator/notifications?per_page=1`; a 403 hides the entry. |
 | B4 | **No edit of a draft.** There is no PATCH or PUT. | "Edit draft" means cancel and create a new draft. | — (as designed; confirm with the product owner) |
@@ -91,15 +91,25 @@ Stack: `auth:sanctum` + `staff.side`, then:
   "title": "string, required — 1..150 characters after trimming",
   "body": "string, required — 1..2000 characters after trimming",
   "level": "NORMAL | IMPORTANT (optional, default NORMAL)",
-  "audience": { "type": "STAFF_FAMILIES", "family_ids": [12, 57] },
+  "audience": { "type": "STAFF_FAMILIES", "family_codes": ["FAM-000012", "FAM-000057"] },
   "expires_at": "ISO-8601 or null (optional; must be in the future)",
   "client_reference": "uuid or null (optional; idempotency key, §10)"
 }
 ```
 - **Staff audiences:**
-  - `{ "type": "STAFF_FAMILIES", "family_ids": [int, …] }`: 1–500 ids, every one an ACTIVE family (**B1**).
+  - `{ "type": "STAFF_FAMILIES", "family_codes": ["FAM-…", …] }`: public family codes, taken from `GET /api/v1/families?search=&status=ACTIVE` (`family.view`) as the assistance nomination picker already does.
   - `{ "type": "STAFF_ALL_ACTIVE" }`: no other key; needs `announcement.send-all`.
-- **Strict parsing:** unknown keys, empty or duplicate-only lists, non-integer ids, or a coordinator / SYSTEM type give `422 NOTIFICATION_AUDIENCE_INVALID`.
+- **Code rules:**
+  - each code is a string, trimmed on the server, at most 50 characters, and matched exactly;
+  - duplicates are removed;
+  - 1–500 **distinct** codes, and at most 1000 entries in the list.
+- **Strict parsing:** the following give `422 NOTIFICATION_AUDIENCE_INVALID`:
+  - an unknown key;
+  - **any internal id key** (`family_ids`, `branch_ids`, `branch_group_ids`, `clan_ids`), alone or mixed with `family_codes`;
+  - an empty, blank, non-string or over-long code;
+  - more than 500 distinct codes or 1000 entries;
+  - a coordinator or SYSTEM type.
+- **Ineligible families:** an unknown, inactive or deleted family gives `422 NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE` for the **whole** audience. The response never says which code failed, so ask the user to re-check the selection.
 - **Length limits:** the HTTP layer allows up to 500 / 5000 characters before trimming, and the domain enforces **150 / 2000** after trimming. Use 150 / 2000 for the counters.
 - **Expiry lead:** `expires_at` is checked "in the future" at draft time. Publishing needs it **at least 1 hour ahead** (`422 NOTIFICATION_EXPIRY_TOO_SOON`), so enforce the 1-hour minimum in the picker.
 
@@ -140,7 +150,7 @@ Stack: `auth:sanctum` + `staff.side`, then:
 | Field | Type | Notes |
 |---|---|---|
 | `body` | string | |
-| `audience_selection` | object **or `[]`** | Count of ids per criterion, e.g. `{ "family_ids": 2 }`; never the ids. For `STAFF_ALL_ACTIVE` / `COORDINATOR_SCOPE` it serializes as an **empty JSON array `[]`**, so accept both. |
+| `audience_selection` | object **or `[]`** | How many items each stored criterion selects, e.g. `{ "family_ids": 2 }` (the stored key name with a **count**, never the ids or the codes). For `STAFF_ALL_ACTIVE` / `COORDINATOR_SCOPE` it serializes as an **empty JSON array `[]`**, so accept both. |
 | `statistics_basis` | `ALL_RECIPIENTS` \| `CURRENT_COORDINATOR_SCOPE` \| `NO_CURRENT_SCOPE` \| null | null before publication |
 | `statistics` | object \| null | null before publication and for `NO_CURRENT_SCOPE` |
 | `available_actions` | `("PUBLISH" \| "CANCEL" \| "RETRY")[]` | what the **state** allows (§6); permission still applies |
@@ -193,7 +203,8 @@ Base stack: `auth:sanctum` + `family.side`. **Operations** also need `coordinato
 
 - **Coordinator audiences:**
   - `{ "type": "COORDINATOR_SCOPE" }`: every ACTIVE family of the CURRENT scope. **Usable now.**
-  - `{ "type": "COORDINATOR_SELECTION", "family_ids": [], "branch_ids": [], "branch_group_ids": [], "clan_ids": [] }`: at least one non-empty list. It is intersected with the current scope, and every selected structure must itself be in scope. **Blocked by B1.**
+  - `{ "type": "COORDINATOR_SELECTION", "family_codes": ["FAM-…", …] }`: selected families of the CURRENT scope, taken from `GET /api/v1/family/coordinator/families?q=`. The code rules are as in §3.2. A family outside the scope, inactive or unknown gives `422 NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE` for the whole audience, and the response never says which code failed. **Usable now** (local code baseline).
+  - **Deferred:** selecting a branch, branch group or clan. Internal `branch_ids`, `branch_group_ids` and `clan_ids` (and `family_ids`) are `422 NOTIFICATION_AUDIENCE_INVALID`.
 - **A Staff audience type from a coordinator is `422 NOTIFICATION_AUDIENCE_INVALID`.**
 - **Scope is re-checked at publication.** If the scope shrinks or is revoked before the worker runs, the message ends as `PUBLISH_FAILED` with `SENDER_NOT_AUTHORIZED` (permanent: cancel only) or with fewer recipients.
 - **After revocation** (`coordinator.space` answers `403 COORDINATOR_SPACE_UNAVAILABLE`):

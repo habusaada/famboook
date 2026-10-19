@@ -6,7 +6,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * An audience to count before sending (FB-NOTIFY-01B.2b.6c; docs/11 §22).
- * The grammar, side, scope and eligibility are the resolver's.
+ * The PUBLIC grammar — families by family_code, never an internal id — is
+ * NotificationAudienceReferences' (FB-NOTIFY-01B.2b.8a); side, scope and
+ * eligibility are the resolver's.
  */
 class AudiencePreviewRequest extends FormRequest
 {

@@ -17,6 +17,7 @@ use App\Http\Resources\AnnouncementResource;
 use App\Models\NotificationMessage;
 use App\Support\Notifications\NotificationActors;
 use App\Support\Notifications\NotificationAudience;
+use App\Support\Notifications\NotificationAudienceReferences;
 use App\Support\Notifications\NotificationAudienceResolver;
 use App\Support\Notifications\NotificationOutcome;
 use App\Support\Notifications\SenderAnnouncements;
@@ -70,14 +71,13 @@ abstract class AnnouncementController extends Controller
      * How many families this audience reaches NOW (docs/11 §22: shown before
      * sending). The same side, scope, send-all and eligibility rules as a
      * draft; an empty audience is a count of 0, not an error. Counts only.
+     * Families are named by their public family_code
+     * (NotificationAudienceReferences), never by an internal id.
      */
-    public function preview(AudiencePreviewRequest $request, NotificationAudienceResolver $resolver): JsonResponse
+    public function preview(AudiencePreviewRequest $request, NotificationAudienceResolver $resolver, NotificationAudienceReferences $references): JsonResponse
     {
         $sender = NotificationActors::sender($request->user(), send: false);
-        $audience = NotificationAudience::fromArray($request->validated('audience'));
-        if ($audience->type->senderSide() !== $sender->side) {
-            throw new NotificationAudienceException(NotificationAudienceException::INVALID);
-        }
+        $audience = NotificationAudience::fromArray($references->toAudience($sender, $request->validated('audience')));
         try {
             $resolver->validateRequest($sender->user, $audience);
         } catch (NotificationAudienceException $e) {
@@ -90,9 +90,15 @@ abstract class AnnouncementController extends Controller
             ->header('Cache-Control', 'no-store, private');
     }
 
-    public function store(StoreAnnouncementRequest $request, CreateAnnouncementDraftAction $action): JsonResponse
+    /**
+     * The public audience (family_code) is mapped onto the internal one for
+     * the Domain Action, which re-checks the actor and validates the draft.
+     */
+    public function store(StoreAnnouncementRequest $request, CreateAnnouncementDraftAction $action, NotificationAudienceReferences $references): JsonResponse
     {
-        $outcome = $action->handle($request->user(), $request->draftInput());
+        $sender = NotificationActors::sender($request->user(), send: false);
+        $input = [...$request->draftInput(), 'audience' => $references->toAudience($sender, $request->validated('audience'))];
+        $outcome = $action->handle($request->user(), $input);
 
         return $this->outcome($request, $outcome, $outcome->replayed ? 200 : 201);
     }
