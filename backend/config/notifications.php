@@ -54,6 +54,18 @@ return [
     // A PUBLISHING message older than this is a stale candidate (R5, 60–86400).
     'stale_publishing_seconds' => env('NOTIFICATIONS_STALE_PUBLISHING_SECONDS', 600),
 
+    // Announcement management limits, per signed-in user (FB-NOTIFY-01B.2b.6c):
+    // reads include the audience preview (a resolution query); writes are
+    // draft, publish, cancel and retry.
+    'staff_limits' => [
+        'read_user_minute' => (int) env('NOTIFICATIONS_STAFF_READ_LIMIT_USER_MINUTE', 60),
+        'write_user_minute' => (int) env('NOTIFICATIONS_STAFF_WRITE_LIMIT_USER_MINUTE', 20),
+    ],
+    'coordinator_limits' => [
+        'read_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_READ_LIMIT_USER_MINUTE', 60),
+        'write_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_WRITE_LIMIT_USER_MINUTE', 20),
+    ],
+
     // Family inbox limits, per signed-in user (FB-NOTIFY-01B.2b.6b).
     'family_limits' => [
         'read_user_minute' => (int) env('NOTIFICATIONS_FAMILY_READ_LIMIT_USER_MINUTE', 60),

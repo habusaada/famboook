@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorAnnouncementController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorChangeRequestController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorMemberController;
@@ -45,6 +46,7 @@ use App\Http\Controllers\Api\V1\PersonMobileTrustController;
 use App\Http\Controllers\Api\V1\PublicCredentialController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ReportController;
+use App\Http\Controllers\Api\V1\StaffAnnouncementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -291,7 +293,39 @@ Route::prefix('family')->group(function () {
                 ->middleware(['can:coordinator-request.resubmit', 'throttle:coordinator-request-action']);
             Route::post('/requests/{changeRequest}/cancel', [CoordinatorChangeRequestController::class, 'cancel'])
                 ->middleware(['can:coordinator-request.cancel', 'throttle:coordinator-request-action']);
+
+            // Announcements (FB-NOTIFY-01B.2b.6c; ADR FB-NOTIFY-01 ADR-04): the
+            // OPERATIONS on the Coordinator's own announcements need the CURRENT
+            // scope — preview, draft, publish, retry — through the lifecycle
+            // Domain Actions; coordinator-announcement.* only, never
+            // announcement.*; plain uuid strings, unowned = 404. /publish and
+            // /retry also need the publication readiness gate.
+            // /audience-preview before {notification}. (The read-only history and
+            // /cancel are registered OUTSIDE coordinator.space, below.)
+            Route::post('/notifications/audience-preview', [CoordinatorAnnouncementController::class, 'preview'])
+                ->middleware(['can:coordinator-announcement.create', 'throttle:coordinator-announcement-read']);
+            Route::post('/notifications', [CoordinatorAnnouncementController::class, 'store'])
+                ->middleware(['can:coordinator-announcement.create', 'throttle:coordinator-announcement-write']);
+            Route::post('/notifications/{notification}/publish', [CoordinatorAnnouncementController::class, 'publish'])
+                ->middleware(['can:coordinator-announcement.send', 'throttle:coordinator-announcement-write', 'notifications.publication-ready']);
+            Route::post('/notifications/{notification}/retry', [CoordinatorAnnouncementController::class, 'retry'])
+                ->middleware(['can:coordinator-announcement.send', 'throttle:coordinator-announcement-write', 'notifications.publication-ready']);
         });
+
+        // Coordinator announcements OUTSIDE coordinator.space (FB-NOTIFY-01B.2b.4 /
+        // 2b.6c), for the ORIGINAL sender only (ownership on every lookup):
+        // - the READ-ONLY history (list and detail) after a scope revocation —
+        //   statistics only over the CURRENT scope, none without one;
+        // - /cancel of an own DRAFT / QUEUED / PUBLISH_FAILED message —
+        //   ownership, the account side and the state-dependent permission are
+        //   CancelPublicationAction's (NotificationActors::canceller).
+        // None of them previews, drafts, publishes, retries or widens anything.
+        Route::get('/coordinator/notifications', [CoordinatorAnnouncementController::class, 'index'])
+            ->middleware(['can:coordinator-announcement.view', 'throttle:coordinator-announcement-read']);
+        Route::get('/coordinator/notifications/{notification}', [CoordinatorAnnouncementController::class, 'show'])
+            ->middleware(['can:coordinator-announcement.view', 'throttle:coordinator-announcement-read']);
+        Route::post('/coordinator/notifications/{notification}/cancel', [CoordinatorAnnouncementController::class, 'cancel'])
+            ->middleware(['can:coordinator-announcement.create', 'throttle:coordinator-announcement-write']);
     });
 });
 
@@ -388,6 +422,29 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     // authentication, so a guest always gets 401). Each step is its PWA-5b Domain Action, which
     // re-checks actor, transition, fresh canonical state and the base
     // fingerprint. Apply runs WITHOUT any surrounding transaction.
+    // Announcements (FB-NOTIFY-01B.2b.6c; ADR FB-NOTIFY-01 ADR-04): the Staff
+    // sender's OWN announcements, through the lifecycle Domain Actions; plain
+    // uuid strings, unowned = 404. /publish and /retry also need the
+    // publication readiness gate (fail closed). Cancel needs .create here; the
+    // action adds .send once the message was queued. /audience-preview before
+    // {notification}. announcement.send-all is checked again by the domain.
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [StaffAnnouncementController::class, 'index'])
+            ->middleware(['can:announcement.view', 'throttle:staff-announcement-read']);
+        Route::post('/audience-preview', [StaffAnnouncementController::class, 'preview'])
+            ->middleware(['can:announcement.create', 'throttle:staff-announcement-read']);
+        Route::post('/', [StaffAnnouncementController::class, 'store'])
+            ->middleware(['can:announcement.create', 'throttle:staff-announcement-write']);
+        Route::get('/{notification}', [StaffAnnouncementController::class, 'show'])
+            ->middleware(['can:announcement.view', 'throttle:staff-announcement-read']);
+        Route::post('/{notification}/publish', [StaffAnnouncementController::class, 'publish'])
+            ->middleware(['can:announcement.send', 'throttle:staff-announcement-write', 'notifications.publication-ready']);
+        Route::post('/{notification}/cancel', [StaffAnnouncementController::class, 'cancel'])
+            ->middleware(['can:announcement.create', 'throttle:staff-announcement-write']);
+        Route::post('/{notification}/retry', [StaffAnnouncementController::class, 'retry'])
+            ->middleware(['can:announcement.send', 'throttle:staff-announcement-write', 'notifications.publication-ready']);
+    });
+
     Route::prefix('change-requests')->group(function () {
         Route::get('/', [ChangeRequestController::class, 'index'])
             ->middleware('can:change-request.view');

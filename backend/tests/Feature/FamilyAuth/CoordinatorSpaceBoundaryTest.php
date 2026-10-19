@@ -200,17 +200,37 @@ class CoordinatorSpaceBoundaryTest extends TestCase
 
     public function test_the_coordinator_routes_carry_both_boundaries(): void
     {
+        // The approved exceptions (FB-NOTIFY-01B.2b.4 / 2b.6c), keyed by method
+        // and uri: the original sender reads their OWN announcement history and
+        // withdraws their OWN unpublished message even after their scope was
+        // revoked — ownership is checked on every lookup; none of them
+        // previews, drafts, publishes or retries. Every other method on these
+        // uris (e.g. POST /notifications, the draft) keeps coordinator.space.
+        $withoutSpace = [
+            'GET api/v1/family/coordinator/notifications',
+            'GET api/v1/family/coordinator/notifications/{notification}',
+            'POST api/v1/family/coordinator/notifications/{notification}/cancel',
+        ];
         $checked = 0;
+        $exceptions = 0;
         foreach (app('router')->getRoutes() as $route) {
             if (str_starts_with($route->uri(), 'api/v1/family/coordinator')) {
                 $middleware = $route->gatherMiddleware();
-                foreach (['auth:sanctum', 'family.side', 'coordinator.space'] as $required) {
-                    $this->assertContains($required, $middleware, $route->uri());
+                $key = $route->methods()[0].' '.$route->uri();
+                $exempt = in_array($key, $withoutSpace, true);
+                $required = $exempt ? ['auth:sanctum', 'family.side'] : ['auth:sanctum', 'family.side', 'coordinator.space'];
+                foreach ($required as $boundary) {
+                    $this->assertContains($boundary, $middleware, $route->uri());
+                }
+                if ($exempt) {
+                    $this->assertNotContains('coordinator.space', $middleware, $key);
+                    $exceptions++;
                 }
                 $this->assertNotContains('staff.side', $middleware);
                 $checked++;
             }
         }
         $this->assertGreaterThanOrEqual(1, $checked);
+        $this->assertSame(3, $exceptions);
     }
 }

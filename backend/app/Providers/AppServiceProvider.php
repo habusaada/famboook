@@ -295,6 +295,21 @@ class AppServiceProvider extends ServiceProvider
             ->by("family-card|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
 
+        // Announcement management (FB-NOTIFY-01B.2b.6c): per signed-in user —
+        // reads (and the audience preview, a resolution query) and writes
+        // (draft, publish, cancel, retry). Staff keep the default 429 answer;
+        // coordinators the family-side one, like their other limiters.
+        RateLimiter::for('staff-announcement-read', fn (Request $request) => Limit::perMinute((int) config('notifications.staff_limits.read_user_minute'))
+            ->by("staff-announcement-read|user|{$request->user()?->getAuthIdentifier()}"));
+        RateLimiter::for('staff-announcement-write', fn (Request $request) => Limit::perMinute((int) config('notifications.staff_limits.write_user_minute'))
+            ->by("staff-announcement-write|user|{$request->user()?->getAuthIdentifier()}"));
+        RateLimiter::for('coordinator-announcement-read', fn (Request $request) => Limit::perMinute((int) config('notifications.coordinator_limits.read_user_minute'))
+            ->by("coordinator-announcement-read|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        RateLimiter::for('coordinator-announcement-write', fn (Request $request) => Limit::perMinute((int) config('notifications.coordinator_limits.write_user_minute'))
+            ->by("coordinator-announcement-write|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+
         // Family notifications (FB-NOTIFY-01B.2b.6b): per signed-in user — the
         // inbox, archive and details; the explicit view / acknowledge writes.
         RateLimiter::for('family-notification-read', fn (Request $request) => Limit::perMinute((int) config('notifications.family_limits.read_user_minute'))

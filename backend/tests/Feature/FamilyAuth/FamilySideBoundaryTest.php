@@ -280,6 +280,22 @@ class FamilySideBoundaryTest extends TestCase
                     : [...$boundary, 'throttle:family-notification-action'];
                 $this->assertSame($expected, $middleware, $route->uri());
             }
+            // Coordinator announcements (FB-NOTIFY-01B.2b.6c): operations behind
+            // coordinator.space, a coordinator-announcement.* permission and a
+            // per-user throttle; /publish and /retry add the publication
+            // readiness gate. OUTSIDE coordinator.space, for the original sender
+            // only: the read-only history (GET list and detail) and /cancel.
+            if (str_starts_with($route->uri(), 'api/v1/family/coordinator/notifications')) {
+                $space = ['api', 'auth:sanctum', 'family.side', 'coordinator.space'];
+                $expected = match (true) {
+                    str_ends_with($route->uri(), '/cancel') => ['api', 'auth:sanctum', 'family.side', 'can:coordinator-announcement.create', 'throttle:coordinator-announcement-write'],
+                    str_ends_with($route->uri(), '/publish'), str_ends_with($route->uri(), '/retry') => [...$space, 'can:coordinator-announcement.send', 'throttle:coordinator-announcement-write', 'notifications.publication-ready'],
+                    str_ends_with($route->uri(), '/audience-preview') => [...$space, 'can:coordinator-announcement.create', 'throttle:coordinator-announcement-read'],
+                    in_array('GET', $route->methods(), true) => ['api', 'auth:sanctum', 'family.side', 'can:coordinator-announcement.view', 'throttle:coordinator-announcement-read'],
+                    default => [...$space, 'can:coordinator-announcement.create', 'throttle:coordinator-announcement-write'],
+                };
+                $this->assertSame($expected, $middleware, $route->uri());
+            }
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
@@ -290,7 +306,8 @@ class FamilySideBoundaryTest extends TestCase
         // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a)
         // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2)
         // + the Coordinator summary (FB-FAMILY-DASHBOARD-01) + the five
-        // notification routes (FB-NOTIFY-01B.2b.6b).
-        $this->assertSame(60, $checked);
+        // notification routes (FB-NOTIFY-01B.2b.6b) + the seven Coordinator
+        // announcement routes (FB-NOTIFY-01B.2b.6c).
+        $this->assertSame(67, $checked);
     }
 }
