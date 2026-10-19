@@ -18,6 +18,11 @@
  *                                        then waits for one more STDIN line
  *   hold-revoke <assignment_id> <actor>  revoke the assignment inside a held
  *                                        transaction (committed after the wait)
+ *   claim-then-attempt <message_id>      T1, prints CLAIMED, waits for one more
+ *                                        STDIN line (a stalled worker), then T2
+ *                                        (and T3 if T2 refuses)
+ *   reconcile <limit>                    NotificationPublicationReconciler::run;
+ *                                        prints "OK <counters as JSON>"
  *
  * Synchronization: after READY each actor waits for one STDIN line
  * "<milliseconds>", waits that long and proceeds (holders then commit).
@@ -30,6 +35,9 @@ use App\Actions\RevokeCoordinatorScopeAction;
 use App\Enums\CoordinatorRevokeReason;
 use App\Models\CoordinatorScopeAssignment;
 use App\Models\User;
+use App\Support\Notifications\NotificationHeartbeat;
+use App\Support\Notifications\NotificationPublicationFailure;
+use App\Support\Notifications\NotificationPublicationReconciler;
 use App\Support\Notifications\NotificationPublisher;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\QueryException;
@@ -103,6 +111,34 @@ try {
                 $wait();
             });
             $out('OK');
+            break;
+
+        case 'claim-then-attempt':
+            [, , $messageId] = $argv;
+            $publisher = app(NotificationPublisher::class);
+            $out('READY');
+            $wait();
+            $token = $publisher->claim((int) $messageId);
+            if (! is_string($token)) {
+                $out('OK '.$token->value);
+                break;
+            }
+            $out('CLAIMED');
+            fgets(STDIN);
+            try {
+                $out('OK '.$publisher->attempt((int) $messageId, $token)->value);
+            } catch (NotificationPublicationFailure $failure) {
+                $out('OK '.$publisher->recordFailure((int) $messageId, $token, $failure->failure, $failure->cause)->value);
+            }
+            break;
+
+        case 'reconcile':
+            [, , $limit] = $argv;
+            // A live worker's heartbeat, as in production (this process's cache).
+            NotificationHeartbeat::record();
+            $out('READY');
+            $wait();
+            $out('OK '.json_encode(app(NotificationPublicationReconciler::class)->run((int) $limit)->toArray()));
             break;
 
         default:

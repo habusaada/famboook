@@ -6,6 +6,7 @@ use App\Enums\NotificationStatus as Status;
 use App\Exceptions\NotificationPublicationException;
 use App\Models\NotificationMessage;
 use DateTimeInterface;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The publication lifecycle of a message (FB-NOTIFY-01B.2b.4; ADR
@@ -64,6 +65,31 @@ final class NotificationLifecycle
     public static function mayStartPublishing(NotificationMessage $locked): bool
     {
         return $locked->status === Status::QUEUED;
+    }
+
+    /**
+     * PostgreSQL: bound every lock wait and statement of a publication-side
+     * transaction well below the worker's 60 s job timeout (lock_timeout 5s,
+     * statement_timeout 45s, both transaction-local).
+     */
+    public static function limitTransaction(): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("SET LOCAL lock_timeout = '5s'");
+            DB::statement("SET LOCAL statement_timeout = '45s'");
+        }
+    }
+
+    /**
+     * The message re-read under FOR UPDATE SKIP LOCKED (PostgreSQL), or NULL
+     * when another session holds it — a live worker or another reconciler.
+     * Never waits. (SQLite has no row locks: the plain read.)
+     */
+    public static function lockOrSkip(int $messageId): ?NotificationMessage
+    {
+        return NotificationMessage::query()->whereKey($messageId)
+            ->lock(DB::getDriverName() === 'pgsql' ? 'for update skip locked' : true)
+            ->first();
     }
 
     /** R2: an expiry, when set, at least an hour after now. */

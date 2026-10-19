@@ -23,3 +23,10 @@ Schedule::command('famboook:close-expired-contact-updates')->everyFiveMinutes();
 // Records a timestamp only — publishes nothing. Not active without the cron
 // and a `queue:work --queue=notifications` worker (separate approval).
 Schedule::job(new NotificationHeartbeatJob)->everyMinute();
+
+// Notification publication recovery (FB-NOTIFY-01B.2b.5d): stale claims,
+// automatic retries, orphaned QUEUED messages. Idempotent; never publishes
+// itself. withoutOverlapping (lock expires after 10 minutes) and onOneServer
+// rely on the shared cache store's atomic locks (the database store in
+// Production). Not active without the cron (separate approval).
+Schedule::command('famboook:notifications-reconcile')->everyMinute()->withoutOverlapping(10)->onOneServer();

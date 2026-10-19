@@ -21,10 +21,9 @@ use App\Support\Notifications\NotificationPublisher;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
-use PDO;
-use PDOException;
 use RuntimeException;
 use Tests\Support\NotificationActionFixtures;
+use Tests\Support\Notifications\NotificationActorProcesses;
 use Tests\TestCase;
 use Throwable;
 
@@ -43,19 +42,14 @@ use Throwable;
  */
 class NotificationPublicationConcurrencyTest extends TestCase
 {
-    use DatabaseTruncation, NotificationActionFixtures;
+    use DatabaseTruncation, NotificationActionFixtures, NotificationActorProcesses;
 
     /** @var list<string> reference data created by migrations */
     protected $exceptTables = ['clans', 'relationship_types'];
 
-    private const ACTOR = __DIR__.'/../../Support/Notifications/publication-actor.php';
-
     private const LOCK_NOT_AVAILABLE = '55P03';
 
     private User $staff;
-
-    /** @var list<array{process: resource, pipes: array<int, resource>}> */
-    private array $children = [];
 
     protected function setUp(): void
     {
@@ -65,73 +59,16 @@ class NotificationPublicationConcurrencyTest extends TestCase
         parent::setUp();
         $this->setUpNotificationActions();
         $this->staff = $this->staffSender();
-        foreach (['DB_CONNECTION' => 'pgsql', 'DB_HOST' => config('database.connections.pgsql.host'), 'DB_PORT' => config('database.connections.pgsql.port'),
-            'DB_DATABASE' => config('database.connections.pgsql.database'), 'DB_USERNAME' => config('database.connections.pgsql.username'),
-            'DB_PASSWORD' => (string) config('database.connections.pgsql.password'), 'DB_URL' => '', 'APP_ENV' => 'testing', 'CACHE_STORE' => 'array'] as $key => $value) {
-            putenv("{$key}={$value}");
-        }
+        $this->exportActorEnvironment();
     }
 
     protected function tearDown(): void
     {
-        foreach ($this->children as $child) {
-            proc_terminate($child['process']);
-            proc_close($child['process']);
-        }
+        $this->stopActors();
         if (isset($this->app)) {
-            DB::statement('RESET lock_timeout');
-            $this->truncateTablesForAllConnections();
+            $this->resetConcurrencyDatabase();
         }
         parent::tearDown();
-    }
-
-    private static function pgsqlTestDatabaseIsReachable(): bool
-    {
-        $env = static fn (string $key): ?string => ($_ENV[$key] ?? $_SERVER[$key] ?? getenv($key)) ?: null;
-        $database = (string) $env('DB_DATABASE');
-        if ($env('DB_CONNECTION') !== 'pgsql' || ! str_ends_with($database, '_test')) {
-            return false;
-        }
-        try {
-            new PDO(
-                sprintf('pgsql:host=%s;port=%s;dbname=%s;connect_timeout=3', $env('DB_HOST') ?? '127.0.0.1', $env('DB_PORT') ?? '5432', $database),
-                $env('DB_USERNAME'),
-                $env('DB_PASSWORD'),
-            );
-
-            return true;
-        } catch (PDOException) {
-            return false;
-        }
-    }
-
-    // ------------------------------------------------------------- harness
-
-    /** Starts an actor and waits for its READY line. */
-    private function spawn(string ...$args): int
-    {
-        $process = proc_open([PHP_BINARY, self::ACTOR, ...$args], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        $this->assertIsResource($process);
-        stream_set_timeout($pipes[1], 30);
-        $this->children[] = ['process' => $process, 'pipes' => $pipes];
-        $ready = $this->lineOf(count($this->children) - 1);
-        if ($ready !== 'READY') {
-            $this->fail("actor did not start ({$ready}): ".stream_get_contents($pipes[2]));
-        }
-
-        return count($this->children) - 1;
-    }
-
-    /** Lets a READY actor proceed after $milliseconds (a holder then commits); also resumes a paused publisher. */
-    private function go(int $child, int $milliseconds = 0): void
-    {
-        fwrite($this->children[$child]['pipes'][0], $milliseconds.PHP_EOL);
-        fflush($this->children[$child]['pipes'][0]);
-    }
-
-    private function lineOf(int $child): string
-    {
-        return trim((string) fgets($this->children[$child]['pipes'][1]));
     }
 
     private function family(): Family

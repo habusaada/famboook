@@ -5,7 +5,6 @@ namespace App\Support\Notifications;
 use App\Enums\NotificationEventType;
 use App\Enums\NotificationFailureCode;
 use App\Enums\NotificationKind;
-use App\Enums\NotificationMode;
 use App\Enums\NotificationPublicationResult as Result;
 use App\Enums\NotificationSenderSide;
 use App\Enums\NotificationStatus;
@@ -96,12 +95,12 @@ final class NotificationPublisher
     public function claim(int $messageId): string|Result
     {
         return DB::transaction(function () use ($messageId) {
-            $this->transactionLimits();
+            NotificationLifecycle::limitTransaction();
             $message = NotificationMessage::query()->whereKey($messageId)->lockForUpdate()->first();
             if ($message === null || ! NotificationLifecycle::mayStartPublishing($message)) {
                 return Result::NOT_CLAIMED;
             }
-            $blocked = $this->gateBlocks($message) ?? (NotificationConfig::queueTimingValid() ? null : 'QUEUE_TIMING_INVALID');
+            $blocked = NotificationPublicationGate::blocks($message) ?? (NotificationConfig::queueTimingValid() ? null : 'QUEUE_TIMING_INVALID');
             $limit = $this->policy->claimLimit();
             if ($blocked === null && ($limit === null || $message->publish_attempts >= $limit)) {
                 $blocked = 'CLAIM_LIMIT_REACHED';
@@ -131,12 +130,12 @@ final class NotificationPublisher
     public function attempt(int $messageId, string $token): Result
     {
         return DB::transaction(function () use ($messageId, $token) {
-            $this->transactionLimits();
+            NotificationLifecycle::limitTransaction();
             $message = $this->ownedClaim($messageId, $token);
             if ($message === null) {
                 return Result::SUPERSEDED;
             }
-            if (($blocked = $this->gateBlocks($message)) !== null) {
+            if (($blocked = NotificationPublicationGate::blocks($message)) !== null) {
                 throw new NotificationPublicationFailure(NotificationFailureCode::PUBLICATION_ERROR, $blocked);
             }
             // ONE timestamp: the expiry check, published_at and the snapshot.
@@ -171,7 +170,7 @@ final class NotificationPublisher
     {
         try {
             return DB::transaction(function () use ($messageId, $token, $failure, $cause) {
-                $this->transactionLimits();
+                NotificationLifecycle::limitTransaction();
                 $message = $this->ownedClaim($messageId, $token);
                 if ($message === null) {
                     return Result::SUPERSEDED;
@@ -207,36 +206,6 @@ final class NotificationPublisher
     }
 
     /**
-     * Why publication may not proceed now (a cause CODE), or NULL. The same
-     * gates as NotificationReadiness, minus the heartbeat and queue checks
-     * that concern the dispatching side — this IS the worker.
-     */
-    private function gateBlocks(NotificationMessage $message): ?string
-    {
-        if (NotificationConfig::invalidKeys() !== []) {
-            return 'CONFIG_INVALID';
-        }
-        $mode = NotificationConfig::mode();
-        if ($mode === NotificationMode::OFF) {
-            return 'FEATURE_OFF';
-        }
-        if ($message->kind === NotificationKind::SYSTEM) {
-            return match (true) {
-                $mode !== NotificationMode::ON => 'SYSTEM_REQUIRES_ON',
-                ! NotificationConfig::systemDiscoveryEnabled() => 'SYSTEM_GATE_CLOSED',
-                NotificationConfig::systemCutoff() === null => 'SYSTEM_CUTOFF_INVALID',
-                default => null,
-            };
-        }
-        if ($mode === NotificationMode::PILOT
-            && ! in_array((int) $message->sender_user_id, NotificationConfig::pilotSenderUserIds() ?? [], true)) {
-            return 'PILOT_NOT_ELIGIBLE';
-        }
-
-        return null;
-    }
-
-    /**
      * The families to publish to, re-authorized NOW. An announcement's sender
      * is re-read and must still be an active account of the message's side
      * with the send permission (a coordinator: a current context, its
@@ -268,15 +237,6 @@ final class NotificationPublisher
             throw new NotificationPublicationFailure($e->reason === NotificationAudienceException::NOT_AUTHORIZED
                 ? NotificationFailureCode::SENDER_NOT_AUTHORIZED
                 : NotificationFailureCode::AUDIENCE_INVALID);
-        }
-    }
-
-    /** PostgreSQL: bound every wait and statement well below the job timeout. */
-    private function transactionLimits(): void
-    {
-        if (DB::getDriverName() === 'pgsql') {
-            DB::statement("SET LOCAL lock_timeout = '5s'");
-            DB::statement("SET LOCAL statement_timeout = '45s'");
         }
     }
 }
