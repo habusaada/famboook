@@ -1132,6 +1132,64 @@ stands. Audiences: single family, selected families, branch / branch group
 / clan within the sender's scope, filtered groups; "all eligible family
 users" needs the explicit administrative permission.
 
+**As built — FB-NOTIFY-01B.2b (recorded 2026-10-19, FB-NOTIFY-01B.2b.7).**
+- **Status:** implemented in local commits up to `022acc8`. Not deployed; Production is not migrated or seeded; publication is OFF by default.
+- **Implemented here:** manual announcements (Staff and Coordinator) and the Family inbox. SYSTEM notifications (no discovery yet) and follow-ups are **not** implemented, and no frontend exists.
+- **Contracts:**
+  - field-level API contract: `docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md`;
+  - permissions: docs/06 §22b "Unified notifications";
+  - design: ADR FB-NOTIFY-01 §2b.
+
+*Endpoints* (`/api/v1`; every response `no-store, private`; a message is addressed by its uuid and never route-model bound, so unowned means 404):
+
+```text
+Staff (staff.side)                       GET  /notifications                 own announcements (filter: status; page, per_page ≤ 50)
+                                         POST /notifications/audience-preview {audience} → {recipient_count}
+                                         POST /notifications                 draft → 201 (200 replay)
+                                         GET  /notifications/{id}            detail
+                                         POST /notifications/{id}/publish    DRAFT → QUEUED → 202 (200 replay)
+                                         POST /notifications/{id}/cancel     DRAFT | QUEUED | PUBLISH_FAILED → CANCELLED
+                                         POST /notifications/{id}/retry      PUBLISH_FAILED → QUEUED → 202 (200 replay)
+Coordinator (family.side)                the same seven under /family/coordinator/notifications;
+                                         preview, draft, publish, retry inside coordinator.space (CURRENT scope);
+                                         list, detail and cancel outside it (own history after a revocation)
+Family (family.side + family.context)    GET  /family/notifications           active inbox + meta.unread_count
+                                         GET  /family/notifications/archive   archived or expired
+                                         GET  /family/notifications/{id}      detail — records NO view
+                                         POST /family/notifications/{id}/view         first view (explicit)
+                                         POST /family/notifications/{id}/acknowledge  IMPORTANT only; late after expiry
+```
+
+*Response contracts:*
+- **Sender** (`AnnouncementResource`):
+  - summary: `id`, `notice_code`, `level`, `status`, `title`, `audience_type`, `expires_at`, `created_at`, `queued_at`, `published_at`, `recipient_count_at_publication`, `publish_attempts`, `publish_failure_code`, `publish_failed_at`, `archived_at`, `cancelled_at`, `cancellation_reason_code`;
+  - the detail adds `body`, `audience_selection` (counts per criterion, never ids), `statistics_basis`, `statistics` (aggregate counts only) and `available_actions` (`PUBLISH`, `CANCEL`, `RETRY`).
+- **Family** (`FamilyNotificationResource`): `id`, `notice_code`, `kind`, `source` («إدارة Famboook» / «منسق العائلة»), `level`, `title`, `body` (detail only), `action_path`, `published_at`, `expires_at`, `expired`, `viewed_at`, `requires_acknowledgement`, `acknowledged_at`, `acknowledged_late`, `available_actions` (`VIEW`, `ACKNOWLEDGE`).
+- **Never exposed:** the sender, internal ids, recipient families, or publication internals beyond the fields above.
+- **Errors:** `{message, code}` with stable `NOTIFICATION_*` codes (403 / 404 / 409 / 422), and `503 NOTIFICATION_PUBLICATION_UNAVAILABLE` from the readiness gate.
+
+*Publication lifecycle:*
+- **Queued publication:**
+  - `DRAFT → QUEUED` happens on request, and the job is dispatched after commit;
+  - the worker claims the message (`QUEUED → PUBLISHING`, one attempt counted);
+  - one transaction then re-checks the sender, permission and current scope, re-resolves the audience, writes every recipient and sets `PUBLISHED` with `published_at`. Otherwise it records `PUBLISH_FAILED` with a code.
+- **Cancel:** `CANCELLED` from `DRAFT`, `QUEUED` or `PUBLISH_FAILED` only. A published message is never cancelled.
+- **Archive:** `ARCHIVED` only by the expiry sweep (`famboook:notifications-expire`). Read models already treat a message as expired at `expires_at`.
+- **Not visible to families:** nothing before `PUBLISHED`.
+
+*Retry policy* (ADR R4 as decided in 01B.2b.5b):
+- transient failures (`PUBLICATION_ERROR`, `STALE_PUBLISHING`) are retried **automatically** up to 3 attempts, with a 1 min / 5 min backoff;
+- then **one** manual retry by the sender, at most 4 attempts in all;
+- `AUDIENCE_EMPTY` is manual-retry only;
+- `SENDER_NOT_AUTHORIZED`, `AUDIENCE_INVALID` and `EXPIRED_BEFORE_PUBLICATION` are permanent (cancel only);
+- `famboook:notifications-reconcile` recovers a `PUBLISHING` claim older than 10 min as `STALE_PUBLISHING`, and re-dispatches a `QUEUED` message after 3 min (at most once per 5 min).
+
+*Audiences as built:*
+- Staff: `STAFF_FAMILIES` (selected ACTIVE families) and `STAFF_ALL_ACTIVE` (`announcement.send-all`).
+- Coordinator: `COORDINATOR_SCOPE` (the current scope) and `COORDINATOR_SELECTION` (families, branches, branch groups or clans, intersected with the current scope).
+
+The Staff clan / branch criteria and the "filtered groups" listed above are **not implemented**. Selections take canonical integer ids that no API exposes yet (handoff §1, B1).
+
 ---
 
 # 22. Coordinator Notifications
@@ -1141,6 +1199,12 @@ users" needs the explicit administrative permission.
 - Recipients can tell "إدارة Famboook" from "منسق العائلة".
 - A coordinator's message never appears to be an administrative Famboook
   decision.
+
+*As built 2026-10-19 (FB-NOTIFY-01B.2b.6c, local):*
+- **Scope:** the coordinator API enforces the current scope on preview, draft, publish and retry.
+- **Count before sending:** `POST /family/coordinator/notifications/audience-preview` returns the resolved recipient count.
+- **Source:** families see the source «منسق العائلة».
+- **After a scope revocation:** the coordinator keeps a read-only history of their own messages, and can cancel unpublished ones. Statistics cover only families of the current scope (docs/06 §22b "Unified notifications").
 
 ---
 
@@ -5273,3 +5337,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.54 | 2026-10-17 | Approved | ADR FB-UI-01: FP-ADR-022, PFP-013 and A-08 amended — the Kingfisher palette is the unified Famboook color system for both portals; Family overlays (Select, Dialog, Sheet, DropdownMenu) align with it |
 | 1.55 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01: §23 amended — the unified Family home (welcome header with current time and previous sign-in, shortcuts, server-driven services, Coordinator section for open Coordinator Space); docs/06 AUTH-ADR-096 |
 | 1.56 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §21 amended — unified notifications, family recipient, levels, follow-up, expiry; FP-ADR-018 and A-07 amended; documentation only |
+| 1.57 | 2026-10-19 | Approved | FB-NOTIFY-01B.2b.7: §21 "As built" — notification endpoints (Staff, Coordinator, Family), response contracts, publication and retry lifecycle, audiences as built and the audience-id gap; §22 as built (current scope, count preview, history after revocation); frontend handoff `docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md`. Documentation only |

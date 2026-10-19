@@ -718,15 +718,15 @@ finalized separately and moved to §22b.
 | `family-verification.view` | Authorized Staff | PWA-4 |
 | `family-verification.review` | Authorized Staff | PWA-4 |
 | `family-verification.approve` | Authorized Staff | PWA-4 |
-| `announcement.view` | Authorized Staff (administration) — *coordinators use `coordinator-announcement.view` (ADR FB-NOTIFY-01, aligned 2026-10-18)* | PWA-9 |
-| `announcement.create` | Administration — *coordinators use `coordinator-announcement.create`* | PWA-9 |
-| `announcement.send` | Administration — *coordinators use `coordinator-announcement.send`* | PWA-9 |
-| `announcement.send-all` (all eligible family users) | Administration only | PWA-9 |
+| ~~`announcement.view`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": SUPER_ADMIN, ADMINISTRATOR — *coordinators use `coordinator-announcement.view`* | ~~PWA-9~~ FB-NOTIFY-01 |
+| ~~`announcement.create`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": SUPER_ADMIN, ADMINISTRATOR | ~~PWA-9~~ FB-NOTIFY-01 |
+| ~~`announcement.send`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": SUPER_ADMIN, ADMINISTRATOR | ~~PWA-9~~ FB-NOTIFY-01 |
+| ~~`announcement.send-all`~~ (every ACTIVE family) | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": SUPER_ADMIN only | ~~PWA-9~~ FB-NOTIFY-01 |
 | `notification-followup.view` | Authorized Staff responsible for follow-up — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `notification-followup.manage` (record manual follow-up actions) | Authorized Staff — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
-| `coordinator-announcement.view` | COORDINATOR (own messages; current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
-| `coordinator-announcement.create` | COORDINATOR (current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
-| `coordinator-announcement.send` | COORDINATOR (current scope, revalidated before publication) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
+| ~~`coordinator-announcement.view`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": COORDINATOR only (own messages; history readable after a scope revocation) | FB-NOTIFY-01 |
+| ~~`coordinator-announcement.create`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": COORDINATOR only (current scope; own cancel outside it) | FB-NOTIFY-01 |
+| ~~`coordinator-announcement.send`~~ | **Seeded FB-NOTIFY-01B.2b.6d (local, not deployed)** — see §22b "Unified notifications": COORDINATOR only (current scope, revalidated before publication) | FB-NOTIFY-01 |
 | `coordinator-notification-followup.view` | COORDINATOR (families in the current scope) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `coordinator-notification-followup.manage` | COORDINATOR (current scope; never their own family) — **proposed by ADR FB-NOTIFY-01** | FB-NOTIFY-01 |
 | `family-card.view` | **Seeded PWA-8.2:** SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, SOCIAL_WORKER | PWA-8 |
@@ -1301,6 +1301,79 @@ or apply one, and never change a registry record directly.
   request uses `change-request.reject`; `/coordinator/context`, `/families`
   and `/families/{code}` gain the per-user `coordinator-read` throttle; the
   household sees the submitting Coordinator's name (D8), nothing else (ADR §20).
+
+## Unified notifications (FB-NOTIFY-01B.2b, implemented locally)
+
+Recorded 2026-10-19 (FB-NOTIFY-01B.2b.7; AUTH-ADR-097 as amended; ADR
+FB-NOTIFY-01 §2b). Seeded and enforced in local commits up to `022acc8`.
+**Not deployed:** Production is not seeded, and publication is OFF by
+default (`NOTIFICATIONS_MODE`). Frontend contract:
+`docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md`.
+
+**The eight canonical roles** are unchanged:
+- six Staff roles: SUPER_ADMIN, ADMINISTRATOR, DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER;
+- two family-side roles: FAMILY_USER and COORDINATOR (the existing scope-bound role of §22a; FAMILY_USER + COORDINATOR on one account).
+
+Notifications add no role.
+
+```text
+STAFF SIDE — auth:sanctum + staff.side
+GET  /api/v1/notifications                         announcement.view      throttle staff-announcement-read
+POST /api/v1/notifications/audience-preview        announcement.create    throttle staff-announcement-read
+POST /api/v1/notifications                         announcement.create    throttle staff-announcement-write
+GET  /api/v1/notifications/{uuid}                  announcement.view      throttle staff-announcement-read
+POST /api/v1/notifications/{uuid}/publish          announcement.send      throttle staff-announcement-write + notifications.publication-ready
+POST /api/v1/notifications/{uuid}/cancel           announcement.create    throttle staff-announcement-write   (the action adds .send once queued)
+POST /api/v1/notifications/{uuid}/retry            announcement.send      throttle staff-announcement-write + notifications.publication-ready
+
+FAMILY SIDE, COORDINATOR — auth:sanctum + family.side + coordinator.space (CURRENT scope)
+POST /api/v1/family/coordinator/notifications/audience-preview   coordinator-announcement.create   throttle coordinator-announcement-read
+POST /api/v1/family/coordinator/notifications                    coordinator-announcement.create   throttle coordinator-announcement-write
+POST /api/v1/family/coordinator/notifications/{uuid}/publish     coordinator-announcement.send     throttle coordinator-announcement-write + notifications.publication-ready
+POST /api/v1/family/coordinator/notifications/{uuid}/retry       coordinator-announcement.send     throttle coordinator-announcement-write + notifications.publication-ready
+
+FAMILY SIDE, COORDINATOR — auth:sanctum + family.side, OUTSIDE coordinator.space (documented exception)
+GET  /api/v1/family/coordinator/notifications                    coordinator-announcement.view     throttle coordinator-announcement-read
+GET  /api/v1/family/coordinator/notifications/{uuid}             coordinator-announcement.view     throttle coordinator-announcement-read
+POST /api/v1/family/coordinator/notifications/{uuid}/cancel      coordinator-announcement.create   throttle coordinator-announcement-write   (.send once queued)
+
+FAMILY SIDE, HOUSEHOLD — auth:sanctum + family.side + can:family-portal.access + family.context
+GET  /api/v1/family/notifications                                throttle family-notification-read
+GET  /api/v1/family/notifications/archive                        throttle family-notification-read
+GET  /api/v1/family/notifications/{uuid}                         throttle family-notification-read
+POST /api/v1/family/notifications/{uuid}/view                    throttle family-notification-action
+POST /api/v1/family/notifications/{uuid}/acknowledge             throttle family-notification-action
+```
+
+| Permission | Purpose | Holders (seeded) |
+|---|---|---|
+| `announcement.view` | List and read the account's OWN Staff announcements | SUPER_ADMIN, ADMINISTRATOR |
+| `announcement.create` | Preview an audience, create a draft, cancel an own draft | SUPER_ADMIN, ADMINISTRATOR |
+| `announcement.send` | Request publication, retry, cancel once queued | SUPER_ADMIN, ADMINISTRATOR |
+| `announcement.send-all` | The `STAFF_ALL_ACTIVE` audience (every ACTIVE family): checked by the FormRequest, the draft, the request and again by the worker | SUPER_ADMIN only |
+| `coordinator-announcement.view` | List and read the coordinator's OWN announcements | COORDINATOR only |
+| `coordinator-announcement.create` | Preview and draft within the CURRENT scope; cancel an own draft | COORDINATOR only |
+| `coordinator-announcement.send` | Request publication and retry within the CURRENT scope; cancel once queued | COORDINATOR only |
+| *(none new)* | Family inbox, archive, detail, view and acknowledgement | FAMILY_USER through `family-portal.access` + `family.context` |
+
+DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER hold
+none of the seven. `notification-followup.*` and
+`coordinator-notification-followup.*` stay PROPOSED and not seeded (§22a).
+
+**Rules enforced in code:**
+- **Separate sides:** `announcement.*` never authorizes a family-side account, and `coordinator-announcement.*` never authorizes a Staff account. The side is the account's (`AccountSide`), never the client's.
+- **Ownership:** every lookup is restricted to the account's OWN announcements on its side. Another sender's message, SUPER_ADMIN's view of an ADMINISTRATOR message included, is `404 NOTIFICATION_NOT_FOUND`, exactly like a nonexistent one. **There is no administrator override.**
+- **Coordinator scope:**
+  - Preview, draft, publish and retry need the CURRENT scope (`coordinator.space`, `CoordinatorScopes`). The audience is intersected with that scope, and every selected structure must itself be in scope.
+  - The publication worker re-checks the coordinator's permission and current context in the publication transaction, with the assignment rows locked `FOR SHARE`. A revocation that commits first produces `PUBLISH_FAILED` / `SENDER_NOT_AUTHORIZED`.
+- **Historical read exceptions** (approved in 2b.4 and 2b.6c): the list, the detail and `/cancel` sit OUTSIDE `coordinator.space`, for the original sender only.
+  - After a scope revocation the coordinator still reads their own history and may withdraw their own DRAFT, QUEUED or PUBLISH_FAILED message, which only reduces exposure. Nothing else is granted.
+  - Statistics are counted over the families of the CURRENT scope only: `statistics_basis` is `CURRENT_COORDINATOR_SCOPE`, or `NO_CURRENT_SCOPE` with no statistics.
+  - `recipient_count_at_publication` stays as the historical fact.
+  - Losing the COORDINATOR role or the permission ends the history and cancel too (403).
+- **Family actions:** only the family's own household (`family.context`) can view or acknowledge. Staff and coordinators can never record either for a family; a coordinator only for their own household.
+- **Readiness is not authorization:** `notifications.publication-ready` (503) and the readiness checks run after the permission and never grant anything.
+- **Verifier:** `famboook:verify-permissions` checks the exact matrix above, including explicit CRITICAL checks per role. It also fails on any DIRECT (model) grant of a notification permission: the seven may come only from their roles.
 
 ## SMS delivery (TweetsMS)
 
@@ -4576,11 +4649,21 @@ permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
 ### AUTH-ADR-097
-Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; documentation only, NOT implemented; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)).
+Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)). *Status 2026-10-19: announcement authorization IMPLEMENTED LOCALLY (FB-NOTIFY-01B.2b.4 – 2b.6d, commits `da77d93` … `022acc8`), not deployed; follow-up authorization not implemented.*
 - **Senders:** authorized administrators and coordinators. Coordinators send individual and bulk messages directly (no preapproval) strictly within their CURRENT scope (`CoordinatorScopes`); global sending needs an explicit permission. Follow-up actions also need the current scope.
 - **Proposed permissions (not seeded):** Staff `announcement.view`, `.create`, `.send`, `.send-all`, `notification-followup.view`, `.manage`; COORDINATOR `coordinator-announcement.view`, `.create`, `.send`, `coordinator-notification-followup.view`, `.manage` (the existing `coordinator-*` convention; aligned 2026-10-18). No role is added (COORDINATOR exists); no existing mapping changes. SOCIAL_WORKER has no follow-up access until a Staff assignment model is approved.
 - **Current scope:** revalidated by the worker immediately before publication and on every follow-up operation. A coordinator never acknowledges for a family and never manually closes a follow-up for their own family. Spatie role / permission revocation is not claimed to be serialized with publication.
 - **Family side:** reads, viewing and acknowledgement only through `family.context`; never recordable by staff or coordinators. Rate limits on sending and acknowledgement; append-only audit with safe metadata.
+- **Amended 2026-10-19 (FB-NOTIFY-01B.2b.6d, implemented locally):**
+  - **Seeded:** `announcement.view`, `.create` and `.send` to SUPER_ADMIN and ADMINISTRATOR; `announcement.send-all` to SUPER_ADMIN only; `coordinator-announcement.view`, `.create` and `.send` to the existing COORDINATOR role only.
+  - **Unchanged:** the catalog is 151 → 158 permissions; still eight roles; no other mapping changes; `notification-followup.*` and `coordinator-notification-followup.*` remain PROPOSED and not seeded.
+  - **Verifier:** `famboook:verify-permissions` asserts the matrix on every role, and fails on any DIRECT (model) grant of a notification permission.
+- **Implemented boundaries:**
+  - **Staff:** `/api/v1/notifications` behind `staff.side`.
+  - **Coordinator:** `/api/v1/family/coordinator/notifications` behind `family.side`. Operations also need `coordinator.space` (current scope); history read and cancel of an own unpublished message stay outside it. Statistics are counted over the CURRENT scope only.
+  - **Family:** `/api/v1/family/notifications` behind `family.context`.
+  - **Every layer:** ownership 404 on every lookup, and no administrator override.
+  - **Domain Actions** re-check the side, permission, current context and ownership; the worker re-checks them before writing recipients. Details: §22b "Unified notifications".
 
 ### AUTH-ADR-096
 Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).
@@ -4841,6 +4924,14 @@ This is a baseline, not a substitute for explicit permissions.
 
 `Policy`, `Scope`, and `Permission` deliberately indicate that role membership alone is insufficient.
 
+*Note 2026-10-19 (FB-NOTIFY-01B.2b.7, AUTH-ADR-097):* the table has seven role columns. The eighth canonical role, **COORDINATOR** (§22a, family-side, scope-bound), has no column; its capabilities are listed in §22b.
+- **Unified notifications** (seeded locally in FB-NOTIFY-01B.2b.6d): only the sender's OWN announcements, with no administrator override.
+  - Manage and send their own announcements: Super Admin and Administrator `Permission` (`announcement.view` / `.create` / `.send`).
+  - Send to every ACTIVE family: Super Admin only (`announcement.send-all`).
+  - Coordinator announcements: COORDINATOR only (`coordinator-announcement.*`, current scope).
+  - Family inbox, view and acknowledgement: Family User `Own authorized` (existing `family-portal.access` + `family.context`).
+- **Follow-ups:** none for any role (`notification-followup.*` not seeded).
+
 ---
 
 # 141. Authorization Request Pattern
@@ -5076,6 +5167,7 @@ Date: 2026-09-24
 | 1.2.70 | 2026-10-15 | Approved | FB-GEO-01 Stage 2B (AUTH-ADR-095): read-only Staff `/gaza-locations` API implemented locally with `reference-data.view` OR `residence.update` (controller union check); §56 note; no permission, role or mapping change |
 | 1.2.73 | 2026-10-18 | Approved | FB-NOTIFY-01A (AUTH-ADR-097): notification authorization recorded; `notification-followup.view` / `.manage` added to the PROPOSED permissions; §126 clarified; nothing seeded, no role or mapping change |
 | 1.2.74 | 2026-10-18 | Approved | FB-NOTIFY-01B.1 alignment (AUTH-ADR-097): coordinator-specific PROPOSED names `coordinator-announcement.*` / `coordinator-notification-followup.*`; current-scope revalidation; own-family closure excluded; nothing seeded, no role or mapping change |
+| 1.2.75 | 2026-10-19 | Approved | FB-NOTIFY-01B.2b.7 documentation sync (AUTH-ADR-097 amended): the seven notification permissions seeded locally in 2b.6d recorded (SUPER_ADMIN, ADMINISTRATOR, COORDINATOR); §22a rows marked; §22b "Unified notifications" — routes, matrix, eight canonical roles, coordinator scope and the history / cancel exceptions, verifier guarantees; §140 note. Documentation only; follow-up permissions still PROPOSED |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |

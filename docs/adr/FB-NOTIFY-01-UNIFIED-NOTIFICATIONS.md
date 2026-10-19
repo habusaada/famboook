@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Approved by the owner 2026-10-18 (architecture and business rules). **Documentation only (FB-NOTIFY-01A); nothing implemented**. Aligned 2026-10-18 with the FB-NOTIFY-01B.1 schema and authorization design (§2a; documentation only) |
+| Status | Approved by the owner 2026-10-18 (architecture and business rules). Documentation only in FB-NOTIFY-01A; aligned 2026-10-18 with the FB-NOTIFY-01B.1 schema and authorization design (§2a). **Updated 2026-10-19 (FB-NOTIFY-01B.2b.7): the schema, manual announcements (Staff and Coordinator), the publication worker, recovery, expiry and the Family inbox are implemented in local commits `29a0b12` … `022acc8` (§2b); NOT deployed, Production not migrated or seeded, mode OFF. SYSTEM notifications and follow-ups are not implemented** |
 | Supersedes / amends | FP-ADR-018 and docs/11 §21 ("two kinds"); docs/02 §59 and docs/04 §56 (Laravel database notifications as the default store); the "Notifications and announcements" rules of docs/03 and the Announcements flow of docs/05; docs/08 §16 (no worker, no cron) for this feature; docs/06 proposed `announcement.*` permissions (still proposed) |
 | Keeps | docs/03 §90–§92, docs/05 §85–§87, docs/06 §126–§127 (backend-originated, after commit, minimal content, own-identity reads); docs/11 §22 (coordinator sending rules, preserved unchanged); "audiences resolved on the server"; the family-visible sources «إدارة Famboook» / «منسق العائلة» |
-| Schema / data change | None in this phase. Logical entities only; the physical schema is reviewed in FB-NOTIFY-01B |
-| RBAC change | None in this phase. Permission names below are PROPOSED and not seeded |
+| Schema / data change | None in FB-NOTIFY-01A. *Since FB-NOTIFY-01B.2a (DB-ADR-067):* four additive tables, migrations `2026_10_24_090000`–`090003` (docs/04 §56) |
+| RBAC change | None in FB-NOTIFY-01A. *Since FB-NOTIFY-01B.2b.6d (AUTH-ADR-097 amended):* `announcement.view` / `.create` / `.send` / `.send-all` and `coordinator-announcement.view` / `.create` / `.send` are seeded (SUPER_ADMIN, ADMINISTRATOR, COORDINATOR); `notification-followup.*` and `coordinator-notification-followup.*` stay PROPOSED and not seeded; no role added |
 | Production | No Production change is authorized by this ADR |
 
 Registered: docs/06 AUTH-ADR-097 (authorization), docs/11 FP-ADR-018 (amended).
@@ -227,6 +227,77 @@ The owner provisionally approved the physical design directions below. They refi
 | R8 | A SYSTEM message to a family that is not ACTIVE is published and recorded, but opens no follow-up |
 | E1 | SYSTEM recipient eligibility: the request's own non-null `family_id` only; family-less requests skipped as diagnostics, never failures; the action link only where the family is already authorized (ADR-09) |
 
+## 2b. Implementation status (FB-NOTIFY-01B.2, as built — 2026-10-19)
+
+Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-geo-02`. **Local commits only:** not merged, not deployed. Production is not migrated or seeded, and the mode is OFF. The decisions above are unchanged. This section records how they were built and the decisions taken during implementation.
+
+| Phase | Commit | Delivered |
+|---|---|---|
+| 01B.2a | `29a0b12` | four tables, CHECKs, append-only trigger, `NTF-` sequence (docs/02 §59, docs/04 §56) |
+| 01B.2b.2 | `60f62bd` | `config/notifications.php`, `NotificationReadiness`, worker heartbeat, `famboook:notifications-check`, `notifications.publication-ready` middleware |
+| 01B.2b.3 | `d71f595` | `NotificationAudienceResolver`, `NotificationEventRecorder` |
+| 01B.2b.4 | `da77d93` | Domain Actions: draft, request publication, cancel, retry |
+| 01B.2b.5b | `281ec85` | `NotificationRetryPolicy` (R4 as decided, below) |
+| 01B.2b.5c | `5246484` | `PublishNotificationJob` + `NotificationPublisher` (T1 claim / T2 atomic publication / T3 failure) |
+| 01B.2b.5d | `27890a1` | `famboook:notifications-reconcile` (stale recovery, automatic retry, orphan re-dispatch) |
+| 01B.2b.6b | `6fadbd7` | Family inbox, archive, detail, explicit view, acknowledgement; `famboook:notifications-expire` |
+| 01B.2b.6c | `3ee4958` | Staff and Coordinator announcement APIs |
+| 01B.2b.6d | `022acc8` | RBAC seeding and verifier (docs/06 AUTH-ADR-097) |
+
+**Implemented as decided:**
+- **ADR-01:** one inbox, `kind` SYSTEM / ANNOUNCEMENT, sources «إدارة Famboook» / «منسق العائلة».
+- **ADR-02:** custom tables.
+- **ADR-03:** family recipients snapshotted by one `INSERT … SELECT`, deduplicated.
+- **ADR-04:** the sender re-read in T2, with a coordinator's assignment rows locked `FOR SHARE`.
+- **ADR-05:** list and detail never record a view; view and acknowledge are explicit POSTs.
+- **ADR-07:** expiry effective at `expires_at` in read models; the sweep archives; late acknowledgement allowed.
+- **ADR-08:** the queued lifecycle and no synchronous fallback.
+- **ADR-10:** ownership 404 on every lookup, per-user rate limits, codes-only audit metadata.
+
+**Decisions taken during implementation** (approved in the phase briefs):
+1. **Retry policy (R4 as decided, 2b.5b):**
+   - `publish_attempts` counts worker claims;
+   - **3** automatic attempts for transient failures (`PUBLICATION_ERROR`, `STALE_PUBLISHING`), with a 60 s / 300 s backoff;
+   - **1** manual retry, counted from `REQUEUED` events by STAFF or COORDINATOR, and available for a transient failure only after the automatic attempts are used;
+   - `AUDIENCE_EMPTY` is manual-only;
+   - `SENDER_NOT_AUTHORIZED`, `AUDIENCE_INVALID` and `EXPIRED_BEFORE_PUBLICATION` are permanent (cancel only);
+   - never more than **4** claims.
+2. **Reconciliation (R5):**
+   - stale `PUBLISHING` after 600 s becomes `PUBLISH_FAILED` / `STALE_PUBLISHING`;
+   - an orphaned `QUEUED` message is re-dispatched after 180 s, at most once per 300 s, throttled by `updated_at` (no migration);
+   - automatic requeues are attributed to SYSTEM;
+   - steps that could lead to publication pause while dispatching is unsafe.
+3. **Readiness:**
+   - mode OFF (default) / PILOT (sender allow-list) / ON;
+   - a `sync` or `null` queue is refused;
+   - the heartbeat must be fresh (≤ 300 s);
+   - timing must satisfy job timeout 60 s < queue `retry_after` < stale 600 s;
+   - readiness is checked after authorization and never grants anything. **Accepted limitation:** a mode switched OFF between T1 and T2 makes T2 refuse, and the attempt is consumed as a transient `PUBLICATION_ERROR`.
+4. **Coordinator history and cancel after revocation (2b.4 / 2b.6c):**
+   - the list, the detail and `/cancel` of their own unpublished messages are routed **outside** `coordinator.space`, so they remain after a scope revocation;
+   - statistics there are counted over the CURRENT scope only (`NO_CURRENT_SCOPE`: none);
+   - preview, draft, publish and retry need the current scope;
+   - losing the COORDINATOR role or permission ends all of it.
+5. **Idempotency:**
+   - `client_reference` (uuid, unique per sender) makes **draft creation** idempotent;
+   - publish, retry, cancel, view and acknowledge are idempotent by state (replays answer 200 with `meta.replayed`).
+6. **Statistics:** aggregate counts only (`recipients`, `with_account`, `without_account`, `viewed`, `not_viewed`, and for IMPORTANT `acknowledged`, `acknowledged_late`, `pending_acknowledgement`); `recipient_count` is the publication-time fact (D2).
+
+**Not implemented:**
+- **SYSTEM notifications (ADR-09):** no discovery command. The gates, cutoff and `SYSTEM_ORIGIN` audience exist and stay closed.
+- **Follow-ups (ADR-06):** the table exists, with no automation, API or seeded permission.
+- **Notice correction (R6).**
+- **Any frontend.**
+
+**Known gaps** (`docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md` §1):
+- **Audience ids:** audiences take canonical integer ids, and no API exposes them. Only `STAFF_ALL_ACTIVE` and `COORDINATOR_SCOPE` can be built by a client. A server-side mapping from public references is needed.
+- **No discovery:** neither publication availability nor the coordinator's notification permission is discoverable.
+
+**Contracts:**
+- **API:** docs/11 §21 "As built".
+- **Permissions:** docs/06 §22b "Unified notifications".
+- **Operations:** docs/08 §16 and `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`.
+
 ## 3. Rationale and alternatives
 | Alternative | Why not |
 |---|---|
@@ -253,8 +324,9 @@ The owner provisionally approved the physical design directions below. They refi
 - **Physical design:** schema, indexes and constraint names (FB-NOTIFY-01B).
 
 ## 7. Implementation prerequisites
-1. Owner review of this ADR and of the physical schema (FB-NOTIFY-01B).
-2. Approval and seeding of the proposed permissions, Staff and `coordinator-*` (docs/06 AUTH-ADR-097).
-3. A queue worker and a scheduler cron verified locally, then a separate, approved Production deployment plan (docs/08 §16).
-4. The family-facing `workflow_events` mapping (ADR-09: RETURNED, REJECTED, APPLIED; provisionally approved).
-5. A retention confirmation (ADR-07).
+1. Owner review of this ADR and of the physical schema (FB-NOTIFY-01B). *Done (01B.1 / 01B.2a).*
+2. Approval and seeding of the proposed permissions, Staff and `coordinator-*` (docs/06 AUTH-ADR-097). *Done for `announcement.*` and `coordinator-announcement.*` (01B.2b.6d, local); follow-up permissions remain proposed.*
+3. A queue worker and a scheduler cron verified locally, then a separate, approved Production deployment plan (docs/08 §16). *Open: checklist in `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`; no plan approved.*
+4. The family-facing `workflow_events` mapping (ADR-09: RETURNED, REJECTED, APPLIED; provisionally approved). *Open: SYSTEM discovery not implemented.*
+5. A retention confirmation (ADR-07). *Open.*
+6. *Added 2026-10-19:* a server-side mapping of public audience references (family code, structure uuid) to canonical ids, before any frontend can address selected families (§2b). *Open.*

@@ -414,6 +414,28 @@ Production configuration must be verified independently, and activating
 the worker and the scheduler needs a separate deployment plan and explicit
 approval. Nothing in this amendment changes the Pilot servers.
 
+*As built 2026-10-19 (FB-NOTIFY-01B.2b, local commits up to `022acc8`;
+recorded in FB-NOTIFY-01B.2b.7; NOT deployed).* The notification code now
+defines these operational components. None of them is installed on the Pilot
+servers.
+
+| Component | What it is | Requirement |
+|---|---|---|
+| `NOTIFICATIONS_MODE` | `OFF` (default) / `PILOT` (`NOTIFICATIONS_PILOT_SENDER_USER_IDS`) / `ON`; invalid values fail closed | stays `OFF` until an approved activation |
+| Queue | `PublishNotificationJob` and `NotificationHeartbeatJob` on the `notifications` queue (`NOTIFICATIONS_QUEUE`) | an asynchronous connection (`database` recommended); `sync` / `null` are refused; job timeout 60 s < `retry_after` (90 s) < stale threshold 600 s |
+| Worker | `queue:work --queue=notifications --tries=1 --timeout=60`, supervised | dedicated, restarted on deploy (`queue:restart`) |
+| Scheduler | `routes/console.php`: the heartbeat job, `famboook:notifications-reconcile` and `famboook:notifications-expire`, every minute (the last two `withoutOverlapping(10)` + `onOneServer()`) | `schedule:run` cron every minute; a shared, lock-capable cache store (`CACHE_STORE=database`) |
+| Heartbeat | cache key written by a worker running the heartbeat job; fresh ≤ `NOTIFICATIONS_HEARTBEAT_MAX_AGE_SECONDS` (300) | stale or absent closes publication (503) |
+| Health check | `famboook:notifications-check` (read-only, codes and counts, exit 1 on warnings) | run after every configuration change and periodically |
+| Reconciliation | stale `PUBLISHING` (> 600 s) recovered; transient failures requeued (3 automatic attempts, 1 manual retry, at most 4 claims); orphaned `QUEUED` re-dispatched after 180 s | needs the cron; pauses its dispatching steps while publication is not ready |
+| Expiry sweep | `PUBLISHED` → `ARCHIVED` at `expires_at`; runs whatever the mode | needs the cron |
+
+- **Not implemented:** SYSTEM discovery and follow-up automation. Their gates (`NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED`, `NOTIFICATIONS_FOLLOWUPS_ENABLED`) stay `false`.
+- **Rollback constraint:** once any message exists, the migrations refuse to roll back, so rollback is code-only with the mode OFF.
+- **Before any PILOT:** the full checklist, which distinguishes code readiness from operational readiness, is
+  `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. It needs its own approved deployment plan.
+- **This amendment changes nothing on the servers.**
+
 ---
 
 # 16a. Family Portal activation prerequisites (not yet applicable)
@@ -1522,6 +1544,7 @@ Never do this once real data has been entered.
 | 1.1.27 | 2026-10-14 | Ready for Review | §16d Coordinator requests release (CO-02): content, dependency migrations (CO-01C / CO-01D.4 first), gates, read-only state step, deployment with the coordinator mode OFF, permission seeding and readiness check, smoke checks, monitoring, feature shutdown, rollback / fix-forward |
 | 1.1.28 | 2026-10-18 | Approved | §16 amended (ADR FB-NOTIFY-01): queue worker and scheduler cron recorded as FB-NOTIFY-01 prerequisites; no server change |
 | 1.1.29 | 2026-10-18 | Approved | §16 (ADR FB-NOTIFY-01, 01B.1 alignment): scheduler and worker dependencies per function (manual publication, SYSTEM discovery and publication, follow-up / expiry); no synchronous fallback; Production readiness unverified; documentation only, no server change |
+| 1.1.30 | 2026-10-19 | Approved | §16 as built (FB-NOTIFY-01B.2b.7): notification mode, queue, dedicated worker, scheduler tasks and locks, heartbeat, `famboook:notifications-check`, reconciliation and expiry sweep; rollback constraint; PILOT readiness checklist `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. Documentation only, no server change |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |
