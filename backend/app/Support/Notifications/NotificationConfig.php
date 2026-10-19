@@ -24,7 +24,8 @@ final class NotificationConfig
         'followups_enabled',
         'queue',
         'heartbeat_max_age_seconds',
-        'max_publish_attempts',
+        'automatic_publish_attempts',
+        'manual_publish_retries',
         'stale_publishing_seconds',
     ];
 
@@ -85,9 +86,22 @@ final class NotificationConfig
         return self::integer('heartbeat_max_age_seconds', 120, 3600);
     }
 
-    public static function maxPublishAttempts(): ?int
+    /** Worker claims after which a transient failure is no longer retried automatically (R4: 3). */
+    public static function automaticPublishAttempts(): ?int
     {
-        return self::integer('max_publish_attempts', 1, 10);
+        return self::integer('automatic_publish_attempts', 1, 3);
+    }
+
+    /** Manual retries a sender may request per message (R4: 1). */
+    public static function manualPublishRetries(): ?int
+    {
+        return self::integer('manual_publish_retries', 0, 1);
+    }
+
+    /** Whether the replaced total-attempts key is still configured (it changes nothing). */
+    public static function legacyMaxPublishAttemptsSet(): bool
+    {
+        return config('notifications.legacy_max_publish_attempts') !== null;
     }
 
     public static function stalePublishingSeconds(): ?int
@@ -129,7 +143,8 @@ final class NotificationConfig
             'followups_enabled' => is_bool(config('notifications.followups_enabled')),
             'queue' => self::queue() !== null,
             'heartbeat_max_age_seconds' => self::heartbeatMaxAgeSeconds() !== null,
-            'max_publish_attempts' => self::maxPublishAttempts() !== null,
+            'automatic_publish_attempts' => self::automaticPublishAttempts() !== null,
+            'manual_publish_retries' => self::manualPublishRetries() !== null,
             'stale_publishing_seconds' => self::stalePublishingSeconds() !== null,
         ];
 

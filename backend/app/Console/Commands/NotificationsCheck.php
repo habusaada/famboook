@@ -9,6 +9,7 @@ use App\Enums\NotificationStatus;
 use App\Support\Notifications\NotificationConfig;
 use App\Support\Notifications\NotificationHeartbeat;
 use App\Support\Notifications\NotificationReadiness;
+use App\Support\Notifications\NotificationRetryPolicy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -23,9 +24,10 @@ use Throwable;
  * the notification tables (or failed_jobs) do not exist in this database.
  *
  * Warnings (exit code 1): invalid configuration, a set but invalid SYSTEM
- * cutoff, an enabled mode or gate that is not ready, PILOT with no usable
- * allow-list, stale PUBLISHING messages, and an enabled mode without the
- * notification tables. The release default (everything OFF) has none.
+ * cutoff, the replaced NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS still set, an
+ * enabled mode or gate that is not ready, PILOT with no usable allow-list,
+ * stale PUBLISHING messages, and an enabled mode without the notification
+ * tables. The release default (everything OFF) has none.
  */
 class NotificationsCheck extends Command
 {
@@ -76,12 +78,20 @@ class NotificationsCheck extends Command
             default => 'VALID',
         };
         $this->line('SYSTEM cutoff: '.$cutoff);
+        $claims = app(NotificationRetryPolicy::class)->claimLimit();
+        $this->line('Retry policy: '.($claims === null
+            ? 'INVALID (no retry)'
+            : NotificationConfig::automaticPublishAttempts().' automatic attempt(s), '.NotificationConfig::manualPublishRetries().' manual retry(ies), at most '.$claims.' claim(s)'));
+        $this->line('Legacy NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS set: '.(NotificationConfig::legacyMaxPublishAttemptsSet() ? 'YES' : 'NO'));
 
         if ($invalid !== []) {
             $this->warnings[] = 'Invalid notification configuration ('.implode(', ', $invalid).') — every notification operation is closed.';
         }
         if ($cutoff === 'INVALID') {
             $this->warnings[] = 'NOTIFICATIONS_SYSTEM_CUTOFF is invalid (ISO-8601 with an offset) — SYSTEM discovery is closed.';
+        }
+        if (NotificationConfig::legacyMaxPublishAttemptsSet()) {
+            $this->warnings[] = 'Remove NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS: it is replaced by NOTIFICATIONS_AUTOMATIC_PUBLISH_ATTEMPTS and NOTIFICATIONS_MANUAL_PUBLISH_RETRIES and changes nothing.';
         }
         if ($mode === NotificationMode::PILOT && ($ids === null || $ids === [])) {
             $this->warnings[] = 'PILOT mode with no usable allow-listed sender: nobody can publish.';

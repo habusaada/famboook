@@ -145,6 +145,32 @@ class NotificationsCheckCommandTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_the_retry_policy_is_reported_and_the_replaced_key_is_flagged(): void
+    {
+        $this->artisan('famboook:notifications-check')
+            ->expectsOutputToContain('Retry policy: 3 automatic attempt(s), 1 manual retry(ies), at most 4 claim(s)')
+            ->expectsOutputToContain('Legacy NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS set: NO')
+            ->assertExitCode(0);
+
+        // The replaced total-attempts key changes nothing, but must be removed.
+        config(['notifications.legacy_max_publish_attempts' => '5']);
+        $this->artisan('famboook:notifications-check')
+            ->expectsOutputToContain('Retry policy: 3 automatic attempt(s), 1 manual retry(ies), at most 4 claim(s)')
+            ->expectsOutputToContain('Legacy NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS set: YES')
+            ->expectsOutputToContain('WARN: Remove NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS')
+            ->assertExitCode(1);
+    }
+
+    public function test_an_invalid_retry_policy_is_reported_as_invalid_configuration(): void
+    {
+        config(['notifications.manual_publish_retries' => 3]);
+
+        $this->artisan('famboook:notifications-check')
+            ->expectsOutputToContain('Configuration: INVALID (manual_publish_retries)')
+            ->expectsOutputToContain('Retry policy: INVALID (no retry)')
+            ->assertExitCode(1);
+    }
+
     public function test_a_pilot_allow_list_is_reported_as_a_count_only(): void
     {
         config(['notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => '987654,876543']);

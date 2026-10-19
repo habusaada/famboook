@@ -94,7 +94,7 @@ class NotificationPublicationReadyMiddlewareTest extends TestCase
 
     public function test_invalid_configuration_is_refused(): void
     {
-        config(['notifications.max_publish_attempts' => 99]);
+        config(['notifications.automatic_publish_attempts' => 99]);
         $this->assertRefused($this->publish());
     }
 

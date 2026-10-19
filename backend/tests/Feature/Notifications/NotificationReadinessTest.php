@@ -43,7 +43,9 @@ class NotificationReadinessTest extends TestCase
         $this->assertNull($shipped['system_cutoff']);
         $this->assertSame('notifications', $shipped['queue']);
         $this->assertSame(300, (int) $shipped['heartbeat_max_age_seconds']);
-        $this->assertSame(3, (int) $shipped['max_publish_attempts']);
+        $this->assertSame(3, (int) $shipped['automatic_publish_attempts']);
+        $this->assertSame(1, (int) $shipped['manual_publish_retries']);
+        $this->assertArrayNotHasKey('max_publish_attempts', $shipped);
         $this->assertSame(600, (int) $shipped['stale_publishing_seconds']);
     }
 
@@ -117,7 +119,8 @@ class NotificationReadinessTest extends TestCase
             'followups_enabled' => 'yes',
             'queue' => 'Bad Queue',
             'heartbeat_max_age_seconds' => 60,
-            'max_publish_attempts' => 0,
+            'automatic_publish_attempts' => 4,
+            'manual_publish_retries' => 2,
             'stale_publishing_seconds' => 'ten',
         ];
         foreach ($invalid as $key => $value) {
@@ -135,13 +138,15 @@ class NotificationReadinessTest extends TestCase
     {
         config([
             'notifications.heartbeat_max_age_seconds' => '120',
-            'notifications.max_publish_attempts' => '10',
+            'notifications.automatic_publish_attempts' => '3',
+            'notifications.manual_publish_retries' => '0',
             'notifications.stale_publishing_seconds' => ' 86400 ',
         ]);
 
         $this->assertSame([], NotificationConfig::invalidKeys());
         $this->assertSame(120, NotificationConfig::heartbeatMaxAgeSeconds());
-        $this->assertSame(10, NotificationConfig::maxPublishAttempts());
+        $this->assertSame(3, NotificationConfig::automaticPublishAttempts());
+        $this->assertSame(0, NotificationConfig::manualPublishRetries());
         $this->assertSame(86400, NotificationConfig::stalePublishingSeconds());
     }
 

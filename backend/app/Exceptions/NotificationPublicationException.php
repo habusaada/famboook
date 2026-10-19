@@ -36,8 +36,11 @@ class NotificationPublicationException extends RuntimeException
     // The last failure is permanent: the message can only be cancelled.
     public const RETRY_NOT_ALLOWED = 'NOTIFICATION_RETRY_NOT_ALLOWED';
 
-    // The maximum number of publication attempts was reached (R4).
+    // The manual retry is used up, or no publication attempt is left (R4).
     public const RETRY_LIMIT_REACHED = 'NOTIFICATION_RETRY_LIMIT_REACHED';
+
+    // A transient failure still has automatic attempts left: no manual retry yet.
+    public const AUTOMATIC_RETRY_PENDING = 'NOTIFICATION_AUTOMATIC_RETRY_PENDING';
 
     private const MESSAGES = [
         self::ACTOR_NOT_ALLOWED => 'لا تملك صلاحية تنفيذ هذا الإجراء على الإشعار.',
@@ -48,6 +51,7 @@ class NotificationPublicationException extends RuntimeException
         self::EXPIRY_TOO_SOON => 'يجب أن يكون موعد انتهاء الإشعار بعد ساعة على الأقل.',
         self::RETRY_NOT_ALLOWED => 'لا يمكن إعادة محاولة نشر هذا الإشعار، ويمكن إلغاؤه.',
         self::RETRY_LIMIT_REACHED => 'تم بلوغ الحد الأقصى لمحاولات النشر، ويمكن إلغاء الإشعار.',
+        self::AUTOMATIC_RETRY_PENDING => 'ستُعاد محاولة نشر الإشعار تلقائيًا.',
     ];
 
     public function __construct(public readonly string $reason)

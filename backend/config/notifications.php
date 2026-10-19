@@ -35,8 +35,21 @@ return [
     // A worker heartbeat older than this is stale (120–3600).
     'heartbeat_max_age_seconds' => env('NOTIFICATIONS_HEARTBEAT_MAX_AGE_SECONDS', 300),
 
-    // Automatic publication attempts before manual retry or cancel (R4, 1–10).
-    'max_publish_attempts' => env('NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS', 3),
+    // Retry policy (R4 as decided in FB-NOTIFY-01B.2b.5b; NotificationRetryPolicy).
+    // A worker claim is one publication attempt (publish_attempts). Transient
+    // failures are retried automatically while fewer than this many attempts
+    // were made (1–3).
+    'automatic_publish_attempts' => env('NOTIFICATIONS_AUTOMATIC_PUBLISH_ATTEMPTS', 3),
+
+    // Manual retries a sender may request per message, after the automatic
+    // attempts are exhausted or for a manual-only failure (0–1). Never more
+    // than 4 worker claims in total, whatever is configured.
+    'manual_publish_retries' => env('NOTIFICATIONS_MANUAL_PUBLISH_RETRIES', 1),
+
+    // The REPLACED total-attempts key (FB-NOTIFY-01B.2b.2). Read only so that
+    // famboook:notifications-check can warn that it is still set: it is NOT
+    // mapped onto the keys above (its "total" meaning would be ambiguous).
+    'legacy_max_publish_attempts' => env('NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS'),
 
     // A PUBLISHING message older than this is a stale candidate (R5, 60–86400).
     'stale_publishing_seconds' => env('NOTIFICATIONS_STALE_PUBLISHING_SECONDS', 600),

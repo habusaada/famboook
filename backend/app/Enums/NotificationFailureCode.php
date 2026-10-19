@@ -27,15 +27,22 @@ enum NotificationFailureCode: string
     case STALE_PUBLISHING = 'STALE_PUBLISHING';
 
     /**
-     * A permanent failure is never retried: the sender must cancel. A retry
-     * re-checks permission, scope, audience and expiry anyway; a permanent
-     * code says that doing so cannot succeed on this message.
+     * The retry class (FB-NOTIFY-01B.2b.5b). Permanent: retrying cannot
+     * succeed on this message — only cancel. Manual-only: an empty audience
+     * is not retried automatically within minutes, but the sender may try
+     * once more. Transient: retried automatically, then once manually.
      */
-    public function isPermanent(): bool
+    public function category(): NotificationFailureCategory
     {
         return match ($this) {
-            self::SENDER_NOT_AUTHORIZED, self::AUDIENCE_INVALID, self::EXPIRED_BEFORE_PUBLICATION => true,
-            self::AUDIENCE_EMPTY, self::PUBLICATION_ERROR, self::STALE_PUBLISHING => false,
+            self::SENDER_NOT_AUTHORIZED, self::AUDIENCE_INVALID, self::EXPIRED_BEFORE_PUBLICATION => NotificationFailureCategory::PERMANENT,
+            self::AUDIENCE_EMPTY => NotificationFailureCategory::MANUAL_ONLY,
+            self::PUBLICATION_ERROR, self::STALE_PUBLISHING => NotificationFailureCategory::TRANSIENT,
         };
+    }
+
+    public function isPermanent(): bool
+    {
+        return $this->category() === NotificationFailureCategory::PERMANENT;
     }
 }

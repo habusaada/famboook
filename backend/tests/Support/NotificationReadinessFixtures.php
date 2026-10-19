@@ -23,7 +23,9 @@ trait NotificationReadinessFixtures
             'notifications.system_cutoff' => null,
             'notifications.queue' => 'notifications',
             'notifications.heartbeat_max_age_seconds' => 300,
-            'notifications.max_publish_attempts' => 3,
+            'notifications.automatic_publish_attempts' => 3,
+            'notifications.manual_publish_retries' => 1,
+            'notifications.legacy_max_publish_attempts' => null,
             'notifications.stale_publishing_seconds' => 600,
         ]);
     }
