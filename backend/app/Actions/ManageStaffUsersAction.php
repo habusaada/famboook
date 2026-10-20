@@ -99,6 +99,11 @@ class ManageStaffUsersAction
         ]);
 
         return DB::transaction(function () use ($actor, $user, $data) {
+            // Serializes a role-only change (syncRoles never touches the users
+            // row) with authorization decisions that hold this row FOR SHARE —
+            // follow-up management (ADR FB-NOTIFY-01 §2e). User row only: no
+            // other lock is taken first, so no cycle.
+            self::lockUser($user);
             $user->fill(array_intersect_key($data, array_flip(['name', 'email'])))->save();
 
             $current = AccountSide::staffRole($user);
@@ -125,6 +130,7 @@ class ManageStaffUsersAction
         }
 
         return DB::transaction(function () use ($actor, $user, $active) {
+            self::lockUser($user);
             if ($user->is_active !== $active) {
                 $user->forceFill(['is_active' => $active])->save();
                 $this->audit($active ? 'staff_user.activated' : 'staff_user.deactivated', $actor, $user);
@@ -193,6 +199,12 @@ class ManageStaffUsersAction
     }
 
     /** @param array<string, mixed> $context never credential values */
+    /** The user row FOR UPDATE, first in the transaction. */
+    private static function lockUser(User $user): void
+    {
+        User::query()->whereKey($user->getKey())->lockForUpdate()->first();
+    }
+
     private function audit(string $event, User $actor, User $target, array $context = []): void
     {
         Log::info($event, ['actor_user_id' => $actor->id, 'target_user_id' => $target->id, ...$context]);

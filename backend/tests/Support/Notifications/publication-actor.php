@@ -47,6 +47,10 @@
  *                                        BRANCH:<id>, GROUP:<id>, CLAN:<id> or a bare branch id;
  *                                        prints "OK" or "REFUSED <code>"
  *   hold-assign <person_id> <target> <admin_id>      the same inside a held transaction
+ *   mutate <name> <args…> / hold-mutate <name> <args…>
+ *                                        an ownership-changing writer (F3.1d): update-family,
+ *                                        update-branch, suspend-link, suspend-identity,
+ *                                        record-death, staff-role — run, or held
  *
  * Synchronization: after READY each actor waits for one STDIN line
  * "<milliseconds>", waits that long and proceeds (holders then commit).
@@ -56,22 +60,34 @@
  */
 
 use App\Actions\AssignCoordinatorScopeAction;
+use App\Actions\ManageClanStructureAction;
+use App\Actions\ManageStaffUsersAction;
 use App\Actions\Notifications\AcknowledgeNotificationAction;
 use App\Actions\Notifications\CloseFollowupManuallyAction;
 use App\Actions\Notifications\RecordFollowupContactAction;
 use App\Actions\Notifications\RecordNotificationViewAction;
+use App\Actions\RecordPersonDeathAction;
 use App\Actions\RevokeCoordinatorRoleAction;
 use App\Actions\RevokeCoordinatorScopeAction;
+use App\Actions\SuspendUserPersonLinkAction;
+use App\Actions\UpdateFamilyAction;
+use App\Enums\AuthIdentityStatus;
 use App\Enums\CoordinatorRevokeReason;
+use App\Enums\LifeStatusVerificationMethod;
+use App\Enums\UserPersonLinkSuspensionReason;
 use App\Exceptions\CoordinatorException;
 use App\Exceptions\NotificationFollowupException;
 use App\Models\Branch;
 use App\Models\BranchGroup;
 use App\Models\Clan;
 use App\Models\CoordinatorScopeAssignment;
+use App\Models\Family;
 use App\Models\Person;
 use App\Models\User;
+use App\Models\UserPersonLink;
 use App\Support\FamilyAuth\FamilyAccessResolver;
+use App\Support\FamilyAuth\FamilyAuthIdentities;
+use App\Support\FamilyAuth\FamilySessions;
 use App\Support\Notifications\NotificationFollowupEngine;
 use App\Support\Notifications\NotificationHeartbeat;
 use App\Support\Notifications\NotificationPublicationFailure;
@@ -303,6 +319,52 @@ try {
             } catch (CoordinatorException $e) {
                 $out('REFUSED '.$e->reason);
             }
+            break;
+
+        case 'mutate':
+        case 'hold-mutate':
+            [, , $name] = $argv;
+            $args = array_slice($argv, 3);
+            $mutation = match ($name) {
+                // UpdateFamilyAction (placement): <family_id> <branch_code|NONE>
+                'update-family' => fn () => app(UpdateFamilyAction::class)->handle(Family::findOrFail((int) $args[0]),
+                    ['branch_code' => $args[1] === 'NONE' ? null : $args[1]], null),
+                // ManageClanStructureAction::updateBranch: <branch_id> inactive | group:<group_id>
+                'update-branch' => fn () => app(ManageClanStructureAction::class)->updateBranch(Branch::findOrFail((int) $args[0]),
+                    $args[1] === 'inactive' ? ['is_active' => false] : ['branch_group' => BranchGroup::findOrFail((int) substr($args[1], 6))]),
+                // SuspendUserPersonLinkAction: <link_id> <admin_id>
+                'suspend-link' => fn () => app(SuspendUserPersonLinkAction::class)->handle(User::findOrFail((int) $args[1]),
+                    UserPersonLink::findOrFail((int) $args[0]), UserPersonLinkSuspensionReason::ADMINISTRATIVE),
+                // The identity-suspension writer's own lock order (FamilyAuthIdentities::
+                // syncAfterNationalIdCorrection: person → link → identity → user), which
+                // no production input reaches today: <person_id>
+                'suspend-identity' => function () use ($args) {
+                    Person::query()->whereKey((int) $args[0])->lockForUpdate()->firstOrFail();
+                    $link = UserPersonLink::query()->where('person_id', (int) $args[0])->current()->lockForUpdate()->firstOrFail();
+                    $identity = app(FamilyAuthIdentities::class)->current($link->user, lock: true);
+                    $identity->forceFill(['status' => AuthIdentityStatus::SUSPENDED])->save();
+                    FamilySessions::revoke($link->user);
+                },
+                // RecordPersonDeathAction: <person_id>
+                'record-death' => fn () => app(RecordPersonDeathAction::class)->handle(Person::findOrFail((int) $args[0]), null,
+                    LifeStatusVerificationMethod::IN_PERSON, null),
+                // ManageStaffUsersAction::update (role only): <user_id> <role> <admin_id>
+                'staff-role' => fn () => app(ManageStaffUsersAction::class)->update(User::findOrFail((int) $args[2]),
+                    User::findOrFail((int) $args[0]), ['role' => $args[1]]),
+            };
+            if ($command === 'hold-mutate') {
+                DB::transaction(function () use ($mutation, $out, $wait) {
+                    $mutation();
+                    $out('READY');
+                    $wait();
+                });
+                $out('OK');
+                break;
+            }
+            $out('READY');
+            $wait();
+            DB::transaction(fn () => $mutation());
+            $out('OK');
             break;
 
         default:

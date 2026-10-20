@@ -4700,7 +4700,11 @@ Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR F
     - A new assignment is therefore seen or waits; the action never completes under a replaced owner.
     - **Rule:** any future path that creates an assignment or edits its scope must take the same clan lock first.
   - **Lock timeout:** SQLSTATE `55P03` must be answered as retryable by the F3.2 API.
-  - **Still not serialized** (ADR §2e): family placement changes, structure changes (activation, regrouping), a coordinator's own household eligibility, and role–permission mappings.
+  - **Hardened (F3.1d, ADR §2e):**
+    - Coordinator actions also share-lock the target family, its branch and group, and every candidate's person, current link and current identity rows, in the writers' own order.
+    - `ManageStaffUsersAction` locks the user row first for role or activation changes.
+    - As a result, family placement, branch activation and regrouping, link suspension, death, identity changes and Staff role changes are serialized with contact and closure.
+  - **Still not serialized:** role–permission mappings (procedurally, by the deployment maintenance window), and writers that do not exist in the application today (head succession, family status, person deactivation). Any future writer of these must lock the person or family row first.
 
 ### AUTH-ADR-096
 Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).

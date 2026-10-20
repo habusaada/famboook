@@ -485,16 +485,36 @@ An inactive family is CENTRAL (§2c): only Staff close it, e.g. with `FAMILY_INA
 - **Authorization point:** the ownership ranking that runs while the clan row (and the rows below) are locked. A new assignment either committed before it, so the ranking sees it, or waits for the action to commit. The action never completes under an owner that a committed assignment has already replaced.
 - **Rule for future code:** any future path that creates an assignment, or edits an assignment's scope, MUST take the same clan lock first. Editing a scope would mean both clans, in id order.
 
-**Lock order:**
+**Lock order (F3.1b, extended by F3.1d hardening, 2026-10-20).** All locks are FOR SHARE unless stated; every multi-row step is taken by id.
 - **Coordinator action:**
-  0. **The family's clan row FOR SHARE**, before the recipient. A coordinator action waiting for an assignment therefore never holds up the family's view or acknowledgement or the scheduler. The family's `clan_id` is re-checked after the recipient lock; if the family moved, the action refuses with `FOLLOWUP_OWNERSHIP_CHANGED`.
-  1. **The recipient row FOR UPDATE.**
-  2. **The follow-up row FOR UPDATE.**
-  3. **Users FOR SHARE, by id:** the actor and every CURRENT ownership candidate. Locking the candidates, not only the actor, avoids a multi-row lock cycle with a role revocation of another candidate.
-  4. **Those users' non-revoked assignments FOR SHARE, by id.**
-  5. **Ownership resolved again under the locks;** the action is allowed only if the actor is still the eligible primary coordinator. An unlocked candidate gives `FOLLOWUP_OWNERSHIP_CHANGED`, which is defensive: the clan lock makes it unreachable through assignment creation.
-- **Staff action (unchanged):** recipient FOR UPDATE → follow-up FOR UPDATE → the actor's user row FOR SHARE.
+  - **Placement, before the recipient.** A coordinator action waiting for an administrator therefore never holds up the family's view or acknowledgement, or the scheduler.
+    - a. **The family's clan row.**
+    - b. **The target family row.** Its `clan_id` is re-checked; if the family moved, the action refuses with `FOLLOWUP_OWNERSHIP_CHANGED`.
+    - c. **The family's branch row, then that branch's group row.**
+  - d. **The recipient row FOR UPDATE.**
+  - e. **The follow-up row FOR UPDATE.**
+  - **Eligibility of the actor and every CURRENT candidate, in the writers' own order** (person → link → identity → user):
+    - f. **Their person rows.**
+    - g. **Their current user-person link rows.**
+    - h. **Their current family auth identity rows.**
+    - i. **Their user rows.**
+    - j. **Their non-revoked assignments.**
+  - k. **Ownership resolved again under the locks.** A candidate, link or person row that appeared meanwhile and is not locked gives `FOLLOWUP_OWNERSHIP_CHANGED`, with nothing written.
+- **Staff action:** recipient FOR UPDATE → follow-up FOR UPDATE → the actor's user row FOR SHARE. `ManageStaffUsersAction::update` and `setActive` now lock that user row FOR UPDATE first, so a role-only change (Spatie `syncRoles`, which never touches the users row) is serialized too.
 - **Timeouts:** transactions set `lock_timeout` 5 s and `statement_timeout` 45 s locally. A lock wait that times out raises SQLSTATE **`55P03`** (a `QueryException`, not a `NotificationFollowupException`). **The API stage (F3.2) must answer it as retryable** (for example 409 or 503 with retry) and write nothing.
+
+**Serialized writers** (each waits for a running action, or the action waits for it and then decides on the new state):
+
+| Writer | Its locks (order) | Meets the action at |
+|---|---|---|
+| `AssignCoordinatorScopeAction` | clan NO KEY UPDATE → user FOR UPDATE → INSERT | clan (a) |
+| `UpdateFamilyAction` (`FamilyLineage::apply`, placement) | UPDATE families (row lock; FK key-share on the new clan or branch) | family (b) |
+| `ManageClanStructureAction::updateBranch` (activation, regrouping) / `updateGroup` / `updateClan` | single-row UPDATE (regrouping: FK key-share on the new group) | branch / group / clan (c, a) |
+| `RecordPersonDeathAction`, `ConfirmPersonAliveAction`, `CorrectNationalIdAction`, `ResetFamilyPasswordAction`, `EstablishFamilyIdentityAction` | person FOR UPDATE first (then link → identity → users UPDATE through session revocation) | person (f) |
+| `SuspendUserPersonLinkAction`, `ResumeUserPersonLinkAction`, `EndUserPersonLinkAction` | link FOR UPDATE (→ identity → users UPDATE) | link (g) |
+| identity supersession / suspension (`FamilyAuthIdentities`) | person → link → identity FOR UPDATE | person (f) |
+| `Grant/RevokeCoordinatorRoleAction`, `ChangeFamilyPasswordAction`, `ManageStaffUsersAction` (update / setActive), session revocation | user FOR UPDATE / UPDATE users | user (i) |
+| `RevokeCoordinatorScopeAction` | assignment FOR UPDATE | assignment (j) |
 
 How each coordinator administration action interacts:
 
@@ -505,11 +525,19 @@ How each coordinator administration action interacts:
 | Revoke role | user FOR UPDATE → the user's assignments FOR UPDATE | waits on the user FOR SHARE (or the action waits for it) |
 | Grant role | user FOR UPDATE | waits on the user FOR SHARE for a current candidate |
 
-**Lock-order audit (from the code):**
-- **No user-then-clan path.** No path takes a user lock and then a clan lock. The only clan lockers are this action (FOR SHARE), the change-request placement check (request FOR UPDATE → clan FOR SHARE → branch FOR SHARE; no user, recipient or follow-up locks) and assignment creation (clan → user).
-- **Structure and placement edits:** clan, group and branch structure edits and family placement updates (`UpdateFamilyAction`) are plain row UPDATEs with no earlier lock. A clan UPDATE briefly waits for these share locks.
-- **Change requests:** change-request family locks never lead to a clan or user lock.
-- **Notifications:** family view and acknowledgement, the F2 engine, the expiry sweep, the reconciler and the publication worker take no clan or user locks.
+**Lock-order audit (from the code, F3.1d).** Every writer's order is a subsequence of the action's order:
+- **Family → person:** change-request canonical locks, `CreateFamilyMembershipAction`, `AttachFamilyMemberAction`.
+- **Person → link → identity → user:** link lifecycle, death and National ID correction; `FamilySessions::revoke` UPDATEs `users.remember_token` last.
+- **Person → user:** password reset.
+- **Clan → user:** assignment creation.
+- **User → assignments:** role revocation.
+- **Single-row UPDATEs:** structure and placement edits.
+
+Inverse orders found:
+- **No locking inversion.** No writer locks a person, link, identity or user and then a family, branch, group or clan FOR UPDATE / NO KEY UPDATE.
+- **Key-share only:** the only family lock taken after a person lock is an activity-log foreign-key key-share (death), which is compatible with FOR SHARE. National ID correction takes family key-share before its person lock.
+- **Family view and acknowledgement, and the engine:** they lock none of these rows. Their event inserts take key-share on the head user only, also compatible.
+- **Other clan lockers:** the change-request placement check takes request FOR UPDATE → clan FOR SHARE → branch FOR SHARE, with no family, person, link, identity or user lock.
 
 No cycle was found. This is not a claim of system-wide deadlock freedom: PostgreSQL's deadlock detection and the lock timeout remain the backstop.
 
@@ -529,14 +557,36 @@ The family view and acknowledgement and the expiry closure take the recipient fi
 | Two closures | one wins; the other gets `FOLLOWUP_NOT_OPEN` | — |
 | Three sessions: assignment, action, acknowledgement | the action holds the clan row and the recipient; both others wait, then proceed; no deadlock | the assignment holds the clan row; the action waits WITHOUT the recipient, so the acknowledgement goes through at once; the action is then refused |
 
-**Limitations: ownership changes that are NOT serialized.** Any of these may still let one action complete under an owner they change:
-- **Family placement changes:** a family moved after the clan re-check, or a branch change within the clan (`UpdateFamilyAction`, plain UPDATE).
-- **Structural changes:** a branch or group activated or deactivated, or a branch regrouped (`ManageClanStructureAction`), changes coverage and eligibility without touching an assignment.
-- **The coordinator's own household eligibility:** household-head membership, person link, identity, or the status of their own family.
-- **Permission mappings:** role–permission changes (seeder) and Staff role changes made outside these actions (Spatie, ADR-04). The Staff user row is locked FOR SHARE, which only serializes writers that lock or update it.
+**Verified on PostgreSQL, F3.1d** (`FollowupAuthorizationRaceTest`). Each scenario was run in both orders, and the waiter's tuple lock was seen on the expected table:
+
+| Writer | Against | Table waited on |
+|---|---|---|
+| family placement | contact, closure | `families` |
+| branch deactivation | contact | `branches` |
+| branch regrouping | closure | `branches` |
+| coordinator link suspension | contact | `user_person_links` |
+| coordinator identity suspension (the writer's own lock order; see below) | closure | `persons` |
+| coordinator death (an eligibility change against an already running action, and the reverse) | — | `persons` |
+| Staff role-only change | closure | `users` |
+| three sessions (placement, action, acknowledgement) | both orders | `families` and `notification_recipients` |
+
+- **Action first:** the action completes, the writer commits after it, and the next action is refused.
+- **Writer first:** the action is refused with nothing written.
+- **Three sessions:** no deadlock. While the action waits on the family row, the family's acknowledgement goes through.
+
+**Limitations (honest):**
+- **Role–permission mappings:** `RolePermissionSeeder` (`syncPermissions`) takes no lock that conflicts with these actions, and Spatie caches permissions. It runs only inside the deployment's maintenance window (`deploy-backend.sh`: `artisan down` → seed → `up`), which keeps it out of request handling. That is a procedural guarantee, not a database lock.
+- **Writers that do not exist in the application today:**
+  - household-head succession (FU-01);
+  - family status changes (only creation sets a family's status);
+  - person deactivation or deletion;
+  - a candidate's own-family membership (no writer can end a head membership or flip `is_household_head`).
+
+  An out-of-band database edit of these is not serialized. **Rule:** any future writer of them must lock the person row (and, for a family, the family row) FOR UPDATE first, inside the order above.
+- **Identity suspension:** no production input reaches it today. The registry accepts only valid nine-digit National IDs, so `syncAfterNationalIdCorrection` never suspends. The test uses that writer's own lock order.
 - **Clock:** time decisions use the application server's clock (§2d).
 
-These do not involve an assignment mutation and are outside the clan-row protocol. Complete serialization of every possible ownership change is **not** claimed.
+Complete serialization of every possible ownership change is **not** claimed.
 
 ## 3. Rationale and alternatives
 | Alternative | Why not |
