@@ -452,6 +452,92 @@ DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER hold none of
 
 **Not built:** Staff or Coordinator follow-up APIs, contact and manual-closure actions, owner alerts, UI, the SYSTEM producer and any external channel.
 
+## 2e. Follow-up contact and manual closure actions (FB-NOTIFY-01E.3-F3.1, 2026-10-20)
+
+**Local code only:** not committed, not deployed. There is **no route and no screen**, and no migration. Assignment creation now takes the clan lock (below). Two Domain Actions share one lock-then-authorize step (`App\Support\Notifications\FollowupManagement`):
+
+| Action | Effect | Event |
+|---|---|---|
+| `RecordFollowupContactAction` | none on the follow-up or the recipient; it never closes | `CONTACT_RECORDED`: actor STAFF / COORDINATOR, `reason_code` a contact outcome (`CALLED_INFORMED`, `CALLED_NO_ANSWER`, `VISITED`, `MESSAGE_LEFT`, `OTHER`), optional note, metadata `stage` |
+| `CloseFollowupManuallyAction` | OPEN → CLOSED / CLOSED_MANUALLY; `closed_at`, `closed_by_user_id`, `close_reason_code` (`INFORMED_BY_PHONE`, `INFORMED_IN_PERSON`, `FAMILY_UNREACHABLE`, `FAMILY_INACTIVE`, `NOT_APPLICABLE`) | exactly one `FOLLOWUP_CLOSED`: same actor, same reason code, optional note, metadata `stage`, `outcome` |
+
+- **Domain-boundary validation:** reason codes are validated against their enum before any lock. The note is trimmed and must be 1..1000 characters; otherwise it is refused. Notes are never logged.
+- **Refusals write nothing:** each refusal is a `NotificationFollowupException` with a stable code (`FOLLOWUP_NOT_FOUND`, `_ACTOR_NOT_ALLOWED`, `_NOT_OPEN`, `_EXPIRED`, `_REASON_INVALID`, `_NOTE_INVALID`, `_OWNERSHIP_CHANGED`) and leaves no event and no state change. A failed event rolls the closure back.
+- **Never the recipient:** neither action touches the recipient: no view, no acknowledgement, no impersonation of the family. A CLOSED stage is never reopened. Closing FIRST never suppresses an IMPORTANT SECOND.
+- **Expiry wins:** at or after `expires_at`, or for an ARCHIVED message, both actions are refused with `FOLLOWUP_EXPIRED`; the scheduler closes the stage EXPIRED.
+
+**Authorization (re-evaluated under the locks):**
+
+| Actor | Contact / manual closure |
+|---|---|
+| SUPER_ADMIN, ADMINISTRATOR (active, Staff side, `notification-followup.manage`) | every follow-up, CENTRAL ones included |
+| COORDINATOR, the family's CURRENT primary coordinator (`coordinator-notification-followup.manage`, current family context, `coordinator-space.access`, effective scope) | allowed |
+| COORDINATOR in scope but not primary; out of scope; only a revoked (historical) assignment; their own household | refused |
+| DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER, FAMILY_USER, any inactive account, a role that lost the permission | refused |
+
+An inactive family is CENTRAL (§2c): only Staff close it, e.g. with `FAMILY_INACTIVE`.
+
+**Clan-row ownership protocol (FB-NOTIFY-01E.3-F3.1b, 2026-10-20).** It prevents a phantom primary owner created by a concurrent assignment.
+- **Why the clan row:** every assignment that covers a family carries that family's `clan_id`. That equality is enforced both in the ranking and in `CoordinatorScopes`. `clan_id` is NOT NULL on assignments and never updated, and the composite FKs keep a group or branch inside its clan. A branch or group row would not work: a CLAN-level assignment never references them, and a family may have no branch.
+- **Assignment creation** (`AssignCoordinatorScopeAction`, the only writer that creates assignments) locks the target's clan row FOR NO KEY UPDATE, before the target user, for CLAN, BRANCH_GROUP and BRANCH alike.
+  - NO KEY UPDATE, not UPDATE, so the FK key-share locks taken by inserts under the clan (families, branches, change requests) are not blocked.
+- **Coordinator follow-up actions** lock the family's clan row FOR SHARE first, then resolve ownership under it.
+- **Authorization point:** the ownership ranking that runs while the clan row (and the rows below) are locked. A new assignment either committed before it, so the ranking sees it, or waits for the action to commit. The action never completes under an owner that a committed assignment has already replaced.
+- **Rule for future code:** any future path that creates an assignment, or edits an assignment's scope, MUST take the same clan lock first. Editing a scope would mean both clans, in id order.
+
+**Lock order:**
+- **Coordinator action:**
+  0. **The family's clan row FOR SHARE**, before the recipient. A coordinator action waiting for an assignment therefore never holds up the family's view or acknowledgement or the scheduler. The family's `clan_id` is re-checked after the recipient lock; if the family moved, the action refuses with `FOLLOWUP_OWNERSHIP_CHANGED`.
+  1. **The recipient row FOR UPDATE.**
+  2. **The follow-up row FOR UPDATE.**
+  3. **Users FOR SHARE, by id:** the actor and every CURRENT ownership candidate. Locking the candidates, not only the actor, avoids a multi-row lock cycle with a role revocation of another candidate.
+  4. **Those users' non-revoked assignments FOR SHARE, by id.**
+  5. **Ownership resolved again under the locks;** the action is allowed only if the actor is still the eligible primary coordinator. An unlocked candidate gives `FOLLOWUP_OWNERSHIP_CHANGED`, which is defensive: the clan lock makes it unreachable through assignment creation.
+- **Staff action (unchanged):** recipient FOR UPDATE → follow-up FOR UPDATE → the actor's user row FOR SHARE.
+- **Timeouts:** transactions set `lock_timeout` 5 s and `statement_timeout` 45 s locally. A lock wait that times out raises SQLSTATE **`55P03`** (a `QueryException`, not a `NotificationFollowupException`). **The API stage (F3.2) must answer it as retryable** (for example 409 or 503 with retry) and write nothing.
+
+How each coordinator administration action interacts:
+
+| Admin action | Locks (order) | Against a coordinator follow-up action |
+|---|---|---|
+| Assign scope | clan NO KEY UPDATE → target user FOR UPDATE → INSERT | waits on the clan row (or the action waits for it) |
+| Revoke scope | that assignment FOR UPDATE | waits on the assignment FOR SHARE (or the action waits for it) |
+| Revoke role | user FOR UPDATE → the user's assignments FOR UPDATE | waits on the user FOR SHARE (or the action waits for it) |
+| Grant role | user FOR UPDATE | waits on the user FOR SHARE for a current candidate |
+
+**Lock-order audit (from the code):**
+- **No user-then-clan path.** No path takes a user lock and then a clan lock. The only clan lockers are this action (FOR SHARE), the change-request placement check (request FOR UPDATE → clan FOR SHARE → branch FOR SHARE; no user, recipient or follow-up locks) and assignment creation (clan → user).
+- **Structure and placement edits:** clan, group and branch structure edits and family placement updates (`UpdateFamilyAction`) are plain row UPDATEs with no earlier lock. A clan UPDATE briefly waits for these share locks.
+- **Change requests:** change-request family locks never lead to a clan or user lock.
+- **Notifications:** family view and acknowledgement, the F2 engine, the expiry sweep, the reconciler and the publication worker take no clan or user locks.
+
+No cycle was found. This is not a claim of system-wide deadlock freedom: PostgreSQL's deadlock detection and the lock timeout remain the backstop.
+
+The family view and acknowledgement and the expiry closure take the recipient first, so they serialize on it.
+
+**Verified on PostgreSQL** (`FollowupManagementConcurrencyTest`). Waiting is proven through `pg_stat_activity`, and for the clan lock through the waiter's tuple lock on `clans` in `pg_locks`, not by timing:
+
+| Scenario | Action first | The other session first |
+|---|---|---|
+| New, more specific assignment (a non-candidate) vs contact, and vs manual closure | the assignment waits on the clan row; the action completes; the assignment then commits | the action waits on the clan row, sees the new primary and is refused |
+| CLAN- and GROUP-level assignments | they wait on the clan row too | — |
+| Scope revocation vs contact or closure | the revocation waits; the action completes | the action waits, then is refused |
+| Role revocation vs contact or closure | the revocation waits; the action completes | the action waits, then is refused |
+| Two assignments in one clan | serialized; an identical one gets `SCOPE_EXISTS` | — |
+| Family acknowledgement vs closure | the acknowledgement waits and satisfies only the stage still OPEN | the closure gets `FOLLOWUP_NOT_OPEN` |
+| Expiry vs closure | the scheduler skips the held recipient, so a stage is never closed twice | the closure is refused |
+| Two closures | one wins; the other gets `FOLLOWUP_NOT_OPEN` | — |
+| Three sessions: assignment, action, acknowledgement | the action holds the clan row and the recipient; both others wait, then proceed; no deadlock | the assignment holds the clan row; the action waits WITHOUT the recipient, so the acknowledgement goes through at once; the action is then refused |
+
+**Limitations: ownership changes that are NOT serialized.** Any of these may still let one action complete under an owner they change:
+- **Family placement changes:** a family moved after the clan re-check, or a branch change within the clan (`UpdateFamilyAction`, plain UPDATE).
+- **Structural changes:** a branch or group activated or deactivated, or a branch regrouped (`ManageClanStructureAction`), changes coverage and eligibility without touching an assignment.
+- **The coordinator's own household eligibility:** household-head membership, person link, identity, or the status of their own family.
+- **Permission mappings:** role–permission changes (seeder) and Staff role changes made outside these actions (Spatie, ADR-04). The Staff user row is locked FOR SHARE, which only serializes writers that lock or update it.
+- **Clock:** time decisions use the application server's clock (§2d).
+
+These do not involve an assignment mutation and are outside the clan-row protocol. Complete serialization of every possible ownership change is **not** claimed.
+
 ## 3. Rationale and alternatives
 | Alternative | Why not |
 |---|---|

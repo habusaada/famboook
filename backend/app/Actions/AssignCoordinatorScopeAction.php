@@ -27,7 +27,21 @@ use Illuminate\Support\Facades\DB;
  * Requires the COORDINATOR role ALREADY held (an assignment never grants the
  * role), a family-side account of THIS Person that still has its Family
  * context, and an ACTIVE target. The same active scope twice is refused (the
- * partial unique indexes are the backstop). Written in the existing typed
+ * partial unique indexes are the backstop).
+ *
+ * Ownership serialization (FB-NOTIFY-01E.3-F3.1b; ADR FB-NOTIFY-01 §2e): the
+ * target's CLAN row is locked FOR NO KEY UPDATE (PostgreSQL) BEFORE the
+ * user row — for CLAN, BRANCH_GROUP and BRANCH alike (every assignment has
+ * the clan_id of the families it covers). Coordinator follow-up management
+ * holds the family's clan row FOR SHARE while it resolves the primary
+ * coordinator, so a new assignment either commits before that resolution
+ * (and is seen) or waits until the follow-up action commits — never a
+ * phantom owner. NO KEY UPDATE, not UPDATE: the foreign-key KEY SHARE locks
+ * of rows inserted under the clan (families, branches, requests) are not
+ * blocked. Lock order: clan → user. Any future path that creates or edits an
+ * assignment's scope MUST take the same clan lock first.
+ *
+ * Written in the existing typed
  * columns: clan_id always, plus branch_group_id or branch_id — never a
  * polymorphic reference.
  */
@@ -40,6 +54,10 @@ class AssignCoordinatorScopeAction
         Coordinators::authorize($actor);
 
         return DB::transaction(function () use ($actor, $person, $target) {
+            // Clan first (ownership serialization), then the user.
+            Clan::query()->whereKey($target instanceof Clan ? $target->getKey() : $target->clan_id)
+                ->lock(DB::getDriverName() === 'pgsql' ? 'for no key update' : true)
+                ->first();
             $account = Coordinators::accountOf($person);
             if ($account === null) {
                 throw new CoordinatorException(CoordinatorException::NO_FAMILY_ACCOUNT);

@@ -4689,6 +4689,18 @@ Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR F
   - **Seeded:** `notification-followup.view` / `.manage` to SUPER_ADMIN and ADMINISTRATOR; `coordinator-notification-followup.view` / `.manage` to COORDINATOR only. Catalog 158 → 162; still eight roles; no other mapping changes; the verifier asserts all eight roles and refuses direct grants.
   - **Narrowed:** "follow-up actions need the current scope" now means: any in-scope coordinator VIEWS (their own household included); only the family's single, dynamically resolved PRIMARY coordinator records contacts or closes manually; no coordinator is ever primary for, or manages, their own household's follow-ups (ownership falls to the next eligible coordinator, or CENTRAL); SUPER_ADMIN and ADMINISTRATOR manage every follow-up. Enforced by the future Domain Actions, never only the UI.
   - **Unchanged:** SOCIAL_WORKER has no follow-up access; nobody records a view or acknowledgement for a family.
+- **Enforced 2026-10-20 (FB-NOTIFY-01E.3-F3.1, local, uncommitted; ADR FB-NOTIFY-01 §2e):**
+  - **Where:** the contact and manual-closure Domain Actions (`RecordFollowupContactAction`, `CloseFollowupManuallyAction`) re-check the rules above under row locks.
+    - **Staff:** an active Staff-side SUPER_ADMIN or ADMINISTRATOR with `notification-followup.manage`.
+    - **Coordinator:** the CURRENT primary coordinator with `coordinator-notification-followup.manage`, never for their own household.
+  - **Not exposed:** no route or screen exists yet.
+  - **Clan-row protocol (F3.1b):** no phantom primary owner from a concurrent assignment.
+    - `AssignCoordinatorScopeAction` locks the target's clan row FOR NO KEY UPDATE before the user row.
+    - Coordinator follow-up actions lock the family's clan row FOR SHARE before anything else and resolve ownership under it.
+    - A new assignment is therefore seen or waits; the action never completes under a replaced owner.
+    - **Rule:** any future path that creates an assignment or edits its scope must take the same clan lock first.
+  - **Lock timeout:** SQLSTATE `55P03` must be answered as retryable by the F3.2 API.
+  - **Still not serialized** (ADR §2e): family placement changes, structure changes (activation, regrouping), a coordinator's own household eligibility, and role–permission mappings.
 
 ### AUTH-ADR-096
 Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).

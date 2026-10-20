@@ -34,6 +34,19 @@
  *                                        transaction right after its first event INSERT
  *                                        (the recipient and follow-up rows held): prints
  *                                        PAUSED, then waits for one more STDIN line
+ *   followup-contact[-pause] <user_id> <followup_uuid> <outcome>
+ *   followup-close[-pause]   <user_id> <followup_uuid> <reason>
+ *                                        RecordFollowupContactAction / CloseFollowupManuallyAction
+ *                                        (FB-NOTIFY-01E.3-F3.1); -pause stops at the event INSERT,
+ *                                        every lock held: PAUSED, then one more STDIN line.
+ *                                        Prints "OK" or "DENIED <code>"
+ *   revoke-scope <assignment_id> <admin_id>      RevokeCoordinatorScopeAction
+ *   revoke-role <person_id> <admin_id>           RevokeCoordinatorRoleAction
+ *   hold-revoke-role <person_id> <admin_id>      the same inside a held transaction
+ *   assign-scope <person_id> <target> <admin_id>     AssignCoordinatorScopeAction; <target> is
+ *                                        BRANCH:<id>, GROUP:<id>, CLAN:<id> or a bare branch id;
+ *                                        prints "OK" or "REFUSED <code>"
+ *   hold-assign <person_id> <target> <admin_id>      the same inside a held transaction
  *
  * Synchronization: after READY each actor waits for one STDIN line
  * "<milliseconds>", waits that long and proceeds (holders then commit).
@@ -42,11 +55,21 @@
  * Never a value.
  */
 
+use App\Actions\AssignCoordinatorScopeAction;
 use App\Actions\Notifications\AcknowledgeNotificationAction;
+use App\Actions\Notifications\CloseFollowupManuallyAction;
+use App\Actions\Notifications\RecordFollowupContactAction;
 use App\Actions\Notifications\RecordNotificationViewAction;
+use App\Actions\RevokeCoordinatorRoleAction;
 use App\Actions\RevokeCoordinatorScopeAction;
 use App\Enums\CoordinatorRevokeReason;
+use App\Exceptions\CoordinatorException;
+use App\Exceptions\NotificationFollowupException;
+use App\Models\Branch;
+use App\Models\BranchGroup;
+use App\Models\Clan;
 use App\Models\CoordinatorScopeAssignment;
+use App\Models\Person;
 use App\Models\User;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\Notifications\NotificationFollowupEngine;
@@ -196,6 +219,90 @@ try {
             $out('READY');
             $wait();
             $out('OK '.json_encode(app(NotificationFollowupEngine::class)->run((int) $limit)));
+            break;
+
+        case 'followup-contact':
+        case 'followup-contact-pause':
+        case 'followup-close':
+        case 'followup-close-pause':
+            [, , $userId, $uuid, $code] = $argv;
+            if (str_ends_with($command, '-pause')) {
+                $paused = false;
+                DB::listen(function ($query) use ($out, &$paused) {
+                    if (! $paused && str_starts_with(strtolower(ltrim($query->sql)), 'insert into "notification_recipient_events"')) {
+                        $paused = true;
+                        $out('PAUSED');
+                        fgets(STDIN);
+                    }
+                });
+            }
+            $actor = User::findOrFail((int) $userId);
+            $out('READY');
+            $wait();
+            try {
+                str_starts_with($command, 'followup-contact')
+                    ? app(RecordFollowupContactAction::class)->handle($actor, $uuid, $code)
+                    : app(CloseFollowupManuallyAction::class)->handle($actor, $uuid, $code);
+                $out('OK');
+            } catch (NotificationFollowupException $e) {
+                $out('DENIED '.$e->reason);
+            }
+            break;
+
+        case 'revoke-scope':
+            [, , $assignmentId, $adminId] = $argv;
+            $out('READY');
+            $wait();
+            app(RevokeCoordinatorScopeAction::class)->handle(User::findOrFail((int) $adminId),
+                CoordinatorScopeAssignment::findOrFail((int) $assignmentId), CoordinatorRevokeReason::ADMINISTRATIVE);
+            $out('OK');
+            break;
+
+        case 'revoke-role':
+            [, , $personId, $adminId] = $argv;
+            $out('READY');
+            $wait();
+            app(RevokeCoordinatorRoleAction::class)->handle(User::findOrFail((int) $adminId), Person::findOrFail((int) $personId), CoordinatorRevokeReason::ADMINISTRATIVE);
+            $out('OK');
+            break;
+
+        case 'hold-revoke-role':
+            [, , $personId, $adminId] = $argv;
+            DB::transaction(function () use ($personId, $adminId, $out, $wait) {
+                app(RevokeCoordinatorRoleAction::class)->handle(User::findOrFail((int) $adminId), Person::findOrFail((int) $personId), CoordinatorRevokeReason::ADMINISTRATIVE);
+                $out('READY');
+                $wait();
+            });
+            $out('OK');
+            break;
+
+        case 'assign-scope':
+        case 'hold-assign':
+            [, , $personId, $targetSpec, $adminId] = $argv;
+            [$kind, $targetId] = str_contains($targetSpec, ':') ? explode(':', $targetSpec, 2) : ['BRANCH', $targetSpec];
+            $target = match ($kind) {
+                'CLAN' => Clan::findOrFail((int) $targetId),
+                'GROUP' => BranchGroup::findOrFail((int) $targetId),
+                default => Branch::findOrFail((int) $targetId),
+            };
+            $assign = fn () => app(AssignCoordinatorScopeAction::class)->handle(User::findOrFail((int) $adminId), Person::findOrFail((int) $personId), $target);
+            if ($command === 'hold-assign') {
+                DB::transaction(function () use ($assign, $out, $wait) {
+                    $assign();
+                    $out('READY');
+                    $wait();
+                });
+                $out('OK');
+                break;
+            }
+            $out('READY');
+            $wait();
+            try {
+                $assign();
+                $out('OK');
+            } catch (CoordinatorException $e) {
+                $out('REFUSED '.$e->reason);
+            }
             break;
 
         default:
