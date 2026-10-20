@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\AccountSide;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
 
@@ -114,14 +115,24 @@ final class NotificationEventRecorder
         ?string $reasonCode = null,
         ?string $internalNote = null,
         array $metadata = [],
+        ?string $clientReference = null,
     ): NotificationRecipientEvent {
         $this->assertInTransaction();
         $this->assertScope($type, 'FOLLOWUP');
         if ($type === NotificationEventType::NOTE_CORRECTION) {
             throw new InvalidArgumentException('A note correction is recorded with correction().');
         }
+        // Contact idempotency (F3.2; chk_nre_client_reference): a uuid, on a
+        // person's CONTACT_RECORDED only.
+        if ($clientReference !== null && ($type !== NotificationEventType::CONTACT_RECORDED || $actor === null || ! Str::isUuid($clientReference))) {
+            throw new InvalidArgumentException('A client reference is a uuid on a contact recorded by a person only.');
+        }
+        $references = $this->followupColumns($followup);
+        if ($clientReference !== null) {
+            $references['client_reference'] = strtolower($clientReference);
+        }
 
-        return $this->write($type, $side, $actor, $reasonCode, $internalNote, $metadata, $this->followupColumns($followup));
+        return $this->write($type, $side, $actor, $reasonCode, $internalNote, $metadata, $references);
     }
 
     /**
@@ -149,7 +160,7 @@ final class NotificationEventRecorder
         ]);
     }
 
-    /** @param  array<string, int|null>  $references */
+    /** @param  array<string, int|string|null>  $references */
     private function write(
         NotificationEventType $type,
         WorkflowActorSide $side,

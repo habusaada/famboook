@@ -296,6 +296,16 @@ class FamilySideBoundaryTest extends TestCase
                 };
                 $this->assertSame($expected, $middleware, $route->uri());
             }
+            // Coordinator follow-ups (FB-NOTIFY-01E.3-F3.2): all behind
+            // coordinator.space (the CURRENT scope), a coordinator-notification-
+            // followup.* permission and a per-user throttle.
+            if (str_starts_with($route->uri(), 'api/v1/family/coordinator/followups')) {
+                $space = ['api', 'auth:sanctum', 'family.side', 'coordinator.space'];
+                $expected = in_array('GET', $route->methods(), true)
+                    ? [...$space, 'can:coordinator-notification-followup.view', 'throttle:coordinator-followup-read']
+                    : [...$space, 'can:coordinator-notification-followup.manage', 'throttle:coordinator-followup-write'];
+                $this->assertSame($expected, $middleware, $route->uri());
+            }
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
@@ -307,7 +317,8 @@ class FamilySideBoundaryTest extends TestCase
         // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2)
         // + the Coordinator summary (FB-FAMILY-DASHBOARD-01) + the five
         // notification routes (FB-NOTIFY-01B.2b.6b) + the seven Coordinator
-        // announcement routes (FB-NOTIFY-01B.2b.6c).
-        $this->assertSame(67, $checked);
+        // announcement routes (FB-NOTIFY-01B.2b.6c) + the six Coordinator
+        // follow-up routes (FB-NOTIFY-01E.3-F3.2).
+        $this->assertSame(73, $checked);
     }
 }

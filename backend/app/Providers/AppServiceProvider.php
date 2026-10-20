@@ -309,6 +309,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('coordinator-announcement-write', fn (Request $request) => Limit::perMinute((int) config('notifications.coordinator_limits.write_user_minute'))
             ->by("coordinator-announcement-write|user|{$request->user()?->getAuthIdentifier()}")
             ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        // Follow-ups (FB-NOTIFY-01E.3-F3.2): per signed-in user, per account side.
+        RateLimiter::for('staff-followup-read', fn (Request $request) => Limit::perMinute((int) config('notifications.staff_limits.followup_read_user_minute'))
+            ->by("staff-followup-read|user|{$request->user()?->getAuthIdentifier()}"));
+        RateLimiter::for('staff-followup-write', fn (Request $request) => Limit::perMinute((int) config('notifications.staff_limits.followup_write_user_minute'))
+            ->by("staff-followup-write|user|{$request->user()?->getAuthIdentifier()}"));
+        RateLimiter::for('coordinator-followup-read', fn (Request $request) => Limit::perMinute((int) config('notifications.coordinator_limits.followup_read_user_minute'))
+            ->by("coordinator-followup-read|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
+        RateLimiter::for('coordinator-followup-write', fn (Request $request) => Limit::perMinute((int) config('notifications.coordinator_limits.followup_write_user_minute'))
+            ->by("coordinator-followup-write|user|{$request->user()?->getAuthIdentifier()}")
+            ->response(fn () => FamilyAuthException::response(FamilyAuthError::TOO_MANY_REQUESTS)));
 
         // Family notifications (FB-NOTIFY-01B.2b.6b): per signed-in user — the
         // inbox, archive and details; the explicit view / acknowledge writes.

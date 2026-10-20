@@ -3090,6 +3090,7 @@ Purpose: the append-only history of messages, recipients and follow-ups.
 | `reason_code` | varchar(50) | yes | — | a code |
 | `internal_note` | text | yes | — | Staff / coordinator note, 1..1000 characters; never shown to families |
 | `corrects_event_id` | bigint | yes | — | → an earlier event of the same follow-up |
+| `client_reference` | uuid | yes | — | *Since FB-NOTIFY-01E.3-F3.2:* the client's idempotency key of a person's `CONTACT_RECORDED` only; **unique per (follow-up, acting user)** (partial); never exposed by the API |
 | `metadata` | jsonb | no | `{}` | JSON object; codes and counts only |
 | `created_at` | timestamp | no | current time | no `updated_at` |
 

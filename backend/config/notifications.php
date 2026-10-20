@@ -67,10 +67,15 @@ return [
     'staff_limits' => [
         'read_user_minute' => (int) env('NOTIFICATIONS_STAFF_READ_LIMIT_USER_MINUTE', 60),
         'write_user_minute' => (int) env('NOTIFICATIONS_STAFF_WRITE_LIMIT_USER_MINUTE', 20),
+        // Follow-ups (FB-NOTIFY-01E.3-F3.2): lists, summary, detail, history / contact, closure.
+        'followup_read_user_minute' => (int) env('NOTIFICATIONS_STAFF_FOLLOWUP_READ_LIMIT_USER_MINUTE', 60),
+        'followup_write_user_minute' => (int) env('NOTIFICATIONS_STAFF_FOLLOWUP_WRITE_LIMIT_USER_MINUTE', 20),
     ],
     'coordinator_limits' => [
         'read_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_READ_LIMIT_USER_MINUTE', 60),
         'write_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_WRITE_LIMIT_USER_MINUTE', 20),
+        'followup_read_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_FOLLOWUP_READ_LIMIT_USER_MINUTE', 60),
+        'followup_write_user_minute' => (int) env('NOTIFICATIONS_COORDINATOR_FOLLOWUP_WRITE_LIMIT_USER_MINUTE', 20),
     ],
 
     // Family inbox limits, per signed-in user (FB-NOTIFY-01B.2b.6b).

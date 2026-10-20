@@ -186,6 +186,8 @@ class NotificationSchemaTest extends TestCase
         $this->assertSame([
             'id', 'message_id', 'recipient_id', 'followup_id', 'event_type', 'actor_user_id', 'actor_side', 'reason_code',
             'internal_note', 'corrects_event_id', 'metadata', 'created_at',
+            // FB-NOTIFY-01E.3-F3.2 (2026_10_25_090000): contact idempotency.
+            'client_reference',
         ], Schema::getColumnListing('notification_recipient_events'));
 
         $this->assertFalse(Schema::hasTable('notifications'));
@@ -234,7 +236,7 @@ class NotificationSchemaTest extends TestCase
             'notification_recipients' => ['chk_nr_ack_actor', 'chk_nr_ack_requires_view', 'chk_nr_family_status', 'chk_nr_late', 'chk_nr_view_actor'],
             'notification_followups' => ['chk_nf_close_reason', 'chk_nf_closed', 'chk_nf_manual', 'chk_nf_outcome', 'chk_nf_stage',
                 'chk_nf_stage_reason', 'chk_nf_status', 'chk_nf_trigger_reason'],
-            'notification_recipient_events' => ['chk_nre_actor', 'chk_nre_actor_side', 'chk_nre_correction', 'chk_nre_correction_actor',
+            'notification_recipient_events' => ['chk_nre_actor', 'chk_nre_actor_side', 'chk_nre_client_reference', 'chk_nre_correction', 'chk_nre_correction_actor',
                 'chk_nre_event_type', 'chk_nre_family_actor', 'chk_nre_internal_note', 'chk_nre_metadata', 'chk_nre_reason_code', 'chk_nre_scope'],
         ];
         ksort($installed);

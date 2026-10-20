@@ -2797,6 +2797,7 @@ reason_code        VARCHAR(50) NULL
 internal_note      TEXT NULL                   -- 1..1000 characters
 corrects_event_id  BIGINT NULL
 metadata           JSONB DEFAULT '{}'          -- object; codes and counts only
+client_reference   UUID NULL                   -- F3.2: contact idempotency key
 created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP   -- no updated_at
 
 UNIQUE (id, followup_id)
@@ -2805,7 +2806,13 @@ FK (followup_id, recipient_id)     → notification_followups (id, recipient_id)
 FK (corrects_event_id, followup_id) → notification_recipient_events (id, followup_id) RESTRICT
 INDEX (message_id, id), (recipient_id, id), (followup_id, id),
       (event_type, created_at), (actor_user_id)
+UNIQUE INDEX notification_recipient_events_contact_reference_unique
+      (followup_id, actor_user_id, client_reference) WHERE client_reference IS NOT NULL
+CHECK chk_nre_client_reference (PostgreSQL): client_reference only on a
+      CONTACT_RECORDED with an acting user
 ```
+
+*FB-NOTIFY-01E.3-F3.2 (migration `2026_10_25_090000`, additive):* `client_reference`, its partial unique index and its CHECK. Existing rows keep NULL, and the append-only trigger is unchanged. `down()` refuses once a reference is stored. ADR FB-NOTIFY-01 §2f.
 
 Every one of the 15 foreign keys is RESTRICT: no history is cascaded
 away. The composite keys guarantee that an event's recipient belongs to

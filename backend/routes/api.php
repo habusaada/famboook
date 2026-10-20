@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorAnnouncementController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorChangeRequestController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorFamilyController;
+use App\Http\Controllers\Api\V1\Family\CoordinatorFollowupController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorMemberController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorSpaceController;
 use App\Http\Controllers\Api\V1\Family\FamilyAccountController;
@@ -47,6 +48,7 @@ use App\Http\Controllers\Api\V1\PublicCredentialController;
 use App\Http\Controllers\Api\V1\ReferenceController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\StaffAnnouncementController;
+use App\Http\Controllers\Api\V1\StaffFollowupController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -310,6 +312,25 @@ Route::prefix('family')->group(function () {
                 ->middleware(['can:coordinator-announcement.send', 'throttle:coordinator-announcement-write', 'notifications.publication-ready']);
             Route::post('/notifications/{notification}/retry', [CoordinatorAnnouncementController::class, 'retry'])
                 ->middleware(['can:coordinator-announcement.send', 'throttle:coordinator-announcement-write', 'notifications.publication-ready']);
+
+            // Follow-ups (FB-NOTIFY-01E.3-F3.2; ADR FB-NOTIFY-01 §2f): the
+            // follow-ups of the families in the CURRENT scope (outside it: 404,
+            // like a nonexistent uuid); coordinator-notification-followup.view to
+            // read, .manage to record a contact or close — the CURRENT primary
+            // coordinator only (the Domain Actions decide under their locks).
+            // Independent of the opening gate.
+            Route::get('/followups', [CoordinatorFollowupController::class, 'index'])
+                ->middleware(['can:coordinator-notification-followup.view', 'throttle:coordinator-followup-read']);
+            Route::get('/followups/summary', [CoordinatorFollowupController::class, 'summary'])
+                ->middleware(['can:coordinator-notification-followup.view', 'throttle:coordinator-followup-read']);
+            Route::get('/followups/{followup}', [CoordinatorFollowupController::class, 'show'])
+                ->middleware(['can:coordinator-notification-followup.view', 'throttle:coordinator-followup-read']);
+            Route::get('/followups/{followup}/history', [CoordinatorFollowupController::class, 'history'])
+                ->middleware(['can:coordinator-notification-followup.view', 'throttle:coordinator-followup-read']);
+            Route::post('/followups/{followup}/contacts', [CoordinatorFollowupController::class, 'contact'])
+                ->middleware(['can:coordinator-notification-followup.manage', 'throttle:coordinator-followup-write']);
+            Route::post('/followups/{followup}/close', [CoordinatorFollowupController::class, 'close'])
+                ->middleware(['can:coordinator-notification-followup.manage', 'throttle:coordinator-followup-write']);
         });
 
         // Coordinator announcements OUTSIDE coordinator.space (FB-NOTIFY-01B.2b.4 /
@@ -429,6 +450,28 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     // action adds .send once the message was queued. /audience-preview before
     // {notification}. announcement.send-all is checked again by the domain.
     Route::prefix('notifications')->group(function () {
+        // Follow-ups (FB-NOTIFY-01E.3-F3.2; ADR FB-NOTIFY-01 §2f): every
+        // follow-up for central Staff — notification-followup.view to read,
+        // .manage to record a contact or close (the Domain Actions re-check
+        // SUPER_ADMIN / ADMINISTRATOR under their locks). Plain uuid strings;
+        // registered BEFORE {notification}. Independent of the opening gate:
+        // OFF opens nothing new but existing follow-ups stay readable and
+        // manageable.
+        Route::prefix('followups')->group(function () {
+            Route::get('/', [StaffFollowupController::class, 'index'])
+                ->middleware(['can:notification-followup.view', 'throttle:staff-followup-read']);
+            Route::get('/summary', [StaffFollowupController::class, 'summary'])
+                ->middleware(['can:notification-followup.view', 'throttle:staff-followup-read']);
+            Route::get('/{followup}', [StaffFollowupController::class, 'show'])
+                ->middleware(['can:notification-followup.view', 'throttle:staff-followup-read']);
+            Route::get('/{followup}/history', [StaffFollowupController::class, 'history'])
+                ->middleware(['can:notification-followup.view', 'throttle:staff-followup-read']);
+            Route::post('/{followup}/contacts', [StaffFollowupController::class, 'contact'])
+                ->middleware(['can:notification-followup.manage', 'throttle:staff-followup-write']);
+            Route::post('/{followup}/close', [StaffFollowupController::class, 'close'])
+                ->middleware(['can:notification-followup.manage', 'throttle:staff-followup-write']);
+        });
+
         Route::get('/', [StaffAnnouncementController::class, 'index'])
             ->middleware(['can:announcement.view', 'throttle:staff-announcement-read']);
         Route::post('/audience-preview', [StaffAnnouncementController::class, 'preview'])

@@ -588,6 +588,77 @@ The family view and acknowledgement and the expiry closure take the recipient fi
 
 Complete serialization of every possible ownership change is **not** claimed.
 
+## 2f. Follow-up management APIs (FB-NOTIFY-01E.3-F3.2, 2026-10-20)
+
+**Local code only:** not deployed and not activated. One additive migration (`2026_10_25_090000`, below). No frontend.
+
+**Routes.** Plain uuid strings only. Every response is `Cache-Control: no-store, private`.
+
+| Side | Base path | Middleware |
+|---|---|---|
+| Staff | `/api/v1/notifications/followups` | `staff.side`; registered before `/{notification}` |
+| Coordinator | `/api/v1/family/coordinator/followups` | `family.side` + `coordinator.space`, so only the CURRENT scope |
+
+| Method and path | Staff permission | Coordinator permission | Throttle (per user, per side) |
+|---|---|---|---|
+| `GET /` (list) · `GET /summary` · `GET /{followup}` · `GET /{followup}/history` | `notification-followup.view` | `coordinator-notification-followup.view` | `*-followup-read`, 60 per minute |
+| `POST /{followup}/contacts` · `POST /{followup}/close` | `notification-followup.manage` | `coordinator-notification-followup.manage` | `*-followup-write`, 20 per minute |
+
+**The routes are independent of the opening gate.** OFF opens nothing new; existing follow-ups stay readable and manageable.
+
+**Authorization:**
+- **Staff** see every follow-up. Contact and closure are decided by the Domain Actions: an active SUPER_ADMIN or ADMINISTRATOR.
+- **A coordinator** sees the follow-ups of the families in the CURRENT effective scope (`CoordinatorScopes::families`).
+  - **Out of scope, or nonexistent:** the same 404 `FOLLOWUP_NOT_FOUND`, with the same body.
+  - **In scope but not primary, or the own household:** 403 `FOLLOWUP_ACTOR_NOT_ALLOWED`.
+  - **The CURRENT primary coordinator** may manage. That decision is made by the Domain Actions under the §2e locks.
+
+**Read model (`FollowupInbox`).** Every filter, ordering and count is SQL.
+- **Filters:** `status` (default OPEN), `stage`, `level`, `outcome`, `family_code`, `due_before`, `per_page` (Staff at most 50, coordinator at most 25), `page`. The coordinator side adds `ownership=all|mine`.
+- **Ordering:** OPEN by `due_at`, then `id`; CLOSED by `closed_at` descending, then `id`.
+- **`mine` is set-based, applied before pagination and in the summary.** It mirrors `FollowupOwnership`:
+  - the reader is an eligible owner, and SOME non-revoked covering assignment of theirs is outranked by NO non-revoked covering assignment of another ELIGIBLE coordinator (whose own household the family is not);
+  - other coordinators' eligibility is evaluated once per request, bounded by the coordinator count, never per row;
+  - a parity test compares it with `FollowupOwnership` for every follow-up.
+- **`can_manage` in coordinator lists** comes from the same SQL condition.
+
+**Resources:**
+
+| Resource | Contents |
+|---|---|
+| List | uuid, stage, trigger reason, status, outcome, close reason, due / opened / closed times; message notice code, level, title, expiry; family `family_code` and the household head's display name; coordinator side: `can_manage`. Never an internal id, user, assignment, phone number, National ID or note. |
+| Detail | adds the recipient state (viewed, acknowledged, late, `had_family_account`) and the contact count. Staff: `ownership.kind` = `PRIMARY_COORDINATOR` or `CENTRAL`, never who. Coordinator: `can_manage`. |
+| History | Staff see the actor's side and name, and notes. Coordinators see a label only (`SYSTEM`, `STAFF`, `YOU`, `COORDINATOR`), never another coordinator's identity. They see notes except on their own household. A note corrected by a `NOTE_CORRECTION` is never returned. `NOTE_CORRECTION` itself is not implemented. |
+
+**Contact idempotency:**
+- **Request:** `client_reference` (uuid) is REQUIRED on `POST …/contacts`.
+- **Storage:** migration `2026_10_25_090000` adds a nullable `notification_recipient_events.client_reference` with a partial unique index on (`followup_id`, `actor_user_id`, `client_reference`). PostgreSQL adds `chk_nre_client_reference`: the reference only appears on a person's `CONTACT_RECORDED`. Existing rows are not backfilled; `down()` refuses once a reference is stored.
+- **The key never crosses actors or follow-ups.**
+- **Replay:** decided under the recipient and follow-up locks, before authorization.
+  - The same reference with the same outcome and note returns the ORIGINAL event with **200** and `meta.replayed: true`.
+  - A different outcome or note gets **409** `FOLLOWUP_CLIENT_REFERENCE_CONFLICT`.
+  - A first contact returns **201**.
+  - Concurrent identical requests record exactly one event: the second waits on the recipient row, then replays. The unique index is the last guard.
+- **Closure** is idempotent by state: a second closure gets 409 `FOLLOWUP_NOT_OPEN`.
+
+**Errors:**
+
+| Status | Code(s) |
+|---|---|
+| 404 | `FOLLOWUP_NOT_FOUND` |
+| 403 | `FOLLOWUP_ACTOR_NOT_ALLOWED` |
+| 409 | `FOLLOWUP_NOT_OPEN`, `FOLLOWUP_EXPIRED`, `FOLLOWUP_OWNERSHIP_CHANGED`, `FOLLOWUP_CLIENT_REFERENCE_CONFLICT` |
+| 422 | FormRequest validation; `FOLLOWUP_REASON_INVALID`, `FOLLOWUP_NOTE_INVALID`, `FOLLOWUP_CLIENT_REFERENCE_INVALID` |
+| 503 | `FOLLOWUP_BUSY` with `Retry-After: 1`, for SQLSTATE `55P03` (lock timeout) or `40P01` (deadlock). The transaction rolled back and nothing was written. Any other database error is re-thrown. |
+| 429 | the side's throttle format |
+
+- **Blank notes:** the HTTP layer trims notes and converts a blank (including Unicode blanks) to no note.
+
+**Performance:**
+- **Lists:** one paginated query each (joins plus correlated subqueries for the head name and `can_manage`), with no per-row PHP.
+- **Indexes used:** `notification_followups_open_due_index` for OPEN lists; families (`clan_id`, `branch_id`) for scope; events (`followup_id`, `id`) for history.
+- **CLOSED lists** (`closed_at` order) have no index. It is deferred: there is no query evidence at pilot volume. Re-assess with `EXPLAIN (ANALYZE)` on production-like volume.
+
 ## 3. Rationale and alternatives
 | Alternative | Why not |
 |---|---|

@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\UserPersonLink;
 use App\Support\AccountSide;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
@@ -130,11 +131,14 @@ final class FollowupManagement
 
     /**
      * Locks in the documented order, then authorizes and checks the state.
+     * $replay (optional) is asked under the recipient and follow-up locks,
+     * before authorization: a non-null answer is returned as ['replay' => …].
      *
-     * @return array{followup: NotificationFollowup, recipient: NotificationRecipient, message: NotificationMessage,
-     *     actor: User, side: WorkflowActorSide, now: CarbonImmutable}
+     * @param  (Closure(NotificationFollowup): mixed)|null  $replay
+     * @return array{followup: NotificationFollowup, recipient?: NotificationRecipient, message?: NotificationMessage,
+     *     actor?: User, side?: WorkflowActorSide, now?: CarbonImmutable, replay?: mixed}
      */
-    public function lockAndAuthorize(User $actor, string $followupUuid): array
+    public function lockAndAuthorize(User $actor, string $followupUuid, ?Closure $replay = null): array
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Follow-up management runs inside the Domain Action transaction.');
@@ -153,6 +157,14 @@ final class FollowupManagement
         $recipient = NotificationRecipient::query()->whereKey($found->recipient_id)->lockForUpdate()->firstOrFail();
         $followup = NotificationFollowup::query()->whereKey($found->getKey())->lockForUpdate()->firstOrFail();
         $family = $placement ?? Family::withTrashed()->findOrFail($recipient->family_id);
+
+        // An idempotent replay (contact client_reference, F3.2) is decided under
+        // the recipient and follow-up locks — every contact of this follow-up is
+        // inserted under them — and BEFORE authorization: the original result is
+        // returned even if the actor's authorization changed since.
+        if ($replay !== null && ($replayed = $replay($followup)) !== null) {
+            return ['replay' => $replayed, 'followup' => $followup];
+        }
 
         // f–j. the authorization's own rows, then the decision on fresh data.
         $user = $coordinator ? $this->lockCoordinatorRows($actor, $family) : $this->lockUsers([(int) $actor->getKey()], (int) $actor->getKey());

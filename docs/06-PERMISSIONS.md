@@ -4705,6 +4705,12 @@ Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR F
     - `ManageStaffUsersAction` locks the user row first for role or activation changes.
     - As a result, family placement, branch activation and regrouping, link suspension, death, identity changes and Staff role changes are serialized with contact and closure.
   - **Still not serialized:** role–permission mappings (procedurally, by the deployment maintenance window), and writers that do not exist in the application today (head succession, family status, person deactivation). Any future writer of these must lock the person or family row first.
+- **Follow-up API (F3.2, local, ADR §2f):**
+  - **Staff:** `/api/v1/notifications/followups` (list, summary, detail, history, contacts, close) behind `staff.side`, with `notification-followup.view` / `.manage`.
+  - **Coordinator:** `/api/v1/family/coordinator/followups` behind `family.side` + `coordinator.space`, with `coordinator-notification-followup.view` / `.manage`.
+  - **Throttles:** per user and side, 60 reads and 20 writes per minute.
+  - **Coordinator outcomes:** out of scope = 404, the same as nonexistent; in scope but not primary, or the own household = 403; management only by the CURRENT primary coordinator (Domain Actions, §2e locks).
+  - **No RBAC change:** no permission, role or mapping was added.
 
 ### AUTH-ADR-096
 Unified Family home figures (2026-10-18, FB-FAMILY-DASHBOARD-01; implemented LOCALLY, not deployed).

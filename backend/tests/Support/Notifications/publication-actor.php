@@ -34,7 +34,7 @@
  *                                        transaction right after its first event INSERT
  *                                        (the recipient and follow-up rows held): prints
  *                                        PAUSED, then waits for one more STDIN line
- *   followup-contact[-pause] <user_id> <followup_uuid> <outcome>
+ *   followup-contact[-pause] <user_id> <followup_uuid> <outcome> [client_reference]
  *   followup-close[-pause]   <user_id> <followup_uuid> <reason>
  *                                        RecordFollowupContactAction / CloseFollowupManuallyAction
  *                                        (FB-NOTIFY-01E.3-F3.1); -pause stops at the event INSERT,
@@ -256,10 +256,14 @@ try {
             $out('READY');
             $wait();
             try {
-                str_starts_with($command, 'followup-contact')
-                    ? app(RecordFollowupContactAction::class)->handle($actor, $uuid, $code)
-                    : app(CloseFollowupManuallyAction::class)->handle($actor, $uuid, $code);
-                $out('OK');
+                $replayed = false;
+                if (str_starts_with($command, 'followup-contact')) {
+                    // Optional 6th argument: the client_reference (F3.2 idempotency).
+                    [, $replayed] = app(RecordFollowupContactAction::class)->record($actor, $uuid, $code, null, $argv[5] ?? null);
+                } else {
+                    app(CloseFollowupManuallyAction::class)->handle($actor, $uuid, $code);
+                }
+                $out($replayed ? 'OK replayed' : 'OK');
             } catch (NotificationFollowupException $e) {
                 $out('DENIED '.$e->reason);
             }

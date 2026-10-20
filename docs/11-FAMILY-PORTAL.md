@@ -1213,6 +1213,12 @@ Family (family.side + family.context)    GET  /family/notifications           ac
 - **Source:** families see the source «منسق العائلة».
 - **After a scope revocation:** the coordinator keeps a read-only history of their own messages, and can cancel unpublished ones. Statistics cover only families of the current scope (docs/06 §22b "Unified notifications").
 
+*As built 2026-10-20 (FB-NOTIFY-01E.3-F3.2, local; ADR FB-NOTIFY-01 §2f) — coordinator follow-ups:* `GET/POST /api/v1/family/coordinator/followups…`
+- **Reads:** list (`ownership=all|mine`, at most 25 per page), summary, detail and history, over the CURRENT scope only. Out of scope is the same 404 as nonexistent.
+- **Writes:** contact recording (with a required `client_reference`) and manual closure, for the family's CURRENT primary coordinator only. Not primary, or the own household: 403.
+- **History:** labels only (`SYSTEM`, `STAFF`, `YOU`, `COORDINATOR`), never another coordinator's name, and no notes on the coordinator's own household.
+- **Family data:** the family code and the household head's name only. Contact data stays behind the existing family endpoints.
+
 ---
 
 # 23. Family Home Information Architecture

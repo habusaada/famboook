@@ -33,6 +33,7 @@ class NotificationRecipientEvent extends Model
         'internal_note',
         'corrects_event_id',
         'metadata',
+        'client_reference',
     ];
 
     protected $attributes = [
@@ -47,6 +48,7 @@ class NotificationRecipientEvent extends Model
         'actor_user_id',
         'internal_note',
         'corrects_event_id',
+        'client_reference',
     ];
 
     protected static function booted(): void
