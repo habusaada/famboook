@@ -27,6 +27,13 @@
  *   family-view <user_id> <uuid>         RecordNotificationViewAction as that head
  *   family-acknowledge <user_id> <uuid>  AcknowledgeNotificationAction as that head
  *                                        (both print "OK recorded" or "OK replayed")
+ *   followups <limit>                    NotificationFollowupEngine::run with the follow-up
+ *                                        gate ready (FB-NOTIFY-01E.3-F2); prints
+ *                                        "OK <counters as JSON>"
+ *   followups-pause <limit>              the same, pausing INSIDE the first follow-up
+ *                                        transaction right after its first event INSERT
+ *                                        (the recipient and follow-up rows held): prints
+ *                                        PAUSED, then waits for one more STDIN line
  *
  * Synchronization: after READY each actor waits for one STDIN line
  * "<milliseconds>", waits that long and proceeds (holders then commit).
@@ -42,6 +49,7 @@ use App\Enums\CoordinatorRevokeReason;
 use App\Models\CoordinatorScopeAssignment;
 use App\Models\User;
 use App\Support\FamilyAuth\FamilyAccessResolver;
+use App\Support\Notifications\NotificationFollowupEngine;
 use App\Support\Notifications\NotificationHeartbeat;
 use App\Support\Notifications\NotificationPublicationFailure;
 use App\Support\Notifications\NotificationPublicationReconciler;
@@ -167,6 +175,27 @@ try {
             $wait();
             [, $recorded] = $action->handle($context, $uuid);
             $out('OK '.($recorded ? 'recorded' : 'replayed'));
+            break;
+
+        case 'followups':
+        case 'followups-pause':
+            [, , $limit] = $argv;
+            // The follow-up gate ready: on, a cutoff long before every fixture, a live worker.
+            config(['notifications.followups_enabled' => true, 'notifications.followups_cutoff' => '2000-01-01T00:00:00Z']);
+            NotificationHeartbeat::record();
+            if ($command === 'followups-pause') {
+                $paused = false;
+                DB::listen(function ($query) use ($out, &$paused) {
+                    if (! $paused && str_starts_with(strtolower(ltrim($query->sql)), 'insert into "notification_recipient_events"')) {
+                        $paused = true;
+                        $out('PAUSED');
+                        fgets(STDIN);
+                    }
+                });
+            }
+            $out('READY');
+            $wait();
+            $out('OK '.json_encode(app(NotificationFollowupEngine::class)->run((int) $limit)));
             break;
 
         default:

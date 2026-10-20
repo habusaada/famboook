@@ -292,7 +292,7 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 
 **Not implemented:**
 - **SYSTEM notifications (ADR-09):** no discovery command. The gates, cutoff and `SYSTEM_ORIGIN` audience exist and stay closed.
-- **Follow-ups (ADR-06):** the table exists, with no automation or API. *Foundations since FB-NOTIFY-01E.3-F1 (local): permissions seeded, reason catalogues, dynamic ownership and the cutoff configuration (§2c).*
+- **Follow-ups (ADR-06):** the table exists, with no automation or API. *Foundations since FB-NOTIFY-01E.3-F1 (local): permissions seeded, reason catalogues, dynamic ownership and the cutoff configuration (§2c). Engine since FB-NOTIFY-01E.3-F2 (local, uncommitted, gate OFF): opening, satisfaction, expiry and the scheduled command (§2d); still no follow-up API.*
 - **Notice correction (R6).**
 - **Any frontend.**
 
@@ -373,6 +373,84 @@ DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER hold none of
 - **Lists:** a future list endpoint must paginate with a fixed upper bound and must not resolve ownership per row without that bound (no unbounded N+1). A set-based form comes with such an endpoint if needed.
 - **Revocation races:** role, permission and assignment revocation racing a contact or closure must be handled before those actions are implemented (lock order recipient → follow-up → actor user FOR SHARE → assignments FOR SHARE, ownership re-resolved under the locks).
 - **PostgreSQL tests:** PostgreSQL locking and concurrency tests are mandatory for the contact and closure actions.
+
+## 2d. Follow-up engine (FB-NOTIFY-01E.3-F2, 2026-10-20)
+
+**Local code only:** not committed, not deployed, nothing activated. Follow-ups stay OFF by default. No migration: the existing schema is enough. Built in `App\Support\Notifications\NotificationFollowupEngine`, the command `famboook:notifications-followups` and two hooks in the family view and acknowledge actions.
+
+**Transitions (and nothing else):**
+
+| From | To | When | Event |
+|---|---|---|---|
+| none | `OPEN` | the stage is due and unmet, and the gate is ready (below) | `FOLLOWUP_OPENED` (SYSTEM; metadata `stage`, `trigger_reason`, `level`, `had_family_account` — the account state AT OPENING, diagnostic only) |
+| `OPEN` | `CLOSED` / `SATISFIED` | the family's own view (NORMAL, FIRST) or acknowledgement (IMPORTANT, every OPEN stage), strictly before `expires_at` | `FOLLOWUP_CLOSED` (SYSTEM; `outcome` SATISFIED, `closed_by` VIEWED / ACKNOWLEDGED) |
+| `OPEN` | `CLOSED` / `EXPIRED` | the message reached `expires_at` (or is ARCHIVED), whatever the gate | `FOLLOWUP_CLOSED` (SYSTEM; `outcome` EXPIRED, `closed_by` EXPIRES_AT) |
+
+- **Stages:** NORMAL FIRST `UNVIEWED` at `published_at` + 72 h; IMPORTANT FIRST `UNACKNOWLEDGED` + 24 h and SECOND + 72 h. `due_at` is derived from `published_at`, never from the run time.
+- **Independent stages:** FIRST and SECOND are independent. A closed FIRST, whatever its outcome, is never reopened and never suppresses SECOND. After a scheduler outage both stages open in the same run.
+- **Expiry wins:** at or after `expires_at`, a late acknowledgement is still recorded (ACKNOWLEDGED_LATE) but changes no follow-up. The scheduler closes them EXPIRED. Nothing opens for an expired message.
+- **Manual closure** (a later stage) changes the follow-up only, never the recipient.
+
+**Opening conditions:**
+- **Gate:** `NotificationReadiness::forFollowups()` is empty, meaning a mode other than OFF, `NOTIFICATIONS_FOLLOWUPS_ENABLED`, a valid cutoff and a ready worker. PILOT opens like ON once ready; there is no per-sender restriction for follow-ups.
+- **Message:** PUBLISHED, `published_at` at or after the cutoff (no backfill) and not expired.
+- **Family:** ACTIVE at publication (`family_status_at_publication`) AND at opening (not soft-deleted). A family that leaves ACTIVE keeps its OPEN follow-ups: they stay OPEN pending central review (manual closure `FAMILY_INACTIVE`, §2c) or the message's actual expiry. Family inactivity alone never produces EXPIRED.
+- **Accountless families:** accountless ACTIVE families remain eligible, because contact is most needed there. `had_family_account` is diagnostic metadata only. It reflects the account state at the time of opening, using the publication snapshot's definition (`NotificationRecipientSnapshot::activatedAccount()`), not the publication-time snapshot itself, and it never decides eligibility. *Confirmed as the F2 business baseline, 2026-10-20.*
+- **Uniqueness:** never a second row per (recipient, stage). The unique index is the last guard.
+
+**Lock order (every path):**
+1. **The recipient row `FOR UPDATE`.** The family actions already hold it; the scheduler takes it with `SKIP LOCKED` and leaves a busy recipient to the next run.
+2. **That recipient's follow-up rows `FOR UPDATE`, by id.**
+3. **Inserts:** the follow-up row (FK key-share on the recipient, already held) and its event (FK key-share on the message, the recipient and the follow-up).
+
+- **The message row is never locked by the engine.** The expiry sweep and the publication worker lock messages and never then lock a recipient, so no cycle can form. At most an event insert waits for a sweep's short message transaction.
+- **Expiry closure is deliberately not part of the message sweep.** Locking recipients after the message would invert the family actions' order: recipient, then key-share on the message.
+- **Timeouts:** scheduler transactions set `lock_timeout` 5 s and `statement_timeout` 45 s locally. The family hooks run inside the actions' existing transaction.
+- **No partial state:** each transition and its event commit together. A failed event rolls back the transition, including the family action that caused it. Errors are counted, logged with codes only and give exit code 1; they are never swallowed.
+
+**Concurrency review (F2 hardening, 2026-10-20):** a review against the code, not a proof of deadlock freedom.
+- **No message → recipient inversion.** The paths that lock a message row FOR UPDATE never lock a recipient or follow-up row:
+  - the expiry sweep;
+  - the publication worker's claim and T2, which only INSERTs new recipient rows for a message that is not yet PUBLISHED, so the engine cannot see them before commit;
+  - the reconciler.
+
+  The engine and the family actions lock recipient → follow-ups and only take FK key-share on the message. Family rows are read without locks, and `had_family_account` is a plain read.
+- **Same-session FK locks:**
+  - the follow-up INSERT's key-share on the recipient is covered by the recipient lock the transaction already holds;
+  - the event INSERT's key-share on the follow-up is covered by its FOR UPDATE (or is a row this transaction inserted);
+  - the only cross-session wait left is key-share on a message held by the sweep or the worker, bounded by `lock_timeout` (5 s) in scheduler transactions.
+- **Timestamps:** every decision uses a PHP timestamp taken AFTER the recipient lock is held (the acknowledgement's `$now`, the view's `$now`, the engine's per-transaction `now`).
+  - Two transactions on one recipient therefore decide in lock order. An expiry closure committed first means a later acknowledgement's `$now` ≥ `expires_at`, so it is late; an acknowledgement before `expires_at` that commits first leaves nothing OPEN to expire.
+  - Times come from the application server's clock (single server, docs/08 §1), not from the database.
+- **Residual boundary:** the opening step reads the message without a lock. A sweep archiving it within the same instant of `expires_at` could, in theory, race an opening decided with a `now` a few milliseconds earlier. The result is self-healing: the next run closes that follow-up EXPIRED. No event is duplicated and nothing is reopened.
+- **Family hooks:** they run inside the existing actions' transactions, which set no lock or statement timeout (unchanged behaviour). They only wait on their own recipient's follow-up rows, already serialized by the recipient lock.
+
+**Scheduler:** `famboook:notifications-followups --limit=1..1000` (default 100) runs every minute with `withoutOverlapping(10)` and `onOneServer()`.
+- **Order:** expiry first, then opening.
+- **Bounded:** at most `limit` recipients per phase, oldest publication first, each recipient its own short transaction.
+- **Recovery:** an interrupted run leaves nothing behind, and the next run resumes. Repeated runs are idempotent.
+- **Output:** counters only (`expiry_scanned`, `expired`, `expiry_skipped`, `expiry_deferred`, `opening_scanned`, `opened`, `opening_skipped`, `opening_deferred`, `errors`).
+- **Fairness:** each candidate is tried at most once per run.
+  - A recipient whose step FAILED is deferred for 10 minutes (`RETRY_BACKOFF_SECONDS`) and then retried.
+  - Deferred recipients are excluded from the candidate queries before the limit, so a healthy recipient behind a failing one still progresses.
+  - The deferral list is one shared-cache entry per phase (`…:retry-backoff:expiry` / `:opening`), bounded to 1,000 ids. Losing it, or an overflow, only means an earlier retry: nothing is deleted, excluded for good or lost.
+    - **Production store:** `CACHE_STORE=database`, shared by every scheduler process, with atomic locks in `cache_locks`.
+    - **No overwrites:** a run merges only its OWN new failures into the freshly re-read list, under that phase's cache lock (at most about 5 s of bounded attempts, then it logs `FOLLOWUP_BACKOFF_BUSY` and records nothing). Concurrent runs never overwrite each other's deferrals.
+    - **No idle writes:** nothing is written when nothing failed, so mode OFF never creates or changes the opening list.
+    - **Bounded reads:** entries further ahead than one backoff period, or malformed, are ignored, so a corrupt value can never defer a recipient for longer.
+  - Failures stay visible in `errors`, the `*_deferred` counters and the logs (code `FOLLOWUP_STEP_ERROR`).
+- **Not active without the cron**, which is a separate approval.
+
+**Health (`famboook:notifications-check`):** informational counts only. There is no warning and no threshold (none is approved), so the exit code and the health script's states are unchanged, and an OFF-mode backlog is never a failure.
+- **`open_followups`:** every OPEN follow-up.
+- **`expired_open`:** OPEN follow-ups whose message reached `expires_at` or is ARCHIVED. The follow-up command closes them EXPIRED whatever the gate.
+- **`due_unopened`:** (recipient, stage) pairs the opening rules would open now (cutoff, due, unmet, not expired, family ACTIVE at publication and now) with no follow-up yet.
+  - It is annotated "expected while opening is not ready: <reasons>" or "opening ready".
+  - It reads "not applicable" without a valid cutoff.
+
+**Correction (pre-existing):** `famboook:notifications-check` now resets its warnings at the start of every run. The command instance is reused within one process, so a previous run's warnings could leak into the next run's exit code. Production runs one check per process and was not affected.
+
+**Not built:** Staff or Coordinator follow-up APIs, contact and manual-closure actions, owner alerts, UI, the SYSTEM producer and any external channel.
 
 ## 3. Rationale and alternatives
 | Alternative | Why not |

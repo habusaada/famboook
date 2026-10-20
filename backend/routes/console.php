@@ -35,3 +35,10 @@ Schedule::command('famboook:notifications-reconcile')->everyMinute()->withoutOve
 // expires_at is reached. Read models treat it as expired from that moment
 // already; this makes it persistent. Runs whatever the feature mode.
 Schedule::command('famboook:notifications-expire')->everyMinute()->withoutOverlapping(10)->onOneServer();
+
+// Notification follow-ups (FB-NOTIFY-01E.3-F2, ADR-06/07): OPEN follow-ups of
+// expired messages close as EXPIRED whatever the mode; due stages open only
+// when the follow-up gate is ready (mode not OFF, NOTIFICATIONS_FOLLOWUPS_
+// ENABLED, a valid cutoff, a ready worker) — OFF by default. Bounded and
+// idempotent. Not active without the cron (separate approval).
+Schedule::command('famboook:notifications-followups')->everyMinute()->withoutOverlapping(10)->onOneServer();

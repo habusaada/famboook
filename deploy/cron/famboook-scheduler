@@ -14,6 +14,9 @@
 #   NotificationHeartbeatJob                 every minute — queued on `notifications`
 #   famboook:notifications-reconcile         every minute, withoutOverlapping, onOneServer
 #   famboook:notifications-expire            every minute, withoutOverlapping, onOneServer
+#   famboook:notifications-followups         every minute, withoutOverlapping, onOneServer —
+#                                            closes follow-ups of expired messages;
+#                                            opens none while the follow-up gate is OFF
 #
 # Install (as root):  cp deploy/cron/famboook-scheduler /etc/cron.d/famboook-scheduler
 #                     chmod 644 /etc/cron.d/famboook-scheduler

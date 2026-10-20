@@ -9,6 +9,7 @@ use App\Models\NotificationRecipient;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\Notifications\FamilyNotificationRecipient;
 use App\Support\Notifications\NotificationEventRecorder;
+use App\Support\Notifications\NotificationFollowupEngine;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,10 +27,18 @@ use Illuminate\Support\Facades\DB;
  *   ACKNOWLEDGED_LATE event — all in the same transaction;
  * - a repeat is a replay that writes nothing.
  * Late acknowledgement stays possible after expiry and archiving.
+ *
+ * Follow-ups (FB-NOTIFY-01E.3-F2): an acknowledgement before expires_at
+ * closes every OPEN stage as SATISFIED — same transaction, same recipient
+ * lock. A late one changes no follow-up (expiry wins; EXPIRED and other
+ * CLOSED rows are never touched).
  */
 class AcknowledgeNotificationAction
 {
-    public function __construct(private readonly NotificationEventRecorder $events) {}
+    public function __construct(
+        private readonly NotificationEventRecorder $events,
+        private readonly NotificationFollowupEngine $followups,
+    ) {}
 
     /** @return array{0: NotificationRecipient, 1: bool} the recipient and whether this call recorded the acknowledgement */
     public function handle(FamilyAccessResult $context, string $messageUuid): array
@@ -63,6 +72,7 @@ class AcknowledgeNotificationAction
                 $this->events->recipient($recipient, NotificationEventType::VIEWED, $user);
             }
             $this->events->recipient($recipient, $late ? NotificationEventType::ACKNOWLEDGED_LATE : NotificationEventType::ACKNOWLEDGED, $user);
+            $this->followups->satisfyOnAcknowledgement($recipient, $recipient->message, $now);
 
             return [$recipient, true];
         });

@@ -160,6 +160,7 @@ Enabling it starts **every** task in `backend/routes/console.php` (verified at `
 | `NotificationHeartbeatJob` | every minute | queues the heartbeat; with `sync` it would run inline and still never make readiness pass | the worker (R7) |
 | `famboook:notifications-reconcile` | every minute, `withoutOverlapping(10)`, `onOneServer` | stale-claim recovery (runs even when OFF); retries and re-dispatch pause unless dispatching is safe | shared cache locks |
 | `famboook:notifications-expire` | every minute, same locks | `PUBLISHED` → `ARCHIVED` at `expires_at` (runs whatever the mode) | shared cache locks |
+| `famboook:notifications-followups` | every minute, same locks | closes OPEN follow-ups of expired messages (whatever the mode); opens follow-ups ONLY when the follow-up gate is ready — with `NOTIFICATIONS_FOLLOWUPS_ENABLED=false` (this PILOT) it opens nothing. With no follow-ups yet it does nothing (FB-NOTIFY-01E.3-F2, ADR §2d) | shared cache locks |
 
 - **Locks:** `withoutOverlapping` / `onOneServer` need the atomic locks of a shared cache store: `CACHE_STORE=database` with the `cache_locks` table (migration `0001_01_01_000001`). Single application server (docs/08 §1).
 - **Pre-install checks:** replace `<PHP_BINARY>`; the file must be owned by root, mode 644, end with a newline, and its name must contain no dot (cron.d ignores such files). After installing, confirm it is picked up: `grep CRON /var/log/syslog` or `journalctl -u cron` shows `(www-data) CMD (cd /var/www/famboook/backend && … schedule:run …)` within a minute.

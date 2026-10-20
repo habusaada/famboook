@@ -424,13 +424,13 @@ servers.
 | `NOTIFICATIONS_MODE` | `OFF` (default) / `PILOT` (`NOTIFICATIONS_PILOT_SENDER_USER_IDS`) / `ON`; invalid values fail closed | stays `OFF` until an approved activation |
 | Queue | `PublishNotificationJob` and `NotificationHeartbeatJob` on the `notifications` queue (`NOTIFICATIONS_QUEUE`) | an asynchronous connection (`database` recommended); `sync` / `null` are refused; job timeout 60 s < `retry_after` (90 s) < stale threshold 600 s |
 | Worker | `queue:work --queue=notifications --tries=1 --timeout=60`, supervised | dedicated, restarted on deploy (`queue:restart`) |
-| Scheduler | `routes/console.php`: the heartbeat job, `famboook:notifications-reconcile` and `famboook:notifications-expire`, every minute (the last two `withoutOverlapping(10)` + `onOneServer()`) | `schedule:run` cron every minute; a shared, lock-capable cache store (`CACHE_STORE=database`) |
+| Scheduler | `routes/console.php`: the heartbeat job, `famboook:notifications-reconcile`, `famboook:notifications-expire` and (FB-NOTIFY-01E.3-F2, local) `famboook:notifications-followups`, every minute (the last three `withoutOverlapping(10)` + `onOneServer()`) | `schedule:run` cron every minute; a shared, lock-capable cache store (`CACHE_STORE=database`) |
 | Heartbeat | cache key written by a worker running the heartbeat job; fresh ≤ `NOTIFICATIONS_HEARTBEAT_MAX_AGE_SECONDS` (300) | stale or absent closes publication (503) |
 | Health check | `famboook:notifications-check` (read-only, codes and counts, exit 1 on warnings) | run after every configuration change and periodically |
 | Reconciliation | stale `PUBLISHING` (> 600 s) recovered; transient failures requeued (3 automatic attempts, 1 manual retry, at most 4 claims); orphaned `QUEUED` re-dispatched after 180 s | needs the cron; pauses its dispatching steps while publication is not ready |
 | Expiry sweep | `PUBLISHED` → `ARCHIVED` at `expires_at`; runs whatever the mode | needs the cron |
 
-- **Not implemented:** SYSTEM discovery and follow-up automation. Their gates (`NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED`, `NOTIFICATIONS_FOLLOWUPS_ENABLED`) stay `false`. *FB-NOTIFY-01E.3-F1 (local):* follow-ups also need `NOTIFICATIONS_FOLLOWUPS_CUTOFF` (unset by default; no backfill before it; setting it activates nothing).
+- **Not implemented:** SYSTEM discovery and follow-up automation. Their gates (`NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED`, `NOTIFICATIONS_FOLLOWUPS_ENABLED`) stay `false`. *FB-NOTIFY-01E.3-F1 (local):* follow-ups also need `NOTIFICATIONS_FOLLOWUPS_CUTOFF` (unset by default; no backfill before it; setting it activates nothing). *FB-NOTIFY-01E.3-F2 (local):* the follow-up engine exists; with the gate `false` it opens nothing and only closes follow-ups of expired messages (ADR §2d).
 - **Rollback constraint:** once any message exists, the migrations refuse to roll back, so rollback is code-only with the mode OFF.
 - **Before any PILOT:** the full checklist, which distinguishes code readiness from operational readiness, is
   `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. It needs its own approved deployment plan.

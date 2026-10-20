@@ -54,19 +54,7 @@ final class NotificationRecipientSnapshot
             ->where('hm.is_household_head', true)
             ->limit(1);
 
-        $account = DB::query()->selectRaw('1')
-            ->from('family_memberships as am')
-            ->join('user_person_links as al', 'al.person_id', '=', 'am.person_id')
-            ->join('users as au', 'au.id', '=', 'al.user_id')
-            ->whereColumn('am.family_id', 'families.id')
-            ->where('am.is_active', true)
-            ->where('am.is_household_head', true)
-            ->where('al.status', UserPersonLinkStatus::ACTIVE->value)
-            ->where('au.is_active', true)
-            ->whereExists(fn (QueryBuilder $i) => $i->selectRaw('1')
-                ->from('family_auth_identities as ai')
-                ->whereColumn('ai.user_id', 'al.user_id')
-                ->where('ai.status', AuthIdentityStatus::ACTIVE->value));
+        $account = self::activatedAccount();
 
         $time = $now->format('Y-m-d H:i:s');
 
@@ -80,6 +68,30 @@ final class NotificationRecipientSnapshot
             ->selectRaw(self::typed('timestamp').' as updated_at', [$time])
             ->reorder()
             ->orderBy('families.id');
+    }
+
+    /**
+     * "The family has an activated account" — correlated to an outer
+     * `families` row: its ACTIVE household head has an ACTIVE User-Person
+     * Link to an ACTIVE user holding an ACTIVE Family Auth Identity. The one
+     * definition, used for the publication snapshot and (FB-NOTIFY-01E.3-F2)
+     * the follow-up engine's diagnostic metadata at opening time.
+     */
+    public static function activatedAccount(): QueryBuilder
+    {
+        return DB::query()->selectRaw('1')
+            ->from('family_memberships as am')
+            ->join('user_person_links as al', 'al.person_id', '=', 'am.person_id')
+            ->join('users as au', 'au.id', '=', 'al.user_id')
+            ->whereColumn('am.family_id', 'families.id')
+            ->where('am.is_active', true)
+            ->where('am.is_household_head', true)
+            ->where('al.status', UserPersonLinkStatus::ACTIVE->value)
+            ->where('au.is_active', true)
+            ->whereExists(fn (QueryBuilder $i) => $i->selectRaw('1')
+                ->from('family_auth_identities as ai')
+                ->whereColumn('ai.user_id', 'al.user_id')
+                ->where('ai.status', AuthIdentityStatus::ACTIVE->value));
     }
 
     /**

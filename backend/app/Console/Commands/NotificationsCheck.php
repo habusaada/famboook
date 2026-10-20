@@ -2,11 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\NotificationFollowupStatus;
 use App\Enums\NotificationHeartbeatState;
 use App\Enums\NotificationMode;
 use App\Enums\NotificationReadinessReason;
 use App\Enums\NotificationStatus;
 use App\Support\Notifications\NotificationConfig;
+use App\Support\Notifications\NotificationFollowupEngine;
 use App\Support\Notifications\NotificationHeartbeat;
 use App\Support\Notifications\NotificationReadiness;
 use App\Support\Notifications\NotificationRetryPolicy;
@@ -40,6 +42,9 @@ class NotificationsCheck extends Command
 
     public function handle(): int
     {
+        // The command instance is reused within one process (scheduler, tests):
+        // every run starts without the previous run's warnings.
+        $this->warnings = [];
         $this->configuration();
         $this->infrastructure();
         $this->readiness();
@@ -163,10 +168,14 @@ class NotificationsCheck extends Command
                 ->where('publishing_started_at', '<', now()->subSeconds($threshold))
                 ->count());
             $this->line('Stale PUBLISHING'.($threshold === null ? '' : " (> {$threshold} s)").': '.$this->count(fn () => $stale));
+            $this->followupCounts();
         } else {
             $this->line('Messages QUEUED: unavailable');
             $this->line('Messages PUBLISHING: unavailable');
             $this->line('Stale PUBLISHING: unavailable');
+            $this->line('open_followups: unavailable');
+            $this->line('expired_open: unavailable');
+            $this->line('due_unopened: unavailable');
         }
         $this->line('Failed jobs (notification queue): '.$this->count(fn () => $this->failedJobs()));
 
@@ -176,6 +185,46 @@ class NotificationsCheck extends Command
         if ($tables === false && NotificationConfig::mode() !== NotificationMode::OFF) {
             $this->warnings[] = 'Notifications are enabled but the notification tables do not exist in this database.';
         }
+    }
+
+    /**
+     * Follow-up metrics (FB-NOTIFY-01E.3-F2) — informational counts only. No
+     * warning and no threshold (none is approved), so the exit code and the
+     * health script's states are unchanged, and an OFF-mode backlog is never
+     * a failure:
+     * - open_followups: every OPEN follow-up;
+     * - expired_open:   OPEN follow-ups whose message reached expires_at or is
+     *                   ARCHIVED — famboook:notifications-followups closes
+     *                   them EXPIRED whatever the gate;
+     * - due_unopened:   (recipient, stage) pairs that the opening rules would
+     *                   open now (published at or after the cutoff, due, unmet,
+     *                   not expired, family ACTIVE at publication and now) with
+     *                   no follow-up yet. Annotated with the opening state: a
+     *                   backlog while opening is not ready is EXPECTED; "not
+     *                   applicable" without a valid cutoff (nothing is due).
+     * The per-run opened / expired / deferred counters are printed by
+     * famboook:notifications-followups itself.
+     */
+    private function followupCounts(): void
+    {
+        $engine = app(NotificationFollowupEngine::class);
+        $now = now()->toImmutable();
+        $this->line('open_followups: '.$this->count(fn () => DB::table('notification_followups')
+            ->where('status', NotificationFollowupStatus::OPEN->value)->count()));
+        $this->line('expired_open: '.$this->count(fn () => $engine->expiredOpenQuery($now)->count()));
+
+        $cutoff = NotificationConfig::followupsCutoff();
+        if ($cutoff === null) {
+            $this->line('due_unopened: not applicable (follow-up cutoff not set or invalid)');
+
+            return;
+        }
+        $readiness = NotificationReadiness::forFollowups();
+        $this->line('due_unopened: '
+            .$this->count(fn () => array_sum(array_map(fn ($query) => $query->count(), $engine->dueQueries($now, $cutoff))))
+            .($readiness === []
+                ? ' (opening ready: opened by famboook:notifications-followups)'
+                : ' (expected while opening is not ready: '.$this->codes($readiness).')'));
     }
 
     /** Failed jobs on the notification queue, or NULL when the failed-job store is not a readable table. */

@@ -7,6 +7,7 @@ use App\Models\NotificationRecipient;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\Notifications\FamilyNotificationRecipient;
 use App\Support\Notifications\NotificationEventRecorder;
+use App\Support\Notifications\NotificationFollowupEngine;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,10 +21,17 @@ use Illuminate\Support\Facades\DB;
  * viewed_by_user_id once, one VIEWED event in the same transaction; a repeat
  * is a replay that writes nothing. Works on an archived or expired
  * notification too (history stays viewable).
+ *
+ * Follow-ups (FB-NOTIFY-01E.3-F2): the first view of a NORMAL notification
+ * closes its OPEN FIRST (UNVIEWED) follow-up as SATISFIED — same transaction,
+ * under the same recipient lock, before expires_at only.
  */
 class RecordNotificationViewAction
 {
-    public function __construct(private readonly NotificationEventRecorder $events) {}
+    public function __construct(
+        private readonly NotificationEventRecorder $events,
+        private readonly NotificationFollowupEngine $followups,
+    ) {}
 
     /** @return array{0: NotificationRecipient, 1: bool} the recipient and whether this call recorded the view */
     public function handle(FamilyAccessResult $context, string $messageUuid): array
@@ -36,8 +44,10 @@ class RecordNotificationViewAction
                 return [$recipient, false];
             }
 
-            $recipient->forceFill(['viewed_at' => now(), 'viewed_by_user_id' => $user->getKey()])->save();
+            $now = now();
+            $recipient->forceFill(['viewed_at' => $now, 'viewed_by_user_id' => $user->getKey()])->save();
             $this->events->recipient($recipient, NotificationEventType::VIEWED, $user);
+            $this->followups->satisfyOnView($recipient, $recipient->message, $now);
 
             return [$recipient, true];
         });
