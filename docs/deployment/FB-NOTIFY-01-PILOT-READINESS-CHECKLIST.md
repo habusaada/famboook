@@ -68,14 +68,16 @@ Any failed [VERIFY] stops the runbook; go to §11 (rollback to OFF).
 ## 4. RBAC seeding and verification
 
 - **Automatic:** `deploy-backend.sh` always runs `db:seed --class=RolePermissionSeeder --force` then `famboook:verify-permissions` (docs/08 §7).
-- **Expected result:** 8 roles (no new role) and a catalog of 158 permissions:
+- **Expected result:** 8 roles (no new role) and a catalog of 162 permissions (158 before FB-NOTIFY-01E.3-F1 added the four follow-up permissions):
 
   | Role | Grants |
   |---|---|
-  | SUPER_ADMIN | `announcement.view`, `.create`, `.send`, `.send-all` (98 permissions in total; 99 with the Import Apply gate open) |
-  | ADMINISTRATOR | `announcement.view`, `.create`, `.send`, never `send-all` |
-  | COORDINATOR | `coordinator-announcement.view`, `.create`, `.send` |
+  | SUPER_ADMIN | `announcement.view`, `.create`, `.send`, `.send-all`; `notification-followup.view`, `.manage` (100 permissions in total; 101 with the Import Apply gate open) |
+  | ADMINISTRATOR | `announcement.view`, `.create`, `.send`, never `send-all`; `notification-followup.view`, `.manage` |
+  | COORDINATOR | `coordinator-announcement.view`, `.create`, `.send`; `coordinator-notification-followup.view`, `.manage` |
   | DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER, FAMILY_USER | none of them |
+
+  The follow-up permissions authorize no route yet: nothing opens or lists follow-ups until that stage is built and approved.
 
   The verifier also fails on any **direct** (model) grant of a notification permission.
 - **Seeding activates nothing**, but drafts become possible for the holders at R2 (publish / retry answer 503 while OFF). Brief the PILOT senders before R2.
@@ -95,8 +97,16 @@ Template: `deploy/env/backend.production.env.example` (notifications block at th
 | `NOTIFICATIONS_MODE` | `OFF` | `PILOT` at R12 only | `ON` is a later, separate approval |
 | `NOTIFICATIONS_PILOT_SENDER_USER_IDS` | empty | D1 ids | one malformed entry = nobody; never committed |
 | `NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED` / `_FOLLOWUPS_ENABLED` | `false` | `false` | not implemented |
+| `NOTIFICATIONS_FOLLOWUPS_CUTOFF` | unset | unset | follow-ups only (FB-NOTIFY-01E.3-F1); see the note below |
 | `NOTIFICATIONS_QUEUE`, `_HEARTBEAT_MAX_AGE_SECONDS`, `_AUTOMATIC_PUBLISH_ATTEMPTS`, `_MANUAL_PUBLISH_RETRIES`, `_STALE_PUBLISHING_SECONDS` | defaults (`notifications`, 300, 3, 1, 600) | defaults | invalid values fail closed |
 | `NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS` | absent | absent | replaced; the check warns while set |
+
+**Follow-up cutoff `NOTIFICATIONS_FOLLOWUPS_CUTOFF` (FB-NOTIFY-01E.3-F1; not needed for the announcement PILOT):**
+- **Format:** a valid offset-aware ISO-8601 timestamp, e.g. `2026-11-01T00:00:00+02:00`. A date without time, no offset or an impossible date (`2026-02-30`) is INVALID: `famboook:notifications-check` warns, and follow-up readiness reports `FOLLOWUPS_CUTOFF_INVALID`. Unset reports `FOLLOWUPS_CUTOFF_MISSING`.
+- **No backfill:** recipients published before the cutoff never get a follow-up.
+- **No activation:** a cutoff alone activates nothing. Follow-ups also need `NOTIFICATIONS_FOLLOWUPS_ENABLED=true`, a mode other than `OFF` and a ready worker.
+- **Gate stays OFF:** `NOTIFICATIONS_FOLLOWUPS_ENABLED` stays `false` until follow-ups are built, verified and separately approved. Setting the cutoff is part of that later approval, not of this PILOT.
+- **D1–D6 unchanged:** the PILOT decisions D1–D6 (§2) remain unresolved; the cutoff resolves none of them.
 
 **Global impact of `QUEUE_CONNECTION=database` (verified in the code at `65d670a`):**
 - The ONLY queued jobs are `PublishNotificationJob` and `NotificationHeartbeatJob`, both on the `notifications` queue.

@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Approved by the owner 2026-10-18 (architecture and business rules). Documentation only in FB-NOTIFY-01A; aligned 2026-10-18 with the FB-NOTIFY-01B.1 schema and authorization design (§2a). **Updated 2026-10-19 (FB-NOTIFY-01B.2b.7): the schema, manual announcements (Staff and Coordinator), the publication worker, recovery, expiry and the Family inbox are implemented in local commits `29a0b12` … `022acc8` (§2b); NOT deployed, Production not migrated or seeded, mode OFF. SYSTEM notifications and follow-ups are not implemented** |
+| Status | Approved by the owner 2026-10-18 (architecture and business rules). Documentation only in FB-NOTIFY-01A; aligned 2026-10-18 with the FB-NOTIFY-01B.1 schema and authorization design (§2a). **Updated 2026-10-19 (FB-NOTIFY-01B.2b.7): the schema, manual announcements (Staff and Coordinator), the publication worker, recovery, expiry and the Family inbox are implemented in local commits `29a0b12` … `022acc8` (§2b); NOT deployed, Production not migrated or seeded, mode OFF. SYSTEM notifications and follow-ups are not implemented**. *FB-NOTIFY-01E.3-F1 (local, uncommitted): ADR-06 clarified — one dynamic primary owner per family, CENTRAL fallback (§2c); follow-up permissions, reason catalogues, ownership service and cutoff configuration built; still no follow-up opening, API or screen* |
 | Supersedes / amends | FP-ADR-018 and docs/11 §21 ("two kinds"); docs/02 §59 and docs/04 §56 (Laravel database notifications as the default store); the "Notifications and announcements" rules of docs/03 and the Announcements flow of docs/05; docs/08 §16 (no worker, no cron) for this feature; docs/06 proposed `announcement.*` permissions (still proposed) |
 | Keeps | docs/03 §90–§92, docs/05 §85–§87, docs/06 §126–§127 (backend-originated, after commit, minimal content, own-identity reads); docs/11 §22 (coordinator sending rules, preserved unchanged); "audiences resolved on the server"; the family-visible sources «إدارة Famboook» / «منسق العائلة» |
 | Schema / data change | None in FB-NOTIFY-01A. *Since FB-NOTIFY-01B.2a (DB-ADR-067):* four additive tables, migrations `2026_10_24_090000`–`090003` (docs/04 §56) |
-| RBAC change | None in FB-NOTIFY-01A. *Since FB-NOTIFY-01B.2b.6d (AUTH-ADR-097 amended):* `announcement.view` / `.create` / `.send` / `.send-all` and `coordinator-announcement.view` / `.create` / `.send` are seeded (SUPER_ADMIN, ADMINISTRATOR, COORDINATOR); `notification-followup.*` and `coordinator-notification-followup.*` stay PROPOSED and not seeded; no role added |
+| RBAC change | None in FB-NOTIFY-01A. *Since FB-NOTIFY-01B.2b.6d (AUTH-ADR-097 amended):* `announcement.view` / `.create` / `.send` / `.send-all` and `coordinator-announcement.view` / `.create` / `.send` are seeded (SUPER_ADMIN, ADMINISTRATOR, COORDINATOR); `notification-followup.*` and `coordinator-notification-followup.*` stay PROPOSED and not seeded; no role added. *Since FB-NOTIFY-01E.3-F1 (local):* `notification-followup.view` / `.manage` seeded to SUPER_ADMIN and ADMINISTRATOR, `coordinator-notification-followup.view` / `.manage` to COORDINATOR only (§2c); still no role added |
 | Production | No Production change is authorized by this ADR |
 
 Registered: docs/06 AUTH-ADR-097 (authorization), docs/11 FP-ADR-018 (amended).
@@ -83,6 +83,12 @@ The approved product needs things Laravel's notification table cannot express on
 - **Revalidation before publication:** the coordinator's permission and CURRENT assignment scope (and, for Staff, the sending permission) are revalidated by the publication worker immediately before the recipient snapshot is written, in the publication transaction (ADR-08 rule 2). A sender who is no longer authorized gets `PUBLISH_FAILED`, never a publication.
 - **Follow-ups:** every follow-up operation (list, view, record a contact, close) re-checks the permission and, for a coordinator, that the family is in the CURRENT scope (`CoordinatorScopes`). Revoking an assignment removes access on the next request.
 - **Own family:** a coordinator cannot manually close a follow-up for their own family, even when it is in their scope.
+- *Clarified 2026-10-19 (FB-NOTIFY-01E.3-F1, §2c)* — "Follow-ups" and "Own family" above now read:
+   - **Current scope permits VIEWING:** a coordinator with `coordinator-notification-followup.view` sees the follow-ups of every family in their CURRENT scope, their own household included.
+   - **Only the primary coordinator MANAGES:** recording a contact or closing manually needs `coordinator-notification-followup.manage` AND being the family's dynamically resolved primary coordinator.
+   - **Never their own household:** a coordinator is never the primary coordinator of, and never manages, their own household's follow-ups. Ownership falls to the next eligible coordinator, or CENTRAL.
+   - **Central Staff manage all:** SUPER_ADMIN and ADMINISTRATOR (`notification-followup.view` / `.manage`) oversee and manage every follow-up, CENTRAL ones included.
+   - With no eligible coordinator the family's follow-ups are CENTRAL. The management restrictions are enforced by the follow-up Domain Actions (via `FollowupOwnership`), never only by a UI.
 - **No acting for the family:** coordinators, like Staff, cannot view-record or acknowledge a message for any family (ADR-05).
 - **SOCIAL_WORKER:** no follow-up access until a separately approved Staff assignment model exists (none exists in the repository).
 - **Revocation is not serialized:** the coordinator's assignment rows can be locked against a concurrent scope revocation during publication. Spatie role and permission revocation is NOT claimed to be transactionally serialized with publication: the permission tables are not locked, so publication is ordered at the moment of the check. A stronger guarantee needs the revocation writes to use compatible locking, which is not part of this design.
@@ -107,6 +113,7 @@ The approved product needs things Laravel's notification table cannot express on
 - **Reason codes before notes:** manual actions and closures use structured reason codes. A free-text note is optional, short and visible only to authorized follow-up users (never to families). Sensitive personal information (health, identity documents, national IDs, contact data) must not be entered in follow-up notes, and the interface says so.
 - **Note correction:** an incorrect or sensitive note is never edited or deleted. An authorized administrator records a `NOTE_CORRECTION` event that references it; application views then suppress the corrected note. This is audit-preserving suppression in application views, not physical database erasure.
 - **Closing:** a follow-up closes automatically once its condition is met. History is kept.
+- **Clarified 2026-10-19 (FB-NOTIFY-01E.3-F1):** "the currently responsible" coordinator is the family's ONE primary coordinator, derived dynamically; no eligible coordinator means CENTRAL ownership. "Manual actions … coordinators within their current scope" is narrowed: the current scope permits viewing; only the primary coordinator (never for their own household) or central Staff manage. Contact outcomes and manual closure reasons are fixed catalogues, and follow-ups never cover recipients published before a configured cutoff. Details and limitations: §2c.
 
 ### ADR-07 — Expiration, archiving and late acknowledgement
 - **Optional expiry:** `expires_at` is optional and applies to `PUBLISHED` messages only (expiration and automatic archiving never act on a message that was not successfully published). At expiry the system:
@@ -285,7 +292,7 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 
 **Not implemented:**
 - **SYSTEM notifications (ADR-09):** no discovery command. The gates, cutoff and `SYSTEM_ORIGIN` audience exist and stay closed.
-- **Follow-ups (ADR-06):** the table exists, with no automation, API or seeded permission.
+- **Follow-ups (ADR-06):** the table exists, with no automation or API. *Foundations since FB-NOTIFY-01E.3-F1 (local): permissions seeded, reason catalogues, dynamic ownership and the cutoff configuration (§2c).*
 - **Notice correction (R6).**
 - **Any frontend.**
 
@@ -301,6 +308,71 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 - **API:** docs/11 §21 "As built".
 - **Permissions:** docs/06 §22b "Unified notifications".
 - **Operations:** docs/08 §16 and `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`.
+
+## 2c. Follow-up foundations — ADR-06 clarification (FB-NOTIFY-01E.3-F1, 2026-10-19)
+
+Approved implementation baseline (owner, FB-NOTIFY-01E.2 reconciliation). **Local code only:** not committed, not deployed, nothing activated. Production is not migrated or seeded. It clarifies ADR-04 ("Follow-ups", "Own family") and ADR-06 ("Alerting", "Manual actions") and changes no other decision.
+
+**Ownership (`App\Support\Notifications\FollowupOwnership`):**
+1. **One primary coordinator per family**, or none. Only the primary coordinator records a contact or closes manually; every other coordinator whose CURRENT scope covers the family may view only.
+2. **Candidates:** the users of the non-revoked assignments covering the family (its Clan; the Branch Group of its Branch; its Branch). Each user is ranked by their most specific covering assignment: **BRANCH > BRANCH_GROUP > CLAN**, then the earliest `assigned_at`, then the lowest assignment id. The order is deterministic, including on equal timestamps.
+3. **Eligibility**, checked per candidate in order (the first who passes is primary):
+   - `CoordinatorScopes::context()` allowed, which covers the household head, the COORDINATOR role, `coordinator-space.access` and an effective assignment;
+   - `CoordinatorScopes::canAccessFamily()`, the very same scope rule (nothing is duplicated);
+   - `coordinator-notification-followup.manage`;
+   - the family is NOT the coordinator's own household.
+
+   An ineligible candidate is skipped, never inherited.
+4. **CENTRAL:** if no candidate is eligible, or the family is not ACTIVE, the follow-ups are CENTRAL. SUPER_ADMIN and ADMINISTRATOR (`notification-followup.*`) oversee and manage every follow-up in any case. No new role.
+5. **Dynamic:**
+   - ownership is derived on every call;
+   - no `owner_user_id` or assignee column, and no cache;
+   - a revocation, a role or permission removal, a moved family or an inactive structure takes effect on the next call;
+   - the resolver is a pure read; callers that act lock first (recipient, follow-up, actor, assignments);
+   - the owner is a server-side value, and no internal id is exposed by any resource.
+6. **View versus manage (the rule every later action and endpoint follows):**
+   - **Current scope permits VIEWING:** a coordinator with `coordinator-notification-followup.view` sees the follow-ups of every family in their CURRENT scope, their own household included.
+   - **Only the primary coordinator MANAGES:** recording a contact or closing manually needs `coordinator-notification-followup.manage` AND being the family's dynamically resolved primary coordinator.
+   - **Never their own household:** a coordinator is never the primary coordinator of, and never manages, their own household's follow-ups. Ownership falls to the next eligible coordinator, or CENTRAL.
+   - **Central Staff manage all:** SUPER_ADMIN and ADMINISTRATOR (`notification-followup.view` / `.manage`) oversee and manage every follow-up, CENTRAL ones included.
+   - The management restrictions are enforced in the future contact and closure Domain Actions (`coordinatorMayManage()` under their locks), never only in a UI.
+7. **Cost:** one ranking query, then a few queries per examined candidate. It stops at the first eligible candidate and is exact for one family. Listing many families needs a set-based form, which is deferred.
+
+**Permissions** (seeded locally, verified by `famboook:verify-permissions`; catalog 158 → 162):
+
+| Permission | Holders |
+|---|---|
+| `notification-followup.view` / `.manage` | SUPER_ADMIN, ADMINISTRATOR (central oversight and management) |
+| `coordinator-notification-followup.view` / `.manage` | COORDINATOR only (view: current scope; manage: primary owner only) |
+
+DATA_ENTRY, REVIEWER, SOCIAL_WORKER, REPORTS_VIEWER and FAMILY_USER hold none of them. SOCIAL_WORKER waits for a Staff assignment model. Direct (model) grants are refused by the verifier.
+
+**Reason catalogues (codes only; any free text is the internal note):**
+- **Contact outcome** (`CONTACT_RECORDED.reason_code`, `NotificationFollowupContactOutcome`): `CALLED_INFORMED`, `CALLED_NO_ANSWER`, `VISITED`, `MESSAGE_LEFT`, `OTHER`. A contact never closes the follow-up. `CALLED_INFORMED` means "told", not "acknowledged".
+- **Manual closure** (`close_reason_code`, outcome `CLOSED_MANUALLY`, `NotificationFollowupCloseReason`): `INFORMED_BY_PHONE`, `INFORMED_IN_PERSON`, `FAMILY_UNREACHABLE`, `FAMILY_INACTIVE`, `NOT_APPLICABLE`.
+- **No impersonation:** neither catalogue can impersonate a family view or acknowledgement. Those are recorded only by the family's own household head (FAMILY side), and a manual closure is never `SATISFIED`.
+
+**Cutoff (`NOTIFICATIONS_FOLLOWUPS_CUTOFF`, `notifications.followups_cutoff`):**
+- **Scope:** recipients published before the cutoff never get a follow-up. There is no backfill.
+- **Default:** unset.
+- **Format:** ISO-8601 with an explicit offset, the same as the SYSTEM cutoff and independent of it.
+- **Readiness:** `NotificationReadiness::forFollowups()` adds `FOLLOWUPS_CUTOFF_MISSING` or `FOLLOWUPS_CUTOFF_INVALID` to the existing gate (`FOLLOWUPS_DISABLED`), the mode and the infrastructure reasons.
+- **No activation:** a cutoff alone activates nothing. The gate stays `false`, and the mode OFF closes everything.
+- **Health check:** `famboook:notifications-check` reports "Follow-up cutoff: NOT SET / INVALID / VALID" and warns when it is invalid.
+
+**Not built in F1:** follow-up opening, the scheduler task, workers or cron, APIs, screens, any change to the view or acknowledge actions, and migrations.
+
+**Limitations and open points:**
+- **Not serialized:** Spatie role and permission revocation is not serialized with a follow-up action (as for publication, ADR-04).
+- **Family inactivity:** a family that leaves ACTIVE keeps its OPEN follow-ups. They become CENTRAL and are closed manually with `FAMILY_INACTIVE`.
+- **Earlier wording:** ADR-04 "Follow-ups" and AUTH-ADR-097 still say a coordinator may act "within the current scope". That reading is now narrowed to the primary owner, and the earlier text is superseded.
+- **Not yet recorded:** the reason codes are not yet checked at the database level, and are enforced by the future actions. Contact-attempt limits and alerting the owner are still unspecified.
+
+**Performance and concurrency boundaries (binding on the later stages):**
+- **One family per call:** ownership is resolved dynamically for ONE family. A set-based resolver is not required in F1.
+- **Lists:** a future list endpoint must paginate with a fixed upper bound and must not resolve ownership per row without that bound (no unbounded N+1). A set-based form comes with such an endpoint if needed.
+- **Revocation races:** role, permission and assignment revocation racing a contact or closure must be handled before those actions are implemented (lock order recipient → follow-up → actor user FOR SHARE → assignments FOR SHARE, ownership re-resolved under the locks).
+- **PostgreSQL tests:** PostgreSQL locking and concurrency tests are mandatory for the contact and closure actions.
 
 ## 3. Rationale and alternatives
 | Alternative | Why not |
@@ -329,7 +401,7 @@ Recorded in FB-NOTIFY-01B.2b.7 from the code at `022acc8`, branch `feature/fb-ge
 
 ## 7. Implementation prerequisites
 1. Owner review of this ADR and of the physical schema (FB-NOTIFY-01B). *Done (01B.1 / 01B.2a).*
-2. Approval and seeding of the proposed permissions, Staff and `coordinator-*` (docs/06 AUTH-ADR-097). *Done for `announcement.*` and `coordinator-announcement.*` (01B.2b.6d, local); follow-up permissions remain proposed.*
+2. Approval and seeding of the proposed permissions, Staff and `coordinator-*` (docs/06 AUTH-ADR-097). *Done for `announcement.*` and `coordinator-announcement.*` (01B.2b.6d, local); follow-up permissions seeded locally in FB-NOTIFY-01E.3-F1 (§2c, uncommitted).*
 3. A queue worker and a scheduler cron verified locally, then a separate, approved Production deployment plan (docs/08 §16). *Open: checklist in `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`; no plan approved.*
 4. The family-facing `workflow_events` mapping (ADR-09: RETURNED, REJECTED, APPLIED; provisionally approved). *Open: SYSTEM discovery not implemented.*
 5. A retention confirmation (ADR-07). *Open.*

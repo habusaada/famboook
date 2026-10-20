@@ -24,7 +24,7 @@ final class NotificationConfig
      */
     public const PUBLICATION_JOB_TIMEOUT_SECONDS = 60;
 
-    /** The keys every notification operation depends on (the SYSTEM cutoff is SYSTEM-only). */
+    /** The keys every notification operation depends on (each cutoff concerns its own channel only). */
     public const REQUIRED_KEYS = [
         'mode',
         'pilot_sender_user_ids',
@@ -145,25 +145,27 @@ final class NotificationConfig
     /** The SYSTEM activation cutoff, or NULL when unset or invalid. */
     public static function systemCutoff(): ?CarbonImmutable
     {
-        $raw = config('notifications.system_cutoff');
-        if (! is_string($raw) || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/', $raw) !== 1) {
-            return null;
-        }
-
-        $cutoff = CarbonImmutable::createFromFormat('!Y-m-d\TH:i:sP', $raw);
-        // A round trip rejects overflowing dates and times (2026-02-30, 25:00).
-        if ($cutoff === null || $cutoff->format('Y-m-d\TH:i:s') !== substr($raw, 0, 19)) {
-            return null;
-        }
-
-        return $cutoff->utc();
+        return self::cutoff('system_cutoff');
     }
 
     public static function systemCutoffIsSet(): bool
     {
-        $raw = config('notifications.system_cutoff');
+        return self::isSet('system_cutoff');
+    }
 
-        return $raw !== null && ! (is_string($raw) && trim($raw) === '');
+    /**
+     * The FOLLOW-UP cutoff (ADR-06): recipients published before it never get
+     * a follow-up (no backfill). NULL when unset or invalid — then follow-ups
+     * stay closed (NotificationReadiness::forFollowups).
+     */
+    public static function followupsCutoff(): ?CarbonImmutable
+    {
+        return self::cutoff('followups_cutoff');
+    }
+
+    public static function followupsCutoffIsSet(): bool
+    {
+        return self::isSet('followups_cutoff');
     }
 
     /** @return list<string> the required keys whose value is invalid (names only) */
@@ -189,6 +191,30 @@ final class NotificationConfig
         $raw = config('notifications.mode');
 
         return is_string($raw) ? NotificationMode::tryFrom(strtoupper(trim($raw))) : null;
+    }
+
+    /** An ISO-8601 instant with an explicit offset (in UTC), else NULL. */
+    private static function cutoff(string $key): ?CarbonImmutable
+    {
+        $raw = config("notifications.{$key}");
+        if (! is_string($raw) || preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})$/', $raw) !== 1) {
+            return null;
+        }
+
+        $cutoff = CarbonImmutable::createFromFormat('!Y-m-d\TH:i:sP', $raw);
+        // A round trip rejects overflowing dates and times (2026-02-30, 25:00).
+        if ($cutoff === null || $cutoff->format('Y-m-d\TH:i:s') !== substr($raw, 0, 19)) {
+            return null;
+        }
+
+        return $cutoff->utc();
+    }
+
+    private static function isSet(string $key): bool
+    {
+        $raw = config("notifications.{$key}");
+
+        return $raw !== null && ! (is_string($raw) && trim($raw) === '');
     }
 
     /** An integer (or digit string) within [min, max], else NULL. */

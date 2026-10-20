@@ -312,7 +312,6 @@ class RolePermissionSeeder extends Seeder
         // (coordinator-announcement.*) — never interchangeable. Sending to
         // every ACTIVE family needs announcement.send-all (SUPER_ADMIN only).
         // Publication is also gated by NOTIFICATIONS_MODE (OFF by default).
-        // notification-followup.* stays unseeded (follow-ups not built).
         'announcement.view',
         'announcement.create',
         'announcement.send',
@@ -320,6 +319,16 @@ class RolePermissionSeeder extends Seeder
         'coordinator-announcement.view',
         'coordinator-announcement.create',
         'coordinator-announcement.send',
+        // Notification follow-ups (ADR FB-NOTIFY-01 ADR-06, §2c; FB-NOTIFY-01E.3-F1).
+        // Central oversight and management (notification-followup.*) and the
+        // Coordinator's own (coordinator-notification-followup.*) — never
+        // interchangeable. A coordinator manages a follow-up only as its
+        // PRIMARY owner (FollowupOwnership); viewing needs the current scope.
+        // Nothing opens follow-ups until the engine and its gate exist.
+        'notification-followup.view',
+        'notification-followup.manage',
+        'coordinator-notification-followup.view',
+        'coordinator-notification-followup.manage',
     ];
 
     /**
@@ -344,6 +353,9 @@ class RolePermissionSeeder extends Seeder
             'announcement.create',
             'announcement.send',
             'announcement.send-all',
+            // Follow-ups (ADR-06 §2c): central oversight and management of all.
+            'notification-followup.view',
+            'notification-followup.manage',
             // Family Portal identity administration (§22b, AUTH-ADR-063/064).
             // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
             'person-mobile-trust.view',
@@ -484,6 +496,9 @@ class RolePermissionSeeder extends Seeder
             'announcement.view',
             'announcement.create',
             'announcement.send',
+            // Follow-ups (ADR-06 §2c): central oversight and management of all.
+            'notification-followup.view',
+            'notification-followup.manage',
             // Family Portal identity administration (§22b, AUTH-ADR-063/064).
             // Mobile trust: only SUPER_ADMIN and ADMINISTRATOR grant TRUSTED.
             'person-mobile-trust.view',
@@ -773,6 +788,11 @@ class RolePermissionSeeder extends Seeder
             'coordinator-announcement.view',
             'coordinator-announcement.create',
             'coordinator-announcement.send',
+            // Follow-ups (ADR-06 §2c): view in the CURRENT scope; manage only
+            // as the family's primary owner (FollowupOwnership). Never
+            // notification-followup.*.
+            'coordinator-notification-followup.view',
+            'coordinator-notification-followup.manage',
         ],
     ];
 

@@ -79,7 +79,9 @@ final class NotificationReadiness
     }
 
     /**
-     * Follow-up automation: its own gate on top of a mode that is not OFF.
+     * Follow-up automation (ADR-06 §2c): its own gate and a valid follow-up
+     * cutoff (no backfill before it) on top of a mode that is not OFF. A set
+     * cutoff alone opens nothing.
      *
      * @return list<Reason>
      */
@@ -88,6 +90,11 @@ final class NotificationReadiness
         $reasons = self::forPublication();
         if (! NotificationConfig::followupsEnabled()) {
             $reasons[] = Reason::FOLLOWUPS_DISABLED;
+        }
+        if (! NotificationConfig::followupsCutoffIsSet()) {
+            $reasons[] = Reason::FOLLOWUPS_CUTOFF_MISSING;
+        } elseif (NotificationConfig::followupsCutoff() === null) {
+            $reasons[] = Reason::FOLLOWUPS_CUTOFF_INVALID;
         }
 
         return $reasons;

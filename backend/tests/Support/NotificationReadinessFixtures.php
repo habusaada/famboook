@@ -21,6 +21,7 @@ trait NotificationReadinessFixtures
             'notifications.system_discovery_enabled' => false,
             'notifications.followups_enabled' => false,
             'notifications.system_cutoff' => null,
+            'notifications.followups_cutoff' => null,
             'notifications.queue' => 'notifications',
             'notifications.heartbeat_max_age_seconds' => 300,
             'notifications.automatic_publish_attempts' => 3,

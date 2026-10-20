@@ -41,6 +41,7 @@ class NotificationReadinessTest extends TestCase
         $this->assertFalse($shipped['system_discovery_enabled']);
         $this->assertFalse($shipped['followups_enabled']);
         $this->assertNull($shipped['system_cutoff']);
+        $this->assertNull($shipped['followups_cutoff']);
         $this->assertSame('notifications', $shipped['queue']);
         $this->assertSame(300, (int) $shipped['heartbeat_max_age_seconds']);
         $this->assertSame(3, (int) $shipped['automatic_publish_attempts']);
@@ -228,7 +229,7 @@ class NotificationReadinessTest extends TestCase
         config([
             'notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => (string) $listed->id,
             'notifications.system_discovery_enabled' => true, 'notifications.system_cutoff' => '2026-11-01T00:00:00Z',
-            'notifications.followups_enabled' => true,
+            'notifications.followups_enabled' => true, 'notifications.followups_cutoff' => '2026-11-01T00:00:00Z',
         ]);
 
         $this->assertSame([Reason::SYSTEM_DISCOVERY_REQUIRES_ON], NotificationReadiness::forSystemDiscovery());
@@ -249,15 +250,45 @@ class NotificationReadinessTest extends TestCase
         $this->assertSame([Reason::MODE_OFF], NotificationReadiness::forSystemDiscovery());
     }
 
-    public function test_follow_ups_need_their_own_gate(): void
+    public function test_follow_ups_need_their_own_gate_and_a_valid_cutoff(): void
     {
         $this->infrastructureReady();
-        config(['notifications.mode' => 'ON', 'notifications.system_discovery_enabled' => true]);
+        config(['notifications.mode' => 'ON', 'notifications.system_discovery_enabled' => true, 'notifications.system_cutoff' => '2026-11-01T00:00:00Z']);
 
-        $this->assertSame([Reason::FOLLOWUPS_DISABLED], NotificationReadiness::forFollowups());
+        // The SYSTEM cutoff is SYSTEM's: it never stands in for the follow-up cutoff.
+        $this->assertSame([Reason::FOLLOWUPS_DISABLED, Reason::FOLLOWUPS_CUTOFF_MISSING], NotificationReadiness::forFollowups());
 
         config(['notifications.followups_enabled' => true]);
+        $this->assertSame([Reason::FOLLOWUPS_CUTOFF_MISSING], NotificationReadiness::forFollowups());
+
+        foreach (['2026-11-01', '2026-02-30T00:00:00Z', '2026-11-01T25:00:00+02:00', '2026-11-01 00:00:00', 'tomorrow', '   '] as $raw) {
+            config(['notifications.followups_cutoff' => $raw]);
+            $expected = trim($raw) === '' ? Reason::FOLLOWUPS_CUTOFF_MISSING : Reason::FOLLOWUPS_CUTOFF_INVALID;
+            $this->assertSame([$expected], NotificationReadiness::forFollowups(), $raw);
+            $this->assertNull(NotificationConfig::followupsCutoff(), $raw);
+        }
+
+        config(['notifications.followups_cutoff' => '2026-11-01T00:00:00+02:00']);
         $this->assertSame([], NotificationReadiness::forFollowups());
+        $this->assertSame('2026-10-31 22:00:00', NotificationConfig::followupsCutoff()->format('Y-m-d H:i:s'));
+        // An invalid follow-up cutoff closes follow-ups only.
+        config(['notifications.followups_cutoff' => 'tomorrow']);
+        $this->assertSame([], NotificationReadiness::forSystemDiscovery());
+        $this->assertSame([], NotificationReadiness::forPublication());
+    }
+
+    public function test_a_cutoff_alone_never_opens_follow_ups(): void
+    {
+        $this->infrastructureReady();
+        config(['notifications.followups_cutoff' => '2026-11-01T00:00:00Z']);
+
+        // Mode OFF and gate closed: a set cutoff activates nothing.
+        $this->assertSame([Reason::MODE_OFF, Reason::FOLLOWUPS_DISABLED], NotificationReadiness::forFollowups());
+        config(['notifications.mode' => 'ON']);
+        $this->assertSame([Reason::FOLLOWUPS_DISABLED], NotificationReadiness::forFollowups());
+        // The gate while the mode is OFF: still closed.
+        config(['notifications.mode' => 'OFF', 'notifications.followups_enabled' => true]);
+        $this->assertSame([Reason::MODE_OFF], NotificationReadiness::forFollowups());
     }
 
     public function test_readiness_publishes_nothing_dispatches_nothing_and_writes_nothing(): void

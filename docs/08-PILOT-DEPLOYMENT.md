@@ -430,7 +430,7 @@ servers.
 | Reconciliation | stale `PUBLISHING` (> 600 s) recovered; transient failures requeued (3 automatic attempts, 1 manual retry, at most 4 claims); orphaned `QUEUED` re-dispatched after 180 s | needs the cron; pauses its dispatching steps while publication is not ready |
 | Expiry sweep | `PUBLISHED` → `ARCHIVED` at `expires_at`; runs whatever the mode | needs the cron |
 
-- **Not implemented:** SYSTEM discovery and follow-up automation. Their gates (`NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED`, `NOTIFICATIONS_FOLLOWUPS_ENABLED`) stay `false`.
+- **Not implemented:** SYSTEM discovery and follow-up automation. Their gates (`NOTIFICATIONS_SYSTEM_DISCOVERY_ENABLED`, `NOTIFICATIONS_FOLLOWUPS_ENABLED`) stay `false`. *FB-NOTIFY-01E.3-F1 (local):* follow-ups also need `NOTIFICATIONS_FOLLOWUPS_CUTOFF` (unset by default; no backfill before it; setting it activates nothing).
 - **Rollback constraint:** once any message exists, the migrations refuse to roll back, so rollback is code-only with the mode OFF.
 - **Before any PILOT:** the full checklist, which distinguishes code readiness from operational readiness, is
   `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. It needs its own approved deployment plan.

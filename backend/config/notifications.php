@@ -29,6 +29,13 @@ return [
     // set. ISO-8601 with an explicit offset, e.g. 2026-11-01T00:00:00+02:00.
     'system_cutoff' => env('NOTIFICATIONS_SYSTEM_CUTOFF'),
 
+    // FOLLOW-UP cutoff (ADR-06, FB-NOTIFY-01E.3-F1): only recipients created
+    // (published) at or after it may ever get a follow-up; nothing before it
+    // is backfilled. Unset by default, and setting it activates nothing:
+    // follow-ups stay closed until the gate above is ALSO true, the mode is
+    // not OFF and the worker is ready. Same format as the SYSTEM cutoff.
+    'followups_cutoff' => env('NOTIFICATIONS_FOLLOWUPS_CUTOFF'),
+
     // The dedicated queue every notification job (and the heartbeat) uses.
     'queue' => env('NOTIFICATIONS_QUEUE', 'notifications'),
 

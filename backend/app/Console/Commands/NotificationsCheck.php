@@ -24,7 +24,7 @@ use Throwable;
  * the notification tables (or failed_jobs) do not exist in this database.
  *
  * Warnings (exit code 1): invalid configuration, a set but invalid SYSTEM
- * cutoff, the replaced NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS still set, an
+ * or follow-up cutoff, the replaced NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS still set, an
  * enabled mode or gate that is not ready, PILOT with no usable allow-list,
  * stale PUBLISHING messages, and an enabled mode without the notification
  * tables. The release default (everything OFF) has none.
@@ -78,6 +78,12 @@ class NotificationsCheck extends Command
             default => 'VALID',
         };
         $this->line('SYSTEM cutoff: '.$cutoff);
+        $followupsCutoff = match (true) {
+            ! NotificationConfig::followupsCutoffIsSet() => 'NOT SET',
+            NotificationConfig::followupsCutoff() === null => 'INVALID',
+            default => 'VALID',
+        };
+        $this->line('Follow-up cutoff: '.$followupsCutoff);
         $claims = app(NotificationRetryPolicy::class)->claimLimit();
         $this->line('Retry policy: '.($claims === null
             ? 'INVALID (no retry)'
@@ -89,6 +95,9 @@ class NotificationsCheck extends Command
         }
         if ($cutoff === 'INVALID') {
             $this->warnings[] = 'NOTIFICATIONS_SYSTEM_CUTOFF is invalid (ISO-8601 with an offset) — SYSTEM discovery is closed.';
+        }
+        if ($followupsCutoff === 'INVALID') {
+            $this->warnings[] = 'NOTIFICATIONS_FOLLOWUPS_CUTOFF is invalid (ISO-8601 with an offset) — follow-ups are closed.';
         }
         if (NotificationConfig::legacyMaxPublishAttemptsSet()) {
             $this->warnings[] = 'Remove NOTIFICATIONS_MAX_PUBLISH_ATTEMPTS: it is replaced by NOTIFICATIONS_AUTOMATIC_PUBLISH_ATTEMPTS and NOTIFICATIONS_MANUAL_PUBLISH_RETRIES and changes nothing.';

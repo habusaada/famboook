@@ -56,13 +56,14 @@ class NotificationsCheckCommandTest extends TestCase
             ->expectsOutputToContain('SYSTEM discovery gate: OFF')
             ->expectsOutputToContain('Follow-ups gate: OFF')
             ->expectsOutputToContain('SYSTEM cutoff: NOT SET')
+            ->expectsOutputToContain('Follow-up cutoff: NOT SET')
             ->expectsOutputToContain('Queue connection driver: sync (NOT asynchronous)')
             ->expectsOutputToContain('Notification queue: notifications')
             ->expectsOutputToContain('Worker heartbeat: ABSENT')
             ->expectsOutputToContain('Scheduler/worker: NOT READY')
             ->expectsOutputToContain('Publication readiness: NOT READY (MODE_OFF, QUEUE_NOT_ASYNC, HEARTBEAT_ABSENT)')
             ->expectsOutputToContain('SYSTEM discovery readiness: NOT READY (MODE_OFF, QUEUE_NOT_ASYNC, HEARTBEAT_ABSENT, SYSTEM_DISCOVERY_DISABLED, SYSTEM_CUTOFF_MISSING)')
-            ->expectsOutputToContain('Follow-up readiness: NOT READY (MODE_OFF, QUEUE_NOT_ASYNC, HEARTBEAT_ABSENT, FOLLOWUPS_DISABLED)')
+            ->expectsOutputToContain('Follow-up readiness: NOT READY (MODE_OFF, QUEUE_NOT_ASYNC, HEARTBEAT_ABSENT, FOLLOWUPS_DISABLED, FOLLOWUPS_CUTOFF_MISSING)')
             ->expectsOutputToContain('Notification tables: present')
             ->expectsOutputToContain('Messages QUEUED: 0')
             ->expectsOutputToContain('Messages PUBLISHING: 0')
@@ -80,10 +81,12 @@ class NotificationsCheckCommandTest extends TestCase
         config([
             'notifications.mode' => 'ON', 'notifications.system_discovery_enabled' => true,
             'notifications.followups_enabled' => true, 'notifications.system_cutoff' => '2026-11-01T00:00:00Z',
+            'notifications.followups_cutoff' => '2026-11-01T00:00:00Z',
         ]);
 
         $this->artisan('famboook:notifications-check')
             ->expectsOutputToContain('Queue connection driver: database (asynchronous)')
+            ->expectsOutputToContain('Follow-up cutoff: VALID')
             ->expectsOutputToContain('Worker heartbeat: FRESH (age 42 s, max 300 s)')
             ->expectsOutputToContain('Scheduler/worker: READY')
             ->expectsOutputToContain('SYSTEM cutoff: VALID')
@@ -128,6 +131,7 @@ class NotificationsCheckCommandTest extends TestCase
         config([
             'notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => '987654,x',
             'notifications.queue' => 'Bad Queue', 'notifications.system_cutoff' => '2026-02-30T00:00:00Z',
+            'notifications.followups_cutoff' => '2026-04-31T00:00:00Z',
         ]);
 
         $this->artisan('famboook:notifications-check')
@@ -138,6 +142,9 @@ class NotificationsCheckCommandTest extends TestCase
             ->expectsOutputToContain('SYSTEM cutoff: INVALID')
             ->expectsOutputToContain('WARN: Invalid notification configuration (pilot_sender_user_ids, queue)')
             ->expectsOutputToContain('WARN: NOTIFICATIONS_SYSTEM_CUTOFF is invalid')
+            ->expectsOutputToContain('Follow-up cutoff: INVALID')
+            ->expectsOutputToContain('WARN: NOTIFICATIONS_FOLLOWUPS_CUTOFF is invalid (ISO-8601 with an offset) — follow-ups are closed.')
+            ->doesntExpectOutputToContain('2026-04-31')
             ->expectsOutputToContain('WARN: PILOT mode with no usable allow-listed sender: nobody can publish.')
             ->doesntExpectOutputToContain('987654')
             ->doesntExpectOutputToContain('Bad Queue')

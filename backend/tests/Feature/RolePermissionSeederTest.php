@@ -320,8 +320,9 @@ class RolePermissionSeederTest extends TestCase
         //        (AUTH-ADR-063)
         //      + family-card.view/issue/revoke/reissue (AUTH-ADR-085)
         //      + change-request.view/return/reject/view-internal-notes (AUTH-ADR-087)
-        //      + announcement.view/create/send/send-all (AUTH-ADR-097, FB-NOTIFY-01B.2b.6d).
-        $this->assertSame(98, $superAdmin->getAllPermissions()->count());
+        //      + announcement.view/create/send/send-all (AUTH-ADR-097, FB-NOTIFY-01B.2b.6d)
+        //      + notification-followup.view/manage (ADR FB-NOTIFY-01 ADR-06 §2c, 01E.3-F1).
+        $this->assertSame(100, $superAdmin->getAllPermissions()->count());
         foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
             $this->assertTrue($superAdmin->hasPermissionTo($permission));
         }
@@ -345,13 +346,13 @@ class RolePermissionSeederTest extends TestCase
         }
         $superAdmin = User::factory()->create();
         $superAdmin->assignRole('SUPER_ADMIN');
-        $this->assertSame(99, $superAdmin->getAllPermissions()->count());
+        $this->assertSame(101, $superAdmin->getAllPermissions()->count());
 
         // Closing the gate again and re-seeding (every deployment) revokes it.
         config(['import.apply_enabled' => false]);
         $this->seed(RolePermissionSeeder::class);
         $this->assertFalse($superAdmin->fresh()->hasPermissionTo('import.apply'));
-        $this->assertSame(98, $superAdmin->fresh()->getAllPermissions()->count());
+        $this->assertSame(100, $superAdmin->fresh()->getAllPermissions()->count());
     }
 
     public function test_only_a_strict_boolean_opens_the_apply_gate(): void

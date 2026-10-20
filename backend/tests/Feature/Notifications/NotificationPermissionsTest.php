@@ -21,7 +21,10 @@ use Tests\TestCase;
  * baseline (AUTH-ADR-097) — announcement.view / .create / .send for
  * SUPER_ADMIN and ADMINISTRATOR, announcement.send-all for SUPER_ADMIN only,
  * coordinator-announcement.view / .create / .send for the existing
- * COORDINATOR role only. No role is created. Everything here uses the
+ * COORDINATOR role only; FB-NOTIFY-01E.3-F1 (ADR-06 §2c) adds
+ * notification-followup.view / .manage for SUPER_ADMIN and ADMINISTRATOR and
+ * coordinator-notification-followup.view / .manage for COORDINATOR only. No
+ * role is created. Everything here uses the
  * SEEDED roles — never a direct grant — so it proves the baseline itself,
  * and famboook:verify-permissions detects every deviation. Synthetic data
  * only.
@@ -33,6 +36,10 @@ class NotificationPermissionsTest extends TestCase
     private const ANNOUNCEMENT = ['announcement.view', 'announcement.create', 'announcement.send'];
 
     private const COORDINATOR = ['coordinator-announcement.view', 'coordinator-announcement.create', 'coordinator-announcement.send'];
+
+    private const FOLLOWUP = ['notification-followup.view', 'notification-followup.manage'];
+
+    private const COORDINATOR_FOLLOWUP = ['coordinator-notification-followup.view', 'coordinator-notification-followup.manage'];
 
     protected function setUp(): void
     {
@@ -62,23 +69,26 @@ class NotificationPermissionsTest extends TestCase
 
     public function test_the_catalog_and_the_grants_are_exactly_the_approved_matrix(): void
     {
-        foreach ([...self::ANNOUNCEMENT, 'announcement.send-all', ...self::COORDINATOR] as $permission) {
+        foreach ([...self::ANNOUNCEMENT, 'announcement.send-all', ...self::COORDINATOR, ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP] as $permission) {
             $this->assertContains($permission, RolePermissionSeeder::PERMISSIONS);
             $this->assertSame(1, Permission::query()->where('name', $permission)->count(), $permission);
         }
-        $this->assertSame([], array_values(array_filter(RolePermissionSeeder::PERMISSIONS, fn ($p) => str_contains($p, 'notification-followup'))),
-            'follow-up permissions stay unseeded');
+        // Exactly the four follow-up permissions, no other name of the family.
+        $this->assertEqualsCanonicalizing([...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP],
+            array_values(array_filter(RolePermissionSeeder::PERMISSIONS, fn ($p) => str_contains($p, 'followup'))));
 
         $expected = [
-            'SUPER_ADMIN' => [...self::ANNOUNCEMENT, 'announcement.send-all'],
-            'ADMINISTRATOR' => self::ANNOUNCEMENT,
-            'COORDINATOR' => self::COORDINATOR,
+            'SUPER_ADMIN' => [...self::ANNOUNCEMENT, 'announcement.send-all', ...self::FOLLOWUP],
+            'ADMINISTRATOR' => [...self::ANNOUNCEMENT, ...self::FOLLOWUP],
+            'COORDINATOR' => [...self::COORDINATOR, ...self::COORDINATOR_FOLLOWUP],
         ];
         foreach (RolePermissionSeeder::ROLES as $role) {
             $held = array_values(array_filter(Role::findByName($role, 'web')->permissions->pluck('name')->all(),
-                fn ($p) => str_starts_with($p, 'announcement.') || str_starts_with($p, 'coordinator-announcement.')));
+                fn ($p) => str_starts_with($p, 'announcement.') || str_starts_with($p, 'coordinator-announcement.') || str_contains($p, 'followup')));
             $this->assertEqualsCanonicalizing($expected[$role] ?? [], $held, $role);
         }
+        // No direct grant: the matrix is the seeded roles only.
+        $this->assertSame(0, DB::table(config('permission.table_names.model_has_permissions'))->count());
     }
 
     public function test_no_role_is_created_and_seeding_is_idempotent(): void
@@ -122,6 +132,29 @@ class NotificationPermissionsTest extends TestCase
                 'CRITICAL: 1 notification permission grant(s) made directly to a model'],
             'a missing permission' => [fn () => Permission::findByName('coordinator-announcement.view', 'web')->delete(),
                 'permission missing: coordinator-announcement.view'],
+            // Follow-ups (ADR-06 §2c).
+            'ADMINISTRATOR without follow-up management' => [fn () => Role::findByName('ADMINISTRATOR', 'web')->revokePermissionTo('notification-followup.manage'),
+                'CRITICAL: ADMINISTRATOR must have notification-followup.manage'],
+            'SUPER_ADMIN without follow-up oversight' => [fn () => Role::findByName('SUPER_ADMIN', 'web')->revokePermissionTo('notification-followup.view'),
+                'CRITICAL: SUPER_ADMIN must have notification-followup.view'],
+            'COORDINATOR with central follow-up management' => [fn () => Role::findByName('COORDINATOR', 'web')->givePermissionTo('notification-followup.manage'),
+                'CRITICAL: COORDINATOR must NOT have notification-followup.manage'],
+            'COORDINATOR without its follow-up view' => [fn () => Role::findByName('COORDINATOR', 'web')->revokePermissionTo('coordinator-notification-followup.view'),
+                'CRITICAL: COORDINATOR must have coordinator-notification-followup.view'],
+            'ADMINISTRATOR with coordinator follow-ups' => [fn () => Role::findByName('ADMINISTRATOR', 'web')->givePermissionTo('coordinator-notification-followup.manage'),
+                'CRITICAL: ADMINISTRATOR must NOT have coordinator-notification-followup.manage'],
+            'SOCIAL_WORKER with follow-ups' => [fn () => Role::findByName('SOCIAL_WORKER', 'web')->givePermissionTo('notification-followup.view'),
+                'CRITICAL: SOCIAL_WORKER must NOT have notification-followup.view'],
+            'FAMILY_USER with coordinator follow-ups' => [fn () => Role::findByName('FAMILY_USER', 'web')->givePermissionTo('coordinator-notification-followup.view'),
+                'CRITICAL: FAMILY_USER must NOT have coordinator-notification-followup.view'],
+            'REVIEWER with follow-ups' => [fn () => Role::findByName('REVIEWER', 'web')->givePermissionTo('notification-followup.manage'),
+                'CRITICAL: REVIEWER must NOT have notification-followup.manage'],
+            'DATA_ENTRY with follow-ups' => [fn () => Role::findByName('DATA_ENTRY', 'web')->givePermissionTo('notification-followup.view'),
+                'CRITICAL: DATA_ENTRY must NOT have notification-followup.view'],
+            'REPORTS_VIEWER with follow-ups' => [fn () => Role::findByName('REPORTS_VIEWER', 'web')->givePermissionTo('coordinator-notification-followup.view'),
+                'CRITICAL: REPORTS_VIEWER must NOT have coordinator-notification-followup.view'],
+            'follow-up management granted directly' => [fn () => User::factory()->create()->givePermissionTo('coordinator-notification-followup.manage'),
+                'CRITICAL: 1 notification permission grant(s) made directly to a model'],
         ];
 
         foreach ($deviations as $what => [$deviate, $message]) {
@@ -134,6 +167,8 @@ class NotificationPermissionsTest extends TestCase
             $this->artisan('famboook:verify-permissions')->expectsOutputToContain($message)->assertExitCode(1);
         }
         $this->assertSame(VerifyPermissions::COORDINATOR_ANNOUNCEMENT, self::COORDINATOR);
+        $this->assertSame(VerifyPermissions::FOLLOWUP, self::FOLLOWUP);
+        $this->assertSame(VerifyPermissions::COORDINATOR_FOLLOWUP, self::COORDINATOR_FOLLOWUP);
     }
 
     // --------------------------------------------------- the seeded roles at work
