@@ -49,13 +49,17 @@ function urlOf(page: string): string {
 }
 
 // The public Coordinator URLs before the refactor (8f47715), unchanged, plus
-// the FB-NOTIFY-01C.3d announcement routes.
+// the FB-NOTIFY-01C.3d announcement routes and the FB-NOTIFY-01E.3-F3.3
+// follow-up routes.
 const PUBLIC_URLS = [
   "/family/coordinator",
   "/family/coordinator/announcements",
   "/family/coordinator/announcements/[id]",
   "/family/coordinator/announcements/new",
   "/family/coordinator/families/[code]",
+  // FB-NOTIFY-01E.3-F3.3: follow-ups of the CURRENT scope, inside (space).
+  "/family/coordinator/followups",
+  "/family/coordinator/followups/[id]",
   "/family/coordinator/requests",
   "/family/coordinator/requests/[id]",
   "/family/coordinator/requests/new",

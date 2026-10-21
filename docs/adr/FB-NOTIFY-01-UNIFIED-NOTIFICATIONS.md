@@ -659,6 +659,23 @@ Complete serialization of every possible ownership change is **not** claimed.
 - **Indexes used:** `notification_followups_open_due_index` for OPEN lists; families (`clan_id`, `branch_id`) for scope; events (`followup_id`, `id`) for history.
 - **CLOSED lists** (`closed_at` order) have no index. It is deferred: there is no query evidence at pilot volume. Re-assess with `EXPLAIN (ANALYZE)` on production-like volume.
 
+## 2g. Follow-up management interfaces (FB-NOTIFY-01E.3-F3.3, 2026-10-21)
+
+**Local code only:** not deployed and not activated. Frontend only: no backend, migration, RBAC or theme change.
+
+| Side | Screens | Entry | Guard |
+|---|---|---|---|
+| Staff | `/followups` (inbox), `/followups/{uuid}` (detail) | sidebar «المتابعات», group المتابعة | `notification-followup.view` (AuthGate) |
+| Coordinator | `/family/coordinator/followups`, `…/{uuid}` | a card on the Coordinator Space home | the `(space)` group, `CoordinatorGate` (CURRENT scope) |
+
+- **Inbox:** the side's summary counters, OPEN / CLOSED, filters (stage, level, outcome for CLOSED, family code) and server pagination, all in the URL and applied by the server. The coordinator side adds «كل المتابعات الظاهرة» / «متابعاتي» (`ownership=mine`). `due_before` is not exposed in the UI.
+- **Lists** show the list resource only: family code, household head's name, stage, state, level, message and times. Never a note.
+- **Management controls** follow the server: Staff `notification-followup.manage`; coordinator `can_manage`. They are hidden on CLOSED follow-ups and once the message's `expires_at` has passed (the server's `FOLLOWUP_EXPIRED` rule). Hidden controls are UX only; every write is still decided by the Domain Actions.
+- **Contact idempotency:** one `client_reference` (uuid) per contact. A retry of the same outcome and note, after a lost response, 503 or 429, re-sends the same reference. A changed payload, a success or a `FOLLOWUP_CLIENT_REFERENCE_CONFLICT` starts a new one. Nothing is re-sent automatically.
+- **Closure** needs a confirmation dialog and a reason. It is never retried automatically. After any failure the follow-up is re-read, because a lost response may already have closed it.
+- **Errors:** 404 out of scope and 404 missing look the same; 403, 409 (state and ownership), 422 (field errors), 429 and 503 `FOLLOWUP_BUSY` get safe Arabic messages with retry guidance; a connection failure (offline included) says whether the write may have happened. After a write, or a 409, the list, summary, detail and history are invalidated. A coordinator's `COORDINATOR_SPACE_UNAVAILABLE` re-reads `/family/me`.
+- **Notes:** every note field states that it is internal and must not contain health, identity, contact or document data (ADR-06).
+
 ## 3. Rationale and alternatives
 | Alternative | Why not |
 |---|---|

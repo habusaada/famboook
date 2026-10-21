@@ -7,6 +7,7 @@ import {
   HeartHandshake,
   HandHeart,
   Megaphone,
+  BellRing,
   BarChart3,
   Settings,
   type LucideIcon,
@@ -46,6 +47,10 @@ export const navItems: NavItem[] = [
   // FB-NOTIFY-01C.3c: the sender's own announcements (announcement.view —
   // SUPER_ADMIN, ADMINISTRATOR). Also guards /announcements/* in AuthGate.
   { href: "/announcements", label: "الإعلانات", icon: Megaphone, permissions: ["announcement.view"], group: "follow-up" },
+  // FB-NOTIFY-01E.3-F3.3: every follow-up for central Staff
+  // (notification-followup.view — SUPER_ADMIN, ADMINISTRATOR). Also guards
+  // /followups/* in AuthGate.
+  { href: "/followups", label: "المتابعات", icon: BellRing, permissions: ["notification-followup.view"], group: "follow-up" },
   {
     href: "/administration",
     label: "الإدارة",
