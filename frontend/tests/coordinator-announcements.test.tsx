@@ -59,8 +59,10 @@ const BASE = "/api/v1/family/coordinator/notifications";
 const DETAIL = `${BASE}/${UUID}`;
 const DIRECTORY = (q: string) => `/api/v1/family/coordinator/families?page=1&q=${encodeURIComponent(q)}`;
 
-const ACTIVE: FamilyUser = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true });
-const REVOKED: FamilyUser = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: false });
+// Pilot isolation (ADR §2h): these coordinators are shown their notification screens by the server.
+const ACTIVE: FamilyUser = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true, coordinator_notifications: true });
+const REVOKED: FamilyUser = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: false, coordinator_notifications: true });
+const NOT_IN_PILOT: FamilyUser = familyUser({ roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true, coordinator_notifications: false });
 const HEAD_ONLY: FamilyUser = familyUser();
 const CONTEXT = { scopes: [{ type: "BRANCH", code: "BR_A", name: "فرع أ", clan_name: "عشيرة الاختبار" }], family_count: 3 };
 
@@ -193,7 +195,7 @@ describe("entry points", () => {
   });
 
   it("offers «إعلاناتي» in حسابي to a coordinator with or without a current scope, and to nobody else", async () => {
-    for (const [user, shown] of [[ACTIVE, true], [REVOKED, true], [HEAD_ONLY, false]] as const) {
+    for (const [user, shown] of [[ACTIVE, true], [REVOKED, true], [NOT_IN_PILOT, false], [HEAD_ONLY, false]] as const) {
       vi.restoreAllMocks();
       vi.spyOn(apiClient, "get").mockImplementation(familyGet({ user, coordinator: CONTEXT }));
       const { unmount } = renderWithClient(
@@ -207,6 +209,18 @@ describe("entry points", () => {
       else expect(link).toBeNull();
       unmount();
     }
+  });
+
+  it("shows no «الإعلانات» card to a coordinator the server does not show notifications to (pilot isolation)", async () => {
+    mockGets({ "/api/v1/family/coordinator/context": { data: CONTEXT }, "/api/v1/family/coordinator/families?page=1": { data: [], meta: { current_page: 1, last_page: 1, per_page: 25, total: 0 } } });
+    asUser(NOT_IN_PILOT, (
+      <CoordinatorGate>
+        <CoordinatorHome />
+      </CoordinatorGate>
+    ));
+    expect(await screen.findByRole("link", { name: /طلبات التنسيق/ })).toBeInTheDocument();
+    expect(document.querySelector("[data-coordinator-announcements-link]")).toBeNull();
+    expect(document.querySelector("[data-coordinator-followups-link]")).toBeNull();
   });
 
   it("adds no bottom navigation item", async () => {

@@ -676,6 +676,62 @@ Complete serialization of every possible ownership change is **not** claimed.
 - **Errors:** 404 out of scope and 404 missing look the same; 403, 409 (state and ownership), 422 (field errors), 429 and 503 `FOLLOWUP_BUSY` get safe Arabic messages with retry guidance; a connection failure (offline included) says whether the write may have happened. After a write, or a 409, the list, summary, detail and history are invalidated. A coordinator's `COORDINATOR_SPACE_UNAVAILABLE` re-reads `/family/me`.
 - **Notes:** every note field states that it is internal and must not contain health, identity, contact or document data (ADR-06).
 
+## 2h. Pilot isolation (FB-NOTIFY-01, owner decisions C1–C3, C5, 2026-10-21)
+
+**Local code only:** not deployed, not activated. No migration, no RBAC change, no theme change.
+
+**Why:** in PILOT the sender allow-list alone did not keep the feature away from other families. Every family saw the bell and was polled. Every coordinator saw the notification screens. A pilot coordinator could address the whole scope, and a pilot SUPER_ADMIN every ACTIVE family.
+
+**Configuration (one new key, the pilot's recipient side):**
+- `NOTIFICATIONS_PILOT_FAMILY_IDS`: canonical family ids, comma-separated.
+- Same format and fail-closed parsing as `NOTIFICATIONS_PILOT_SENDER_USER_IDS`: empty = no household; one malformed entry = none and `Configuration: INVALID` (every notification operation closed).
+- `famboook:notifications-check` reports its size only, and warns in PILOT when it is empty.
+- It is not a second sender list. It names who may **receive** in PILOT, as the existing list names who may **send**.
+- `CHANGE_REQUESTS_PILOT_FAMILY_IDS` was not reused: it belongs to a different feature and pilot.
+
+**C5 — audience enforcement (server-side):** `NotificationAudienceResolver::assertPilotAudience()`, called at the start of `families()`.
+- **Paths covered:** the draft, the audience preview, the publication request, the manual retry, and the worker's re-resolution at publication (`forMessage`). No path bypasses it.
+- **In PILOT only:**
+
+  | Audience | Result |
+  |---|---|
+  | `STAFF_FAMILIES` / `COORDINATOR_SELECTION` with families only, every one in the list | allowed (scope, eligibility and send-all checks still apply) |
+  | `COORDINATOR_SCOPE`, `STAFF_ALL_ACTIVE` (even with send-all), any branch / group / clan selection, a family outside the list, any audience with an empty or malformed list | **422 `NOTIFICATION_AUDIENCE_NOT_IN_PILOT`** |
+
+- **At publication:** a list or mode change after the request is caught by the worker, which records the existing permanent `AUDIENCE_INVALID` (no schema change; the sender sees the existing explanation and may cancel).
+- **OFF and ON are unchanged:** OFF publishes nothing anyway, and ON keeps every existing rule.
+
+**C1 — family visibility** (`GET /api/v1/family/me` → `notifications`; `NotificationVisibility::forFamily`):
+
+| Mode | Shown to |
+|---|---|
+| OFF | nobody |
+| PILOT | a listed pilot household, **or** a household that already holds notifications (a recipient row: its own, legitimately published history, e.g. after leaving the list) |
+| ON | every household with a Family context, even with an empty inbox |
+
+An invalid configuration shows nothing.
+
+**C2 — family UI:**
+- The bell, and with it the unread poll, renders only when `notifications` is true.
+- `/family/notifications`, `/archive` and `/[id]` sit behind a layout gate that renders an «الإشعارات غير متاحة حاليًا» panel and makes no inbox request otherwise.
+
+**C3 — coordinator UI** (`coordinator_notifications`; `NotificationVisibility::forCoordinator`):
+- **Who sees it:** OFF nobody; PILOT only an allow-listed sender; ON every coordinator.
+- **What it hides:** the «إعلاناتي» account link and the Coordinator Space cards «الإعلانات» and «متابعات الأسر».
+
+**Security notes:**
+- C1–C3 are **visibility only**. Every endpoint keeps its permission, policy, scope and readiness checks; a direct URL reaches only what the server authorizes:
+  - the family inbox API still returns the family's own, possibly empty, inbox;
+  - an unlisted coordinator's publication is still 503 `SENDER_NOT_IN_PILOT`.
+- The flags disclose only a boolean: never which list matched, no id, no count.
+- A coordinator outside the pilot who is the primary owner of a pilot household's follow-up no longer sees the follow-up card; the API still authorizes them, and central Staff manage every follow-up.
+- `NotificationVisibility::forFamily` adds one `EXISTS` on `notification_recipients (family_id)` to `/family/me` in PILOT only.
+
+**Tests:**
+- `NotificationPilotIsolationTest` (configuration, every audience path, request / retry / worker re-check, OFF / ON unchanged, both flags, visibility versus authorization);
+- the existing `/family/me` exact-shape tests;
+- frontend tests for the bell, the polling, the page gate, the coordinator link and cards, and the refusal message.
+
 ## 3. Rationale and alternatives
 | Alternative | Why not |
 |---|---|

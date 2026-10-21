@@ -244,13 +244,16 @@ function Coordinator() {
           لا يوجد نطاق تنسيق فعّال حاليًا.
         </p>
       )}
-      {/* FB-NOTIFY-01C.3d: the own announcement history — role-only, so also without a current scope. */}
-      <Button asChild variant="outline" className="mt-3 h-11 w-full gap-2 rounded-xl text-sm font-semibold">
-        <Link href="/family/coordinator/announcements" data-account-coordinator-announcements>
-          <Megaphone className="size-4" aria-hidden />
-          إعلاناتي
-        </Link>
-      </Button>
+      {/* FB-NOTIFY-01C.3d: the own announcement history — role-only, so also without a current scope;
+          shown only when the server shows coordinator notifications (pilot isolation, ADR §2h). */}
+      {user.coordinator_notifications === true && (
+        <Button asChild variant="outline" className="mt-3 h-11 w-full gap-2 rounded-xl text-sm font-semibold">
+          <Link href="/family/coordinator/announcements" data-account-coordinator-announcements>
+            <Megaphone className="size-4" aria-hidden />
+            إعلاناتي
+          </Link>
+        </Button>
+      )}
     </Section>
   );
 }

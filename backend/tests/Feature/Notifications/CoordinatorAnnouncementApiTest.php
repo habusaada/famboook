@@ -271,6 +271,10 @@ class CoordinatorAnnouncementApiTest extends TestCase
         config(['notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => '999999']);
         $this->as($this->coordinator, 'POST', "/{$uuid}/publish")->assertStatus(503);
         config(['notifications.pilot_sender_user_ids' => (string) $this->coordinator->id]);
+        // Pilot isolation (ADR §2h): in PILOT the whole scope is never addressable — only pilot households, one by one.
+        $this->as($this->coordinator, 'POST', "/{$uuid}/publish")->assertStatus(422)->assertJson(['code' => 'NOTIFICATION_AUDIENCE_NOT_IN_PILOT']);
+        config(['notifications.pilot_family_ids' => (string) $this->inFirst->id]);
+        $uuid = $this->draftVia($this->coordinator, ['type' => 'COORDINATOR_SELECTION', 'family_codes' => [$this->inFirst->family_code]]);
         $this->as($this->coordinator, 'POST', "/{$uuid}/publish")->assertStatus(202)->assertJson(['data' => ['status' => 'QUEUED']]);
 
         $this->failPublication($this->message($uuid), NotificationFailureCode::AUDIENCE_EMPTY, 1);

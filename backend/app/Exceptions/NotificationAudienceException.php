@@ -28,11 +28,17 @@ class NotificationAudienceException extends RuntimeException
     // The audience resolves to no family.
     public const EMPTY = 'NOTIFICATION_AUDIENCE_EMPTY';
 
+    // PILOT (pilot isolation, ADR §2h): only the pilot households, selected
+    // one by one — never a whole scope, every family, a structure, or a
+    // family outside NOTIFICATIONS_PILOT_FAMILY_IDS.
+    public const NOT_IN_PILOT = 'NOTIFICATION_AUDIENCE_NOT_IN_PILOT';
+
     private const MESSAGES = [
         self::INVALID => 'تحديد المستلمين غير صالح.',
         self::NOT_AUTHORIZED => 'لا تملك صلاحية الإرسال إلى هذه الفئة من الأسر.',
         self::FAMILY_NOT_ELIGIBLE => 'إحدى الأسر المحددة غير متاحة للإرسال.',
         self::EMPTY => 'لا توجد أسر مستلمة ضمن هذا التحديد.',
+        self::NOT_IN_PILOT => 'خلال التجربة المضبوطة يُرسل الإعلان إلى أسر التجربة المعتمدة فقط، بتحديدها أسرةً أسرة.',
     ];
 
     public function __construct(public readonly string $reason)

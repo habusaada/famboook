@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fieldClass } from "@/components/family/auth/auth-parts";
 import { useCoordinatorContext } from "@/components/family/coordinator/coordinator-gate";
+import { useFamilyUser } from "@/components/family/family-context";
 import { type CoordinatorFamily, hierarchyLabel, scopeLabel, useCoordinatorFamiliesQuery } from "@/lib/api/coordinator";
 
 function FamilyRow({ family }: { family: CoordinatorFamily }) {
@@ -45,6 +46,7 @@ function FamilyRow({ family }: { family: CoordinatorFamily }) {
  */
 export function CoordinatorHome() {
   const context = useCoordinatorContext();
+  const user = useFamilyUser();
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -96,37 +98,43 @@ export function CoordinatorHome() {
         <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
 
-      {/* FB-NOTIFY-01C.3d: the coordinator's own announcements to the families of the scope. */}
-      <Link
-        href="/family/coordinator/announcements"
-        className="flex items-center gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
-        data-coordinator-announcements-link
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
-          <Megaphone className="size-5" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="font-semibold text-foreground">الإعلانات</span>
-          <span className="text-[13px] text-muted-foreground">أرسل إعلانًا إلى أسر نطاقك وتابع إعلاناتك السابقة.</span>
-        </span>
-        <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
+      {/* Notification screens (announcements, follow-ups) only when the server shows them:
+          pilot isolation, ADR FB-NOTIFY-01 §2h. The endpoints still authorize on their own. */}
+      {user.coordinator_notifications === true && (
+        <>
+        {/* FB-NOTIFY-01C.3d: the coordinator's own announcements to the families of the scope. */}
+        <Link
+          href="/family/coordinator/announcements"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+          data-coordinator-announcements-link
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
+            <Megaphone className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-semibold text-foreground">الإعلانات</span>
+            <span className="text-[13px] text-muted-foreground">أرسل إعلانًا إلى أسر نطاقك وتابع إعلاناتك السابقة.</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
 
-      {/* FB-NOTIFY-01E.3-F3.3: the follow-ups of the families in the current scope. */}
-      <Link
-        href="/family/coordinator/followups"
-        className="flex items-center gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
-        data-coordinator-followups-link
-      >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
-          <BellRing className="size-5" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="font-semibold text-foreground">متابعات الأسر</span>
-          <span className="text-[13px] text-muted-foreground">أسر نطاقك التي لم تطّلع على إعلان أو لم تؤكد الاطلاع عليه في موعده.</span>
-        </span>
-        <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
+        {/* FB-NOTIFY-01E.3-F3.3: the follow-ups of the families in the current scope. */}
+        <Link
+          href="/family/coordinator/followups"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+          data-coordinator-followups-link
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
+            <BellRing className="size-5" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="font-semibold text-foreground">متابعات الأسر</span>
+            <span className="text-[13px] text-muted-foreground">أسر نطاقك التي لم تطّلع على إعلان أو لم تؤكد الاطلاع عليه في موعده.</span>
+          </span>
+          <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        </Link>
+        </>
+      )}
 
       <section aria-labelledby="coordinator-families-title" className="flex flex-col gap-3">
         <h2 id="coordinator-families-title" className="text-sm font-semibold text-foreground">

@@ -95,8 +95,9 @@ export function FamilyShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex h-14 max-w-md items-center justify-between gap-3 px-4">
           <FamilyBrand />
           <div className="flex items-center gap-1">
-            {/* The household's notifications: never in Coordinator Space or without a Family context. */}
-            {available && !coordinatorMode && <NotificationBell />}
+            {/* The household's notifications: never in Coordinator Space or without a Family context,
+                and only when the server shows them (pilot isolation) — otherwise no unread polling. */}
+            {available && !coordinatorMode && user.notifications === true && <NotificationBell />}
             <LogoutButton />
           </div>
         </div>

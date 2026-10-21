@@ -6,6 +6,7 @@ import { FamilyUserContext } from "@/components/family/family-context";
 import { FamilyShell } from "@/components/family/family-shell";
 import { FamilyNotificationDetail } from "@/components/family/notifications/family-notification-detail";
 import { FamilyNotifications } from "@/components/family/notifications/family-notifications";
+import { FamilyNotificationsGate } from "@/components/family/notifications/family-notifications-gate";
 import { NotificationBell } from "@/components/family/notifications/notification-bell";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY, type FamilyUser } from "@/lib/api/family-auth";
@@ -187,7 +188,7 @@ describe("the bell in the Family shell", () => {
 
   it("is in the household header, and the five-entry bottom navigation is unchanged", async () => {
     nav.pathname = "/family";
-    renderShell(familyUser());
+    renderShell(familyUser({ notifications: true }));
 
     const header = screen.getByRole("banner");
     expect(await within(header).findByRole("link", { name: "الإشعارات، 2 غير مقروءة" })).toBeInTheDocument();
@@ -201,6 +202,19 @@ describe("the bell in the Family shell", () => {
     renderShell(familyUser({ coordinator: true, coordinator_space: true, roles: ["FAMILY_USER", "COORDINATOR"] }));
     expect(document.querySelector("[data-family-notification-bell]")).toBeNull();
     expect(apiClient.get).not.toHaveBeenCalledWith(INBOX);
+  });
+
+  it("is hidden, and nothing is polled, when the server does not show notifications (pilot isolation)", async () => {
+    nav.pathname = "/family";
+    for (const user of [familyUser({ notifications: false }), familyUser()]) {
+      vi.mocked(apiClient.get).mockClear?.();
+      const { unmount } = renderShell(user);
+      expect(await screen.findByText("المحتوى")).toBeInTheDocument();
+      expect(document.querySelector("[data-family-notification-bell]")).toBeNull();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(apiClient.get).not.toHaveBeenCalledWith(INBOX);
+      unmount();
+    }
   });
 
   it("is hidden, and nothing is read, without a Family context", () => {
@@ -520,5 +534,47 @@ describe("IMPORTANT acknowledgement", () => {
     await screen.findByText("NTF-000042");
     expect(browserStorageDump()).not.toContain("موعد توزيع المساعدات");
     expect(browserStorageDump()).not.toContain(UUID);
+  });
+});
+
+// --------------------------------------------------------- pilot isolation
+
+describe("the notification pages gate (pilot isolation)", () => {
+  function renderGate(user: FamilyUser) {
+    mockGets({ [INBOX]: page([], { unread_count: 0 }) });
+    return renderWithClient(
+      <FamilyUserContext.Provider value={user}>
+        <FamilyNotificationsGate>
+          <FamilyNotifications view="inbox" />
+        </FamilyNotificationsGate>
+      </FamilyUserContext.Provider>
+    );
+  }
+
+  it("renders nothing of the inbox and reads nothing when the server does not show notifications", async () => {
+    renderGate(familyUser({ notifications: false }));
+    expect(screen.getByRole("heading", { name: "الإشعارات غير متاحة حاليًا" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "العودة إلى الرئيسية" })).toHaveAttribute("href", "/family");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(apiClient.get).not.toHaveBeenCalled();
+  });
+
+  it("opens the inbox when the server shows notifications", async () => {
+    renderGate(familyUser({ notifications: true }));
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith(INBOX));
+    expect(screen.queryByText("الإشعارات غير متاحة حاليًا")).toBeNull();
+  });
+
+  it("the route layout uses the gate", async () => {
+    const { default: Layout } = await import("@/app/family/(portal)/notifications/layout");
+    renderWithClient(
+      <FamilyUserContext.Provider value={familyUser()}>
+        <Layout>
+          <p>محتوى محمي</p>
+        </Layout>
+      </FamilyUserContext.Provider>
+    );
+    expect(screen.queryByText("محتوى محمي")).toBeNull();
+    expect(screen.getByText("الإشعارات غير متاحة حاليًا")).toBeInTheDocument();
   });
 });

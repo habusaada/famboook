@@ -81,6 +81,7 @@ const CODE_MESSAGES: Record<string, string> = {
   NOTIFICATION_AUDIENCE_INVALID: "تحديد المستلمين غير صالح.",
   NOTIFICATION_AUDIENCE_FAMILY_NOT_ELIGIBLE: "إحدى الأسر المحددة غير متاحة للإرسال. راجع الأسر المختارة.",
   NOTIFICATION_AUDIENCE_EMPTY: "لا توجد أسر مستلمة ضمن هذا التحديد.",
+  NOTIFICATION_AUDIENCE_NOT_IN_PILOT: "خلال التجربة المضبوطة يُرسل الإعلان إلى أسر التجربة المعتمدة فقط، بتحديدها أسرةً أسرة. اختر «أسر محددة» وأسر التجربة فقط.",
   NOTIFICATION_EXPIRY_TOO_SOON: "يجب أن يكون موعد انتهاء الإعلان بعد ساعة على الأقل.",
   NOTIFICATION_PUBLICATION_UNAVAILABLE: PUBLICATION_UNAVAILABLE_MESSAGE,
   COORDINATOR_SPACE_UNAVAILABLE: "مساحة التنسيق غير متاحة لهذا الحساب حاليًا.",

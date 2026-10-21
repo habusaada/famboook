@@ -46,6 +46,9 @@ class FamilySideBoundaryTest extends TestCase
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
             'coordinator_space' => false,
+            // Pilot isolation (ADR §2h): notifications are OFF in tests, so nothing is shown.
+            'notifications' => false,
+            'coordinator_notifications' => false,
             // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,
@@ -144,6 +147,9 @@ class FamilySideBoundaryTest extends TestCase
             'roles' => ['FAMILY_USER'],
             'coordinator' => false,
             'coordinator_space' => false,
+            // Pilot isolation (ADR §2h): notifications are OFF in tests, so nothing is shown.
+            'notifications' => false,
+            'coordinator_notifications' => false,
             // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,

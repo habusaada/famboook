@@ -18,6 +18,16 @@ return [
     // returned or committed with real ids.
     'pilot_sender_user_ids' => env('NOTIFICATIONS_PILOT_SENDER_USER_IDS', ''),
 
+    // PILOT households (FB-NOTIFY-01 pilot isolation, ADR §2h): comma-
+    // separated canonical family database ids (e.g. "301,302"). The pilot's
+    // RECIPIENT side, next to the sender allow-list above: in PILOT a manual
+    // announcement may address ONLY these families, selected one by one (no
+    // "whole scope" / "all families" audience), and only they see the family
+    // notification UI unless they already hold notifications. Empty = no
+    // household; one malformed entry = no household. Ignored in OFF and ON.
+    // Server configuration only — never logged, returned or committed.
+    'pilot_family_ids' => env('NOTIFICATIONS_PILOT_FAMILY_IDS', ''),
+
     // Independent gates, each off by default; neither opens the other, and
     // neither works while the mode is OFF. SYSTEM discovery works in ON only,
     // never in PILOT. Only a real boolean `true` opens.

@@ -75,6 +75,12 @@ class NotificationsCheck extends Command
             $ids === [] => 'empty',
             default => count($ids).' id(s)',
         });
+        $families = NotificationConfig::pilotFamilyIds();
+        $this->line('Pilot household allow-list: '.match (true) {
+            $families === null => 'INVALID (no household may receive in PILOT)',
+            $families === [] => 'empty',
+            default => count($families).' id(s)',
+        });
         $this->line('SYSTEM discovery gate: '.(NotificationConfig::systemDiscoveryEnabled() ? 'ON' : 'OFF'));
         $this->line('Follow-ups gate: '.(NotificationConfig::followupsEnabled() ? 'ON' : 'OFF'));
         $cutoff = match (true) {
@@ -109,6 +115,9 @@ class NotificationsCheck extends Command
         }
         if ($mode === NotificationMode::PILOT && ($ids === null || $ids === [])) {
             $this->warnings[] = 'PILOT mode with no usable allow-listed sender: nobody can publish.';
+        }
+        if ($mode === NotificationMode::PILOT && ($families === null || $families === [])) {
+            $this->warnings[] = 'PILOT mode with no usable pilot household: no announcement can be addressed.';
         }
     }
 

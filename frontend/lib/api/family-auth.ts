@@ -21,6 +21,14 @@ export type FamilyUser = {
    */
   coordinator_space: boolean;
   /**
+   * Pilot isolation (ADR FB-NOTIFY-01 §2h): show the household's notification
+   * UI (bell, unread polling, inbox pages). Visibility only — the inbox API
+   * still authorizes on its own. Absent or false = hidden and never polled.
+   */
+  notifications?: boolean;
+  /** Show the coordinator's announcement and follow-up screens (pilot isolation). */
+  coordinator_notifications?: boolean;
+  /**
    * FB-FAMILY-DASHBOARD-01: the previous successful sign-in before THIS
    * session (UTC ISO 8601), resolved once by the server when the session
    * started; null when unknown or on a first sign-in.

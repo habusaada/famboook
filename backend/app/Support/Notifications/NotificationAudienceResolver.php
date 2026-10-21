@@ -6,6 +6,7 @@ use App\Enums\CoordinatorScopeType;
 use App\Enums\FamilyStatus;
 use App\Enums\NotificationAudienceType;
 use App\Enums\NotificationKind;
+use App\Enums\NotificationMode;
 use App\Enums\NotificationSenderSide;
 use App\Enums\WorkflowEventType;
 use App\Exceptions\NotificationAudienceException;
@@ -102,6 +103,8 @@ final class NotificationAudienceResolver
      */
     public function families(User $sender, NotificationAudience $audience): Builder
     {
+        self::assertPilotAudience($audience);
+
         return match ($audience->type) {
             NotificationAudienceType::STAFF_FAMILIES => $this->staffFamilies($sender)
                 ->whereIn('families.id', $audience->ids('family_ids')),
@@ -110,6 +113,39 @@ final class NotificationAudienceResolver
             NotificationAudienceType::COORDINATOR_SELECTION => $this->coordinatorSelection($sender, $audience),
             NotificationAudienceType::SYSTEM_ORIGIN => throw new NotificationAudienceException(NotificationAudienceException::INVALID),
         };
+    }
+
+    /**
+     * PILOT audience isolation (ADR §2h, C5). In mode PILOT a manual audience
+     * must be a selection of FAMILIES only (STAFF_FAMILIES or
+     * COORDINATOR_SELECTION without branches, groups or clans), and every
+     * selected family must be a pilot household
+     * (NOTIFICATIONS_PILOT_FAMILY_IDS). Every other audience —
+     * COORDINATOR_SCOPE, STAFF_ALL_ACTIVE, a structure, a family outside the
+     * list, or any audience while the list is empty or malformed — is
+     * NOT_IN_PILOT. OFF and ON are unchanged.
+     *
+     * Checked here because every path goes through families(): the draft,
+     * the audience preview, the publication request, the manual retry and
+     * the worker's re-resolution at publication (forMessage), so a mode or
+     * list change between request and publication is caught at publication
+     * too (the worker records AUDIENCE_INVALID). This narrows the audience
+     * only; the scope, eligibility and send-all checks still apply.
+     */
+    public static function assertPilotAudience(NotificationAudience $audience): void
+    {
+        if (NotificationConfig::mode() !== NotificationMode::PILOT) {
+            return;
+        }
+
+        $selected = $audience->ids('family_ids');
+        $structures = array_merge($audience->ids('branch_ids'), $audience->ids('branch_group_ids'), $audience->ids('clan_ids'));
+        $pilot = NotificationConfig::pilotFamilyIds() ?? [];
+        $familiesOnly = in_array($audience->type, [NotificationAudienceType::STAFF_FAMILIES, NotificationAudienceType::COORDINATOR_SELECTION], true);
+
+        if (! $familiesOnly || $structures !== [] || $selected === [] || array_diff($selected, $pilot) !== []) {
+            throw new NotificationAudienceException(NotificationAudienceException::NOT_IN_PILOT);
+        }
     }
 
     /**

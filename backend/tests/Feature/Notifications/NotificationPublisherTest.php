@@ -201,7 +201,8 @@ class NotificationPublisherTest extends TestCase
 
     public function test_off_pilot_and_invalid_configuration_pause_without_consuming_an_attempt(): void
     {
-        $message = $this->queued([Family::factory()->create()]);
+        $family = Family::factory()->create();
+        $message = $this->queued([$family]);
 
         config(['notifications.mode' => 'OFF']);
         $this->assertSame(Result::PAUSED, $this->publisher->publish($message->id));
@@ -213,7 +214,8 @@ class NotificationPublisherTest extends TestCase
         $this->assertSame(Result::PAUSED, $this->publisher->publish($message->id));
         $this->assertUntouchedQueued($message);
 
-        config(['queue.connections.database.retry_after' => 90, 'notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => (string) $this->staff->id]);
+        // An allow-listed sender, to a pilot household (pilot isolation, ADR §2h).
+        config(['queue.connections.database.retry_after' => 90, 'notifications.mode' => 'PILOT', 'notifications.pilot_sender_user_ids' => (string) $this->staff->id, 'notifications.pilot_family_ids' => (string) $family->id]);
         $this->assertSame(Result::PUBLISHED, $this->publisher->publish($message->id));
     }
 

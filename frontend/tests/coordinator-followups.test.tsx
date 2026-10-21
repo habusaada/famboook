@@ -5,11 +5,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CoordinatorFollowupDetail, CoordinatorFollowupList } from "@/components/family/coordinator/followups/coordinator-followups";
 import { CoordinatorHome } from "@/components/family/coordinator/coordinator-home";
+import { FamilyUserContext } from "@/components/family/family-context";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { FAMILY_ME_QUERY_KEY } from "@/lib/api/family-auth";
 import { type FollowupCounts, type FollowupDetail, type FollowupEvent, type FollowupSummary, followupListPath } from "@/lib/api/followups";
 import type { PaginatedResponse } from "@/lib/types/api/family";
-import { renderWithClient } from "./helpers";
+import { familyUser, renderWithClient } from "./helpers";
 
 // FB-NOTIFY-01E.3-F3.3: the Coordinator follow-up screens over the F3.2
 // Coordinator API (/api/v1/family/coordinator/followups — the CURRENT scope).
@@ -128,10 +129,25 @@ async function chooseOption(combobox: string, option: string, container: HTMLEle
 }
 
 describe("entry and route placement", () => {
-  it("the Coordinator Space home links to «متابعات الأسر»", () => {
+  it("the Coordinator Space home links to «متابعات الأسر» only when the server shows coordinator notifications", () => {
     vi.spyOn(apiClient, "get").mockImplementation(async () => page([]) as never);
-    renderWithClient(<CoordinatorHome />);
+    const coordinator = { roles: ["FAMILY_USER", "COORDINATOR"], coordinator: true, coordinator_space: true };
+    const { unmount } = renderWithClient(
+      <FamilyUserContext.Provider value={familyUser({ ...coordinator, coordinator_notifications: true })}>
+        <CoordinatorHome />
+      </FamilyUserContext.Provider>
+    );
     expect(screen.getByRole("link", { name: /متابعات الأسر/ })).toHaveAttribute("href", "/family/coordinator/followups");
+    unmount();
+
+    // Pilot isolation (ADR §2h): a coordinator outside the pilot sees no card.
+    renderWithClient(
+      <FamilyUserContext.Provider value={familyUser({ ...coordinator, coordinator_notifications: false })}>
+        <CoordinatorHome />
+      </FamilyUserContext.Provider>
+    );
+    expect(screen.queryByRole("link", { name: /متابعات الأسر/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /طلبات التنسيق/ })).toBeInTheDocument();
   });
 
   it("the follow-up pages live in the (space) group, behind the CURRENT-scope gate", () => {

@@ -80,16 +80,16 @@ describe("opening the details", () => {
     expect(within(sheet).getByRole("heading", { name: "زوجة الاختبار" })).toBeInTheDocument();
     // Only the session check, the list, the household health (PWA-3B.6,
     // household-level) and the navigation's request-type discovery
-    // (FP-ADR-074) and the header bell's household inbox (FB-NOTIFY-01C.2)
-    // are ever requested (a routine refetch of any is fine): no
-    // member-specific request.
+    // (FP-ADR-074) are ever requested (a routine refetch of any is fine): no
+    // member-specific request. The header bell's household inbox
+    // (FB-NOTIFY-01C.2) is not read: this household is not shown
+    // notifications (pilot isolation, ADR FB-NOTIFY-01 §2h).
     const paths = new Set(get.mock.calls.map(([path]) => String(path)));
     expect([...paths].sort()).toEqual([
       "/api/v1/family/change-requests/types",
       "/api/v1/family/household/health",
       "/api/v1/family/household/members",
       "/api/v1/family/me",
-      "/api/v1/family/notifications",
     ]);
   });
 

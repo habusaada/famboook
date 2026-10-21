@@ -159,7 +159,7 @@ class PreviousSignInTest extends TestCase
         $this->login()->assertOk();
 
         $user = $this->getJson(self::ME, self::BROWSER)->assertOk()->json('user');
-        $this->assertSame(['context', 'coordinator', 'coordinator_space', 'display_name', 'first_sign_in', 'previous_sign_in_at', 'roles'], collect($user)->keys()->sort()->values()->all());
+        $this->assertSame(['context', 'coordinator', 'coordinator_notifications', 'coordinator_space', 'display_name', 'first_sign_in', 'notifications', 'previous_sign_in_at', 'roles'], collect($user)->keys()->sort()->values()->all());
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$/', $user['previous_sign_in_at']);
         $json = json_encode($user);
         foreach (['127.0.0.1', 'ip', 'user_agent', 'login_key', 'uuid', 'event'] as $forbidden) {

@@ -151,7 +151,8 @@ class RequestPublicationActionTest extends TestCase
         $this->assertRefused(NotificationPublicationException::PUBLICATION_UNAVAILABLE, fn () => $this->request($this->staff, $message));
         $this->assertStillDraft($message);
 
-        config(['notifications.pilot_sender_user_ids' => (string) $this->staff->id]);
+        // An allow-listed sender, to a pilot household (pilot isolation, ADR §2h).
+        config(['notifications.pilot_sender_user_ids' => (string) $this->staff->id, 'notifications.pilot_family_ids' => (string) $this->family->id]);
         $this->assertSame(NotificationStatus::QUEUED, $this->request($this->staff, $message)->message->status);
 
         config(['notifications.mode' => 'ON']);

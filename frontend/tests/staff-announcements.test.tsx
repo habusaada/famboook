@@ -600,3 +600,14 @@ describe("an announcement's details", () => {
     expect(await within(dialog).findByText("محاولات كثيرة خلال وقت قصير. حاول بعد قليل.")).toBeInTheDocument();
   });
 });
+
+// ------------------------------------------------------- pilot isolation
+
+describe("pilot audience refusal (ADR §2h)", () => {
+  it("explains NOTIFICATION_AUDIENCE_NOT_IN_PILOT in Arabic, without naming any family", async () => {
+    const { announcementErrorMessage } = await import("@/lib/utils/announcement");
+    const message = announcementErrorMessage(refusal(422, "NOTIFICATION_AUDIENCE_NOT_IN_PILOT"));
+    expect(message).toContain("أسر التجربة المعتمدة فقط");
+    expect(message).not.toMatch(/FAM-\d|\d{3,}/);
+  });
+});

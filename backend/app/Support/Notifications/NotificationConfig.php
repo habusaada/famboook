@@ -28,6 +28,7 @@ final class NotificationConfig
     public const REQUIRED_KEYS = [
         'mode',
         'pilot_sender_user_ids',
+        'pilot_family_ids',
         'system_discovery_enabled',
         'followups_enabled',
         'queue',
@@ -51,7 +52,25 @@ final class NotificationConfig
      */
     public static function pilotSenderUserIds(): ?array
     {
-        $raw = config('notifications.pilot_sender_user_ids');
+        return self::idList('pilot_sender_user_ids');
+    }
+
+    /**
+     * The PILOT households (pilot isolation, ADR §2h) as family ids, or NULL
+     * when the list is malformed (then no household is a pilot household).
+     * The same format as the sender allow-list.
+     *
+     * @return list<int>|null
+     */
+    public static function pilotFamilyIds(): ?array
+    {
+        return self::idList('pilot_family_ids');
+    }
+
+    /** @return list<int>|null a comma-separated list of positive ids; NULL when malformed */
+    private static function idList(string $key): ?array
+    {
+        $raw = config("notifications.{$key}");
         if ($raw === null || (is_string($raw) && trim($raw) === '')) {
             return [];
         }
@@ -174,6 +193,7 @@ final class NotificationConfig
         $valid = [
             'mode' => self::parsedMode() !== null,
             'pilot_sender_user_ids' => self::pilotSenderUserIds() !== null,
+            'pilot_family_ids' => self::pilotFamilyIds() !== null,
             'system_discovery_enabled' => is_bool(config('notifications.system_discovery_enabled')),
             'followups_enabled' => is_bool(config('notifications.followups_enabled')),
             'queue' => self::queue() !== null,
