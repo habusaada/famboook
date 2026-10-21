@@ -1,0 +1,25 @@
+# Famboook — Laravel scheduler timer (FB-NOTIFY-01 TEMPLATE, systemd).
+#
+# Starts famboook-scheduler.service at second 0 of every minute. The only
+# scheduler mechanism (decision O2): no cron entry in parallel.
+#
+# NOT INSTALLED, NOT ENABLED. Enabling it is a separate, approved Production
+# step:  sudo systemctl enable --now famboook-scheduler.timer
+# Remove (rollback): sudo systemctl disable --now famboook-scheduler.timer
+#
+# Downtime: Persistent=false — minutes missed while the server or the timer
+# was down are NOT caught up on start. Laravel decides what is due from the
+# current minute, so a missed daily task runs at its next due time.
+
+[Unit]
+Description=Famboook Laravel scheduler, every minute
+Documentation=file:///var/www/famboook/docs/deployment/FB-NOTIFY-01-QUEUE-SCHEDULER-READINESS.md
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Persistent=false
+Unit=famboook-scheduler.service
+
+[Install]
+WantedBy=timers.target

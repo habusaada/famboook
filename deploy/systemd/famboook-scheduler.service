@@ -1,0 +1,74 @@
+# Famboook — Laravel scheduler, one run (FB-NOTIFY-01 TEMPLATE, systemd).
+#
+# The ONLY scheduler template (decision O2): started every minute by
+# famboook-scheduler.timer, it runs `schedule:run` once. There is no cron
+# template; never add a crontab or /etc/cron.d entry for schedule:run in
+# parallel — two schedulers would run every lock-free task twice.
+#
+# NOT INSTALLED, NOT ENABLED, NOT STARTED by any script. Enabling the timer is
+# a separate, approved Production step (docs/deployment/
+# FB-NOTIFY-01-QUEUE-SCHEDULER-READINESS.md). It starts EVERY task in
+# backend/routes/console.php at once, not only the notification ones
+# (times in UTC, config/app.php):
+#
+#   famboook:purge-otp-challenges            daily 00:00 — DELETES finished OTP
+#                                            challenges older than
+#                                            FAMILY_OTP_RETENTION_DAYS (90)
+#   famboook:close-expired-contact-updates   every 5 min — SUBMITTED CONTACT_UPDATE
+#                                            requests past their window →
+#                                            CANCELLED by SYSTEM (CONTACT_UPDATE is
+#                                            LIVE in Production: docs/08)
+#   NotificationHeartbeatJob                 every minute — queued on `notifications`
+#   famboook:notifications-reconcile         every minute, withoutOverlapping, onOneServer
+#   famboook:notifications-expire            every minute, withoutOverlapping, onOneServer
+#   famboook:notifications-followups         every minute, withoutOverlapping, onOneServer
+#
+# Order: enable the timer only AFTER the FB-NOTIFY-01 migrations ran (the
+# notification commands need their tables) and AFTER the worker is active
+# (otherwise one heartbeat job per minute piles up in `jobs`).
+# withoutOverlapping / onOneServer need CACHE_STORE=database (cache_locks).
+#
+# Replace <PHP_BINARY> with the server's PHP 8.3+ CLI before installing.
+#
+#   sudo cp deploy/systemd/famboook-scheduler.service deploy/systemd/famboook-scheduler.timer /etc/systemd/system/
+#   sudo systemd-analyze verify /etc/systemd/system/famboook-scheduler.service /etc/systemd/system/famboook-scheduler.timer
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now famboook-scheduler.timer      # [APPROVAL] — the timer, never the service
+# Remove (rollback): sudo systemctl disable --now famboook-scheduler.timer
+
+[Unit]
+Description=Famboook Laravel scheduler (schedule:run, one run)
+Documentation=file:///var/www/famboook/docs/deployment/FB-NOTIFY-01-QUEUE-SCHEDULER-READINESS.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+# One run per activation. While a run is still active, a timer elapse does
+# not start a second one; the tasks' own locks remain the guard.
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/famboook/backend
+UMask=0007
+ExecStart=<PHP_BINARY> artisan schedule:run --no-interaction
+# A run that hangs is stopped before the 10-minute withoutOverlapping locks
+# expire; a killed task rolls back its own transaction.
+TimeoutStartSec=540
+KillSignal=SIGTERM
+# Output to the journal (journalctl -u famboook-scheduler): each run's task
+# list and counters.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=famboook-scheduler
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+ReadWritePaths=/var/www/famboook/backend/storage /var/www/famboook/backend/bootstrap/cache

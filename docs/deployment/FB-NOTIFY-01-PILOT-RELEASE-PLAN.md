@@ -18,7 +18,7 @@ Labels as in the checklist: **[APPROVAL]** needs an explicit, recorded owner app
   1. the FB-GEO-01 / FB-GEO-02 release (Release 1) and any pending earlier release (Release 0);
   2. Family login and activation in Production (docs/08 §16a);
   3. applying the Production migrations of each release;
-  4. installing infrastructure: the queue switch, the worker and the scheduler cron;
+  4. installing infrastructure: the queue switch, the worker and the scheduler timer;
   5. activating notifications and follow-ups (mode PILOT, follow-up gate, cutoff).
 - Every existing gate and safety rule of the readiness checklist, docs/08 and the FB-GEO-01 plan still applies; this document removes none of them.
 
@@ -119,7 +119,7 @@ Replace `<PHP_BINARY>`; `systemd-analyze verify` must be clean. Without `pcntl` 
 
 ## 6. Scheduler and its side effects
 
-Template `deploy/cron/famboook-scheduler` (`/etc/cron.d`, `www-data`, every minute). Installing it starts **six** tasks (`backend/routes/console.php`):
+Templates `deploy/systemd/famboook-scheduler.service` + `famboook-scheduler.timer` (`www-data`, every minute, no catch-up; the only scheduler mechanism — no cron in parallel, `FB-NOTIFY-01-QUEUE-SCHEDULER-READINESS.md`). Enabling the timer starts **six** tasks (`backend/routes/console.php`):
 
 | Task | When | Effect |
 |---|---|---|
@@ -193,7 +193,7 @@ Preconditions: Release 1 (and any Release 0) done and settled under their own ap
 | S8 | Gate checks with OFF: publish → 503; drafts work; follow-up lists empty and 200 | [VERIFY] |
 | S9 | Queue switch (§4) | [APPROVAL] |
 | S10 | Worker install (§5), `systemd-analyze verify`, enable, `is-active` | [APPROVAL] [VERIFY] |
-| S11 | Scheduler install (§6) after recording the OTP purge count; `schedule:list` shows six tasks; cron picks it up | [APPROVAL] [VERIFY] |
+| S11 | Scheduler install (§6) after recording the OTP purge count; `schedule:list` shows six tasks; `systemctl list-timers` shows the next run; the scheduler journal shows each run | [APPROVAL] [VERIFY] |
 | S12 | Monitoring (§11): `notifications-health.sh` → `STATE: NOT_ACTIVATED`, heartbeat FRESH; alert path tested | [APPROVAL] [VERIFY] → **A3** |
 | S13 | Allow-list set (still OFF); senders and families briefed (§8) | [APPROVAL] |
 | S14 | **Activation (last, separately approved):** `NOTIFICATIONS_MODE=PILOT`; per D2 `NOTIFICATIONS_FOLLOWUPS_ENABLED=true` + cutoff; caches, PHP-FPM, worker restart; check → publication READY, follow-up readiness READY, no warnings; health → `HEALTHY` | [APPROVAL] [VERIFY] |
@@ -205,7 +205,7 @@ Preconditions: Release 1 (and any Release 0) done and settled under their own ap
 
 ## 11. Health checks, monitoring and escalation
 
-- **Automatic:** a root cron (or the monitoring agent) runs `deploy/scripts/notifications-health.sh` every 5 minutes; a non-zero exit (`DEGRADED` 1 / `UNAVAILABLE` 2) notifies the system administrator (D6).
+- **Automatic:** the monitoring agent (or a dedicated root systemd timer) runs `deploy/scripts/notifications-health.sh` every 5 minutes; a non-zero exit (`DEGRADED` 1 / `UNAVAILABLE` 2) notifies the system administrator (D6).
 - **Manual during the PILOT:** `famboook:notifications-check` at least every 15 minutes in working hours for the first week, then daily; plus `failed_jobs` for the `notifications` queue and the `PUBLISH_FAILED` count (not covered by the script).
 - **Escalation:**
   1. System administrator: worker or scheduler down → restart; configuration invalid → fix `.env`.
@@ -219,7 +219,7 @@ Preconditions: Release 1 (and any Release 0) done and settled under their own ap
 | Level | Trigger | Action | Effect |
 |---|---|---|---|
 | L1 Feature shutdown (default) | any problem | `NOTIFICATIONS_MODE=OFF` (and `NOTIFICATIONS_FOLLOWUPS_ENABLED=false`); caches; PHP-FPM; worker restart | publication 503; nothing new opens; inbox, history and existing follow-up management keep working. **Not stopped by L1:** see the note below |
-| L2 Infrastructure | worker / scheduler fault | stop the worker unit; remove `/etc/cron.d/famboook-scheduler` | messages stay QUEUED or recover as stale; removing cron also stops the OTP purge and contact-update expiry; heartbeat goes stale → publication closes |
+| L2 Infrastructure | worker / scheduler fault | stop the worker unit; `systemctl disable --now famboook-scheduler.timer` | messages stay QUEUED or recover as stale; removing cron also stops the OTP purge and contact-update expiry; heartbeat goes stale → publication closes |
 | L3 Queue back to `sync` | **not an automatic step** | only after a recorded impact assessment and its own approval (below) | publication closes (503); jobs wait in `jobs` |
 
 **What closing the gates does NOT stop (L1).** Mode OFF and the follow-up gate stop new publication and new follow-ups only. While the scheduler runs, these continue by design:
@@ -279,7 +279,7 @@ Also required, outside D1–D6, each as a **separate explicit approval** (never 
 - **FB-GEO release** (FB-GEO-01 plan A0 and its D1–D6), extended with `2026_10_23_090000`.
 - **Family login and activation** in Production (§7): if closed, a separate docs/08 §16a release decision.
 - **Production migrations** of each release, approved at the step where they run.
-- **Infrastructure installation:** the queue switch, the worker and the scheduler cron, each approved on its own.
+- **Infrastructure installation:** the queue switch, the worker and the scheduler timer, each approved on its own.
 - **D3 audit retention** (not a PILOT blocker).
 
 Recording a recommended default above is not an approval.
@@ -307,7 +307,7 @@ Recording a recommended default above is not an approval.
 - CLOSED-list index.
 - `backend/.env.example` lacks `NOTIFICATIONS_*` keys.
 - docs/09 has no notification SOP (a short Arabic briefing for PILOT senders is advisable before S13).
-- Stale wording in the readiness checklist (follow-ups "out of scope / not implemented", "five tasks") and the env template comment ("Not implemented yet … follow-ups"): to be corrected in a docs-only change.
+- Stale wording in the readiness checklist (follow-ups "out of scope / not implemented"; the scheduler wording is corrected) and the env template comment ("Not implemented yet … follow-ups"): to be corrected in a docs-only change.
 
 ---
 

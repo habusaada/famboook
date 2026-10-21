@@ -22,7 +22,7 @@
 | Frontend | Family inbox and bell; Staff `/announcements`; Coordinator history (role-only) and compose (scope) | Not deployed |
 | Queue | Jobs refuse `sync` / `null`; timing invariant fails closed | Template keeps `QUEUE_CONNECTION=sync` — **not ready** |
 | Worker | `deploy/systemd/famboook-notifications-worker.service` (template) | **Not installed** |
-| Scheduler | `deploy/cron/famboook-scheduler` (template) | **Not installed** |
+| Scheduler | `deploy/systemd/famboook-scheduler.service` + `.timer` (templates; no cron, decision O2) | **Not installed** |
 | Monitoring | `famboook:notifications-check`, `deploy/scripts/notifications-health.sh` (read-only) | **Not wired** to any alert destination |
 | Mode | `NOTIFICATIONS_MODE` defaults to OFF; fails closed | Template: `OFF` |
 
@@ -54,7 +54,7 @@
 | R5 | **Frontend second**: `deploy-frontend.sh`; the bell / inbox / announcement routes answer (empty, mode OFF) | **[APPROVAL] [VERIFY]** |
 | R6 | **Queue**: server `.env` `QUEUE_CONNECTION=database`, `DB_QUEUE_RETRY_AFTER=90`; `config:clear` + `optimize` + reload PHP-FPM (§5) | **[APPROVAL]** |
 | R7 | **Worker**: install, `systemd-analyze verify`, enable and start `famboook-notifications-worker` (§6) | **[APPROVAL] [VERIFY]** |
-| R8 | **Scheduler**: after D4, install `/etc/cron.d/famboook-scheduler` (§7) | **[APPROVAL] [VERIFY]** |
+| R8 | **Scheduler**: after D4 and after R7, install and enable `famboook-scheduler.timer` (§7) | **[APPROVAL] [VERIFY]** |
 | R9 | **Monitoring**: `notifications-health.sh` → `STATE: NOT_ACTIVATED`, exit 0, worker unit `active`; heartbeat FRESH; publication readiness `NOT READY (MODE_OFF)` only; alert wiring per D6 (§8) | **[APPROVAL] [VERIFY]** |
 | R10 | **Gate checks** with the mode still OFF (§9) | **[VERIFY]** |
 | R11 | **PILOT allow-list**: `NOTIFICATIONS_PILOT_SENDER_USER_IDS` per D1 (still OFF) | **[APPROVAL]** |
@@ -134,7 +134,7 @@ Template: `deploy/systemd/famboook-notifications-worker.service` (**[APPROVAL]**
   sudo -u www-data test -w /var/www/famboook/backend/storage/logs && echo storage-writable
   shellcheck deploy/scripts/deploy-backend.sh deploy/scripts/notifications-health.sh
   ```
-  Replace `<PHP_BINARY>` in the unit first; `systemd-analyze verify` refuses the placeholder. The hardening (`ProtectSystem=full`, `ProtectHome=true`, `PrivateTmp=true`, `NoNewPrivileges=true`) leaves `/var/www`, `/run` (a PostgreSQL socket) and TCP to the database untouched; the application's cache and locks are in the database.
+  Replace `<PHP_BINARY>` in the unit first; `systemd-analyze verify` refuses the placeholder. The hardening (`ProtectSystem=full`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`, `NoNewPrivileges`, `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`, `RestrictSUIDSGID`, `RestrictRealtime`, `LockPersonality`; `UMask=0007`; a crash loop stops after 10 starts in 5 minutes — `systemctl reset-failed` after the fix) leaves `/var/www`, `/run` (a PostgreSQL socket) and TCP to the database untouched; the application's cache and locks are in the database.
 - **Install / verify / remove:**
   ```text
   sudo cp deploy/systemd/famboook-notifications-worker.service /etc/systemd/system/
@@ -149,26 +149,32 @@ Template: `deploy/systemd/famboook-notifications-worker.service` (**[APPROVAL]**
 
 ## 7. Scheduler and its side effects
 
-Template: `deploy/cron/famboook-scheduler` (`/etc/cron.d` format, `www-data`, every minute; **[APPROVAL]** to install, after D4).
+Templates: `deploy/systemd/famboook-scheduler.service` (`Type=oneshot`, `schedule:run` once, `www-data`) and `deploy/systemd/famboook-scheduler.timer` (second 0 of every minute, `Persistent=false`); **[APPROVAL]** to install, after D4. **The only scheduler mechanism** (decision O2, `FB-NOTIFY-01-QUEUE-SCHEDULER-READINESS.md`): the former cron.d template is retired; never add a crontab or `/etc/cron.d` entry for `schedule:run` in parallel. Task audit, overlap and downtime behaviour, dependency order and read-only checks: that document §2–§5.
 
 Enabling it starts **every** task in `backend/routes/console.php` (verified at `65d670a`; times in UTC, `config/app.php` timezone):
 
 | Task | When | Effect | Prerequisite |
 |---|---|---|---|
 | `famboook:purge-otp-challenges` | daily 00:00 | **Deletes** finished OTP challenges (consumed / superseded / locked / expired) older than `FAMILY_OTP_RETENTION_DAYS` (90). Open challenges, mobile trust history and security events are never touched. Its FIRST run deletes the whole backlog older than 90 days | **D4 approval** (data deletion) |
-| `famboook:close-expired-contact-updates` | every 5 min | `SUBMITTED` `CONTACT_UPDATE` requests past their verification window → `CANCELLED` by SYSTEM; codes superseded. With `FAMILY_CONTACT_UPDATE_ENABLED=false` there are normally none | D4 approval |
+| `famboook:close-expired-contact-updates` | every 5 min | `SUBMITTED` `CONTACT_UPDATE` requests past their verification window → `CANCELLED` by SYSTEM; codes superseded. **CONTACT_UPDATE is LIVE in Production since 2026-10-11 (docs/08) and this sweep has never run there: the first run cancels the whole backlog** — count it first (readiness document §5) | D4 approval |
 | `NotificationHeartbeatJob` | every minute | queues the heartbeat; with `sync` it would run inline and still never make readiness pass | the worker (R7) |
 | `famboook:notifications-reconcile` | every minute, `withoutOverlapping(10)`, `onOneServer` | stale-claim recovery (runs even when OFF); retries and re-dispatch pause unless dispatching is safe | shared cache locks |
 | `famboook:notifications-expire` | every minute, same locks | `PUBLISHED` → `ARCHIVED` at `expires_at` (runs whatever the mode) | shared cache locks |
 | `famboook:notifications-followups` | every minute, same locks | closes OPEN follow-ups of expired messages (whatever the mode); opens follow-ups ONLY when the follow-up gate is ready — with `NOTIFICATIONS_FOLLOWUPS_ENABLED=false` (this PILOT) it opens nothing. With no follow-ups yet it does nothing (FB-NOTIFY-01E.3-F2, ADR §2d) | shared cache locks |
 
 - **Locks:** `withoutOverlapping` / `onOneServer` need the atomic locks of a shared cache store: `CACHE_STORE=database` with the `cache_locks` table (migration `0001_01_01_000001`). Single application server (docs/08 §1).
-- **Pre-install checks:** replace `<PHP_BINARY>`; the file must be owned by root, mode 644, end with a newline, and its name must contain no dot (cron.d ignores such files). After installing, confirm it is picked up: `grep CRON /var/log/syslog` or `journalctl -u cron` shows `(www-data) CMD (cd /var/www/famboook/backend && … schedule:run …)` within a minute.
+- **Order:** after the notification migrations (tasks 4–6 have no missing-table guard), after the queue switch and **after the worker is active** (otherwise one heartbeat row per minute accumulates in `jobs`).
+- **Overlap and downtime:** while a run is active the timer starts no second one; missed minutes are not caught up (`Persistent=false`), so a missed 00:00 skips that day's purge.
+- **Pre-install checks:** replace `<PHP_BINARY>` in the service; confirm no scheduler cron exists anywhere (`ls /etc/cron.d/`, `sudo crontab -l -u www-data`).
 - **Install / verify / remove:**
   ```text
-  sudo cp deploy/cron/famboook-scheduler /etc/cron.d/famboook-scheduler && sudo chmod 644 /etc/cron.d/famboook-scheduler
-  php artisan schedule:list                                     # the five tasks above
-  # remove: sudo rm /etc/cron.d/famboook-scheduler
+  sudo cp deploy/systemd/famboook-scheduler.service deploy/systemd/famboook-scheduler.timer /etc/systemd/system/
+  sudo systemd-analyze verify /etc/systemd/system/famboook-scheduler.service /etc/systemd/system/famboook-scheduler.timer
+  sudo systemctl daemon-reload && sudo systemctl enable --now famboook-scheduler.timer   # the timer, never the service
+  systemctl list-timers famboook-scheduler.timer                                  # next run < 1 min
+  php artisan schedule:list                                                       # the six tasks above
+  journalctl -u famboook-scheduler -n 50                                          # each run's tasks, exit 0
+  # remove: sudo systemctl disable --now famboook-scheduler.timer
   ```
 
 ---
@@ -189,7 +195,7 @@ Not covered by the script: messages in `PUBLISH_FAILED` (the check does not coun
 | Condition | How it shows | Operator response |
 |---|---|---|
 | Worker down (PILOT / ON) | `DEGRADED`; worker unit not active, then `Worker heartbeat: STALE / ABSENT`; publish → 503 | `journalctl -u famboook-notifications-worker`; `systemctl restart …`; if it keeps failing, mode OFF |
-| Scheduler down | heartbeat STALE although the worker is active; stale counts grow | check `/etc/cron.d/famboook-scheduler`, cron service, `php artisan schedule:list` |
+| Scheduler down | heartbeat STALE although the worker is active; stale counts grow | `systemctl list-timers famboook-scheduler.timer`, `journalctl -u famboook-scheduler`, `php artisan schedule:list` |
 | Stale publications | `Stale PUBLISHING (> 600 s): N` > 0 | the reconciler recovers them each minute; if N persists, check the scheduler and locks |
 | Failed notification jobs | `Failed jobs (notification queue): N` > 0 | read the exception class in `failed_jobs` / logs; do NOT `queue:retry`; the message state is authoritative |
 | Publication failures | NOT in the health script: senders' details show the code; `storage/logs` has "Notification publication failed." | transient ones are retried automatically; permanent ones need the sender to cancel; repeated `PUBLICATION_ERROR` → logs, possibly mode OFF |
@@ -231,7 +237,7 @@ Run it at least every 15 minutes during the PILOT. It prints counts and codes on
 |---|---|---|
 | **Back to OFF (the default response)** | `NOTIFICATIONS_MODE=OFF`; `config:clear` + `optimize`; reload PHP-FPM; restart the worker | publish / retry → 503; QUEUED messages are not claimed (T1 pauses); inbox and history keep working; stale recovery and expiry continue |
 | Worker problem | stop the unit; mode OFF | messages stay QUEUED or are recovered as stale; nothing partial is ever visible |
-| Scheduler problem | remove `/etc/cron.d/famboook-scheduler` | ALSO stops the OTP purge and contact-update expiry; heartbeat goes stale → publication closes (503) |
+| Scheduler problem | `sudo systemctl disable --now famboook-scheduler.timer` | ALSO stops the OTP purge and contact-update expiry; heartbeat goes stale → publication closes (503) |
 | Queue back to `sync` | `QUEUE_CONNECTION=sync` + caches + reload | publication closes (503); queued jobs stay in `jobs` until a worker runs again |
 | Withdraw a queued message | the sender cancels it (allowed even when OFF) | `CANCELLED`, never published |
 | Wrong published message | **no unpublish exists** | product decision (e.g. a corrective announcement); consider a short expiry for pilot messages |
@@ -249,7 +255,7 @@ Run it at least every 15 minutes during the PILOT. It prints counts and codes on
 - [ ] R2–R4 backend deployed; migrations and permissions verified
 - [ ] R5 frontend deployed after the backend
 - [ ] R6 queue switched; R7 worker active and `systemd-analyze verify` clean
-- [ ] R8 scheduler installed after D4; `schedule:list` shows the five tasks
+- [ ] R8 scheduler timer enabled after D4 and R7; `schedule:list` shows the six tasks
 - [ ] R9 monitoring verified; heartbeat FRESH
 - [ ] R10 gate checks with OFF
 - [ ] R11 allow-list set; R12 activation separately approved; check READY, no warnings

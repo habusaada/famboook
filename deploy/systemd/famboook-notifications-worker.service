@@ -32,14 +32,24 @@ Description=Famboook notification queue worker (notifications queue)
 Documentation=file:///var/www/famboook/docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md
 After=network-online.target postgresql.service
 Wants=network-online.target
+# A crash loop stops after 10 starts in 5 minutes instead of hammering the
+# database; the unit is then `failed` and notifications-health.sh reports
+# DEGRADED. Recover with `systemctl reset-failed` + `start` after the cause
+# is fixed. A clean --max-time / --memory exit counts as a start too, but
+# happens at most every few minutes.
+StartLimitIntervalSec=300
+StartLimitBurst=10
 
 [Service]
 Type=simple
 # Non-root: the PHP-FPM account. It can read backend/.env (group www-data)
-# and write backend/storage (logs) — nothing else is needed.
+# and write backend/storage (logs) — nothing else is needed. The deploy user
+# owns the code and never runs the worker.
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/famboook/backend
+# New files group-writable, never world-accessible (docs/08 §10: storage 660 / 770).
+UMask=0007
 # One try, 60 s, never a Laravel retry (retries are NotificationRetryPolicy's).
 # --max-time / --memory make the worker exit cleanly so systemd starts a fresh
 # process with the current code and configuration; `php artisan queue:restart`
@@ -55,11 +65,20 @@ TimeoutStopSec=75
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=famboook-notifications-worker
-# Hardening: nothing beyond the backend directory needs to be writable.
+# Hardening: nothing beyond storage/ and bootstrap/cache needs to be
+# writable; /run (a PostgreSQL socket) and TCP to the database stay
+# reachable. Review with `systemd-analyze security` on the server.
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=full
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
 ReadWritePaths=/var/www/famboook/backend/storage /var/www/famboook/backend/bootstrap/cache
 
 [Install]

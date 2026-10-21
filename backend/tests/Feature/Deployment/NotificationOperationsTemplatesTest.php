@@ -14,10 +14,12 @@ use Tests\TestCase;
 /**
  * FB-NOTIFY-01E.1: the notification operations templates in deploy/ agree
  * with the code — the worker's queue, tries and timeout, the timing
- * invariant (timeout < retry_after < stale threshold), the cron line, the
- * env template's safe defaults, the deployment order and the documented list
- * of scheduled tasks. Static: it reads files only, starts nothing and touches
- * no database.
+ * invariant (timeout < retry_after < stale threshold) and its hardening; the
+ * systemd scheduler (oneshot service + every-minute timer without catch-up,
+ * the ONLY scheduler mechanism: no cron template, decision O2); the env
+ * template's safe defaults, the deployment order, the documented list of
+ * scheduled tasks and the inventory of queued jobs. Static: it reads files
+ * only, starts nothing and touches no database or queue.
  */
 class NotificationOperationsTemplatesTest extends TestCase
 {
@@ -64,6 +66,15 @@ class NotificationOperationsTemplatesTest extends TestCase
         $this->assertNotSame('root', $settings['Group']);
         $this->assertSame('/var/www/famboook/backend', $settings['WorkingDirectory']);
         $this->assertSame('always', $settings['Restart']);
+        // FB-NOTIFY-01 consolidation (O1): the hardening of the former proposal, same command.
+        $this->assertSame('0007', $settings['UMask'], 'group-writable, never world-accessible (docs/08 §10)');
+        $this->assertGreaterThan(0, (int) $settings['StartLimitBurst'], 'a crash loop stops');
+        foreach (['NoNewPrivileges', 'PrivateTmp', 'PrivateDevices', 'ProtectHome', 'ProtectKernelTunables', 'ProtectKernelModules', 'ProtectControlGroups', 'RestrictSUIDSGID', 'RestrictRealtime', 'LockPersonality'] as $flag) {
+            $this->assertSame('true', $settings[$flag], $flag);
+        }
+        $this->assertSame('full', $settings['ProtectSystem']);
+        $this->assertSame('/var/www/famboook/backend/storage /var/www/famboook/backend/bootstrap/cache', $settings['ReadWritePaths']);
+        $this->assertArrayNotHasKey('KillMode', $settings, 'stop semantics unchanged');
 
         $exec = $settings['ExecStart'];
         $this->assertStringContainsString('artisan queue:work database', $exec);
@@ -84,31 +95,93 @@ class NotificationOperationsTemplatesTest extends TestCase
         $this->assertNoSecrets($unit);
     }
 
-    public function test_the_cron_template_runs_the_scheduler_every_minute_as_www_data(): void
+    /** @return array<string, array<string, string>> the unit's settings per section */
+    private function sections(string $path): array
     {
-        $cron = $this->deploy('cron/famboook-scheduler');
-        $this->assertStringEndsWith("\n", $cron, 'cron.d ignores a last line without a newline');
+        $text = $this->deploy($path);
+        $this->assertNoSecrets($text);
+        $this->assertStringEndsWith("\n", $text, "{$path}: trailing newline");
+        $parsed = [];
+        $current = null;
+        foreach ($this->lines($text) as $line) {
+            if (preg_match('/^\[([A-Za-z]+)\]$/', $line, $m)) {
+                $current = $m[1];
+                $parsed[$current] = [];
 
-        $jobs = array_values(array_filter($this->lines($cron), fn ($l) => ! preg_match('/^[A-Z_]+=/', $l)));
-        $this->assertCount(1, $jobs);
-        // /etc/cron.d format: five schedule fields, the user, the command.
-        $this->assertMatchesRegularExpression('/^\* \* \* \* \* www-data cd \/var\/www\/famboook\/backend && \S+ artisan schedule:run --no-interaction >> \/dev\/null 2>&1$/', $jobs[0]);
-        $this->assertNoSecrets($cron);
+                continue;
+            }
+            $this->assertMatchesRegularExpression('/^[A-Za-z]+=.+$/', $line, "{$path}: {$line}");
+            $this->assertNotNull($current, "{$path}: a setting before any section");
+            [$key, $value] = explode('=', $line, 2);
+            $this->assertArrayNotHasKey($key, $parsed[$current], "{$path}: {$key} set twice");
+            $parsed[$current][$key] = $value;
+        }
+
+        return $parsed;
     }
 
-    public function test_the_cron_template_documents_every_scheduled_task(): void
+    public function test_the_scheduler_is_a_oneshot_schedule_run_started_every_minute_by_a_timer_without_catch_up(): void
     {
-        $cron = $this->deploy('cron/famboook-scheduler');
+        $service = $this->sections('systemd/famboook-scheduler.service');
+        $this->assertSame(['Unit', 'Service'], array_keys($service), 'started by the timer only: no [Install]');
+        $run = $service['Service'];
+        $this->assertSame('oneshot', $run['Type']);
+        $this->assertSame('www-data', $run['User']);
+        $this->assertSame('www-data', $run['Group']);
+        $this->assertSame('/var/www/famboook/backend', $run['WorkingDirectory']);
+        $this->assertSame('0007', $run['UMask']);
+        $this->assertMatchesRegularExpression('/^\S+ artisan schedule:run --no-interaction$/', $run['ExecStart']);
+        $this->assertArrayNotHasKey('Restart', $run, 'the timer starts it; it never restarts itself');
+        $this->assertLessThan(600, (int) $run['TimeoutStartSec'], 'a hung run stops before the 10-minute task locks expire');
+        $this->assertSame('journal', $run['StandardOutput']);
+        foreach (['NoNewPrivileges', 'PrivateTmp', 'ProtectHome', 'RestrictSUIDSGID'] as $flag) {
+            $this->assertSame('true', $run[$flag], $flag);
+        }
+
+        $timer = $this->sections('systemd/famboook-scheduler.timer');
+        $this->assertSame(['Unit', 'Timer', 'Install'], array_keys($timer));
+        $this->assertSame('*-*-* *:*:00', $timer['Timer']['OnCalendar']);
+        $this->assertSame('false', $timer['Timer']['Persistent'], 'missed minutes are never caught up');
+        $this->assertSame('famboook-scheduler.service', $timer['Timer']['Unit']);
+        $this->assertSame('timers.target', $timer['Install']['WantedBy']);
+    }
+
+    public function test_there_is_exactly_one_scheduler_mechanism_and_one_worker_template(): void
+    {
+        $this->assertDirectoryDoesNotExist(base_path('../deploy/cron'), 'no cron scheduler in parallel with the timer (O2)');
+        $units = array_map('basename', glob(base_path('../deploy/systemd/*')));
+        sort($units);
+        $this->assertSame(['famboook-notifications-worker.service', 'famboook-scheduler.service', 'famboook-scheduler.timer'], $units);
+        // The health script watches the one worker unit (O1).
+        $this->assertStringContainsString('UNIT="famboook-notifications-worker"', $this->deploy('scripts/notifications-health.sh'));
+    }
+
+    public function test_the_scheduler_unit_documents_every_scheduled_task(): void
+    {
+        $text = $this->deploy('systemd/famboook-scheduler.service');
         $events = app(Schedule::class)->events();
-        $this->assertNotEmpty($events);
+        $this->assertCount(6, $events, 'the six tasks of the readiness document');
 
         foreach ($events as $event) {
             /** @var Event $event */
             $name = $event instanceof CallbackEvent
                 ? ($event->description === NotificationHeartbeatJob::class ? 'NotificationHeartbeatJob' : (string) $event->description)
                 : (preg_match('/(famboook:[a-z0-9:-]+)/', (string) $event->command, $m) ? $m[1] : (string) $event->command);
-            $this->assertStringContainsString($name, $cron, "the cron template must document {$name}");
+            $this->assertStringContainsString($name, $text, "the scheduler unit must document {$name}");
         }
+    }
+
+    public function test_the_only_queued_jobs_are_the_two_notification_jobs(): void
+    {
+        // A new queued job needs its own worker decision: the worker consumes `notifications` only.
+        $queued = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path())) as $file) {
+            if ($file->isFile() && $file->getExtension() === 'php' && preg_match('/implements[^{]*\bShouldQueue\b/', (string) file_get_contents($file->getPathname()))) {
+                $queued[] = $file->getBasename('.php');
+            }
+        }
+        sort($queued);
+        $this->assertSame(['NotificationHeartbeatJob', 'PublishNotificationJob'], $queued);
     }
 
     public function test_the_env_template_keeps_notifications_off_on_the_sync_queue(): void
@@ -152,7 +225,7 @@ class NotificationOperationsTemplatesTest extends TestCase
         foreach (['deploy-backend.sh', 'deploy-frontend.sh'] as $name) {
             // Executed lines only: the comments may name what they never do.
             $commands = implode("\n", $this->lines($this->deploy("scripts/{$name}")));
-            $this->assertDoesNotMatchRegularExpression('/systemctl (enable|start)|crontab|cron\.d|queue:work|schedule:(run|work)/', $commands, $name);
+            $this->assertDoesNotMatchRegularExpression('/systemctl (enable|start)|crontab|cron\.d|queue:work|schedule:(run|work)|famboook-scheduler/', $commands, $name);
         }
     }
 
