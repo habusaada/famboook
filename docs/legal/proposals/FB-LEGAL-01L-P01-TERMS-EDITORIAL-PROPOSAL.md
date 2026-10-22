@@ -23,7 +23,7 @@
 | Option B | **Not approved** (no numbering, no bullet markers) |
 | Application status | **APPLIED LOCALLY** to `docs/legal/drafts/TERMS.ar.md`. The diff against `4da00de` is 2 lines added (the sentence and its separating blank line) and 0 removed |
 | Previous approved text baseline | `4da00de` |
-| New Git text baseline | PENDING UNTIL COMMIT |
+| New Git text baseline | `2e0c99d` (stored-file SHA-256 verified, FB-LEGAL-01L.3) |
 | Amended text SHA-256 | `bc1bf806aaa1809872e59658c9701aeb208981c63e202f3c8862b4bfaf4a6aa6` (UTF-8, LF, 7,099 bytes; interim integrity reference). Verify after the commit with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum` |
 | Publication | **NOT AUTHORIZED** |
 
