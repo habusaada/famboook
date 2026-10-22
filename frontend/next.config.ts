@@ -21,7 +21,7 @@ export default function config(phase: string): NextConfig {
   if (phase === PHASE_PRODUCTION_BUILD) {
     console.log(
       effectiveDate
-        ? `Legal policies: PUBLISHED with effective date ${effectiveDate} (version 1.0).`
+        ? `Legal policies: PUBLISHED (privacy, terms, data-protection) with effective date ${effectiveDate} (version 1.0).`
         : "Legal policies: NOT PUBLISHED (NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE is not set).",
     );
   }

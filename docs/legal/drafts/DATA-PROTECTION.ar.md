@@ -7,6 +7,7 @@
 | Constraint | No certification, encryption-at-rest, audit-coverage or retention claim (FB-LEGAL-01A §4: not implemented or unverified). Practices only, as implemented |
 | Format | `##` = section heading; each following line = one paragraph; `<!-- R-xx -->` = review marker (see `FB-LEGAL-01C3-REVIEW.md`), removed on publication |
 | Contact | `info@pcdcd.org` (ACTIVE). The planned support address is not used (R-42 resolved) |
+| Text approval | **APPROVED for publication** by the Executive Director, PCDCD (seven decisions: hosting, legal-basis disclosure, retention, privacy requests, confidentiality, file circulation, import review). Published as version 1.0 only with the actual publication date (`NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE`). The `<!-- R-xx -->` markers are internal and are not published |
 
 ---
 
@@ -22,14 +23,14 @@
 
 ## السرية
 
-يلتزم فريق العمل والمنسقون بسرية البيانات التي يطّلعون عليها، ولا يستخدمونها إلا للغرض الذي مُنحوا الاطلاع من أجله. <!-- R-32 -->
-تُتداول الكشوف وملفات الإدخال الأولية في حدود الفريق المكلَّف فقط، وعبر القنوات التي تعتمدها الجهة المشغّلة. <!-- R-33 -->
+يجب على فريق العمل والمنسقين الحفاظ على سرية البيانات التي يطّلعون عليها، وألّا يستخدموها إلا للغرض الذي مُنحوا الاطلاع من أجله. <!-- R-32 -->
+تُتداول الكشوف وملفات الإدخال الأولية في حدود الفريق المكلَّف فقط. <!-- R-33 -->
 
 ## سلامة البيانات ودقتها
 
 يُطابَق الأشخاص في السجل برقم الهوية مطابقةً دقيقة، ولا يُدمَج سجلّا شخصين تلقائيًا.
 لا تتغيّر البيانات المسجّلة بناءً على طلب تحديث إلا بعد مراجعة فريق العمل واعتماده، ويُحفَظ سجل مراحل الطلب.
-تمرّ ملفات الإدخال الأولية للعائلات والعشائر بمراجعة لجودة البيانات، ثم يعتمدها منسق العشيرة المكلَّف وإدارة Famboook معًا قبل إدخالها. <!-- R-34 -->
+يجب أن تمرّ ملفات الإدخال الأولية بمراجعة لجودة البيانات، وأن يعتمدها منسق العشيرة المكلَّف وإدارة Famboook معًا قبل إدخالها. <!-- R-34 -->
 
 ## تقليل البيانات
 

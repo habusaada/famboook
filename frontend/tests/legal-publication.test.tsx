@@ -12,15 +12,36 @@ import {
   publicationToday,
 } from "@/lib/legal/effective-date";
 
-// Publication of the approved legal policies (Executive Director: version
-// 1.0, effective date = the actual Production publication date, the same for
-// every published policy). The date comes from NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
-// at build time; the dates below are SYNTHETIC test values, never a
-// publication date.
+// Publication of the three approved legal policies (Executive Director:
+// version 1.0, effective date = the actual Production publication date, the
+// same for all three, one coordinated release). The date comes from
+// NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE at build time; the dates below are
+// SYNTHETIC test values, never a publication date.
 
 const TEST_DATE = "2026-11-01"; // synthetic, test-only
-const TERMS_SOURCE = join(process.cwd(), "..", "docs", "legal", "drafts", "TERMS.ar.md");
-const APPROVED_TERMS_SHA256 = "8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c";
+const DRAFTS = join(process.cwd(), "..", "docs", "legal", "drafts");
+
+/** Each approved policy, its source document and the source's LF-normalized SHA-256. */
+const POLICIES = [
+  {
+    id: "privacy",
+    source: "PRIVACY.ar.md",
+    sha256: "7c1bf62cf925f04b6a29c24d77cf4e77e83211b91c99aa3ce50456de2b333475",
+    sectionCount: 12,
+  },
+  {
+    id: "terms",
+    source: "TERMS.ar.md",
+    sha256: "8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c", // approved baseline 0b950e2
+    sectionCount: 9,
+  },
+  {
+    id: "data-protection",
+    source: "DATA-PROTECTION.ar.md",
+    sha256: "3b00bcdbc919f2ae2c97c0d6bf678a06a335e75c91af0b760b40c1e7cf874589",
+    sectionCount: 8,
+  },
+] as const;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -34,17 +55,18 @@ async function loadWith(date: string | undefined) {
   vi.unstubAllEnvs();
   if (date !== undefined) vi.stubEnv("NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE", date);
   const pages = await import("@/lib/legal/pages");
-  const view = await import("@/components/legal/legal-page-view");
   const links = await import("@/components/legal/legal-links");
-  const terms = await import("@/app/(legal)/terms/page");
-  const privacy = await import("@/app/(legal)/privacy/page");
-  const dataProtection = await import("@/app/(legal)/data-protection/page");
-  return { pages, view, links, terms, privacy, dataProtection };
+  const routes = {
+    privacy: await import("@/app/(legal)/privacy/page"),
+    terms: await import("@/app/(legal)/terms/page"),
+    "data-protection": await import("@/app/(legal)/data-protection/page"),
+  };
+  return { pages, links, routes };
 }
 
-/** The approved source, parsed exactly as published: one entry per paragraph, review markers removed. */
-function approvedTermsSections() {
-  const text = readFileSync(TERMS_SOURCE, "utf8").replace(/\r\n/g, "\n");
+/** A source document, LF-normalized, parsed exactly as published: one entry per paragraph, review markers removed. */
+function sourceOf(name: string) {
+  const text = readFileSync(join(DRAFTS, name), "utf8").replace(/\r\n/g, "\n");
   const lines = text.split("\n");
   const sections: { heading: string; paragraphs: string[] }[] = [];
   for (const line of lines.slice(lines.indexOf("---") + 1)) {
@@ -91,83 +113,76 @@ describe("effective-date rules", () => {
 });
 
 describe("without an effective date nothing is published", () => {
-  it("keeps the Terms pending, with no content in the registry entry", async () => {
+  it("keeps all three policies pending, with no content in their registry entries", async () => {
     const { pages } = await loadWith(undefined);
-    const terms = pages.legalPage("terms");
-    expect(terms.status).toBe("PENDING_APPROVAL");
-    expect(Object.keys(terms).sort()).toEqual(["description", "href", "id", "status", "title"]);
+    for (const { id } of POLICIES) {
+      const page = pages.legalPage(id);
+      expect(page.status, id).toBe("PENDING_APPROVAL");
+      expect(Object.keys(page).sort(), id).toEqual(["description", "href", "id", "status", "title"]);
+    }
     expect(pages.publishedLegalPages().map((p) => p.id)).toEqual(["about", "contact"]);
   });
 });
 
-describe("the approved Terms of Use 1.0, published with the effective date", () => {
-  it("is the approved source document (0b950e2)", () => {
-    const { text } = approvedTermsSections();
-    expect(createHash("sha256").update(text, "utf8").digest("hex")).toBe(APPROVED_TERMS_SHA256);
+describe("the approved policies 1.0, published together with the effective date", () => {
+  it.each(POLICIES)("$id: the source document is the approved text (pinned checksum)", ({ source, sha256 }) => {
+    const { text } = sourceOf(source);
+    expect(createHash("sha256").update(text, "utf8").digest("hex")).toBe(sha256);
   });
 
-  it("publishes exactly the approved text — no drift, no review marker", async () => {
+  it.each(POLICIES)("$id: publishes exactly the approved text — no drift, no review marker", async ({ id, source, sectionCount }) => {
     const { pages } = await loadWith(TEST_DATE);
-    const terms = pages.legalPage("terms");
-    if (terms.status !== "PUBLISHED" || terms.kind !== "policy") throw new Error("Terms not published");
-    expect(terms.version).toBe("1.0");
-    expect(terms.version).toBe(POLICY_VERSION);
-    expect(terms.effectiveDate).toBe(TEST_DATE);
-    const { sections } = approvedTermsSections();
-    expect(sections).toHaveLength(9);
-    expect(terms.sections).toEqual(sections);
-    expect(JSON.stringify(terms.sections)).not.toMatch(/<!--|-->|R-\d{2}/);
+    const page = pages.legalPage(id);
+    if (page.status !== "PUBLISHED" || page.kind !== "policy") throw new Error(`${id} not published`);
+    expect(page.version).toBe("1.0");
+    expect(page.version).toBe(POLICY_VERSION);
+    expect(page.effectiveDate).toBe(TEST_DATE);
+    const { sections } = sourceOf(source);
+    expect(sections).toHaveLength(sectionCount);
+    expect(page.sections).toEqual(sections);
+    expect(JSON.stringify(page.sections)).not.toMatch(/<!--|-->|R-\d{2}|NOT APPROVED|DRAFT/);
   });
 
-  it("renders the sections with version 1.0 and the effective date, in the approved order", async () => {
-    const { terms, pages } = await loadWith(TEST_DATE);
-    const Terms = terms.default;
-    render(<Terms />);
+  it.each(POLICIES)("$id: renders its sections with version 1.0 and the effective date, unindexed", async ({ id, source }) => {
+    const { routes } = await loadWith(TEST_DATE);
+    const route = routes[id];
+    const Page = route.default;
+    render(<Page />);
     const article = screen.getByRole("article");
     expect(article).toHaveAttribute("data-legal-status", "PUBLISHED");
     const meta = article.querySelector("[data-legal-effective]") as HTMLElement;
     expect(meta).toHaveTextContent("الإصدار: 1.0");
     expect(meta.textContent).toMatch(/تاريخ السريان: .*2026/);
-    expect(within(article).getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(approvedTermsSections().sections.map((s) => s.heading));
-    expect(article).toHaveTextContent("يُعدّ من الاستخدام غير المسموح ما يأتي:");
+    expect(within(article).getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(sourceOf(source).sections.map((s) => s.heading));
     expect(article.textContent).not.toMatch(/<!--|R-\d{2}|NOT APPROVED|DRAFT/);
     expect(document.querySelector("form, input, button, [role=checkbox]")).toBeNull();
-    expect(terms.metadata.robots).toEqual({ index: false, follow: false }); // D9: noindex
-    expect(pages.legalMetadata("terms").robots).toEqual({ index: false, follow: false });
+    expect(route.metadata.robots).toEqual({ index: false, follow: false }); // D9: noindex
   });
 
-  it("is linked with the other published pages; Privacy and Data Protection stay pending and unlinked", async () => {
-    const { pages, links } = await loadWith(TEST_DATE);
-    expect(pages.publishedLegalPages().map((p) => p.href)).toEqual(["/about", "/terms", "/contact"]);
-    const LegalLinks = links.LegalLinks;
-    render(<LegalLinks variant="list" />);
-    const hrefs = within(screen.getByRole("navigation", { name: "روابط فامبوك" }))
-      .getAllByRole("link")
-      .map((l) => l.getAttribute("href"));
-    expect(hrefs).toEqual(["/about", "/terms", "/contact"]);
-    for (const id of ["privacy", "data-protection"] as const) {
+  it("carries the seven approved decisions verbatim and none of the replaced claims", async () => {
+    const { pages } = await loadWith(TEST_DATE);
+    const text = (id: "privacy" | "data-protection") => {
       const page = pages.legalPage(id);
-      expect(page.status, id).toBe("PENDING_APPROVAL");
-      expect(Object.keys(page).sort(), id).toEqual(["description", "href", "id", "status", "title"]);
-    }
+      if (page.status !== "PUBLISHED" || page.kind !== "policy") throw new Error(id);
+      return page.sections.flatMap((s) => s.paragraphs).join("\n");
+    };
+    const privacy = text("privacy");
+    const dataProtection = text("data-protection");
+    expect(privacy).toContain("تُستضاف المنصة وبياناتها على خوادم تقنية.");
+    expect(privacy).not.toContain("تتعاقد معهم");
+    expect(privacy).toContain("لم يُوثَّق بعدُ في هذه السياسة الأساس القانوني المحدَّد");
+    expect(privacy).toContain("لم تُعتمَد بعدُ مدد الاحتفاظ");
+    expect(privacy).toContain("وتتولّى إدارة Famboook استلام الطلبات الواردة إلى هذا العنوان ومراجعتها.");
+    expect(dataProtection).toContain("يجب على فريق العمل والمنسقين الحفاظ على سرية البيانات التي يطّلعون عليها، وألّا يستخدموها إلا للغرض الذي مُنحوا الاطلاع من أجله.");
+    expect(dataProtection).toContain("تُتداول الكشوف وملفات الإدخال الأولية في حدود الفريق المكلَّف فقط.");
+    expect(dataProtection).not.toContain("القنوات التي تعتمدها");
+    expect(dataProtection).toContain("يجب أن تمرّ ملفات الإدخال الأولية بمراجعة لجودة البيانات، وأن يعتمدها منسق العشيرة المكلَّف وإدارة Famboook معًا قبل إدخالها.");
   });
 
-  it("shows only the neutral notice on /privacy and /data-protection, even with an effective date", async () => {
-    const { privacy, dataProtection } = await loadWith(TEST_DATE);
-    for (const Page of [privacy.default, dataProtection.default]) {
-      const { container, unmount } = render(<Page />);
-      const article = container.querySelector("article") as HTMLElement;
-      expect(article).toHaveAttribute("data-legal-status", "PENDING_APPROVAL");
-      expect(article.querySelector("[data-legal-effective]")).toBeNull();
-      expect(article.textContent).not.toMatch(/تاريخ السريان|الإصدار:/);
-      unmount();
-    }
-  });
-
-  it("gives every published policy the same version and effective date", async () => {
+  it("gives all three policies the same version and the same effective date", async () => {
     const { pages } = await loadWith(TEST_DATE);
     const policies = pages.LEGAL_PAGES.filter((p) => p.status === "PUBLISHED" && p.kind === "policy");
-    expect(policies.length).toBeGreaterThan(0);
+    expect(policies.map((p) => p.id)).toEqual(["privacy", "terms", "data-protection"]);
     for (const p of policies) {
       if (p.status !== "PUBLISHED" || p.kind !== "policy") continue;
       expect(p.version, p.id).toBe("1.0");
@@ -175,8 +190,19 @@ describe("the approved Terms of Use 1.0, published with the effective date", () 
     }
   });
 
+  it("links all five pages, in footer order", async () => {
+    const { pages, links } = await loadWith(TEST_DATE);
+    expect(pages.publishedLegalPages().map((p) => p.href)).toEqual(["/about", "/privacy", "/terms", "/data-protection", "/contact"]);
+    const LegalLinks = links.LegalLinks;
+    render(<LegalLinks variant="list" />);
+    const hrefs = within(screen.getByRole("navigation", { name: "روابط فامبوك" }))
+      .getAllByRole("link")
+      .map((l) => l.getAttribute("href"));
+    expect(hrefs).toEqual(["/about", "/privacy", "/terms", "/data-protection", "/contact"]);
+  });
+
   it("adds no notification or authentication code to the legal modules", () => {
-    for (const file of ["pages.ts", "effective-date.ts", "terms-v1.ts"]) {
+    for (const file of ["pages.ts", "effective-date.ts", "privacy-v1.ts", "terms-v1.ts", "data-protection-v1.ts"]) {
       const source = readFileSync(join(process.cwd(), "lib", "legal", file), "utf8");
       expect(source, file).not.toMatch(/notification|announcement|useAuth|useFamilyUser|@\/lib\/api/);
     }

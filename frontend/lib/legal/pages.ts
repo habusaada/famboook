@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { POLICY_VERSION, requiredEffectiveDate } from "./effective-date";
+import { DATA_PROTECTION_V1_SECTIONS } from "./data-protection-v1";
+import { PRIVACY_V1_SECTIONS } from "./privacy-v1";
 import { TERMS_V1_SECTIONS } from "./terms-v1";
 
 // The public legal and information pages (FB-LEGAL-01B) and their
@@ -15,13 +17,14 @@ import { TERMS_V1_SECTIONS } from "./terms-v1";
 //
 // Approved policy text is published HERE (status PUBLISHED, kind "policy")
 // once PCDCD approves it — no route or component changes are needed. The
-// approved sections live in their own verbatim module (terms-v1.ts). Never
-// add draft or unapproved text: drafts belong in internal documentation.
+// approved sections live in their own verbatim modules (privacy-v1.ts,
+// terms-v1.ts, data-protection-v1.ts). Never add draft or unapproved text:
+// drafts belong in internal documentation.
 //
-// Publication date (lib/legal/effective-date.ts): an approved policy is
-// published only when NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE holds the actual
-// publication date, shared by every published policy, with version 1.0.
-// Without it the policy stays PENDING_APPROVAL; an invalid value throws.
+// Publication date (lib/legal/effective-date.ts): the three approved
+// policies are published together only when NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
+// holds the actual publication date, shared by all three, with version 1.0.
+// Without it they stay PENDING_APPROVAL; an invalid value throws.
 
 export type LegalPageId = "about" | "privacy" | "terms" | "data-protection" | "contact";
 
@@ -51,29 +54,58 @@ export type PublishedPolicy = Base & {
 
 export type LegalPage = PendingLegalPage | PublishedInformationPage | PublishedPolicy;
 
-const TERMS_BASE = {
+type PolicyBase = Base & { id: "privacy" | "terms" | "data-protection" };
+
+const PRIVACY_BASE: PolicyBase = {
+  id: "privacy",
+  href: "/privacy",
+  title: "سياسة الخصوصية",
+  description: "سياسة الخصوصية لمنصة Famboook.",
+};
+
+const TERMS_BASE: PolicyBase = {
   id: "terms",
   href: "/terms",
   title: "شروط الاستخدام",
   description: "شروط استخدام منصة Famboook.",
-} as const;
+};
+
+const DATA_PROTECTION_BASE: PolicyBase = {
+  id: "data-protection",
+  href: "/data-protection",
+  title: "إشعار حماية البيانات",
+  description: "إشعار حماية البيانات لمنصة Famboook.",
+};
+
+/** An approved policy as published: version 1.0 and the one shared effective date. */
+function publishedPolicy(base: PolicyBase, sections: readonly LegalSection[]): PublishedPolicy {
+  return {
+    ...base,
+    status: "PUBLISHED",
+    kind: "policy",
+    version: POLICY_VERSION,
+    effectiveDate: requiredEffectiveDate(process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE),
+    sections,
+  };
+}
 
 /**
- * The approved Terms of Use 1.0 — published only with the actual publication
- * date. The condition reads the inlined variable directly (next.config.ts
- * always defines it), so with no date the approved text is dropped from the
- * client bundle; a malformed or blank date throws.
+ * The three approved policies, published together only with the actual
+ * publication date. Each condition reads the inlined variable directly
+ * (next.config.ts always defines it), so with no date the approved texts are
+ * dropped from the client bundle; a malformed or blank date throws.
  */
+const PRIVACY: PendingLegalPage | PublishedPolicy = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
+  ? publishedPolicy(PRIVACY_BASE, PRIVACY_V1_SECTIONS)
+  : { ...PRIVACY_BASE, status: "PENDING_APPROVAL" };
+
 const TERMS: PendingLegalPage | PublishedPolicy = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
-  ? {
-      ...TERMS_BASE,
-      status: "PUBLISHED",
-      kind: "policy",
-      version: POLICY_VERSION,
-      effectiveDate: requiredEffectiveDate(process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE),
-      sections: TERMS_V1_SECTIONS,
-    }
+  ? publishedPolicy(TERMS_BASE, TERMS_V1_SECTIONS)
   : { ...TERMS_BASE, status: "PENDING_APPROVAL" };
+
+const DATA_PROTECTION: PendingLegalPage | PublishedPolicy = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
+  ? publishedPolicy(DATA_PROTECTION_BASE, DATA_PROTECTION_V1_SECTIONS)
+  : { ...DATA_PROTECTION_BASE, status: "PENDING_APPROVAL" };
 
 /** In footer order. */
 export const LEGAL_PAGES: readonly LegalPage[] = [
@@ -85,21 +117,9 @@ export const LEGAL_PAGES: readonly LegalPage[] = [
     status: "PUBLISHED",
     kind: "information",
   },
-  {
-    id: "privacy",
-    href: "/privacy",
-    title: "سياسة الخصوصية",
-    description: "سياسة الخصوصية لمنصة Famboook.",
-    status: "PENDING_APPROVAL",
-  },
+  PRIVACY,
   TERMS,
-  {
-    id: "data-protection",
-    href: "/data-protection",
-    title: "إشعار حماية البيانات",
-    description: "إشعار حماية البيانات لمنصة Famboook.",
-    status: "PENDING_APPROVAL",
-  },
+  DATA_PROTECTION,
   {
     // FB-LEGAL-01D: verified ACTIVE channel only (lib/legal/operator.ts); the page renders its own content.
     id: "contact",

@@ -172,15 +172,17 @@ describe("draft safety — unpublished text never reaches served code (FB-LEGAL-
     }
   });
 
-  it("holds approved policy text only in its verbatim module: the approved Terms 1.0, nothing from the unapproved drafts", () => {
-    // terms-v1.ts is the APPROVED Terms text (0b950e2), so its approved wording and the
-    // active info@ address are expected there; drift is checked in legal-publication.test.tsx.
-    const source = readFileSync(join(process.cwd(), "lib", "legal", "terms-v1.ts"), "utf8");
-    expect(source.match(/[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/g)).toEqual(["info@pcdcd.org"]);
-    expect(source).not.toMatch(/support@|media@|security@|<!--|R-\d{2}/);
-    expect(source).not.toMatch(/ملفات تعريف الارتباط والتخزين|الإبلاغ عن مخاوف|عن هذه السياسة|الغرض من هذا الإشعار/);
-    // Only the Terms are approved: Privacy and Data Protection have no content module.
-    expect(readdirSync(join(process.cwd(), "lib", "legal")).sort()).toEqual(["effective-date.ts", "operator.ts", "pages.ts", "terms-v1.ts"]);
+  it("holds approved policy text only in its verbatim modules, with only the active info@ address and no review marker", () => {
+    // The *-v1.ts modules are the APPROVED texts, so approved wording and the active info@
+    // address are expected there; drift from their sources is checked in legal-publication.test.tsx.
+    const modules = ["privacy-v1.ts", "terms-v1.ts", "data-protection-v1.ts"];
+    for (const name of modules) {
+      const source = readFileSync(join(process.cwd(), "lib", "legal", name), "utf8");
+      expect([...new Set(source.match(/[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/g))], name).toEqual(["info@pcdcd.org"]);
+      expect(source, name).not.toMatch(/support@|media@|security@|<!--|R-\d{2}|NOT APPROVED|DRAFT/);
+    }
+    // No other content module may exist next to the registry.
+    expect(readdirSync(join(process.cwd(), "lib", "legal")).sort()).toEqual(["data-protection-v1.ts", "effective-date.ts", "operator.ts", "pages.ts", "privacy-v1.ts", "terms-v1.ts"]);
   });
 
   it("keeps the drafts in internal documentation, clearly marked, without the media address on the contact page text", () => {
