@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **D1 APPROVED** (2026-10-22). **D10 APPROVED** as operating procedure (2026-10-22; not a legal approval). **D2–D9 PENDING** — PCDCD confirmation required |
+| Status | **D1 APPROVED** (2026-10-22). **D10 APPROVED** as operating procedure (2026-10-22; not a legal approval). **D2 PARTIALLY APPROVED** (two email addresses, 2026-10-22). **D3–D9 PENDING** — PCDCD confirmation required |
 | Source | `docs/audits/FB-LEGAL-01A-AUDIT.md` (read-only audit, baseline `c5d448c`) |
 | Implementation | FB-LEGAL-01B (local, uncommitted at the time of writing): public pages infrastructure, release identity, footer, legal links |
 | Rule | No legal text, contact detail, retention period, legal basis, right or security guarantee is published until its decision below is APPROVED and recorded here. Drafts never go into publicly served routes |
@@ -14,7 +14,7 @@
 | # | Decision | Status | Recorded outcome / what is needed |
 |---|---|---|---|
 | **D1** | Platform identity, operator and release wording | **APPROVED (2026-10-22)** | Famboook remains the platform name and brand. The Palestinian Center for Data and Community Development (PCDCD) is the legal operator and data management authority. No assumption that PCDCD owns Famboook intellectual property. The release designation is **Famboook V1.0**. Footer wording: «Famboook V1.0» · «© 2026 Famboook — جميع الحقوق محفوظة» · «تشغيل وإدارة البيانات: المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD)». Existing branding, logo, palette, typography, tokens, layouts and behaviour unchanged |
-| **D2** | Official legal identity and contact details | PENDING | PCDCD legal name as registered, registration number, postal address, official email and telephone, the privacy or data-protection contact, and the complaint and incident contact. **Blocks `/contact`** and the contact sections of every policy |
+| **D2** | Official legal identity and contact details | **PARTIALLY APPROVED (2026-10-22)** — institutional email `info@pcdcd.org` and Famboook user support email `support@pcdcd.org` approved. `media@pcdcd.org` approved as PCDCD's media address but **not** to be displayed on Famboook's public contact page. **Still pending:** everything else in this row | PCDCD legal name as registered, registration number, postal address, official email and telephone, the privacy or data-protection contact, and the complaint and incident contact. **Blocks `/contact`** and the contact sections of every policy |
 | **D3** | Legal basis for processing | PENDING | Applicable law; the legal basis for each processing purpose; whether any processing relies on consent, and for what. A Terms of Use acceptance is **not** consent to personal-data processing |
 | **D4** | Retention and deletion | PENDING | A retention period per data category (audit §4), and whether and how deletion or erasure is offered. Today only the 90-day OTP purge exists; the documented 24-month security-event retention is not implemented (audit H2) |
 | **D5** | Hosting and processors | PENDING | Hosting provider and data location; off-server backup provider and location; the processor arrangement with the SMS provider (TweetsMS); any other processor |
@@ -28,11 +28,11 @@
 
 | Route | Technical state | Publication state | Linked? | Blocked by |
 |---|---|---|---|---|
-| `/about` | Ready | **PUBLISHED** — verified product facts (name, purpose as stated in the application metadata, Staff and Family Portal), the release (Famboook V1.0, Initial Production Release, launch 2026-10-01) and the D1 operator wording only | Yes (footer, Family account, Staff menu) | — (indexing: D9) |
+| `/about` | Ready | **PUBLISHED** — verified product facts (purpose, family registry, Family Portal, coordinators, Staff), the D10 onboarding sequence (FB-LEGAL-01C.3), the release (Famboook V1.0, Initial Production Release, launch 2026-10-01) and the D1 operator wording; no contact detail | Yes (footer, Family account, Staff menu) | — (indexing: D9) |
 | `/privacy` | Ready (registry entry, renderer, metadata) | **PENDING_APPROVAL** — neutral "not published yet" notice; no policy text, version, effective date or acceptance control | No | D2, D3, D4, D5, D6, D8 |
 | `/terms` | Ready | **PENDING_APPROVAL** | No | D2, D3, D7 |
 | `/data-protection` | Ready | **PENDING_APPROVAL** | No | D2, D3, D4, D5, D6, D8 |
-| `/contact` | Ready | **PENDING_APPROVAL** — no email, telephone or address is invented | No | D2 |
+| `/contact` | Ready | **PENDING_APPROVAL** — draft in `docs/legal/drafts/CONTACT.ar.md` with the two approved addresses; page text and publication not approved | No | publication approval (D2 emails approved) |
 
 **Publishing a page later** needs only a registry change in `frontend/lib/legal/pages.ts`: status `PUBLISHED`, kind `policy`, the approved `version`, `effectiveDate` and `sections`. The page is then rendered with its version and effective date and appears automatically in `LegalLinks` (footer, Family account page, Staff user menu). No route or component change is needed. Each publication still needs its decision APPROVED here, its content approved by PCDCD, and a recorded publication approval.
 
@@ -48,4 +48,5 @@ The coverage matrix in `docs/audits/FB-LEGAL-01A-AUDIT.md` §7 lists every topic
 | Date | Change |
 |---|---|
 | 2026-10-22 | Register created. D1 APPROVED; D2–D9 PENDING. FB-LEGAL-01B implemented locally: `/about` published; `/privacy`, `/terms`, `/data-protection`, `/contact` pending and unlinked |
+| 2026-10-22 | FB-LEGAL-01C.3: D2 partially approved (two email addresses). Drafts of `/privacy`, `/terms`, `/data-protection`, `/contact` kept in `docs/legal/drafts/` (not in code: the registry ships in public JavaScript); review register `docs/legal/drafts/FB-LEGAL-01C3-REVIEW.md`. `/about` content extended (platform, registry, Family Portal, coordinators, Staff, D10 onboarding). The four pages stay PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01C.1: D10 (clan onboarding workflow, joint import-file approval) recorded as APPROVED operating procedure; governance document `docs/governance/FB-GOV-01-CLAN-ONBOARDING.md` created; its open questions G-01 … G-12 depend on D3–D6, D8 |

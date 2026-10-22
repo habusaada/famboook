@@ -112,6 +112,78 @@ describe("/about — verified facts and the approved operator only", () => {
   });
 });
 
+describe("/about — platform, onboarding and operator (FB-LEGAL-01C.3)", () => {
+  it("explains the platform, registry, Family Portal, coordinators and Staff", () => {
+    renderPage("about");
+    for (const id of ["product", "registry", "family-portal", "coordinators", "staff", "onboarding"]) {
+      expect(document.querySelector(`[data-about-section="${id}"]`), id).not.toBeNull();
+    }
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "المنصة",
+      "سجل العائلات",
+      "بوابة الأسرة",
+      "المنسقون",
+      "فريق العمل",
+      "انضمام العائلات والعشائر",
+      "الإصدار",
+      "الجهة المشغّلة",
+    ]);
+  });
+
+  it("lists the approved nine-step onboarding with joint approval, and the roster is never the import file", () => {
+    renderPage("about");
+    const steps = within(document.querySelector("[data-onboarding-steps]") as HTMLElement).getAllByRole("listitem");
+    expect(steps).toHaveLength(9);
+    expect(steps[6]).toHaveTextContent("منسق العشيرة المكلَّف رسميًا وإدارة Famboook الملف النهائي معًا");
+    expect(screen.getByText(/لا يُعدّ الكشف الأولي الذي تقدّمه العشيرة ملفَّ الإدخال النهائي/)).toBeInTheDocument();
+  });
+
+  it("shows no email address: contact details belong to /contact, which awaits approval", () => {
+    renderPage("about");
+    expect(screen.getByRole("article").textContent).not.toMatch(/@|pcdcd\.org/);
+  });
+});
+
+describe("draft safety — unpublished text never reaches served code (FB-LEGAL-01C.3)", () => {
+  it("keeps pending registry entries free of any content (the registry ships in client JavaScript)", () => {
+    for (const id of PENDING) {
+      expect(Object.keys(legalPage(id)).sort(), id).toEqual(["description", "href", "id", "status", "title"]);
+    }
+  });
+
+  it("has no email address or draft wording anywhere in the served legal code", () => {
+    const sources = [
+      join(process.cwd(), "lib", "legal", "pages.ts"),
+      join(process.cwd(), "lib", "legal", "operator.ts"),
+      join(process.cwd(), "components", "shared", "site-footer.tsx"),
+      join(process.cwd(), "components", "layout", "user-menu.tsx"),
+      join(ROOT, "layout.tsx"),
+      ...Object.keys(PAGES).map((id) => join(ROOT, id, "page.tsx")),
+      ...readdirSync(join(process.cwd(), "components", "legal")).map((f) => join(process.cwd(), "components", "legal", f)),
+    ];
+    for (const file of sources) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).not.toMatch(/[A-Za-z0-9._-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}/);
+      expect(source, file).not.toMatch(/ملفات تعريف الارتباط والتخزين|الاستخدام غير المسموح|الإبلاغ عن مخاوف/);
+    }
+  });
+
+  it("keeps the drafts in internal documentation, clearly marked, without the media address on the contact page text", () => {
+    const drafts = join(process.cwd(), "..", "docs", "legal", "drafts");
+    for (const name of ["PRIVACY.ar.md", "TERMS.ar.md", "DATA-PROTECTION.ar.md", "CONTACT.ar.md"]) {
+      const text = readFileSync(join(drafts, name), "utf8");
+      expect(text, name).toMatch(/NOT APPROVED/);
+      expect(text, name).not.toMatch(/تاريخ السريان:\s*\d/);
+    }
+    // The page text is everything after the header's horizontal rule.
+    const contact = readFileSync(join(drafts, "CONTACT.ar.md"), "utf8").split(/\r?\n---\r?\n/).slice(1).join("\n");
+    expect(contact).toContain("support@pcdcd.org");
+    expect(contact).toContain("info@pcdcd.org");
+    expect(contact).not.toContain("media@pcdcd.org");
+    expect(existsSync(join(drafts, "FB-LEGAL-01C3-REVIEW.md"))).toBe(true);
+  });
+});
+
 describe("pages awaiting legal approval", () => {
   it("are registered as pending and are never linked", () => {
     for (const id of PENDING) expect(legalPage(id).status).toBe("PENDING_APPROVAL");

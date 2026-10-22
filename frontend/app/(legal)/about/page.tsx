@@ -8,6 +8,30 @@ export const metadata: Metadata = legalMetadata("about");
 
 const card = "rounded-2xl border border-border bg-surface-1 p-5";
 
+/** The approved onboarding sequence (FB-LEGAL-01 D10; docs/governance/FB-GOV-01 §2), in plain Arabic. */
+const ONBOARDING_STEPS = [
+  "تتقدّم العائلة أو العشيرة بطلب رسمي لاستخدام Famboook.",
+  "يرشّح مجلس العائلة أو العشيرة المتفق عليه منسقًا ويكلّفه.",
+  "تقدّم العائلة أو العشيرة كشفًا أوليًا يتضمّن أرقام الهوية على الأقل.",
+  "يستكمل فريق Famboook بيانات أرباب الأسر بالتعاون مع العشيرة والمؤسسات الشريكة ذات الصلة.",
+  "تُعَدّ البيانات في نموذج الإدخال المعتمد في Famboook، وفق أعمدته وقواعد التحقق منه.",
+  "يخضع الملف لمراجعة جودة البيانات وسلامتها.",
+  "يعتمد منسق العشيرة المكلَّف رسميًا وإدارة Famboook الملف النهائي معًا.",
+  "يُدخَل الملف المعتمد من الطرفين وحده عبر إجراءات الإدخال القائمة.",
+  "يفعّل أرباب الأسر حساباتهم في بوابة الأسرة ويقدّمون طلبات تحديث بياناتهم.",
+] as const;
+
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className={card} aria-labelledby={`about-${id}`} data-about-section={id}>
+      <h2 id={`about-${id}`} className="text-base font-semibold text-foreground">
+        {title}
+      </h2>
+      <div className="mt-2 text-sm leading-relaxed text-foreground">{children}</div>
+    </section>
+  );
+}
+
 function Row({ label, children, field }: { label: string; children: React.ReactNode; field: string }) {
   return (
     <div className="flex flex-col gap-0.5 py-2.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4" data-field={field}>
@@ -18,8 +42,11 @@ function Row({ label, children, field }: { label: string; children: React.ReactN
 }
 
 /**
- * «عن فامبوك» (FB-LEGAL-01B): verified product facts and the approved operator
- * identity (D1) only — no legal claim, contact detail or guarantee.
+ * «عن فامبوك» (FB-LEGAL-01B, content FB-LEGAL-01C.3): what the platform does
+ * (verified against the application), the approved clan onboarding procedure
+ * (FB-LEGAL-01 D10, docs/governance/FB-GOV-01) and the approved operator
+ * identity (D1). No legal claim, contact detail, ownership claim or guarantee:
+ * contact details belong to /contact, which awaits publication approval.
  */
 export default function AboutPage() {
   const page = legalPage("about");
@@ -30,14 +57,44 @@ export default function AboutPage() {
         {page.title}
       </h1>
 
-      <section className={card} aria-labelledby="about-product">
-        <h2 id="about-product" className="text-base font-semibold text-foreground">
-          المنصة
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-foreground">
-          <bdi>{RELEASE.product}</bdi> نظام لسجل العائلات وإدارة الحالات. يعمل فيه فريق العمل المخوّل على سجل الأسر وأفرادها، ويطّلع رب الأسرة على بيانات أسرته عبر بوابة الأسرة.
+      <Section id="product" title="المنصة">
+        <p>
+          <bdi>{RELEASE.product}</bdi> نظام لسجل العائلات وإدارة الحالات. يجمع في مكان واحد بيانات الأسر وأفرادها، ويدعم فريق العمل في متابعة أوضاع الأسر واحتياجاتها، ويتيح لأرباب الأسر الاطلاع على بيانات أسرهم.
         </p>
-      </section>
+      </Section>
+
+      <Section id="registry" title="سجل العائلات">
+        <p>
+          يحفظ السجل بيانات كل أسرة وأفرادها وصلاتهم برب الأسرة، وبيانات السكن الحالي والأصلي وحالة النزوح. لكل أسرة ولكل شخص رمز تعريف دائم، ويُطابَق الأشخاص برقم الهوية دون دمج تلقائي.
+        </p>
+      </Section>
+
+      <Section id="family-portal" title="بوابة الأسرة">
+        <p>
+          يفعّل رب الأسرة المسجّل حسابه برقم هويته وبرمز تحقق يصل إلى رقم الجوال المسجّل، ثم يطّلع على بيانات أسرته ويقدّم طلبات تحديثها. يراجع فريق العمل كل طلب قبل تطبيقه. تُتاح خدمات البوابة على مراحل.
+        </p>
+      </Section>
+
+      <Section id="coordinators" title="المنسقون">
+        <p>
+          يكلّف مجلس العائلة أو العشيرة منسقًا يمثّلها. يمنحه فريق {RELEASE.product} الدخول إلى مساحة التنسيق ضمن نطاق محدَّد، فيتابع الأسر الواقعة في نطاقه ويقدّم مقترحات تسجيل أسر أو إضافة أفراد، ولا تُطبَّق مقترحاته إلا بعد مراجعة فريق العمل.
+        </p>
+      </Section>
+
+      <Section id="staff" title="فريق العمل">
+        <p>
+          يدير الموظفون المخوّلون السجل، ويراجعون طلبات التحديث، ويُعدّون التقييمات، ويتابعون الاحتياجات والمساعدات، كلٌّ بحسب الصلاحيات المحدَّدة لدوره.
+        </p>
+      </Section>
+
+      <Section id="onboarding" title="انضمام العائلات والعشائر">
+        <ol className="list-decimal space-y-1.5 ps-5" data-onboarding-steps>
+          {ONBOARDING_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <p className="mt-2 text-muted-foreground">لا يُعدّ الكشف الأولي الذي تقدّمه العشيرة ملفَّ الإدخال النهائي؛ يُدخَل فقط الملف الذي اجتاز المراجعة واعتمده الطرفان.</p>
+      </Section>
 
       <section className={card} aria-labelledby="about-release">
         <h2 id="about-release" className="text-base font-semibold text-foreground">
