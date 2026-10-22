@@ -110,16 +110,24 @@ describe("the official logo", () => {
   });
 });
 
-describe("the copyright footer", () => {
-  it("credits Famboook and links the developer safely", () => {
+describe("the release, copyright and operator footer (FB-LEGAL-01 D1)", () => {
+  it("shows the release, the approved copyright and operator wording, and links the operator safely", () => {
     render(<SiteFooter />);
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveTextContent("© 2026 فامبوك. جميع الحقوق محفوظة.");
-    const link = within(footer).getByRole("link", { name: "المركز الفلسطيني للبيانات والتنمية المجتمعية – PCDCD" });
+    expect(footer.querySelector("[data-release]")).toHaveTextContent("Famboook V1.0");
+    expect(footer).toHaveTextContent("© 2026 Famboook — جميع الحقوق محفوظة");
+    expect(footer.querySelector("[data-operator]")).toHaveTextContent("تشغيل وإدارة البيانات: المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD)");
+    // Never an ownership claim for PCDCD, and the old developer credit is gone.
+    expect(footer).not.toHaveTextContent(/تطوير|© 2026 PCDCD|فامبوك\. جميع/);
+    const link = within(footer).getByRole("link", { name: "المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD)" });
     expect(link).toHaveAttribute("href", DEVELOPER_URL);
     expect(link).toHaveAttribute("href", "https://www.facebook.com/pcdcd.gaza");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+
+    // Legal links: published pages only — never a page awaiting approval.
+    const legal = within(footer).getByRole("navigation", { name: "روابط فامبوك" });
+    expect(within(legal).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/about"]);
   });
 });
 

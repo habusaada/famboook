@@ -341,3 +341,17 @@ describe("navigation and privacy", () => {
     expect(browserStorageDump()).not.toMatch(/05\*|FAM-|TRUSTED|عشيرة/);
   });
 });
+
+describe("about Famboook (FB-LEGAL-01B)", () => {
+  it("shows the release and operator and links the published legal pages only", async () => {
+    renderAccount();
+    await loaded();
+    const legal = section("legal");
+    expect(within(legal).getByRole("heading", { level: 2, name: "عن فامبوك" })).toBeInTheDocument();
+    expect(legal.querySelector("[data-account-release]")).toHaveTextContent("Famboook V1.0");
+    expect(legal).toHaveTextContent("تشغيل وإدارة البيانات: المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD)");
+    expect(within(legal).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/about"]);
+    // Informational only: no footer inside the authenticated portal.
+    expect(document.querySelector("[data-site-footer]")).toBeNull();
+  });
+});

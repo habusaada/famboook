@@ -111,13 +111,18 @@ describe("the public verification page", () => {
     expect(brand?.querySelector('[data-brand-theme="light"]')).toHaveAttribute("src", "/brand/FamboookLogoColoredLight.svg");
     expect(brand).not.toHaveTextContent("بوابة الأسرة");
 
-    // No portal or login link: the only link is the footer's external
-    // developer credit (FB-BRAND-01), opened in a new tab.
+    // No portal or login link: every link is in the shared footer — the
+    // operator's page (FB-BRAND-01, new tab) and the published legal pages
+    // (FB-LEGAL-01B); the only navigation is the footer's legal links.
+    const footer = document.querySelector("[data-site-footer]") as HTMLElement;
     const links = screen.queryAllByRole("link");
-    expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAttribute("href", "https://www.facebook.com/pcdcd.gaza");
+    expect(links.filter((link) => !footer.contains(link))).toHaveLength(0);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["https://www.facebook.com/pcdcd.gaza", "/about"]);
     expect(links[0]).toHaveAttribute("target", "_blank");
-    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(links.some((link) => /\/family|\/login/.test(link.getAttribute("href") ?? ""))).toBe(false);
+    const navs = screen.queryAllByRole("navigation");
+    expect(navs).toHaveLength(1);
+    expect(footer.contains(navs[0])).toBe(true);
     // No PDF, download or print control on the public page (PWA-8.3).
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(document.body).not.toHaveTextContent(/PDF|تنزيل|طباعة/);

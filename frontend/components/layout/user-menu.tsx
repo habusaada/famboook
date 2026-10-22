@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut } from "lucide-react";
+import { Info, LogOut } from "lucide-react";
+import { publishedLegalPages } from "@/lib/legal/pages";
 import { Initials } from "@/components/shared/initials";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +58,16 @@ export function UserMenu() {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {/* FB-LEGAL-01B: the published legal and information pages only (public; no permission involved). */}
+        {publishedLegalPages().map((page) => (
+          <DropdownMenuItem key={page.id} asChild>
+            <Link href={page.href} data-user-menu-legal={page.id}>
+              <Info className="size-4" />
+              {page.title}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        {publishedLegalPages().length > 0 && <DropdownMenuSeparator />}
         <DropdownMenuItem onSelect={signOut} disabled={pending} data-logout>
           <LogOut className="size-4" />
           تسجيل الخروج

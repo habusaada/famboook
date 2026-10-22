@@ -5,6 +5,9 @@ import { AlertCircle, ChevronLeft, Info, KeyRound, Loader2, LogOut, Megaphone, N
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFamilyUser } from "@/components/family/family-context";
+import { LegalLinks } from "@/components/legal/legal-links";
+import { OPERATOR, OPERATOR_DISPLAY_NAME } from "@/lib/legal/operator";
+import { RELEASE_DESIGNATION } from "@/lib/release";
 import { useFamilySignOut } from "@/components/family/use-family-sign-out";
 import { ApiError } from "@/lib/api/client";
 import { scopeLabel, useCoordinatorContextQuery } from "@/lib/api/coordinator";
@@ -359,6 +362,14 @@ export function AccountView() {
         </Link>
 
         <ChangePasswordEntry />
+
+        {/* FB-LEGAL-01B: the published legal and information pages (only those) — informational, no new navigation. */}
+        <Section id="legal" title="عن فامبوك" icon={Info}>
+          <p className="mt-2 text-[13px] text-muted-foreground" data-account-release>
+            <bdi dir="ltr">{RELEASE_DESIGNATION}</bdi> · {OPERATOR.roleAr}: {OPERATOR_DISPLAY_NAME}
+          </p>
+          <LegalLinks variant="list" className="mt-1" />
+        </Section>
 
         <SignOut />
       </div>
