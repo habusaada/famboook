@@ -391,8 +391,11 @@ These gaps are documented only. Closing any of them needs its own design and app
 | G-11 | **Withdrawal of a clan** after import: what happens to imported data and accounts (no deletion path exists) | FB-LEGAL-01 D4, D6 | PCDCD | PENDING |
 | G-12 | **System support for the gaps** G-A … G-I (template workbook, mobile and birth-date validation, delegation and approval records, provenance fields) — whether to build them | §14 | Product owner | PENDING — not part of this document |
 
+**G-02 — `/terms` disposition note (FB-LEGAL-G02-DISPOSITION-01, 2026-10-22).** The Executive Director, PCDCD, has accepted G-02 as **OPEN for `/terms` publication readiness only** (`docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). The underlying governance requirements in the G-02 row remain **unresolved** and its status above stays PENDING. The decision is **not** proof of council agreement, membership, composition or delegation, and the required governance work remains pending. No other use of this decision, for other pages, policies, onboarding approvals or imports, is automatically authorized.
+
 ## 16. Change log
 
 | Date | Change |
 |---|---|
 | 2026-10-22 | Created. Workflow (§2) and joint approval (§8) recorded as approved operating procedure; legal questions open (§15); implementation gaps documented (§14), nothing implemented |
+| 2026-10-22 | FB-LEGAL-G02-DISPOSITION-01: `/terms`-only disposition note added under §15 (G-02 accepted as open for `/terms` publication readiness only). G-02 status unchanged (PENDING / open) |

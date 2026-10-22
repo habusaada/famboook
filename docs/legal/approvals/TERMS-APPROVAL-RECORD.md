@@ -111,7 +111,7 @@ The original approval of `c937176` was recorded at commit `27b7041`. It stays va
 
 | Condition | Disposition | By / date |
 |---|---|---|
-| G-02: coordinator delegation (council legitimacy and evidence; R-23) | PENDING (closed / accepted as open, with reason) | PENDING |
+| G-02: coordinator delegation (council legitimacy and evidence; R-23) | **ACCEPTED AS OPEN FOR TERMS PUBLICATION ONLY** (FB-LEGAL-G02-DISPOSITION-01). Rationale: R-23 is a non-blocking wording finding, and the approved Terms wording states a governance obligation without claiming that PCDCD has verified council composition, agreement or delegation. Underlying G-02 governance status: **OPEN** (`docs/governance/FB-GOV-01-CLAN-ONBOARDING.md` §15). Effect on `/terms` readiness: the G-02 disposition requirement is **satisfied**. No Terms wording change. Publication authorization: **NOT AUTHORIZED** | Executive Director, PCDCD / 2026-10-22 (explicit management decision in the project conversation; no signature recorded) |
 | Production configuration verified against the text: `FAMILY_ACTIVATION_ENABLED`, `FAMILY_LOGIN_ENABLED`, `FAMILY_PASSWORD_RESET_ENABLED`, `FAMILY_PASSWORD_CHANGE_ENABLED`, `FAMILY_CONTACT_UPDATE_ENABLED`, `CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE`, `CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE`, `NOTIFICATIONS_MODE`, SMS provider configuration | PENDING (record the values observed; "when available" wording confirmed) | PENDING |
 | Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» communicated to Staff | PENDING (approved as a rule; communication not yet evidenced) | PENDING |
 | Initial indexing setting | **`noindex`** (D9 partially approved, FB-LEGAL-01G.3). Future indexing needs a separate decision | — |
