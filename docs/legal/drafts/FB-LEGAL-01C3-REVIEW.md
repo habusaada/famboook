@@ -174,8 +174,22 @@ All three pages stay **PENDING_APPROVAL**, unlinked and not indexed. `frontend/l
 | 6 | R-22 / R-11: the "when available" wording matches the Production gate state at publication | ☐ at publication |
 | 7 | R-23: coordinator delegation verification (G-02) | ☐ open |
 | 8 | Independent Arabic language review | ☐ |
-| 9 | Approved `version` and `effectiveDate`; recorded approver and date | ☐ |
-| 10 | Separate publication approval (registry change, markers removed, tests green; indexing per D9) | ☐ |
+| 9 | Approved `version` (proposed pattern `terms-YYYY-MM-DD`) and `effectiveDate`; recorded approver and date | ☐ none assigned |
+| 10 | Initial indexing setting | ✓ `noindex` (D9 partial, FB-LEGAL-01G.3) |
+| 11 | Separate publication approval (registry change, markers removed, tests green) | ☐ |
+
+### 4.6 `/terms` editorial amendments (FB-LEGAL-01G.3)
+
+These are approved as text decisions, **not** as publication authorization.
+
+1. **Activation:** the two sentences are merged into «حساب بوابة الأسرة مخصّص لرب الأسرة المسجّل، ويُفعَّل باستخدام رقم الهوية ورمز التحقق المُرسَل إلى رقم الجوال المسجّل.»
+2. **Password and code (R-26):** «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين؛ فلا تُفصح عنهما لأي شخص، حتى لو ادّعى أنه من فريق العمل.» The separate line «الحساب شخصي: لا تشارك كلمة المرور أو رمز التحقق…» is kept.
+3. **Notifications:** «تُعرض إشعارات المنصة داخلها فقط، ولا تُرسَل عبر الرسائل القصيرة أو البريد الإلكتروني. وتُستخدم الرسائل القصيرة لإرسال رموز التحقق في الخدمات التي تتطلبها، عند إتاحتها.»
+   - **Verified locally:** `SmsDispatcher` is used only by `OtpChallenges`, for activation, password reset and contact update, plus the operator command `sms:check`. The notification module sends no SMS or mail. The OTP services are gated, default OFF.
+   - **Not verified:** the Production state.
+4. **Unchanged:** the R-24 sanctions sentence, the access-restriction terms (الاطلاع / تقييد الوصول), R-25 and D7.
+
+The approval record template is `docs/legal/approvals/TERMS-APPROVAL-RECORD.md`. G-02 stays open; it must be closed, or explicitly accepted as open, in that record.
 
 ## 5. Change log
 
@@ -187,3 +201,4 @@ All three pages stay **PENDING_APPROVAL**, unlinked and not indexed. `frontend/l
 | 2026-10-22 | FB-LEGAL-01F: decisions D7 (approved), D4, D6, D8 (partially approved) recorded. A status column was added (MANAGEMENT_DECISION_RECORDED, IMPLEMENTATION_OR_VERIFICATION_PENDING, PUBLICATION_BLOCKER_OPEN, RESOLVED). R-21 resolved. R-07 no longer blocks (disclosure), and follow-up F-01 was opened. R-10, R-12 stay blocking with narrowed scope. R-15 is flagged as an unverified contractual claim. `/terms` is READY_FOR_FINAL_TEXT_APPROVAL; `/privacy` and `/data-protection` are NEEDS_DECISION. All three remain PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G: final text review of `/terms`. R-24 (sanctions) reworded to the existing measures at the operator's discretion; R-25 (service limits) unchanged; R-26 (password and code) extended. Final approval checklist §4.5 added. `/terms` is READY_FOR_MANAGEMENT_APPROVAL and remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.1: management wording applied. R-26 activation sentence; R-24 sanctions sentence «وفق الصلاحيات والإجراءات المتاحة»; R-25 kept unchanged. Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» approved (not evidence of training or enforcement). D7 preserved; G-02 open. `/terms` remains PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01G.3: `/terms` editorial amendments applied (§4.6). D9 partially approved (`noindex` initial setting for `/terms`); version pattern `terms-YYYY-MM-DD` proposed, none assigned; approval record template created. G-02 open. `/terms` remains PENDING_APPROVAL |

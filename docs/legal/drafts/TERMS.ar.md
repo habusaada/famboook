@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E; final text review FB-LEGAL-01G: R-24, R-25, R-26; management wording applied FB-LEGAL-01G.1). Final text prepared for management approval; NOT approved for publication. Not to be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
+| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E; final text review FB-LEGAL-01G: R-24, R-25, R-26; management wording applied FB-LEGAL-01G.1; editorial amendments FB-LEGAL-01G.3). Final text prepared for management approval; NOT approved for publication. Not to be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
 | Target | registry entry `terms` → `PUBLISHED`, kind `policy`, approved `version` and `effectiveDate` (none set here) |
 | Acceptance | **No acceptance mechanism.** This text introduces no mandatory acceptance, no new authentication step and no new restriction on existing users (FB-LEGAL-01 D7 APPROVED, FB-LEGAL-01F: informational publication model). It deliberately contains no "by using you agree" clause, and no text may claim that users have electronically accepted the terms (R-21) |
 | Format | `##` = section heading; each following line = one paragraph; `<!-- R-xx -->` = review marker (see `FB-LEGAL-01C3-REVIEW.md`), removed on publication |
@@ -17,11 +17,11 @@
 
 ## الحساب واستخدامه
 
-حساب بوابة الأسرة مخصّص لرب الأسرة المسجّل. يُفعّل حساب بوابة الأسرة باستخدام رقم الهوية ورمز التحقق المُرسَل إلى رقم الجوال المسجّل. أما حسابات فريق العمل فتُنشئها الجهة المشغّلة.
+حساب بوابة الأسرة مخصّص لرب الأسرة المسجّل، ويُفعَّل باستخدام رقم الهوية ورمز التحقق المُرسَل إلى رقم الجوال المسجّل. أما حسابات فريق العمل فتُنشئها الجهة المشغّلة.
 الحساب شخصي: لا تشارك كلمة المرور أو رمز التحقق مع أي شخص، ولا تسمح لغيرك باستخدام حسابك.
 إذا اشتبهت في استخدام حسابك من غيرك، فغيّر كلمة المرور إن كانت الخدمة متاحة، وراسل الجهة المشغّلة.
 رمز التحقق صالح لمدة قصيرة، ولا يُستخدم إلا في المنصة نفسها.
-لا يحتاج فريق العمل ولا الجهة المشغّلة إلى كلمة المرور أو رمز التحقق، فلا تُفصح عنهما لأي شخص، حتى لو قدّم نفسه على أنه من فريق العمل. <!-- R-26 -->
+لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين؛ فلا تُفصح عنهما لأي شخص، حتى لو ادّعى أنه من فريق العمل. <!-- R-26 -->
 
 ## دقة المعلومات
 
@@ -55,7 +55,7 @@
 تعرض المنصة البيانات كما هي مسجّلة في سجل العائلات، وقد تحتاج بعض البيانات إلى تحديث أو تصحيح.
 قد تُتاح بعض الخدمات، مثل تفعيل الحسابات وتقديم طلبات التحديث، على مراحل، وقد لا تكون متاحة في أوقات معيّنة.
 لا يمكن ضمان توفّر المنصة دون انقطاع، وقد تتوقف مؤقتًا للصيانة أو لأسباب فنية. <!-- R-25 -->
-تُعرض الإشعارات داخل المنصة فقط، ولا تُرسَل برسائل قصيرة أو بالبريد الإلكتروني.
+تُعرض إشعارات المنصة داخلها فقط، ولا تُرسَل عبر الرسائل القصيرة أو البريد الإلكتروني. وتُستخدم الرسائل القصيرة لإرسال رموز التحقق في الخدمات التي تتطلبها، عند إتاحتها.
 
 ## تحديث هذه الشروط
 
