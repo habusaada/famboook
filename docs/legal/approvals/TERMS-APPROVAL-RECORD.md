@@ -2,10 +2,12 @@
 
 | | |
 |---|---|
-| Status | **AMENDED TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the original final administrative text approval (FB-LEGAL-01I, §1), the P-02 amended text approval (FB-LEGAL-01K.1, §1a) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
+| Status | **AMENDED TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the original final administrative text approval (FB-LEGAL-01I, §1), the P-02 amended text approval (FB-LEGAL-01K.1, §1a), the P-01 amended text approval (FB-LEGAL-01L.1, §1c) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
 | Text baseline (original) | `c937176` (FB-LEGAL-01G.4: final wording and this template). Kept as history |
-| Current approved text | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; Git baseline **`4da00de`** (stored-file SHA-256 verified, FB-LEGAL-01K.3) |
+| Current approved text | `4da00de` + the P-01 insertion (§1c). Interim SHA-256 `bc1bf806aaa1809872e59658c9701aeb208981c63e202f3c8862b4bfaf4a6aa6`; Git baseline **PENDING UNTIL COMMIT** |
+| Previous approved text (P-02) | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; Git baseline **`4da00de`** (stored-file SHA-256 verified, FB-LEGAL-01K.3). Kept as history |
+| Approval history | `c937176`: original approved text. `27b7041`: original approval-record commit. `4da00de`: approved P-02 amended text. `b602d00`: governance commit registering `4da00de`. P-01 amended text: pending commit |
 | Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
 | Authority designation status | **APPROVED** (FB-LEGAL-01H, `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). A role designation only: it is **not** the text approval, names no individual and carries no signature or date |
 | Model | Informational usage rules; no mandatory electronic acceptance (FB-LEGAL-01 D7, APPROVED) |
@@ -49,7 +51,26 @@ The original approval of `c937176` was recorded at commit `27b7041`. It stays va
 | Difference from `c937176` | Exactly one line (the P-02 sentence); verified with `git diff c937176` |
 | New Git baseline | **`4da00de`** (FB-LEGAL-01K.2, parent `27b7041`). Verified in FB-LEGAL-01K.3: `git show 4da00de:docs/legal/drafts/TERMS.ar.md \| sha256sum` equals the integrity reference above, and the only difference from `c937176` is the P-02 line |
 
-## 1b. Independent Arabic language review (must cover the amended text)
+## 1c. Amended text approval (P-01)
+
+| Field | Value |
+|---|---|
+| Decision | **TERMS-P01-AMENDED-TEXT-APPROVAL** (FB-LEGAL-01L.1) |
+| Status | **APPROVED** |
+| Authority | Executive Director, PCDCD |
+| Decision date | 2026-10-22 |
+| Evidence | An explicit management decision in the project conversation (FB-LEGAL-01L.1). Not a signed approval, a legal review or a compliance assessment |
+| Named approver / signature | Not recorded / none |
+| Additional conditions | None stated |
+| Scope | The previously approved Terms text at `4da00de`, with only the approved P-01 introductory sentence inserted (Option A, `docs/legal/proposals/FB-LEGAL-01L-P01-TERMS-EDITORIAL-PROPOSAL.md` §0; Option B not approved) |
+| Approved wording | «يُعدّ من الاستخدام غير المسموح ما يأتي:» |
+| Approved placement | Immediately after the heading «## الاستخدام غير المسموح», before the five existing prohibited-use provisions, as its own paragraph |
+| Difference from `4da00de` | 2 lines added (the sentence and its separating blank line), 0 removed; verified with `git diff 4da00de` |
+| Amended file integrity reference (interim) | SHA-256 `bc1bf806aaa1809872e59658c9701aeb208981c63e202f3c8862b4bfaf4a6aa6` (UTF-8, LF, 7,099 bytes). Verify after the commit with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum` |
+| New Git text baseline | PENDING UNTIL COMMIT |
+| Publication authorization | **NOT AUTHORIZED**. This is a text approval only |
+
+## 1b. Independent Arabic language review (must cover the current amended text, §1c)
 
 | Field | Value |
 |---|---|
