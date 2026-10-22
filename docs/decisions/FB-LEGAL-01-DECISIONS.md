@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **D1 APPROVED** (2026-10-22). **D2–D9 PENDING** — PCDCD confirmation required |
+| Status | **D1 APPROVED** (2026-10-22). **D10 APPROVED** as operating procedure (2026-10-22; not a legal approval). **D2–D9 PENDING** — PCDCD confirmation required |
 | Source | `docs/audits/FB-LEGAL-01A-AUDIT.md` (read-only audit, baseline `c5d448c`) |
 | Implementation | FB-LEGAL-01B (local, uncommitted at the time of writing): public pages infrastructure, release identity, footer, legal links |
 | Rule | No legal text, contact detail, retention period, legal basis, right or security guarantee is published until its decision below is APPROVED and recorded here. Drafts never go into publicly served routes |
@@ -22,6 +22,7 @@
 | **D7** | Terms acknowledgement | PENDING | Whether acceptance is recorded (activation, interstitial, Staff), whether it blocks account use, whether the raw IP is stored, re-acceptance on new versions. **No acknowledgement storage exists or is built** until decided (audit §8) |
 | **D8** | Sensitive-data visibility | PENDING | Full mobile numbers for every Staff role with `person.view` (audit H3); household-head visibility of all members' health condition names (audit H4) — keep and disclose, or change |
 | **D9** | Indexing and publication | PENDING | Whether search engines may index the legal pages; the public wording of the release line beyond the footer. Until decided every legal page is `noindex, nofollow` |
+| **D10** | Clan onboarding workflow and joint import-file approval | **APPROVED (2026-10-22) — operating procedure only** | Recorded in `docs/governance/FB-GOV-01-CLAN-ONBOARDING.md`. **Approved:** (1) the nine-step onboarding sequence; (2) the raw clan roster is never the import file; (3) only a file that passed the data-quality review and that **both the formally delegated clan coordinator and Famboook management** approved, identified by its SHA-256 checksum, enters the existing import workflow; (4) any change to the file voids the approval. **Not approved by D10:** any legal basis, consent or partner agreement. Clan participation, coordinator delegation and file approval are three distinct approvals, and none authorizes processing of every member's personal or sensitive data (FB-GOV-01 §3). The open questions are FB-GOV-01 §15 G-01 … G-12 (they depend on D3–D6, D8). No system change: the joint approval is a governance procedure; the application does not record it (FB-GOV-01 §14) |
 
 ## 2. Page readiness (FB-LEGAL-01B)
 
@@ -47,3 +48,4 @@ The coverage matrix in `docs/audits/FB-LEGAL-01A-AUDIT.md` §7 lists every topic
 | Date | Change |
 |---|---|
 | 2026-10-22 | Register created. D1 APPROVED; D2–D9 PENDING. FB-LEGAL-01B implemented locally: `/about` published; `/privacy`, `/terms`, `/data-protection`, `/contact` pending and unlinked |
+| 2026-10-22 | FB-LEGAL-01C.1: D10 (clan onboarding workflow, joint import-file approval) recorded as APPROVED operating procedure; governance document `docs/governance/FB-GOV-01-CLAN-ONBOARDING.md` created; its open questions G-01 … G-12 depend on D3–D6, D8 |
