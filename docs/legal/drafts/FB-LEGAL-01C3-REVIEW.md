@@ -250,7 +250,7 @@ The Privacy Policy is neither approved nor published; the amendment only stops t
 | Management approval | APPROVED (TERMS-P03-P11-CONSOLIDATED-TEXT-APPROVAL, 2026-10-22, Executive Director, PCDCD) |
 | Local application | APPLIED LOCALLY. 5 lines replaced, 0 added or removed against `2e0c99d`. The P-01 and P-02 wording, the prohibited uses, R-24 and the password / code rules are unchanged |
 | Previous baseline | `2e0c99d` (history kept) |
-| New baseline | PENDING UNTIL COMMIT (SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c`) |
+| New baseline | `0b950e2` (SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c`, stored-file verified, FB-LEGAL-01M.3) |
 | Independent Arabic review | PENDING; must cover this amended text |
 | Production gate and SMS verification | PENDING (the wording is conditional and claims nothing about Production) |
 | Publication | NOT AUTHORIZED |
@@ -268,6 +268,7 @@ The draft's internal "NOT APPROVED" marker continues to mean **not approved for 
 | 2026-10-22 | FB-LEGAL-01G: final text review of `/terms`. R-24 (sanctions) reworded to the existing measures at the operator's discretion; R-25 (service limits) unchanged; R-26 (password and code) extended. Final approval checklist §4.5 added. `/terms` is READY_FOR_MANAGEMENT_APPROVAL and remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.1: management wording applied. R-26 activation sentence; R-24 sanctions sentence «وفق الصلاحيات والإجراءات المتاحة»; R-25 kept unchanged. Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» approved (not evidence of training or enforcement). D7 preserved; G-02 open. `/terms` remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.3: `/terms` editorial amendments applied (§4.6). D9 partially approved (`noindex` initial setting for `/terms`); version pattern `terms-YYYY-MM-DD` proposed, none assigned; approval record template created. G-02 open. `/terms` remains PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01M.3: consolidated `/terms` text registered at Git baseline `0b950e2` (§4.11); previous baseline `2e0c99d` kept as history. Language review pending; publication not authorized |
 | 2026-10-22 | FB-LEGAL-01M.1: consolidated language amendments approved; five line replacements applied locally to `/terms` (§4.11); P-03 and P-10 kept; P-08 and P-11 deferred. Previous baseline `2e0c99d`; new baseline pending commit; language review pending; publication not authorized |
 | 2026-10-22 | FB-LEGAL-01L.3: P-01 amended `/terms` text registered at Git baseline `2e0c99d` (§4.10). Earlier baselines kept as history. No text or status change |
 | 2026-10-22 | FB-LEGAL-01L.1: P-01 Option A approved and applied locally to `/terms` (§4.10). Previous baseline `4da00de`; new baseline pending commit; language review pending; publication not authorized |

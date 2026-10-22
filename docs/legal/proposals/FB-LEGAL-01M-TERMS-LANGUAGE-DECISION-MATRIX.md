@@ -24,7 +24,7 @@
 | Deferred | P-08 (version-format decision), P-11 (independent reviewer) |
 | Application | **APPLIED LOCALLY**. All five replacements applied; `git diff 2e0c99d` shows 5 lines replaced, 0 added or removed |
 | Previous approved text baseline | `2e0c99d` |
-| New Git text baseline | PENDING UNTIL COMMIT |
+| New Git text baseline | `0b950e2` (`0b950e2f032b5759ad996533c8186ae6b45159f0`, parent `960d4fe`; stored-file SHA-256 verified, FB-LEGAL-01M.3) |
 | New Terms SHA-256 | `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c` (UTF-8, LF, 7,155 bytes) |
 | Operational caveats kept | Production gate and SMS state remain PENDING VERIFICATION. The applied wording is conditional and claims nothing about Production. The «فقط» variant is not approved |
 | Independent review | PENDING |

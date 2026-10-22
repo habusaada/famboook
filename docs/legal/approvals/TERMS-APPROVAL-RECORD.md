@@ -5,10 +5,10 @@
 | Status | **AMENDED TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the original final administrative text approval (FB-LEGAL-01I, §1), the P-02 amended text approval (FB-LEGAL-01K.1, §1a), the P-01 amended text approval (FB-LEGAL-01L.1, §1c), the consolidated P-03 … P-11 text approval (FB-LEGAL-01M.1, §1d) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
 | Text baseline (original) | `c937176` (FB-LEGAL-01G.4: final wording and this template). Kept as history |
-| Current approved text | `2e0c99d` + the five FB-LEGAL-01M line replacements (§1d). SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c`; Git baseline **PENDING UNTIL COMMIT** |
+| Current approved text | `2e0c99d` + the five FB-LEGAL-01M line replacements (§1d). SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c`; Git baseline **`0b950e2`** (`0b950e2f032b5759ad996533c8186ae6b45159f0`; stored-file SHA-256 verified, FB-LEGAL-01M.3) |
 | Previous approved text (P-01) | `4da00de` + the P-01 insertion (§1c). SHA-256 `bc1bf806aaa1809872e59658c9701aeb208981c63e202f3c8862b4bfaf4a6aa6`; Git baseline **`2e0c99d`** (`2e0c99dcb873e9f0a00b11dc81cfb1dcba852837`; stored-file SHA-256 verified, FB-LEGAL-01L.3) |
 | Previous approved text (P-02) | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; Git baseline **`4da00de`** (stored-file SHA-256 verified, FB-LEGAL-01K.3). Kept as history |
-| Approval history | `c937176`: original approved text. `27b7041`: original approval-record commit. `4da00de`: approved P-02 amended text. `b602d00`: governance commit registering `4da00de`. `2e0c99d`: approved P-01 amended text. `960d4fe`: governance commit registering `2e0c99d`. FB-LEGAL-01M amended text: current, pending commit |
+| Approval history | `c937176`: original approved text. `27b7041`: original approval-record commit. `4da00de`: approved P-02 amended text. `b602d00`: governance commit registering `4da00de`. `2e0c99d`: approved P-01 amended text. `960d4fe`: governance commit registering `2e0c99d`. `0b950e2`: approved consolidated FB-LEGAL-01M text (current) |
 | Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
 | Authority designation status | **APPROVED** (FB-LEGAL-01H, `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). A role designation only: it is **not** the text approval, names no individual and carries no signature or date |
 | Model | Informational usage rules; no mandatory electronic acceptance (FB-LEGAL-01 D7, APPROVED) |
@@ -87,7 +87,7 @@ The original approval of `c937176` was recorded at commit `27b7041`. It stays va
 | Decisions without edits | P-03, P-10: keep current text. P-08: deferred pending the version-format decision. P-11: deferred to the independent reviewer |
 | Difference from `2e0c99d` | Exactly 5 lines replaced, 0 added or removed. Verified with `git diff 2e0c99d`; each new line equals the matrix §2 "Proposed" sentence |
 | Amended file integrity reference | SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c` (UTF-8, LF, 7,155 bytes). Verify after the commit with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum` |
-| New Git text baseline | PENDING UNTIL COMMIT |
+| New Git text baseline | **`0b950e2`** (`0b950e2f032b5759ad996533c8186ae6b45159f0`, FB-LEGAL-01M.2, parent `960d4fe`). Verified in FB-LEGAL-01M.3: `git show 0b950e2:docs/legal/drafts/TERMS.ar.md \| sha256sum` equals the integrity reference above; 5 lines replaced against `2e0c99d`, 0 added or removed |
 | Publication authorization | **NOT AUTHORIZED**. This is a text approval only; no version or effective date is assigned |
 
 ## 1b. Independent Arabic language review (must cover the current amended text, §1d)
