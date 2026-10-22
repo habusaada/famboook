@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **NOT COMPLETED.** Only the approval-authority designation (FB-LEGAL-01H) and the initial indexing setting are recorded as approved. Every other field stays PENDING until the responsible person fills it in. This record grants no text approval or publication authorization by existing |
+| Status | **TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the final administrative text approval (FB-LEGAL-01I) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
 | Text baseline | `c937176` (FB-LEGAL-01G.4: final wording and this template) |
 | Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
@@ -18,11 +18,18 @@
 
 | Field | Value |
 |---|---|
-| Final text approval (by the Executive Director, PCDCD) | PENDING (approved / approved with conditions / not approved) |
-| Named approver (name of the Executive Director at the time of approval) | PENDING |
-| Text approval date | PENDING |
-| Conditions attached to the text approval | PENDING (none / list) |
-| Approved text = Git baseline above, unchanged | PENDING (yes / no; if no, list the changes and record a new baseline) |
+| Approval type | Final administrative text approval (FB-LEGAL-01I; decision TERMS-FINAL-TEXT-APPROVAL) |
+| Final text approval (by the Executive Director, PCDCD) | **APPROVED** |
+| Approving authority | Executive Director — Palestinian Center for Data and Community Development (PCDCD) |
+| Approved document | `docs/legal/drafts/TERMS.ar.md` |
+| Approved Git baseline | `c937176` |
+| Decision date | 2026-10-22 |
+| Approval scope | The final Arabic Terms of Use wording, including the previously approved R-24, R-25 and R-26 wording; the informational usage-rules model under D7; no mandatory electronic acceptance in the current phase |
+| Approval evidence | An explicit management instruction in the project conversation (FB-LEGAL-01I). **Not** a signed approval, an independently verified legal opinion or a completed legal compliance assessment |
+| Named approver | Not recorded. The approval is recorded by role; no personal name was provided, and none is inferred |
+| Signature | None. No handwritten or digital signature is recorded |
+| Conditions attached to the text approval | None stated in the approval instruction. The exclusions are listed in `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1 |
+| Approved text = Git baseline above, unchanged | Yes. `TERMS.ar.md` is unchanged between `c937176` and `017c791` (verified with `git diff`) |
 | Independent Arabic reviewer (name) | PENDING |
 | Arabic review date | PENDING |
 | Arabic review outcome | PENDING (no changes / changes applied at commit ____) |
