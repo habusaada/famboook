@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | Status | **Internal review document.** The three policy drafts in this folder are NOT approved and NOT published. `/contact` is published (FB-LEGAL-01D) |
-| Date | 2026-10-22 (revised FB-LEGAL-01E) |
-| Baseline | `9059d19` + local, uncommitted FB-LEGAL-01E revision of the three policy drafts |
+| Date | 2026-10-22 (revised FB-LEGAL-01E; decisions recorded FB-LEGAL-01F) |
+| Baseline | `1de6a6e` + local, uncommitted FB-LEGAL-01F decision recording |
 | Drafts | `PRIVACY.ar.md`, `TERMS.ar.md`, `DATA-PROTECTION.ar.md` (pending); `CONTACT.ar.md` (reference copy of the published page and its launch-day version). `/about` and `/contact` live in `frontend/app/(legal)/` |
-| Decisions | `docs/decisions/FB-LEGAL-01-DECISIONS.md` (D1, D10 approved; D2 partially approved — `info@pcdcd.org` active, `support@pcdcd.org` planned; D3–D9 pending) |
+| Decisions | `docs/decisions/FB-LEGAL-01-DECISIONS.md`: D1, D7, D10 approved; D2, D4, D6, D8 partially approved; D3, D5, D9 pending. **A recorded management decision is not legal compliance verification and does not authorize publication** |
 
 ## 1. Why the drafts are documentation, not code
 
@@ -30,118 +30,128 @@ If drafts must later live in code before approval (for preview), that needs a se
 | # | Check | `/privacy` | `/terms` | `/data-protection` | `/contact` |
 |---|---|---|---|---|---|
 | 1 | Draft complete (all required topics) | ✓ | ✓ | ✓ | ✓ published |
-| 2 | Factual review against verified behaviour (FB-LEGAL-01E) | ✓ corrected | ✓ corrected | ✓ corrected | ✓ |
+| 2 | Factual review against verified behaviour (FB-LEGAL-01E) | ✓ corrected; R-15 unverified | ✓ corrected | ✓ corrected | ✓ |
 | 3 | Contact uses only the active address | ✓ `info@pcdcd.org` | ✓ `info@pcdcd.org` | ✓ `info@pcdcd.org` | ✓ |
-| 4 | Every BLOCKER resolved (§3, §4) | ✗ D3, D4, D5, D6, D8 | ✗ D7 | ✗ R-32, R-33 (G-08), R-34 | ✓ |
-| 5 | NON-BLOCKER items confirmed or accepted by management | ✗ | ✗ | ✗ | ✓ |
-| 6 | PCDCD approval of the final text, with a recorded approver and date | ✗ | ✗ | ✗ | ✓ (FB-LEGAL-01D) |
-| 7 | Approved `version` identifier and `effectiveDate` | ✗ | ✗ | ✗ | n/a (R-41) |
-| 8 | Independent Arabic language review | ✗ | ✗ | ✗ | ✗ |
-| 9 | Copied into the registry, markers removed, tests and build green | ✗ | ✗ | ✗ | ✓ |
-| 10 | Publication approval (and D9 indexing decision) | ✗ | ✗ | ✗ | ✓ (noindex until D9) |
+| 4 | Wording aligned with recorded decisions (FB-LEGAL-01F) | ✓ D4, D6, D8 | ✓ D7 | ✓ D4, D6 | ✓ |
+| 5 | Every PUBLICATION_BLOCKER_OPEN item closed (§3, §4) | ✗ R-02, R-05, R-10, R-12, R-15 | ✓ none open | ✗ R-32, R-33, R-34 | ✓ |
+| 6 | NON-BLOCKER items confirmed or accepted by management | ✗ | ✗ R-22 … R-26 | ✗ | ✓ |
+| 7 | PCDCD approval of the final text, with a recorded approver and date | ✗ | ✗ | ✗ | ✓ (FB-LEGAL-01D) |
+| 8 | Approved `version` identifier and `effectiveDate` | ✗ | ✗ | ✗ | n/a (R-41) |
+| 9 | Independent Arabic language review | ✗ | ✗ | ✗ | ✗ |
+| 10 | Copied into the registry, markers removed, tests and build green | ✗ | ✗ | ✗ | ✓ |
+| 11 | Publication approval (and D9 indexing decision) | ✗ | ✗ | ✗ | ✓ (noindex until D9) |
 
 ## 3. Review items
 
-**Classification:**
+**Class** (severity for publication):
 - **BLOCKER:** the statement cannot be published until the decision is taken or the fact is confirmed. Publishing without it would be misleading, or would make a claim PCDCD has not authorised.
-- **NON-BLOCKER:** the drafted wording is truthful as it stands. Management confirms it, or accepts it as drafted, at approval.
+- **NON-BLOCKER:** the drafted wording is truthful as it stands. Management confirms it, or accepts it as drafted, at final text approval.
 
-| ID | Page | Claim (as drafted after FB-LEGAL-01E) | Basis in the repository | Needs | Class |
-|---|---|---|---|---|---|
-| R-01 | privacy | Scope: all personal data processed in the platform | — | PCDCD confirms the policy covers every channel (Staff, Family Portal, Coordinator Space, imports) | NON-BLOCKER |
-| R-02 | privacy | Health and disability data are processed when recorded by Staff | `person_health_records` (audit §4) | **D3:** legal basis for sensitive data | **BLOCKER** |
-| R-03 | privacy | Security and session records keep the IP address and browser information; passwords and codes are not kept in original form | `auth_security_events` (IP, browser hash); `sessions` (**raw** IP and user agent); `auth_otp_challenges` (IP). Corrected in FB-LEGAL-01E: the earlier "derived browser value" was true of security events only | **D4:** retention of IP and session data | NON-BLOCKER (wording now accurate; the retention period follows R-10) |
-| R-04 | privacy | Initial rosters are completed with the clan and, when needed, partner institutions, then jointly approved before entry | FB-GOV-01 §2, D10 | **D5 / G-03:** no partner arrangement is recorded; the wording stays conditional ("عند الحاجة") | NON-BLOCKER, provided no partner is involved before an arrangement exists |
-| R-05 | privacy | The legal basis per purpose will be stated in a later version; clan approval of the import file is not individual consent | none (D3 pending); FB-GOV-01 §3 | **D3:** legal basis per purpose. Publishing a privacy policy without any legal basis is a decision management must take explicitly | **BLOCKER** |
-| R-06 | privacy | Coordinators: scope only, masked values, logged full reveals, no health, residence, needs or assistance | Coordinator resources (audit §4) | confirm; true while the code is unchanged | NON-BLOCKER |
-| R-07 | privacy | The household head sees members' recorded health conditions; other members have no own accounts | audit H4 (PDD-018 open); activation is head-only | **D8:** keep and disclose (as drafted), or change the behaviour and the text | **BLOCKER** |
-| R-08 | privacy | The SMS provider receives the mobile number and message text only, for activation, password recovery and mobile update | `TweetsSmsSender.php`; OTP purposes | **D5:** whether to name the provider (TweetsMS) and the processor arrangement | NON-BLOCKER (accurate unnamed) |
-| R-09 | privacy | Institutional sharing only under an arrangement the operator approves | none recorded | **D5, G-03.** The FB-LEGAL-01E revision removed "وبما يتوافق مع الأحكام المعمول بها", an unsupported compliance claim | NON-BLOCKER |
-| R-10 | privacy, data-protection | Retention periods are not yet approved; until then data, including initial import files, stays in the platform | no purge runs in Production: the OTP purge needs the scheduler, not yet installed (FB-NOTIFY-01 runbook) | **D4:** periods, or explicit acceptance of publishing "not yet approved; data retained" | **BLOCKER** (management decision) |
-| R-11 | privacy | Portal corrections "when available" | change-request gates default OFF | confirm the wording matches the Production gate state at publication | NON-BLOCKER |
-| R-12 | privacy | Other inquiries and corrections via `info@pcdcd.org`, reviewed under the operator's rules | `info@pcdcd.org` ACTIVE (D2) | **D6:** the rights actually offered (access, correction, erasure, objection) and the response process. **No erasure path exists, and none is promised** | **BLOCKER** |
-| R-13 | privacy | Role-based access, coordinator scope, masking and logged reveals, hashed codes and passwords, "no absolute guarantee" | audit §4. FB-LEGAL-01E removed "not recorded in system logs" (unverified: unexpected database errors can contain query bindings, docs/08 §15) | confirm. Do not add HTTPS, backup or encryption claims until verified in Production (audit H6) | NON-BLOCKER |
-| R-14 | privacy | Household data includes children | `persons.birth_date`; no minor or guardian model (PDD-020) | **D6:** rights and safeguards for children | NON-BLOCKER for disclosure; **D6** before any children-specific statement |
-| R-15 | privacy | The platform and its data are hosted by technical service providers contracted by the operator | hosting and backup provider UNKNOWN (CTX-PENDING-001…005); off-server backup is a placeholder | **D5:** name or describe the hosting and backup processors and the data location | **BLOCKER** |
-| R-16 | privacy | The National ID is masked in Staff screens and exported in full only in assistance lists that require a special permission; full reveals are logged in the Family Portal and Coordinator Space | `PersonResource`; `ExportFieldCatalog` (`assistance.export-sensitive`); reveal audit. Corrected in FB-LEGAL-01E: the earlier text implied every full reveal is logged, but Staff see full mobile numbers without a log | confirm | NON-BLOCKER |
-| R-17 | privacy | Confirming that a notification was read is not consent to processing | notification acknowledgement (audit M1) | confirm the wording | NON-BLOCKER |
-| R-21 | terms | Neutral scope; no "by using you agree"; the terms contain no consent to processing | D7 pending | **D7:** whether the terms are published as informational rules without acceptance (as drafted), or acceptance is required (a later feature) | **BLOCKER** (management decision) |
-| R-22 | terms | Corrections through the portal "when available", or by email | as R-11 | as R-11 | NON-BLOCKER |
-| R-23 | terms | The coordinator acts within the council's delegation and the assigned scope | FB-GOV-01 §5, D10 | **G-02** council legitimacy wording | NON-BLOCKER |
-| R-24 | terms | Misuse may lead to account suspension or restricted access | accounts can be deactivated (`is_active`) | PCDCD confirms the sanctions it will actually apply | NON-BLOCKER |
-| R-25 | terms | No guarantee of uninterrupted availability; no liability clause | — | PCDCD decides whether a liability clause is wanted (applicable law: **D3 / G-10**); none is drafted | NON-BLOCKER |
-| R-26 | terms | Staff do not need a user's password or code; do not disclose them to anyone | passwords are hashed and codes are single-use; Staff tools never ask for them | PCDCD confirms this as an operating rule for Staff | NON-BLOCKER |
-| R-31 | data-protection | Staff: National ID masked, full export only with special permission; Family Portal and Coordinator Space: masking and logged reveals | audit §4. Corrected in FB-LEGAL-01E: removed "least privilege" (Staff roles have no per-family scope) and the implication that mobiles are masked for Staff (audit H3) | **D8** confirms the current Staff visibility is acceptable | NON-BLOCKER (now accurate) |
-| R-32 | data-protection | Staff and coordinators are bound by confidentiality | no signed undertaking recorded | PCDCD confirms the duty exists (contract, code of conduct, coordinator delegation terms) | **BLOCKER** (a stated duty must exist) |
-| R-33 | data-protection | Rosters and files handled only through approved channels; never via personal or public messaging | FB-GOV-01 §12, G-08 | **G-08:** the approved channels must exist before this is stated | **BLOCKER** |
-| R-34 | data-protection | Initial files: quality review and joint approval before entry | D10 | confirm the procedure is actually followed for every import before publishing it | **BLOCKER** (confirmation of practice) |
-| R-35 | data-protection | Report privacy concerns to `info@pcdcd.org` | ACTIVE (D2) | PCDCD confirms the institutional mailbox handles privacy concerns, or names a privacy contact (**D2** remainder) | NON-BLOCKER |
-| R-41 | contact | Whether a contact page shows a version and effective date | — | **Resolved (FB-LEGAL-01D):** published as an informational page, with no version or effective date | resolved |
-| R-42 | privacy, terms, data-protection | The drafts named the planned `support@pcdcd.org` | PLANNED, not active (FB-LEGAL-01D) | **Resolved (FB-LEGAL-01E):** replaced by `info@pcdcd.org` in all three drafts. On launch day, re-evaluate whether policy contacts move to the support address (launch-day checklist §3) | resolved |
+**Status** (FB-LEGAL-01F; an item may carry more than one):
+- **MANAGEMENT_DECISION_RECORDED:** a decision in the register covers the item. This alone never closes a blocker.
+- **IMPLEMENTATION_OR_VERIFICATION_PENDING:** a fact, procedure or follow-up still has to be verified, formalized or built.
+- **PUBLICATION_BLOCKER_OPEN:** the page cannot be published while this stays open.
+- **RESOLVED:** nothing further is needed for publication.
+- "—": unchanged since FB-LEGAL-01E; confirm at final text approval.
+
+| ID | Page | Claim (as drafted) | Basis in the repository | Needs | Class | Status (FB-LEGAL-01F) |
+|---|---|---|---|---|---|---|
+| R-01 | privacy | Scope: all personal data processed in the platform | — | PCDCD confirms the policy covers every channel (Staff, Family Portal, Coordinator Space, imports) | NON-BLOCKER | — |
+| R-02 | privacy | Health and disability data are processed when recorded by Staff | `person_health_records` (audit §4) | **D3:** legal basis for sensitive health data. D8 concerns who sees the data, not the basis for processing it | BLOCKER | PUBLICATION_BLOCKER_OPEN |
+| R-03 | privacy | Security and session records keep the IP address and browser information; passwords and codes are not kept in original form | `auth_security_events` (IP, browser hash); `sessions` (raw IP and user agent); `auth_otp_challenges` (IP) | Retention of IP and session data follows R-10 | NON-BLOCKER | MANAGEMENT_DECISION_RECORDED (D4: no period stated, none invented) |
+| R-04 | privacy | Initial rosters are completed with the clan and, when needed, partner institutions, then jointly approved before entry | FB-GOV-01 §2, D10 | **D5 / G-03:** no partner arrangement is recorded; the wording stays conditional («عند الحاجة») | NON-BLOCKER, provided no partner is involved before an arrangement exists | — |
+| R-05 | privacy | The legal basis per purpose will be stated in a later version; clan approval of the import file is not individual consent | none (D3 pending); FB-GOV-01 §3, G-01, G-10 | **D3:** legal basis per purpose, including imported records. Publishing a privacy policy without any legal basis is a decision management must take explicitly | BLOCKER | PUBLICATION_BLOCKER_OPEN |
+| R-06 | privacy | Coordinators: scope only, masked values, logged full reveals, no health, residence, needs or assistance | Coordinator resources (audit §4) | Confirm; true while the code is unchanged | NON-BLOCKER | — |
+| R-07 | privacy | The household head **currently** sees members' recorded health conditions **through the Family Portal**; other members have no own accounts | audit H4 (PDD-018 open); activation is head-only | **D8 (partial):** disclose, as drafted. The text does not call this visibility privacy-approved. Follow-up **F-01** reviews authorization, minimization and visibility; no permission or UI change here. The basis for processing the health data stays under R-02 | was BLOCKER; now NON-BLOCKER for disclosure | MANAGEMENT_DECISION_RECORDED; IMPLEMENTATION_OR_VERIFICATION_PENDING (F-01, not a publication blocker) |
+| R-08 | privacy | The SMS provider receives the mobile number and message text only, for activation, password recovery and mobile update | `TweetsSmsSender.php`; OTP purposes | **D5:** whether to name the provider (TweetsMS) and the processor arrangement | NON-BLOCKER (accurate unnamed) | — (D5 pending) |
+| R-09 | privacy | Institutional sharing only under an arrangement the operator approves | none recorded | **D5, G-03** | NON-BLOCKER | — (D5 pending) |
+| R-10 | privacy, data-protection | Retention periods are not yet approved; until then data, including initial import files, stays in the platform | no purge runs in Production: the OTP purge needs the scheduler, not yet installed (FB-NOTIFY-01 runbook) | **D4 (partial):** the wording is permitted and no period is invented. **Outstanding:** the formal retention and deletion policy (G-04, G-11; no erasure path exists). For `/privacy`, publishing before that policy exists must be explicitly accepted in the publication approval. For `/data-protection`, the limits sentence is permitted by D4 and does not block | BLOCKER (`/privacy` only) | MANAGEMENT_DECISION_RECORDED; IMPLEMENTATION_OR_VERIFICATION_PENDING (formal policy); PUBLICATION_BLOCKER_OPEN (`/privacy`) |
+| R-11 | privacy | Portal corrections "when available" | change-request gates default OFF | Confirm the wording matches the Production gate state at publication | NON-BLOCKER | — |
+| R-12 | privacy | Privacy questions and correction requests via `info@pcdcd.org`; the operator reviews incoming requests. No response time, deletion outcome or procedure is promised | `info@pcdcd.org` ACTIVE (D2) | **D6 (partial):** the intake channel is approved, and the wording no longer refers to "rules the operator approves", which do not exist yet. **Outstanding:** the internal handling procedure and responsibilities (who reads, assesses, answers and records), and the rights actually offered. A privacy-request channel must not be published before someone is responsible for handling it | BLOCKER | MANAGEMENT_DECISION_RECORDED; IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
+| R-13 | privacy | Role-based access, coordinator scope, masking and logged reveals, hashed codes and passwords, "no absolute guarantee" | audit §4 | Confirm. Do not add HTTPS, backup or encryption claims until verified in Production (audit H6) | NON-BLOCKER | — |
+| R-14 | privacy | Household data includes children | `persons.birth_date`; no minor or guardian model (PDD-020) | **D6 remainder:** rights and safeguards for children | NON-BLOCKER for disclosure; D6 before any children-specific statement | — (D6 remainder pending) |
+| R-15 | privacy | «تُستضاف المنصة وبياناتها لدى مزوّدي خدمات تقنية تتعاقد معهم الجهة المشغّلة» | hosting and backup provider UNKNOWN (CTX-PENDING-001…005); off-server backup is a placeholder. **No evidence of a contract between PCDCD and a hosting provider is held in the repository** | **D5:** the hosting and backup providers, the contractual relationship and the data location. **The sentence is an unverified factual claim:** before publication it must be verified with evidence, or reworded to what is verified | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
+| R-16 | privacy | The National ID is masked in Staff screens and exported in full only in assistance lists that require a special permission; full reveals are logged in the Family Portal and Coordinator Space | `PersonResource`; `ExportFieldCatalog` (`assistance.export-sensitive`); reveal audit | Confirm. Staff full-mobile visibility stays under the D8 remainder | NON-BLOCKER | — |
+| R-17 | privacy | Confirming that a notification was read is not consent to processing | notification acknowledgement (audit M1) | Confirm the wording | NON-BLOCKER | — |
+| R-21 | terms | Neutral scope; no "by using you agree"; the terms contain no consent to processing | **D7 APPROVED:** informational publication model | None for this item. No text may claim electronic acceptance; none does | was BLOCKER | MANAGEMENT_DECISION_RECORDED; RESOLVED |
+| R-22 | terms | Corrections through the portal "when available", or by email | as R-11 | As R-11 | NON-BLOCKER | — |
+| R-23 | terms | The coordinator acts within the council's delegation and the assigned scope | FB-GOV-01 §5, D10 | **G-02:** council legitimacy wording | NON-BLOCKER | — |
+| R-24 | terms | Misuse may lead to account suspension or restricted access | accounts can be deactivated (`is_active`) | PCDCD confirms the sanctions it will actually apply (kept under review by D7) | NON-BLOCKER | — (final text approval) |
+| R-25 | terms | No guarantee of uninterrupted availability; no liability clause | — | PCDCD decides whether a liability clause is wanted (applicable law: D3 / G-10); none is drafted (kept under review by D7) | NON-BLOCKER | — (final text approval) |
+| R-26 | terms | Staff do not need a user's password or code; do not disclose them to anyone | passwords are hashed and codes are single-use; Staff tools never ask for them | PCDCD confirms this as an operating rule for Staff (kept under review by D7) | NON-BLOCKER | — (final text approval) |
+| R-31 | data-protection | Staff: National ID masked, full export only with special permission; Family Portal and Coordinator Space: masking and logged reveals | audit §4 | **D8 remainder:** confirm the current Staff visibility (full mobiles) is acceptable | NON-BLOCKER (accurate) | — (D8 remainder pending) |
+| R-32 | data-protection | Staff and coordinators are bound by confidentiality | no signed undertaking recorded | PCDCD confirms the duty exists (contract, code of conduct, coordinator delegation terms) | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
+| R-33 | data-protection | Rosters and files handled only through approved channels; never via personal or public messaging | FB-GOV-01 §12, G-08 | **G-08:** approved secure transfer channels must exist before this is stated | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
+| R-34 | data-protection | Initial files: quality review and joint approval before entry | D10 | Evidence that the joint approval (clan coordinator + Famboook management) was followed for each relevant import, before publishing it as practice | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
+| R-35 | data-protection | Report privacy concerns to `info@pcdcd.org` | ACTIVE (D2) | **D6 (partial):** the intake channel is approved. Handling responsibilities follow R-12 | NON-BLOCKER | MANAGEMENT_DECISION_RECORDED; IMPLEMENTATION_OR_VERIFICATION_PENDING (handling, via R-12) |
+| R-41 | contact | Whether a contact page shows a version and effective date | — | Resolved in FB-LEGAL-01D: an informational page, with no version or effective date | — | RESOLVED |
+| R-42 | privacy, terms, data-protection | The drafts named the planned `support@pcdcd.org` | PLANNED, not active (D2, D6) | Resolved in FB-LEGAL-01E: replaced by `info@pcdcd.org`. On launch day, re-evaluate whether policy contacts move to the support address (launch-day checklist §3) | — | RESOLVED |
+
+**Follow-ups that do not block publication:**
+
+| ID | Follow-up | Source | Status |
+|---|---|---|---|
+| F-01 | Review authorization, minimization and visibility of sensitive information (health) for the household head in the Family Portal. No permission or UI change before a separate decision | D8 (partial), audit H4, PDD-018 | IMPLEMENTATION_OR_VERIFICATION_PENDING |
 
 **Not used anywhere in the drafts:**
 - `media@pcdcd.org`, or the planned support address;
 - telephone numbers, postal addresses, registration numbers;
+- response times, deletion outcomes or guaranteed procedures;
 - certifications, compliance claims, encryption-at-rest, HTTPS, backup or audit-coverage guarantees;
 - a consent claim (the drafts state twice what is **not** consent: R-05, R-17);
-- an acceptance clause.
+- an acceptance clause, or a claim that users accepted the terms.
 
-## 4. Publication-readiness report (FB-LEGAL-01E)
+## 4. Publication-readiness report
 
-### 4.1 Changes made in FB-LEGAL-01E
+### 4.1 FB-LEGAL-01E changes (committed `1de6a6e`)
 
 **`/privacy`:**
 - **Operator separated from platform:** "من نحن" became «عن هذه السياسة»; "we" phrasing became "the operator", defined once as «الجهة المشغّلة».
-- **Consent:** added that clan approval of the import file is not individual consent (FB-GOV-01 §3), and that confirming a notification is not consent.
-- **Accuracy:**
-  - children disclosed;
-  - internal Staff notes disclosed;
-  - session records now say what they hold (IP address and browser information);
-  - the claim of a "derived browser value" for all records removed.
-- **Hosting:** a hosting-processor statement added (wording held by R-15).
-- **Retention:** now truthful — not yet approved, data retained meanwhile, including initial import files.
-- **Removed unsupported claims:** "compliant with applicable rules" for sharing, and "passwords not recorded in system logs".
-- **Security:** the masking statement narrowed to what is implemented.
-- **Contact:** the support address replaced by `info@pcdcd.org`, addressed to the operator.
-- **Language:** first-person and uneven constructions made consistent.
-
-**`/terms`:**
-- **Operator:** defined; a statement added that the terms contain no consent to processing.
-- **Accounts:** Staff accounts covered (created by the operator); "change your password if the service is available" (the password-change gate).
-- **Password rule:** "the Famboook team never asks" reworded as "Staff do not need your password or code; do not disclose them" (R-26).
-- **Contact:** a single `info@pcdcd.org` line addressed to the operator.
-- **Language:** minor fixes.
-
-**`/data-protection`:**
-- **Access:** "least privilege" removed (not true for Staff), replaced by role-based access.
-- **Masking:** made accurate — Staff see the National ID masked, with full export only under a special permission; masking and logged reveals in the Family Portal and Coordinator Space; no claim that mobiles are masked for Staff.
-- **Minimisation:** softened from an absolute "only necessary data is collected" to «يُراعى».
+- **Consent:** clan approval of the import file is not individual consent; confirming a notification is not consent.
+- **Accuracy:** children and internal Staff notes disclosed; session records now say what they hold.
+- **Hosting:** a hosting-processor statement added (R-15, unverified).
+- **Retention:** not yet approved; data retained meanwhile.
+- **Removed unsupported claims:** "compliant with applicable rules", "passwords not recorded in system logs".
 - **Contact:** `info@pcdcd.org`.
-- **Language:** grammar fixes («يُطابَق الأشخاص», «سجلّا شخصين»).
 
-### 4.2 Blockers and management decisions
+**`/terms`:** operator defined; no consent in the terms; Staff accounts covered; password rule R-26; single `info@pcdcd.org` contact.
 
-| Page | BLOCKER items | Management decision required |
+**`/data-protection`:** "least privilege" removed; masking made accurate; minimisation softened; `info@pcdcd.org`.
+
+### 4.2 FB-LEGAL-01F alignment (minimal edits)
+
+- **`PRIVACY.ar.md`:**
+  - R-07 now states that the head sees the data «حاليًا عبر بوابة الأسرة» (D8).
+  - R-12 names `info@pcdcd.org` for privacy questions and correction requests. "Reviewed under the rules the operator approves", which implied an existing procedure, became «وتتولّى الجهة المشغّلة مراجعة الطلبات الواردة إلى هذا العنوان» (D6).
+  - Header updated.
+- **`TERMS.ar.md`:** header only (D7 approved). The page text already matched the informational model.
+- **`DATA-PROTECTION.ar.md`:** unchanged. Its retention and contact wording already matches D4 and D6.
+
+### 4.3 Blocker matrix
+
+| Page | PUBLICATION_BLOCKER_OPEN | Decision or evidence still needed |
 |---|---|---|
-| `/privacy` | R-02, R-05 (D3 legal basis); R-07 (D8); R-10 (D4); R-12 (D6 rights); R-15 (D5 hosting) | Legal basis per purpose, including health data; household-head health visibility; retention, or explicit acceptance of "not yet approved"; the rights offered and the response process; the hosting and backup processors and the data location |
-| `/terms` | R-21 (D7) | Publish as informational rules without acceptance (as drafted), or require acceptance (a later feature with its own approval) |
-| `/data-protection` | R-32, R-33 (G-08), R-34 | Confirm the confidentiality duty exists in contracts or codes; approve the transfer channels; confirm the joint-approval procedure is applied to every import |
+| `/privacy` | <ul><li>R-02, R-05 (D3)</li><li>R-10 (D4 remainder)</li><li>R-12 (D6 remainder)</li><li>R-15 (D5)</li></ul> | <ul><li>Legal basis for personal and sensitive health data, including imported records.</li><li>A formal retention and deletion policy, or explicit acceptance of publishing without it.</li><li>An internal request-handling procedure and responsible person.</li><li>Hosting and backup providers, contracts, location and sharing arrangements, with evidence for the R-15 sentence.</li></ul> |
+| `/terms` | none | Final text approval, including R-24 sanctions, R-25 liability wording and R-26 password guidance |
+| `/data-protection` | <ul><li>R-32</li><li>R-33 (G-08)</li><li>R-34</li></ul> | <ul><li>Evidence of the confidentiality duty.</li><li>Approved secure transfer channels.</li><li>Evidence the joint approval was followed for each relevant import.</li></ul> |
 
-**NON-BLOCKER items to confirm at approval:**
-- R-01, R-03, R-04, R-06, R-08, R-09, R-11, R-13, R-14, R-16, R-17;
-- R-22, R-23, R-24, R-25, R-26;
-- R-31, R-35;
+**Open, non-blocking:**
+- F-01;
+- the D8 remainder (Staff full mobiles; R-16, R-31);
+- the D6 remainder for children (R-14);
+- D5 naming of the SMS provider (R-08, R-09);
+- G-02 (R-23);
 - an independent Arabic language review of all three pages.
 
-### 4.3 Recommendation
+### 4.4 Recommendation
 
 | Page | Recommendation | Reason |
 |---|---|---|
-| `/privacy` | **NEEDS_DECISION** | Five blocking management decisions (D3, D4, D5, D6, D8). The text is factually corrected but cannot be published truthfully without them |
-| `/terms` | **READY_FOR_APPROVAL** | Text factually corrected; its one BLOCKER (R-21, D7) is a yes/no management decision that can be taken in the approval itself (publish as informational rules, as drafted). Non-blocker confirmations: R-24, R-25, R-26 |
-| `/data-protection` | **NEEDS_DECISION** | It states duties and channels (R-32, R-33) that must exist before they are published, and a procedure (R-34) whose practice must be confirmed |
+| `/privacy` | **NEEDS_DECISION** | Five blockers stay open. D4, D6 and D8 are recorded, but each leaves an outstanding part (R-10, R-12), and D3 and D5 are pending |
+| `/terms` | **READY_FOR_FINAL_TEXT_APPROVAL** | Its only blocker (R-21) is resolved by D7. The remaining items are confirmations within the final text approval. **Not PUBLISHED**; publication still needs final text approval, the language review, an approved version and effective date, and a recorded publication approval |
+| `/data-protection` | **NEEDS_DECISION** | It states duties, channels and a practice (R-32, R-33, R-34) for which no evidence is recorded |
 
-No page may be published before: PCDCD approval of its final text, an approved version and effective date, the language review, and a recorded publication approval. All three pages stay **PENDING_APPROVAL**, unlinked and not indexed.
+All three pages stay **PENDING_APPROVAL**, unlinked and not indexed. `frontend/lib/legal/pages.ts` is unchanged.
 
 ## 5. Change log
 
@@ -149,4 +159,5 @@ No page may be published before: PCDCD approval of its final text, an approved v
 |---|---|
 | 2026-10-22 | Drafts of the four pending pages and this register created (FB-LEGAL-01C.3). `/about` content extended in code. Nothing published beyond `/about` |
 | 2026-10-22 | FB-LEGAL-01D: `/contact` published with `info@pcdcd.org` only; R-41 resolved; R-42 added |
-| 2026-10-22 | FB-LEGAL-01E: the three policy drafts reviewed and revised (factual corrections, consent boundaries, operator distinction, language). `support@pcdcd.org` replaced by `info@pcdcd.org` (R-42 resolved). New items R-14 … R-17, R-26; R-03, R-09, R-12, R-13, R-31, R-35 updated. Items classified BLOCKER / NON-BLOCKER; readiness report §4 added. All three pages remain PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01E: the three policy drafts reviewed and revised (factual corrections, consent boundaries, operator distinction, language). `support@pcdcd.org` replaced by `info@pcdcd.org` (R-42 resolved). New items R-14 … R-17, R-26; items classified BLOCKER / NON-BLOCKER; readiness report §4 added |
+| 2026-10-22 | FB-LEGAL-01F: decisions D7 (approved), D4, D6, D8 (partially approved) recorded. A status column was added (MANAGEMENT_DECISION_RECORDED, IMPLEMENTATION_OR_VERIFICATION_PENDING, PUBLICATION_BLOCKER_OPEN, RESOLVED). R-21 resolved. R-07 no longer blocks (disclosure), and follow-up F-01 was opened. R-10, R-12 stay blocking with narrowed scope. R-15 is flagged as an unverified contractual claim. `/terms` is READY_FOR_FINAL_TEXT_APPROVAL; `/privacy` and `/data-protection` are NEEDS_DECISION. All three remain PENDING_APPROVAL |

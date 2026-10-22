@@ -4,7 +4,7 @@
 |---|---|
 | Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E). Not to be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
 | Target | registry entry `terms` → `PUBLISHED`, kind `policy`, approved `version` and `effectiveDate` (none set here) |
-| Acceptance | **No acceptance mechanism.** This text introduces no mandatory acceptance, no new authentication step and no new restriction on existing users (FB-LEGAL-01 D7 pending). It deliberately contains no "by using you agree" clause (R-21) |
+| Acceptance | **No acceptance mechanism.** This text introduces no mandatory acceptance, no new authentication step and no new restriction on existing users (FB-LEGAL-01 D7 APPROVED, FB-LEGAL-01F: informational publication model). It deliberately contains no "by using you agree" clause, and no text may claim that users have electronically accepted the terms (R-21) |
 | Format | `##` = section heading; each following line = one paragraph; `<!-- R-xx -->` = review marker (see `FB-LEGAL-01C3-REVIEW.md`), removed on publication |
 | Contact | `info@pcdcd.org` (ACTIVE). The planned support address is not used (R-42 resolved) |
 

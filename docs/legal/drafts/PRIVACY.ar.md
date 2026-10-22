@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E). Must not be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
+| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E; aligned with the FB-LEGAL-01F decisions D4, D6, D8). Must not be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
 | Target | registry entry `privacy` → status `PUBLISHED`, kind `policy`, with an approved `version` and `effectiveDate` (none is set here) |
 | Format | `##` = one registry section heading; each following line = one paragraph. `<!-- R-xx -->` marks a claim that needs review (`docs/legal/drafts/FB-LEGAL-01C3-REVIEW.md`); remove the markers on publication |
 | Basis | `docs/audits/FB-LEGAL-01A-AUDIT.md` §4; `docs/governance/FB-GOV-01-CLAN-ONBOARDING.md`; `docs/decisions/FB-LEGAL-01-DECISIONS.md` |
@@ -48,7 +48,7 @@ Famboook منصةٌ لسجل العائلات وإدارة الحالات. يت�
 
 فريق العمل المخوّل: يطّلع كل موظف على البيانات بحسب دوره والصلاحيات الممنوحة له.
 المنسقون: يطّلعون على ملخّصات الأسر الواقعة ضمن نطاق تكليفهم فقط، ويظهر لهم رقم الهوية ورقم الجوال مخفيَّين جزئيًا، ويُسجَّل كل كشفٍ كامل لهما. ولا يطّلع المنسقون على البيانات الصحية أو السكن أو الاحتياجات أو المساعدات. <!-- R-06 -->
-رب الأسرة: يطّلع على بيانات أسرته، بما في ذلك الحالات الصحية المسجّلة لأفرادها. ولا تتوفر حاليًا حسابات خاصة لبقية أفراد الأسرة. <!-- R-07 -->
+رب الأسرة: يطّلع حاليًا عبر بوابة الأسرة على بيانات أسرته، بما في ذلك الحالات الصحية المسجّلة لأفرادها. ولا تتوفر حاليًا حسابات خاصة لبقية أفراد الأسرة. <!-- R-07 -->
 صفحة التحقق العامة من بطاقة الأسرة لا تعرض إلا رقم البطاقة، ورمز الأسرة، وتاريخ الإصدار، واسم العشيرة والفرع، والاسم الأول واسم العائلة لرب الأسرة.
 
 ## مشاركة البيانات
@@ -70,7 +70,7 @@ Famboook منصةٌ لسجل العائلات وإدارة الحالات. يت�
 ## الاستفسار وطلب التصحيح
 
 يمكن لرب الأسرة، عند إتاحة الخدمة، تقديم طلب تحديث أو تصحيح لبيانات أسرته عبر بوابة الأسرة، ويراجعه فريق العمل قبل تطبيقه. <!-- R-11 -->
-للاستفسار عن بياناتك أو طلب تصحيحها بطريقة أخرى، راسل الجهة المشغّلة على العنوان info@pcdcd.org. وتُراجَع الطلبات وفق القواعد التي تعتمدها الجهة المشغّلة. <!-- R-12 -->
+للأسئلة المتعلقة بخصوصية بياناتك، أو لطلب تصحيحها بطريقة أخرى، راسل الجهة المشغّلة على العنوان info@pcdcd.org. وتتولّى الجهة المشغّلة مراجعة الطلبات الواردة إلى هذا العنوان. <!-- R-12 -->
 
 ## أمن البيانات
 
