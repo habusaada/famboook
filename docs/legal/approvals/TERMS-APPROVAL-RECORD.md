@@ -100,10 +100,12 @@ The original approval of `c937176` was recorded at commit `27b7041`. It stays va
 
 ## 2. Version and effective date
 
+**Governance note (FB-LEGAL-01N, 2026-10-22).** This is the approved versioning-policy decision; it is not a new text approval. P-08 needs no Terms wording change. The current approved Terms text baseline remains `0b950e2`. The current draft version is unassigned; the first publication target is `1.0`. The effective date is unassigned, and publication is not authorized.
+
 | Field | Value |
 |---|---|
-| Document version | PENDING. Proposed pattern `terms-YYYY-MM-DD`, where the date is the effective date. Approved by the Executive Director when explicitly authorized |
-| Effective date | PENDING. The publication date or later, never retroactive. It must equal the `effectiveDate` set in the registry. Approved by the Executive Director when explicitly authorized |
+| Document version | PENDING — **UNASSIGNED**. Format `MAJOR.MINOR`; first publication target `1.0` (FB-LEGAL-01N, `docs/legal/governance/LEGAL-DOCUMENT-VERSIONING-POLICY.md`). Assigned only by a separate publication-readiness or publication-approval decision. (The earlier proposed pattern `terms-YYYY-MM-DD` is superseded and was never assigned.) |
+| Effective date | PENDING — **UNASSIGNED** (FB-LEGAL-01N: assigned only by an explicit decision; never inferred from commit, approval, version or deployment dates). The publication date or later, never retroactive. It must equal the `effectiveDate` set in the registry. Approved by the Executive Director when explicitly authorized |
 
 ## 3. Conditions before publication
 
