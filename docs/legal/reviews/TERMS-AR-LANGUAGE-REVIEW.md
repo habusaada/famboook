@@ -4,7 +4,7 @@
 |---|---|
 | Document | شروط الاستخدام — Terms of Use (`/terms`) |
 | Path | `docs/legal/drafts/TERMS.ar.md` |
-| Approved text baseline | `c937176` (original). **Amended text:** `c937176` + the approved P-02 replacement (FB-LEGAL-01K.1), SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; new Git baseline PENDING UNTIL COMMIT. **The independent review must examine the amended text** |
+| Approved text baseline | `c937176` (original). **Amended text:** `c937176` + the approved P-02 replacement (FB-LEGAL-01K.1), SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; Git baseline **`4da00de`**. **The independent review must examine the amended text** |
 | Management approval commit | `27b7041` (TERMS-FINAL-TEXT-APPROVAL, Executive Director, PCDCD) |
 | Approval decision date | 2026-10-22 |
 | Review status | **AWAITING_INDEPENDENT_REVIEW** |
@@ -22,7 +22,7 @@
 - initial indexing: `noindex`;
 - version and effective date: PENDING.
 
-**Change rule.** The approved text is fixed at `c937176`. Any correction, however small, changes the approved text. It must be re-approved by the Executive Director, PCDCD, and recorded against a new baseline before publication (`docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1).
+**Change rule.** The currently approved text is fixed at `4da00de` (amended; the original approved baseline was `c937176`). Any correction, however small, changes the approved text. It must be re-approved by the Executive Director, PCDCD, and recorded against a new baseline before publication (`docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1).
 
 **Format note for the reviewer.** Each line under a `##` heading is published as a **separate paragraph**, not as a list item (`LegalSection.paragraphs`). The `<!-- R-xx -->` markers are internal and are removed on publication; they are not part of the text under review.
 
@@ -96,14 +96,14 @@ To be completed **only** by the independent reviewer. Do not prefill.
 | Reviewer role / affiliation | PENDING |
 | Independence from the drafting work (yes / no, explain) | PENDING |
 | Review date | PENDING |
-| Text examined (baseline commit) | PENDING (expected `c937176`) |
+| Text examined (baseline commit) | PENDING (expected `4da00de`, the amended text) |
 | Sections examined | PENDING (all / list) |
 | Findings and recommendations (own findings; position on P-01 … P-11) | PENDING |
 | Outcome | PENDING: `APPROVED_AS_IS` / `APPROVED_WITH_CORRECTIONS` / `REVISION_REQUIRED` |
 | Evidence / reference of review confirmation (signed note, email reference, document ID) | PENDING |
 
 **After the review:**
-- **APPROVED_AS_IS:** record the outcome in `docs/legal/approvals/TERMS-APPROVAL-RECORD.md` §1. The text baseline stays `c937176`.
+- **APPROVED_AS_IS:** record the outcome in `docs/legal/approvals/TERMS-APPROVAL-RECORD.md` §1b. The text baseline stays `4da00de`.
 - **APPROVED_WITH_CORRECTIONS or REVISION_REQUIRED:**
   1. apply the corrections in a separate change;
   2. obtain renewed text approval from the Executive Director, PCDCD;

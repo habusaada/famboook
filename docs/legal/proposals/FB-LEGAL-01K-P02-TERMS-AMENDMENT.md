@@ -24,7 +24,7 @@
 | Publication status | **NOT AUTHORIZED** |
 | Previous approved text baseline | `c937176` |
 | Amended file SHA-256 | `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e` (UTF-8, LF line endings, 7,026 bytes). After the commit, verify with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum`. A working copy re-checked out with CRLF (`core.autocrlf=true`) gives a different value |
-| New Git baseline | PENDING UNTIL COMMIT |
+| New Git baseline | `4da00de` (stored-file SHA-256 verified, FB-LEGAL-01K.3) |
 
 ## 1. Existing wording
 

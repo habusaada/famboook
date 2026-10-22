@@ -5,7 +5,7 @@
 | Status | **AMENDED TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the original final administrative text approval (FB-LEGAL-01I, §1), the P-02 amended text approval (FB-LEGAL-01K.1, §1a) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
 | Text baseline (original) | `c937176` (FB-LEGAL-01G.4: final wording and this template). Kept as history |
-| Current approved text | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; new Git baseline PENDING UNTIL COMMIT |
+| Current approved text | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; Git baseline **`4da00de`** (stored-file SHA-256 verified, FB-LEGAL-01K.3) |
 | Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
 | Authority designation status | **APPROVED** (FB-LEGAL-01H, `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). A role designation only: it is **not** the text approval, names no individual and carries no signature or date |
 | Model | Informational usage rules; no mandatory electronic acceptance (FB-LEGAL-01 D7, APPROVED) |
@@ -47,7 +47,7 @@ The original approval of `c937176` was recorded at commit `27b7041`. It stays va
 | Additional conditions | None stated |
 | Amended file integrity reference | SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e` (UTF-8, LF, 7,026 bytes). Verify after the commit with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum`. This is a content reference, not a substitute for the commit hash |
 | Difference from `c937176` | Exactly one line (the P-02 sentence); verified with `git diff c937176` |
-| New Git baseline | PENDING UNTIL COMMIT |
+| New Git baseline | **`4da00de`** (FB-LEGAL-01K.2, parent `27b7041`). Verified in FB-LEGAL-01K.3: `git show 4da00de:docs/legal/drafts/TERMS.ar.md \| sha256sum` equals the integrity reference above, and the only difference from `c937176` is the P-02 line |
 
 ## 1b. Independent Arabic language review (must cover the amended text)
 
