@@ -191,6 +191,14 @@ These are approved as text decisions, **not** as publication authorization.
 
 The approval record template is `docs/legal/approvals/TERMS-APPROVAL-RECORD.md`. G-02 stays open; it must be closed, or explicitly accepted as open, in that record.
 
+### 4.7 `/terms` approval authority (FB-LEGAL-01H)
+
+- **Designated authority:** the Executive Director of PCDCD («المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية») approves the final `/terms` text (decision TERMS-TEXT-APPROVAL-AUTHORITY, APPROVED).
+- **Text approval:** still PENDING. The designation is not the approval.
+- **Publication:** a separate authorization, still PENDING.
+- **Classification:** `/terms` remains **READY_FOR_MANAGEMENT_APPROVAL**, not PUBLISHED.
+- **Unchanged:** R-24, R-25 and R-26 are not reopened (no inconsistency found); G-02 stays open.
+
 ## 5. Change log
 
 | Date | Change |
@@ -202,3 +210,4 @@ The approval record template is `docs/legal/approvals/TERMS-APPROVAL-RECORD.md`.
 | 2026-10-22 | FB-LEGAL-01G: final text review of `/terms`. R-24 (sanctions) reworded to the existing measures at the operator's discretion; R-25 (service limits) unchanged; R-26 (password and code) extended. Final approval checklist §4.5 added. `/terms` is READY_FOR_MANAGEMENT_APPROVAL and remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.1: management wording applied. R-26 activation sentence; R-24 sanctions sentence «وفق الصلاحيات والإجراءات المتاحة»; R-25 kept unchanged. Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» approved (not evidence of training or enforcement). D7 preserved; G-02 open. `/terms` remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.3: `/terms` editorial amendments applied (§4.6). D9 partially approved (`noindex` initial setting for `/terms`); version pattern `terms-YYYY-MM-DD` proposed, none assigned; approval record template created. G-02 open. `/terms` remains PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01H: the Executive Director of PCDCD designated as the `/terms` text approval authority (§4.7). Text approval and publication authorization stay PENDING. `/terms` remains READY_FOR_MANAGEMENT_APPROVAL and PENDING_APPROVAL |

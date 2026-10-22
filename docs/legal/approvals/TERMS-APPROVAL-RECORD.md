@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| Status | **TEMPLATE — NOT COMPLETED.** Every field below is PENDING until it is filled in by the responsible person. This record grants no approval by existing |
+| Status | **NOT COMPLETED.** Only the approval-authority designation (FB-LEGAL-01H) and the initial indexing setting are recorded as approved. Every other field stays PENDING until the responsible person fills it in. This record grants no text approval or publication authorization by existing |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
-| Git baseline | PENDING — the commit containing the FB-LEGAL-01G.3 amendments (parent `b098ca2`); record the hash here once committed |
+| Text baseline | `c937176` (FB-LEGAL-01G.4: final wording and this template) |
+| Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
+| Authority designation status | **APPROVED** (FB-LEGAL-01H, `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). A role designation only: it is **not** the text approval, names no individual and carries no signature or date |
 | Model | Informational usage rules; no mandatory electronic acceptance (FB-LEGAL-01 D7, APPROVED) |
 | Platform / operator | Famboook / المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD), «الجهة المشغّلة» |
 | Contact in the text | `info@pcdcd.org` |
@@ -16,8 +18,10 @@
 
 | Field | Value |
 |---|---|
-| Management text approver (name, role) | PENDING |
+| Final text approval (by the Executive Director, PCDCD) | PENDING (approved / approved with conditions / not approved) |
+| Named approver (name of the Executive Director at the time of approval) | PENDING |
 | Text approval date | PENDING |
+| Conditions attached to the text approval | PENDING (none / list) |
 | Approved text = Git baseline above, unchanged | PENDING (yes / no; if no, list the changes and record a new baseline) |
 | Independent Arabic reviewer (name) | PENDING |
 | Arabic review date | PENDING |
@@ -27,8 +31,8 @@
 
 | Field | Value |
 |---|---|
-| Document version | PENDING. Proposed pattern `terms-YYYY-MM-DD`, where the date is the effective date |
-| Effective date | PENDING. The publication date or later, never retroactive. It must equal the `effectiveDate` set in the registry |
+| Document version | PENDING. Proposed pattern `terms-YYYY-MM-DD`, where the date is the effective date. Approved by the Executive Director when explicitly authorized |
+| Effective date | PENDING. The publication date or later, never retroactive. It must equal the `effectiveDate` set in the registry. Approved by the Executive Director when explicitly authorized |
 
 ## 3. Conditions before publication
 
