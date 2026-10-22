@@ -75,11 +75,13 @@ export const LEGAL_PAGES: readonly LegalPage[] = [
     status: "PENDING_APPROVAL",
   },
   {
+    // FB-LEGAL-01D: verified ACTIVE channel only (lib/legal/operator.ts); the page renders its own content.
     id: "contact",
     href: "/contact",
     title: "التواصل",
-    description: "معلومات التواصل مع الجهة المشغّلة لمنصة Famboook.",
-    status: "PENDING_APPROVAL",
+    description: "قناة التواصل مع الجهة المشغّلة لمنصة Famboook.",
+    status: "PUBLISHED",
+    kind: "information",
   },
 ];
 

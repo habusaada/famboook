@@ -117,7 +117,7 @@ describe("the public verification page", () => {
     const footer = document.querySelector("[data-site-footer]") as HTMLElement;
     const links = screen.queryAllByRole("link");
     expect(links.filter((link) => !footer.contains(link))).toHaveLength(0);
-    expect(links.map((link) => link.getAttribute("href"))).toEqual(["https://www.facebook.com/pcdcd.gaza", "/about"]);
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["https://www.facebook.com/pcdcd.gaza", "/about", "/contact"]);
     expect(links[0]).toHaveAttribute("target", "_blank");
     expect(links.some((link) => /\/family|\/login/.test(link.getAttribute("href") ?? ""))).toBe(false);
     const navs = screen.queryAllByRole("navigation");

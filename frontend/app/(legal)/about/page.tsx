@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { InfoSection as Section, infoCard } from "@/components/legal/info-section";
 import { OPERATOR, OPERATOR_DISPLAY_NAME } from "@/lib/legal/operator";
 import { legalMetadata, legalPage } from "@/lib/legal/pages";
 import { RELEASE, RELEASE_DESIGNATION } from "@/lib/release";
@@ -6,7 +7,7 @@ import { formatDateLong } from "@/lib/utils/date";
 
 export const metadata: Metadata = legalMetadata("about");
 
-const card = "rounded-2xl border border-border bg-surface-1 p-5";
+const card = infoCard;
 
 /** The approved onboarding sequence (FB-LEGAL-01 D10; docs/governance/FB-GOV-01 §2), in plain Arabic. */
 const ONBOARDING_STEPS = [
@@ -20,17 +21,6 @@ const ONBOARDING_STEPS = [
   "يُدخَل الملف المعتمد من الطرفين وحده عبر إجراءات الإدخال القائمة.",
   "يفعّل أرباب الأسر حساباتهم في بوابة الأسرة ويقدّمون طلبات تحديث بياناتهم.",
 ] as const;
-
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
-  return (
-    <section className={card} aria-labelledby={`about-${id}`} data-about-section={id}>
-      <h2 id={`about-${id}`} className="text-base font-semibold text-foreground">
-        {title}
-      </h2>
-      <div className="mt-2 text-sm leading-relaxed text-foreground">{children}</div>
-    </section>
-  );
-}
 
 function Row({ label, children, field }: { label: string; children: React.ReactNode; field: string }) {
   return (

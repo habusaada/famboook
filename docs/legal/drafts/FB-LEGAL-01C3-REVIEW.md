@@ -31,14 +31,14 @@ If drafts must later live in code before approval (for preview), that needs a se
 |---|---|---|---|---|---|
 | 1 | Draft complete (all required topics) | ✓ | ✓ | ✓ | ✓ |
 | 2 | Every R-marker resolved (§3) | ✗ | ✗ | ✗ | ✗ |
-| 3 | Underlying decisions approved | ✗ D2 (partial), D3, D4, D5, D6, D8 | ✗ D3, D7 | ✗ D3, D4, D5, D8 | ✓ emails approved (D2 partial); page text ✗ |
+| 3 | Underlying decisions approved | ✗ D2 (partial), D3, D4, D5, D6, D8; R-42 | ✗ D3, D7; R-42 | ✗ D3, D4, D5, D8; R-42 | ✓ **published (FB-LEGAL-01D)** with the active institutional address |
 | 4 | PCDCD approval of the final text, with a recorded approver and date | ✗ | ✗ | ✗ | ✗ |
 | 5 | Approved `version` identifier and `effectiveDate` | ✗ | ✗ | ✗ | n/a (R-41) |
 | 6 | Arabic language review | ✗ | ✗ | ✗ | ✗ |
 | 7 | Copied into the registry, markers removed, tests and build green | ✗ | ✗ | ✗ | ✗ |
 | 8 | Publication approval (and D9 indexing decision) | ✗ | ✗ | ✗ | ✗ |
 
-**Verdict:** none of the four pages is ready to publish. `/contact` is closest: it depends only on approval of its text and of publication.
+**Verdict:** `/contact` is published (FB-LEGAL-01D) with the active institutional address only. None of the three policies is ready to publish.
 
 ## 3. Unresolved claims requiring review
 
@@ -67,7 +67,8 @@ If drafts must later live in code before approval (for preview), that needs a se
 | R-33 | data-protection | Rosters and files handled only through approved channels; never via personal or public messaging | FB-GOV-01 §12, G-08 | **G-08:** the approved channels |
 | R-34 | data-protection | Initial files: quality review and joint approval before entry | D10 | confirm the procedure is actually followed before publishing it |
 | R-35 | data-protection | Report privacy concerns to support@pcdcd.org | email approved | PCDCD confirms support handles privacy concerns, or names a privacy contact (**D2** remainder) |
-| R-41 | contact | Whether a contact page shows a version and effective date | — | publication decision |
+| R-41 | contact | Whether a contact page shows a version and effective date | — | **Resolved (FB-LEGAL-01D):** published as an informational page, with no version or effective date |
+| R-42 | privacy, terms, data-protection | These drafts name `support@pcdcd.org` as the contact | the address is **PLANNED, not active** (FB-LEGAL-01D) | publish them only after the launch-day activation, or replace it with `info@pcdcd.org` before publication |
 
 **Not used anywhere in the drafts:**
 - `media@pcdcd.org`;

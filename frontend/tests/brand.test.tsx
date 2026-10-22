@@ -127,7 +127,7 @@ describe("the release, copyright and operator footer (FB-LEGAL-01 D1)", () => {
 
     // Legal links: published pages only — never a page awaiting approval.
     const legal = within(footer).getByRole("navigation", { name: "روابط فامبوك" });
-    expect(within(legal).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/about"]);
+    expect(within(legal).getAllByRole("link").map((l) => l.getAttribute("href"))).toEqual(["/about", "/contact"]);
   });
 });
 
