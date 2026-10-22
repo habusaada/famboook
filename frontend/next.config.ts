@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from "next/constants";
+import { assertPublishableEffectiveDate } from "./lib/legal/effective-date";
 
 export default function config(phase: string): NextConfig {
   // NEXT_PUBLIC_* values are inlined at build time. A production build
@@ -9,7 +10,27 @@ export default function config(phase: string): NextConfig {
     throw new Error("NEXT_PUBLIC_API_URL must be set for a production build (e.g. https://api.famboook.com).");
   }
 
+  // Legal policies (lib/legal/effective-date.ts): a production build with an
+  // effective date publishes the approved policies with it, so the date must
+  // be real, not before the authorization and not in the future. Unset: the
+  // policies stay unpublished. The build log states which case applies.
+  const effectiveDate =
+    phase === PHASE_PRODUCTION_BUILD
+      ? assertPublishableEffectiveDate(process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE)
+      : (process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE ?? "").trim() || null;
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    console.log(
+      effectiveDate
+        ? `Legal policies: PUBLISHED with effective date ${effectiveDate} (version 1.0).`
+        : "Legal policies: NOT PUBLISHED (NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE is not set).",
+    );
+  }
+
   return {
+    // Always inlined as a literal (the validated date or ""), so an unset date
+    // lets the bundler drop the unpublished policy text from the client code.
+    env: { NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE: effectiveDate ?? "" },
+
     // Public Digital Family Card verification (docs/11 §19, FP-ADR-070): the
     // URL carries the opaque token, so the page is never cached, indexed or
     // sent as a referrer.

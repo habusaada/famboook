@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { POLICY_VERSION, requiredEffectiveDate } from "./effective-date";
+import { TERMS_V1_SECTIONS } from "./terms-v1";
 
 // The public legal and information pages (FB-LEGAL-01B) and their
 // PUBLICATION STATUS — the one place that decides what may be shown and
@@ -11,9 +13,15 @@ import type { Metadata } from "next";
 //                     its own verified content; a policy renders its approved
 //                     sections with its version and effective date.
 //
-// Approved policy text is inserted HERE (status PUBLISHED, kind "policy")
-// once PCDCD approves it — no route or component changes are needed. Never
+// Approved policy text is published HERE (status PUBLISHED, kind "policy")
+// once PCDCD approves it — no route or component changes are needed. The
+// approved sections live in their own verbatim module (terms-v1.ts). Never
 // add draft or unapproved text: drafts belong in internal documentation.
+//
+// Publication date (lib/legal/effective-date.ts): an approved policy is
+// published only when NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE holds the actual
+// publication date, shared by every published policy, with version 1.0.
+// Without it the policy stays PENDING_APPROVAL; an invalid value throws.
 
 export type LegalPageId = "about" | "privacy" | "terms" | "data-protection" | "contact";
 
@@ -34,7 +42,7 @@ export type PublishedInformationPage = Base & { status: "PUBLISHED"; kind: "info
 export type PublishedPolicy = Base & {
   status: "PUBLISHED";
   kind: "policy";
-  /** The approved version identifier, e.g. "privacy-2026-11-01". */
+  /** The approved version, MAJOR.MINOR (FB-LEGAL-01N), e.g. "1.0". */
   version: string;
   /** The approved effective date (ISO 8601 calendar date). */
   effectiveDate: string;
@@ -42,6 +50,30 @@ export type PublishedPolicy = Base & {
 };
 
 export type LegalPage = PendingLegalPage | PublishedInformationPage | PublishedPolicy;
+
+const TERMS_BASE = {
+  id: "terms",
+  href: "/terms",
+  title: "شروط الاستخدام",
+  description: "شروط استخدام منصة Famboook.",
+} as const;
+
+/**
+ * The approved Terms of Use 1.0 — published only with the actual publication
+ * date. The condition reads the inlined variable directly (next.config.ts
+ * always defines it), so with no date the approved text is dropped from the
+ * client bundle; a malformed or blank date throws.
+ */
+const TERMS: PendingLegalPage | PublishedPolicy = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE
+  ? {
+      ...TERMS_BASE,
+      status: "PUBLISHED",
+      kind: "policy",
+      version: POLICY_VERSION,
+      effectiveDate: requiredEffectiveDate(process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE),
+      sections: TERMS_V1_SECTIONS,
+    }
+  : { ...TERMS_BASE, status: "PENDING_APPROVAL" };
 
 /** In footer order. */
 export const LEGAL_PAGES: readonly LegalPage[] = [
@@ -60,13 +92,7 @@ export const LEGAL_PAGES: readonly LegalPage[] = [
     description: "سياسة الخصوصية لمنصة Famboook.",
     status: "PENDING_APPROVAL",
   },
-  {
-    id: "terms",
-    href: "/terms",
-    title: "شروط الاستخدام",
-    description: "شروط استخدام منصة Famboook.",
-    status: "PENDING_APPROVAL",
-  },
+  TERMS,
   {
     id: "data-protection",
     href: "/data-protection",
