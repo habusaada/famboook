@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E). Not to be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
+| Status | **DRAFT — NOT APPROVED — NOT PUBLISHED.** Internal working text for PCDCD review (FB-LEGAL-01C.3, revised FB-LEGAL-01E; final text review FB-LEGAL-01G: R-24, R-25, R-26; management wording applied FB-LEGAL-01G.1). Final text prepared for management approval; NOT approved for publication. Not to be copied into any publicly served route or into `frontend/lib/legal/pages.ts` before publication is approved |
 | Target | registry entry `terms` → `PUBLISHED`, kind `policy`, approved `version` and `effectiveDate` (none set here) |
 | Acceptance | **No acceptance mechanism.** This text introduces no mandatory acceptance, no new authentication step and no new restriction on existing users (FB-LEGAL-01 D7 APPROVED, FB-LEGAL-01F: informational publication model). It deliberately contains no "by using you agree" clause, and no text may claim that users have electronically accepted the terms (R-21) |
 | Format | `##` = section heading; each following line = one paragraph; `<!-- R-xx -->` = review marker (see `FB-LEGAL-01C3-REVIEW.md`), removed on publication |
@@ -17,10 +17,11 @@
 
 ## الحساب واستخدامه
 
-حساب بوابة الأسرة مخصّص لرب الأسرة المسجّل، ويُنشأ بالتحقق من رقم الهوية ومن رمز يُرسَل إلى رقم الجوال المسجّل. أما حسابات فريق العمل فتُنشئها الجهة المشغّلة.
+حساب بوابة الأسرة مخصّص لرب الأسرة المسجّل. يُفعّل حساب بوابة الأسرة باستخدام رقم الهوية ورمز التحقق المُرسَل إلى رقم الجوال المسجّل. أما حسابات فريق العمل فتُنشئها الجهة المشغّلة.
 الحساب شخصي: لا تشارك كلمة المرور أو رمز التحقق مع أي شخص، ولا تسمح لغيرك باستخدام حسابك.
 إذا اشتبهت في استخدام حسابك من غيرك، فغيّر كلمة المرور إن كانت الخدمة متاحة، وراسل الجهة المشغّلة.
-لا يحتاج فريق العمل إلى كلمة المرور أو رمز التحقق، فلا تُفصح عنهما لأي شخص يطلبهما منك. <!-- R-26 -->
+رمز التحقق صالح لمدة قصيرة، ولا يُستخدم إلا في المنصة نفسها.
+لا يحتاج فريق العمل ولا الجهة المشغّلة إلى كلمة المرور أو رمز التحقق، فلا تُفصح عنهما لأي شخص، حتى لو قدّم نفسه على أنه من فريق العمل. <!-- R-26 -->
 
 ## دقة المعلومات
 
@@ -47,7 +48,7 @@
 جمع البيانات من المنصة بوسائل آلية، أو نسخها أو نشرها دون إذن.
 تقديم معلومات مضلِّلة عن قصد، أو إساءة استخدام الإشعارات أو طلبات التحديث.
 أي استخدام يعطّل عمل المنصة أو يضرّ بغيرك من المستخدمين.
-قد يؤدي الاستخدام غير المسموح إلى إيقاف الحساب أو تقييد الاطلاع، وفق ما تقرّره الجهة المشغّلة. <!-- R-24 -->
+عند الاستخدام غير المسموح، قد تتخذ الجهة المشغّلة، وفق الصلاحيات والإجراءات المتاحة، تدابير لتقييد الوصول أو تعليق الحساب أو سحب صلاحيات المنسق. <!-- R-24 -->
 
 ## حدود الخدمة
 

@@ -76,9 +76,9 @@ If drafts must later live in code before approval (for preview), that needs a se
 | R-21 | terms | Neutral scope; no "by using you agree"; the terms contain no consent to processing | **D7 APPROVED:** informational publication model | None for this item. No text may claim electronic acceptance; none does | was BLOCKER | MANAGEMENT_DECISION_RECORDED; RESOLVED |
 | R-22 | terms | Corrections through the portal "when available", or by email | as R-11 | As R-11 | NON-BLOCKER | — |
 | R-23 | terms | The coordinator acts within the council's delegation and the assigned scope | FB-GOV-01 §5, D10 | **G-02:** council legitimacy wording | NON-BLOCKER | — |
-| R-24 | terms | Misuse may lead to account suspension or restricted access | accounts can be deactivated (`is_active`) | PCDCD confirms the sanctions it will actually apply (kept under review by D7) | NON-BLOCKER | — (final text approval) |
-| R-25 | terms | No guarantee of uninterrupted availability; no liability clause | — | PCDCD decides whether a liability clause is wanted (applicable law: D3 / G-10); none is drafted (kept under review by D7) | NON-BLOCKER | — (final text approval) |
-| R-26 | terms | Staff do not need a user's password or code; do not disclose them to anyone | passwords are hashed and codes are single-use; Staff tools never ask for them | PCDCD confirms this as an operating rule for Staff (kept under review by D7) | NON-BLOCKER | — (final text approval) |
+| R-24 | terms | **Approved wording (FB-LEGAL-01G.1):** «عند الاستخدام غير المسموح، قد تتخذ الجهة المشغّلة، وفق الصلاحيات والإجراءات المتاحة، تدابير لتقييد الوصول أو تعليق الحساب أو سحب صلاحيات المنسق.» No procedure, notice, appeal or automatic sanction is claimed, and the text does not claim that every suspension is available through an administrative interface | Staff accounts: `ManageStaffUsersAction` (`user.suspend`), enforced on the next request by `EnsureUserIsActive`. Coordinators: `RevokeCoordinatorRoleAction`, `RevokeCoordinatorScopeAction` (routes exist). Family accounts: `SuspendUserPersonLinkAction` / `EndUserPersonLinkAction` exist in the domain, but **no endpoint or screen exposes them**; a Family suspension today needs a technical action | Wording approved by management (FB-LEGAL-01G.1). «وفق الصلاحيات والإجراءات المتاحة» limits the measures to what exists | NON-BLOCKER | MANAGEMENT_DECISION_RECORDED (wording approved) |
+| R-25 | terms | No guarantee of uninterrupted availability; temporary stops for maintenance or technical reasons; data shown as recorded. **No liability clause, no exclusion or immunity claim** | — | Management approved keeping the current wording unchanged (FB-LEGAL-01G.1). No blanket liability waiver or legal guarantee. Adding a liability or exclusion clause would need legal review under the applicable law (D3 / G-10) | NON-BLOCKER | MANAGEMENT_DECISION_RECORDED (wording approved) |
+| R-26 | terms | **Activation (approved wording, FB-LEGAL-01G.1):** «يُفعّل حساب بوابة الأسرة باستخدام رقم الهوية ورمز التحقق المُرسَل إلى رقم الجوال المسجّل.» It replaces wording that suggested a record is created during authentication. Account is personal; change the password "if the service is available"; the code is valid for a short time and used only in the platform; neither Staff nor the operator need the password or code, so never disclose them, even to someone claiming to be Staff | activation by National ID + SMS code; OTP TTL 300 s, 5 attempts, 3 sends (`config/family_auth.php`); codes and passwords hashed; password reset and change gates default OFF; login rate-limited; Staff tools never ask for a password or code | Wording approved (FB-LEGAL-01G.1). **Operating rule approved:** «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين.» This is an approved rule, **not** evidence of staff training or an enforcement procedure. No duration or attempt count is published (configurable) | NON-BLOCKER | MANAGEMENT_DECISION_RECORDED; IMPLEMENTATION_OR_VERIFICATION_PENDING (communicating and enforcing the rule among Staff) |
 | R-31 | data-protection | Staff: National ID masked, full export only with special permission; Family Portal and Coordinator Space: masking and logged reveals | audit §4 | **D8 remainder:** confirm the current Staff visibility (full mobiles) is acceptable | NON-BLOCKER (accurate) | — (D8 remainder pending) |
 | R-32 | data-protection | Staff and coordinators are bound by confidentiality | no signed undertaking recorded | PCDCD confirms the duty exists (contract, code of conduct, coordinator delegation terms) | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
 | R-33 | data-protection | Rosters and files handled only through approved channels; never via personal or public messaging | FB-GOV-01 §12, G-08 | **G-08:** approved secure transfer channels must exist before this is stated | BLOCKER | IMPLEMENTATION_OR_VERIFICATION_PENDING; PUBLICATION_BLOCKER_OPEN |
@@ -153,6 +153,30 @@ If drafts must later live in code before approval (for preview), that needs a se
 
 All three pages stay **PENDING_APPROVAL**, unlinked and not indexed. `frontend/lib/legal/pages.ts` is unchanged.
 
+### 4.5 `/terms` final text review (FB-LEGAL-01G)
+
+**Changes (`TERMS.ar.md`; no other section changed):**
+- **R-24:** «قد يؤدي الاستخدام غير المسموح إلى إيقاف الحساب أو تقييد الاطلاع» → «عند الاستخدام غير المسموح، قد تقرّر الجهة المشغّلة إيقاف الحساب، أو سحب صلاحيات المنسق أو نطاق تكليفه، أو تقييد الاطلاع بطريقة أخرى». It names the measures that exist, and the operator's discretion, without a procedure.
+- **R-25:** unchanged. It already gives no guarantee and claims no immunity.
+- **R-26:** added «رمز التحقق صالح لمدة قصيرة، ولا يُستخدم إلا في المنصة نفسها». The disclosure rule now covers the operator and anyone claiming to be Staff.
+
+**Classification: READY_FOR_MANAGEMENT_APPROVAL**, not published.
+
+**Final approval checklist (`/terms`):**
+
+| # | Item | State |
+|---|---|---|
+| 1 | D7 informational model; no acceptance clause or claim (R-21) | ✓ |
+| 2 | Platform (Famboook) and operator (PCDCD) distinguished; contact `info@pcdcd.org` only | ✓ |
+| 3 | R-24 sanctions wording | ✓ approved (FB-LEGAL-01G.1) |
+| 4 | R-25: current wording kept, no liability clause | ✓ approved (FB-LEGAL-01G.1) |
+| 5 | R-26 activation wording and the operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» | ✓ approved (FB-LEGAL-01G.1); communication to Staff not yet evidenced |
+| 6 | R-22 / R-11: the "when available" wording matches the Production gate state at publication | ☐ at publication |
+| 7 | R-23: coordinator delegation verification (G-02) | ☐ open |
+| 8 | Independent Arabic language review | ☐ |
+| 9 | Approved `version` and `effectiveDate`; recorded approver and date | ☐ |
+| 10 | Separate publication approval (registry change, markers removed, tests green; indexing per D9) | ☐ |
+
 ## 5. Change log
 
 | Date | Change |
@@ -161,3 +185,5 @@ All three pages stay **PENDING_APPROVAL**, unlinked and not indexed. `frontend/l
 | 2026-10-22 | FB-LEGAL-01D: `/contact` published with `info@pcdcd.org` only; R-41 resolved; R-42 added |
 | 2026-10-22 | FB-LEGAL-01E: the three policy drafts reviewed and revised (factual corrections, consent boundaries, operator distinction, language). `support@pcdcd.org` replaced by `info@pcdcd.org` (R-42 resolved). New items R-14 … R-17, R-26; items classified BLOCKER / NON-BLOCKER; readiness report §4 added |
 | 2026-10-22 | FB-LEGAL-01F: decisions D7 (approved), D4, D6, D8 (partially approved) recorded. A status column was added (MANAGEMENT_DECISION_RECORDED, IMPLEMENTATION_OR_VERIFICATION_PENDING, PUBLICATION_BLOCKER_OPEN, RESOLVED). R-21 resolved. R-07 no longer blocks (disclosure), and follow-up F-01 was opened. R-10, R-12 stay blocking with narrowed scope. R-15 is flagged as an unverified contractual claim. `/terms` is READY_FOR_FINAL_TEXT_APPROVAL; `/privacy` and `/data-protection` are NEEDS_DECISION. All three remain PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01G: final text review of `/terms`. R-24 (sanctions) reworded to the existing measures at the operator's discretion; R-25 (service limits) unchanged; R-26 (password and code) extended. Final approval checklist §4.5 added. `/terms` is READY_FOR_MANAGEMENT_APPROVAL and remains PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01G.1: management wording applied. R-26 activation sentence; R-24 sanctions sentence «وفق الصلاحيات والإجراءات المتاحة»; R-25 kept unchanged. Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» approved (not evidence of training or enforcement). D7 preserved; G-02 open. `/terms` remains PENDING_APPROVAL |
