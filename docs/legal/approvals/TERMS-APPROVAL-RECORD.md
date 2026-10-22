@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| Status | **TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the final administrative text approval (FB-LEGAL-01I) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
+| Status | **AMENDED TEXT APPROVED — PUBLICATION NOT AUTHORIZED.** Recorded as approved: the approval-authority designation (FB-LEGAL-01H), the original final administrative text approval (FB-LEGAL-01I, §1), the P-02 amended text approval (FB-LEGAL-01K.1, §1a) and the initial indexing setting. Every other field stays PENDING until the responsible person fills it in. This record grants no publication, deployment, indexing or activation authorization |
 | Document | `docs/legal/drafts/TERMS.ar.md` |
-| Text baseline | `c937176` (FB-LEGAL-01G.4: final wording and this template) |
+| Text baseline (original) | `c937176` (FB-LEGAL-01G.4: final wording and this template). Kept as history |
+| Current approved text | `c937176` + the P-02 replacement (§1a). SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e`; new Git baseline PENDING UNTIL COMMIT |
 | Approval authority | المدير التنفيذي للمركز الفلسطيني للبيانات والتنمية المجتمعية — Executive Director, PCDCD |
 | Authority designation status | **APPROVED** (FB-LEGAL-01H, `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1). A role designation only: it is **not** the text approval, names no individual and carries no signature or date |
 | Model | Informational usage rules; no mandatory electronic acceptance (FB-LEGAL-01 D7, APPROVED) |
@@ -14,7 +15,9 @@
 
 **Text approval does not authorize publication.** Part 4 is a separate act.
 
-## 1. Text approval
+## 1. Text approval (original baseline — historical)
+
+The original approval of `c937176` was recorded at commit `27b7041`. It stays valid for that unchanged text and does not by itself cover the amended text (§1a).
 
 | Field | Value |
 |---|---|
@@ -30,6 +33,26 @@
 | Signature | None. No handwritten or digital signature is recorded |
 | Conditions attached to the text approval | None stated in the approval instruction. The exclusions are listed in `docs/decisions/FB-LEGAL-01-DECISIONS.md` §1.1 |
 | Approved text = Git baseline above, unchanged | Yes. `TERMS.ar.md` is unchanged between `c937176` and `017c791` (verified with `git diff`) |
+## 1a. Amended text approval (P-02)
+
+| Field | Value |
+|---|---|
+| Decision | **TERMS-P02-AMENDED-TEXT-APPROVAL** (FB-LEGAL-01K.1) |
+| Status | **APPROVED** |
+| Authority | Executive Director, PCDCD |
+| Decision date | 2026-10-22 |
+| Scope | The complete previously approved Terms text (`c937176`), with only the expressly approved P-02 replacement in «نطاق هذه الشروط», second paragraph: «لا تتضمن هذه الشروط موافقةً على معالجة البيانات الشخصية. وتُبيِّن سياسة الخصوصية، وهي وثيقة مستقلة عن هذه الشروط، كيفية معالجة البيانات الشخصية، وتُتاح عبر المنصة في حال نشرها.» (revised Option B, `docs/legal/proposals/FB-LEGAL-01K-P02-TERMS-AMENDMENT.md` §0) |
+| Evidence | An explicit management instruction in the project conversation (FB-LEGAL-01K.1). Not a signed approval, a legal review or a compliance assessment |
+| Named approver / signature | Not recorded / none |
+| Additional conditions | None stated |
+| Amended file integrity reference | SHA-256 `d98b948810f645fdb38344312d6bb86c8a78f034d94c5da775f29b5ccea74f7e` (UTF-8, LF, 7,026 bytes). Verify after the commit with `git show <commit>:docs/legal/drafts/TERMS.ar.md \| sha256sum`. This is a content reference, not a substitute for the commit hash |
+| Difference from `c937176` | Exactly one line (the P-02 sentence); verified with `git diff c937176` |
+| New Git baseline | PENDING UNTIL COMMIT |
+
+## 1b. Independent Arabic language review (must cover the amended text)
+
+| Field | Value |
+|---|---|
 | Independent Arabic reviewer (name) | PENDING |
 | Arabic review date | PENDING |
 | Arabic review outcome | PENDING (no changes / changes applied at commit ____) |
