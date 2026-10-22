@@ -241,6 +241,20 @@ The Privacy Policy is neither approved nor published; the amendment only stops t
 | Independent Arabic review | PENDING; must cover this amended text |
 | Publication | NOT AUTHORIZED |
 
+### 4.11 `/terms` consolidated language amendments P-03 … P-11 (FB-LEGAL-01M.1)
+
+| Item | State |
+|---|---|
+| Approved replacements (exact sentences: `docs/legal/proposals/FB-LEGAL-01M-TERMS-LANGUAGE-DECISION-MATRIX.md` §2) | Line 22 (P-04 + P-05), line 29 (P-05), line 41 (P-06), line 42 (P-09), line 60 (P-07 + P-05, without «فقط») |
+| Decisions without edits | P-03, P-10: keep current text. P-08: deferred (version format). P-11: deferred (independent reviewer) |
+| Management approval | APPROVED (TERMS-P03-P11-CONSOLIDATED-TEXT-APPROVAL, 2026-10-22, Executive Director, PCDCD) |
+| Local application | APPLIED LOCALLY. 5 lines replaced, 0 added or removed against `2e0c99d`. The P-01 and P-02 wording, the prohibited uses, R-24 and the password / code rules are unchanged |
+| Previous baseline | `2e0c99d` (history kept) |
+| New baseline | PENDING UNTIL COMMIT (SHA-256 `8932fc9a55befd7f718200415fc1f7828db3867da534a918fc62ce258e4e2b2c`) |
+| Independent Arabic review | PENDING; must cover this amended text |
+| Production gate and SMS verification | PENDING (the wording is conditional and claims nothing about Production) |
+| Publication | NOT AUTHORIZED |
+
 The draft's internal "NOT APPROVED" marker continues to mean **not approved for publication**. It is unchanged, and so are R-24, R-25 and R-26. `/terms` stays `PENDING_APPROVAL` in the registry.
 
 ## 5. Change log
@@ -254,6 +268,7 @@ The draft's internal "NOT APPROVED" marker continues to mean **not approved for 
 | 2026-10-22 | FB-LEGAL-01G: final text review of `/terms`. R-24 (sanctions) reworded to the existing measures at the operator's discretion; R-25 (service limits) unchanged; R-26 (password and code) extended. Final approval checklist §4.5 added. `/terms` is READY_FOR_MANAGEMENT_APPROVAL and remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.1: management wording applied. R-26 activation sentence; R-24 sanctions sentence «وفق الصلاحيات والإجراءات المتاحة»; R-25 kept unchanged. Operating rule «لا يطلب موظفو الجهة المشغّلة كلمات المرور أو رموز التحقق من المستخدمين» approved (not evidence of training or enforcement). D7 preserved; G-02 open. `/terms` remains PENDING_APPROVAL |
 | 2026-10-22 | FB-LEGAL-01G.3: `/terms` editorial amendments applied (§4.6). D9 partially approved (`noindex` initial setting for `/terms`); version pattern `terms-YYYY-MM-DD` proposed, none assigned; approval record template created. G-02 open. `/terms` remains PENDING_APPROVAL |
+| 2026-10-22 | FB-LEGAL-01M.1: consolidated language amendments approved; five line replacements applied locally to `/terms` (§4.11); P-03 and P-10 kept; P-08 and P-11 deferred. Previous baseline `2e0c99d`; new baseline pending commit; language review pending; publication not authorized |
 | 2026-10-22 | FB-LEGAL-01L.3: P-01 amended `/terms` text registered at Git baseline `2e0c99d` (§4.10). Earlier baselines kept as history. No text or status change |
 | 2026-10-22 | FB-LEGAL-01L.1: P-01 Option A approved and applied locally to `/terms` (§4.10). Previous baseline `4da00de`; new baseline pending commit; language review pending; publication not authorized |
 | 2026-10-22 | FB-LEGAL-01K.3: amended `/terms` text registered at Git baseline `4da00de` (§4.9). Original `c937176` kept as history. No text or status change |
