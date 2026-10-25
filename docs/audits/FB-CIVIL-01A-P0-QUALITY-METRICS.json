@@ -1,0 +1,589 @@
+{
+  "tool": "FB-CIVIL-01A-P0 profile_identity_export.py",
+  "generated_at_utc": "2026-10-25T11:34:11+00:00",
+  "privacy": "aggregate counts and format shapes only; no field value is included",
+  "validation": {
+    "manifest_total_rows": 2399891,
+    "files": 24,
+    "sha256_verified": 24,
+    "headers_verified": 24,
+    "columns": 36
+  },
+  "structure": {
+    "status": "PASS",
+    "rows_parsed": 2399891,
+    "rows_match_manifest": true,
+    "csv_parse_error": 0,
+    "wrong_field_count": 0,
+    "record_spans_multiple_lines": 0,
+    "nul_character": 0,
+    "per_file": [
+      {
+        "file": "t03maindata_part_00001.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00002.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00003.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00004.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00005.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00006.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00007.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00008.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00009.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00010.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00011.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00012.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00013.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00014.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00015.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00016.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00017.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00018.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00019.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00020.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00021.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00022.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00023.csv",
+        "manifest_rows": 100000,
+        "parsed_rows": 100000,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      },
+      {
+        "file": "t03maindata_part_00024.csv",
+        "manifest_rows": 99891,
+        "parsed_rows": 99891,
+        "malformed_rows": 0,
+        "row_count_matches": true
+      }
+    ]
+  },
+  "identity_keys": {
+    "mainid": {
+      "rows_with_value": 2399891,
+      "missing": 0,
+      "unique_values": 2399891,
+      "values_occurring_once": 2399891,
+      "duplicated_values": 0,
+      "rows_in_duplicated_values": 0,
+      "duplicated_values_identical_rows_ignoring_sert1": 0,
+      "duplicated_values_conflicting_rows": 0,
+      "max_rows_for_one_value": 1,
+      "format": {
+        "ascii_digits_only": 2399891,
+        "digits_not_9_long": 2,
+        "leading_zero": 1,
+        "exactly_9_digits": 2399889
+      },
+      "length_distribution": {
+        "1": 1,
+        "3": 1,
+        "9": 2399889
+      }
+    },
+    "sert1": {
+      "rows_with_value": 2399891,
+      "missing": 0,
+      "unique_values": 2399891,
+      "duplicated_values": 0,
+      "rows_where_sert1_equals_mainid": 0,
+      "format": {
+        "ascii_digits_only": 2399891,
+        "digits_not_9_long": 2399891
+      },
+      "length_distribution": {
+        "7": 2399891
+      }
+    }
+  },
+  "relationships": {
+    "fatherid": {
+      "populated": 2078200,
+      "missing": 321691,
+      "resolves_to_existing_mainid": 1817713,
+      "resolves_to_duplicated_mainid_ambiguous": 0,
+      "unresolved": 260487,
+      "self_reference": 0,
+      "distinct_referenced_values": 446599,
+      "format": {
+        "exactly_9_digits": 2078197,
+        "missing": 321691,
+        "other_format": 3
+      }
+    },
+    "motherid": {
+      "populated": 1972788,
+      "missing": 427103,
+      "resolves_to_existing_mainid": 1888569,
+      "resolves_to_duplicated_mainid_ambiguous": 0,
+      "unresolved": 84219,
+      "self_reference": 0,
+      "distinct_referenced_values": 467108,
+      "format": {
+        "exactly_9_digits": 1972787,
+        "missing": 427103,
+        "other_format": 1
+      }
+    },
+    "partnerid": {
+      "populated": 0,
+      "missing": 2399891,
+      "resolves_to_existing_mainid": 0,
+      "resolves_to_duplicated_mainid_ambiguous": 0,
+      "unresolved": 0,
+      "self_reference": 0,
+      "distinct_referenced_values": 0,
+      "format": {
+        "missing": 2399891
+      }
+    }
+  },
+  "relationship_patterns": {
+    "father_equals_mother": 0,
+    "father_equals_partner": 0,
+    "mother_equals_partner": 0,
+    "ids_referenced_both_as_father_and_as_mother": 1,
+    "parent_child_two_cycles_father": 12,
+    "parent_child_two_cycles_mother": 20,
+    "partner_reciprocal": 0,
+    "partner_target_has_other_partner": 0,
+    "partner_target_has_no_partner": 0,
+    "ids_named_as_partner_by_more_than_one_person": 0
+  },
+  "suspicious_duplicates": {
+    "exact_duplicate_row_groups": 0,
+    "rows_in_exact_duplicate_groups": 0,
+    "duplicate_groups_ignoring_sert1": 0,
+    "rows_in_duplicate_groups_ignoring_sert1": 0,
+    "same_name_parents_family_birthdate_with_different_mainid_groups": 8217,
+    "rows_in_those_groups": 16463
+  },
+  "completeness": {
+    "sert1": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": ">1000"
+    },
+    "mainid": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": ">1000"
+    },
+    "name1": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": ">1000"
+    },
+    "father": {
+      "populated": 2399283,
+      "empty": 608,
+      "whitespace_only": 1,
+      "completeness_pct": 99.97,
+      "distinct_values": ">1000"
+    },
+    "grandfath": {
+      "populated": 2399248,
+      "empty": 643,
+      "whitespace_only": 2,
+      "completeness_pct": 99.97,
+      "distinct_values": ">1000"
+    },
+    "family": {
+      "populated": 2399883,
+      "empty": 8,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": ">1000"
+    },
+    "gender": {
+      "populated": 2399890,
+      "empty": 1,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 4
+    },
+    "govern": {
+      "populated": 2399890,
+      "empty": 1,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 9
+    },
+    "city": {
+      "populated": 2399711,
+      "empty": 180,
+      "whitespace_only": 0,
+      "completeness_pct": 99.99,
+      "distinct_values": 61
+    },
+    "street": {
+      "populated": 2126942,
+      "empty": 272949,
+      "whitespace_only": 4,
+      "completeness_pct": 88.63,
+      "distinct_values": ">1000"
+    },
+    "fatherid": {
+      "populated": 2078200,
+      "empty": 321691,
+      "whitespace_only": 0,
+      "completeness_pct": 86.6,
+      "distinct_values": ">1000"
+    },
+    "motherid": {
+      "populated": 1972788,
+      "empty": 427103,
+      "whitespace_only": 0,
+      "completeness_pct": 82.2,
+      "distinct_values": ">1000"
+    },
+    "partnerid": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "datebirth": {
+      "populated": 2399482,
+      "empty": 409,
+      "whitespace_only": 0,
+      "completeness_pct": 99.98,
+      "distinct_values": ">1000"
+    },
+    "age": {
+      "populated": 2399482,
+      "empty": 409,
+      "whitespace_only": 0,
+      "completeness_pct": 99.98,
+      "distinct_values": 126
+    },
+    "maritalst": {
+      "populated": 2399870,
+      "empty": 21,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 7
+    },
+    "deathdate": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "presonstate": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "relgion": {
+      "populated": 2399781,
+      "empty": 110,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 7
+    },
+    "birthplace": {
+      "populated": 2352728,
+      "empty": 47163,
+      "whitespace_only": 0,
+      "completeness_pct": 98.03,
+      "distinct_values": 150
+    },
+    "householdid": {
+      "populated": 2228724,
+      "empty": 171167,
+      "whitespace_only": 0,
+      "completeness_pct": 92.87,
+      "distinct_values": ">1000"
+    },
+    "householdrel": {
+      "populated": 2328049,
+      "empty": 71842,
+      "whitespace_only": 0,
+      "completeness_pct": 97.01,
+      "distinct_values": 6
+    },
+    "prevfamily": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "phonenum": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "worker": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 1
+    },
+    "att": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "worktype": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "source": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "civilg": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "cwloc": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "mgrade": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "mstartw": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "msalary": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "select": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": 1
+    },
+    "job": {
+      "populated": 0,
+      "empty": 2399891,
+      "whitespace_only": 0,
+      "completeness_pct": 0.0,
+      "distinct_values": 1
+    },
+    "fullname": {
+      "populated": 2399891,
+      "empty": 0,
+      "whitespace_only": 0,
+      "completeness_pct": 100.0,
+      "distinct_values": ">1000"
+    }
+  },
+  "dates": {
+    "datebirth": {
+      "parse": {
+        "parseable": 2399482
+      },
+      "top_shapes": {
+        "9999-99-99A99:99:99": 2399482
+      },
+      "decades": {
+        "1890s": 138,
+        "1900s": 371,
+        "1910s": 837,
+        "1920s": 2353,
+        "1930s": 7977,
+        "1940s": 28621,
+        "1950s": 65240,
+        "1960s": 120457,
+        "1970s": 180337,
+        "1980s": 288690,
+        "1990s": 410086,
+        "2000s": 480630,
+        "2010s": 600402,
+        "2020s": 213343
+      }
+    },
+    "deathdate": {
+      "parse": {},
+      "top_shapes": {},
+      "decades": {}
+    },
+    "mstartw": {
+      "parse": {},
+      "top_shapes": {},
+      "decades": {}
+    }
+  },
+  "death_before_birth": 0,
+  "age": {
+    "0-17": 913446,
+    "18-59": 1311109,
+    "60-110": 174151,
+    "over_110": 776,
+    "missing": 409
+  }
+}

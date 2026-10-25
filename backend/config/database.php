@@ -99,6 +99,27 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        // FB-CIVIL-01A identity reference import (artisan only). A separate
+        // login that is a member of famboook_identity_writer — never the
+        // application role. The login name and password are NOT read here:
+        // `famboook:identity-ref-stage` takes IDENTITY_REF_DB_USERNAME and
+        // IDENTITY_REF_DB_PASSWORD from the operator's shell at run time, so
+        // they are never part of the cached configuration (config:cache /
+        // optimize) and never in the application .env.
+        'identity_ref_import' => [
+            'driver' => 'pgsql',
+            'host' => env('IDENTITY_REF_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('IDENTITY_REF_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('IDENTITY_REF_DB_DATABASE', env('DB_DATABASE')),
+            'username' => null,
+            'password' => null,
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('IDENTITY_REF_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

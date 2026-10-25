@@ -38,6 +38,9 @@ SELECT 'persons_with_2_active_memberships=' || count(*) FROM (SELECT person_id F
 SELECT 'families_with_2_active_heads='      || count(*) FROM (SELECT family_id FROM family_memberships WHERE is_active AND is_household_head GROUP BY family_id HAVING count(*) > 1) x;
 SELECT 'families_with_2_current_residences='|| count(*) FROM (SELECT family_id FROM family_residences WHERE is_current GROUP BY family_id HAVING count(*) > 1) x;
 SELECT 'pg_trgm_indexes='     || count(*) FROM pg_indexes WHERE indexname LIKE '%_trgm';
+-- FB-CIVIL-01A identity reference (0 rows when not installed). A restore drops
+-- owners and grants: a real restore must run 00-roles + 04-reassert (identity-ref).
+SELECT 'identity_ref_schemas=' || count(*) FROM pg_namespace WHERE nspname LIKE 'identity_ref%';
 SQL
 
 echo "Compare the counts with the live database (same queries, run read-only)."

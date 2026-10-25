@@ -21,7 +21,13 @@ file="${BACKUP_DIR}/famboook_pilot_${stamp}.dump"
 mkdir -p "$BACKUP_DIR"
 
 # Custom format: compressed, restorable with pg_restore, table-selective.
+# FB-CIVIL-01A: identity staging rows are scratch data (re-creatable from the
+# source files, never consumed after a restore) and are not backed up; their
+# table definitions are. --no-owner/--no-privileges: after restoring a dump
+# that contains identity_ref, run deploy/sql/identity-ref/00-roles.dba.sql and
+# 04-reassert-after-restore.dba.sql before anything else uses it.
 pg_dump --host="$DB_HOST" --username="$DB_USER" --format=custom --no-owner --no-privileges \
+  --exclude-table-data='identity_ref_staging.*' \
   --file="$file" "$DB_NAME"
 
 # Refuse an unreadable dump before encrypting it.
