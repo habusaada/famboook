@@ -2944,7 +2944,7 @@ whenever a user holds it directly.
 
 ## 61c. Civil Identity Import Management (FB-CIVIL-01A-UI, AUTH-ADR-098)
 
-*Implemented locally 2026-10-26 (FB-CIVIL-01A-UI U1), not deployed.*
+*Implemented locally 2026-10-26 (FB-CIVIL-01A-UI U1 committed `036d478`; U2 local, uncommitted), not deployed.*
 Metadata-only monitoring of the civil identity reference imports
 (`docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md`,
 `docs/adr/FB-CIVIL-01A-UI-API-AND-SCREENS.md`). No permission here reaches
@@ -2958,6 +2958,8 @@ privilege.
 | `civil-import.view` | Overview, import history, run detail (files by ordinal, issue counts), releases | SUPER_ADMIN only |
 | `civil-import.locations.view` | Source file names and issue line numbers (D-UI-8); every read is audited as `LOCATIONS_VIEWED` | SUPER_ADMIN only |
 | `civil-import.audit.view` | The append-only civil import audit trail | SUPER_ADMIN only |
+| `civil-import.stage` | U2: list catalogued sources (their safe labels, O-2); queue source validation, staging (and its resume) and abort; cancel any active request | SUPER_ADMIN only |
+| `civil-import.validate` | U2: queue assessment, preparation and verification | SUPER_ADMIN only |
 
 ```text
 GET /api/v1/civil-registry/overview                          civil-import.view
@@ -2969,12 +2971,23 @@ GET /api/v1/civil-registry/releases/{release}                civil-import.view
 GET /api/v1/civil-registry/imports/{run}/files/locations     civil-import.locations.view   (audited)
 GET /api/v1/civil-registry/imports/{run}/issues/locations    civil-import.locations.view   (audited)
 GET /api/v1/civil-registry/audit                             civil-import.audit.view
+GET    /api/v1/civil-registry/requests                       civil-import.view
+GET    /api/v1/civil-registry/requests/{request}             civil-import.view
+DELETE /api/v1/civil-registry/requests/{request}             civil-import.view + (requester still holding the queuing permission, or civil-import.stage)
+GET    /api/v1/civil-registry/sources                        civil-import.stage
+POST   /api/v1/civil-registry/sources/{source}/validate      civil-import.stage      (202: request recorded)
+POST   /api/v1/civil-registry/imports                        civil-import.stage      (202)
+POST   /api/v1/civil-registry/imports/{run}/abort            civil-import.stage      (202)
+POST   /api/v1/civil-registry/imports/{run}/assess           civil-import.validate   (202)
+POST   /api/v1/civil-registry/imports/{run}/prepare          civil-import.validate   (202)
+POST   /api/v1/civil-registry/releases/{release}/verify      civil-import.validate   (202)
 ```
 
-All routes sit behind `auth:sanctum` and `staff.side`. U1 has no write
-route: staging, validation and publication permissions arrive with U2 and
-U3. `famboook:verify-permissions` requires SUPER_ADMIN to hold all three and
-fails if any other role holds one.
+All routes sit behind `auth:sanctum` and `staff.side`. U2 write routes only
+RECORD a request (202); the dedicated import worker executes it, with its
+own logins (S-1/S-2). No route publishes: publication permissions arrive
+with U3. `famboook:verify-permissions` requires SUPER_ADMIN to hold all five
+and fails if any other role holds one.
 
 ---
 
@@ -4710,6 +4723,11 @@ Civil identity import management — read-only monitoring permissions (2026-10-2
 - **Database:** the API reads through the dedicated `famboook_identity_monitor` role on the metadata-only `identity_ref_monitor` views (X-6). Its credentials come from a protected file outside `.env` and the cached configuration (D-UI-9). The application role gains no identity privilege.
 - **Verifier:** `famboook:verify-permissions` requires the three on SUPER_ADMIN and refuses them on every other role.
 - **Not in U1:** staging, validation and publication permissions; they need U2 / U3 approval.
+- **Amended 2026-10-26 (FB-CIVIL-01A-UI U2, local, uncommitted):**
+  - **Seeded:** `civil-import.stage` and `civil-import.validate`, to SUPER_ADMIN only. Catalog 165 → 167; still eight roles; no other mapping changes.
+  - **Separation:** staging (and abort) and validation (assess, prepare, verify) are separate permissions, checked by route middleware and again by `QueueCivilImportRequestAction`. Cancelling needs `civil-import.stage`, or being the requester while still holding the queuing permission.
+  - **Execution:** the API records requests only; the worker executes them through its control-plane login (`famboook_civil_control`, 07-control-plane.dba.sql; decision O-1) and the FB-CIVIL-01A import login. Neither the application role nor the control role holds any identity privilege.
+  - **Not in U2:** publication (`civil-import.publish.request` / `.approve`, U3).
 
 ### AUTH-ADR-097
 Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)). *Status 2026-10-19: announcement authorization IMPLEMENTED LOCALLY (FB-NOTIFY-01B.2b.4 – 2b.6d, commits `da77d93` … `022acc8`), not deployed; follow-up authorization not implemented.*
@@ -5259,6 +5277,7 @@ Date: 2026-09-24
 | 1.2.75 | 2026-10-19 | Approved | FB-NOTIFY-01B.2b.7 documentation sync (AUTH-ADR-097 amended): the seven notification permissions seeded locally in 2b.6d recorded (SUPER_ADMIN, ADMINISTRATOR, COORDINATOR); §22a rows marked; §22b "Unified notifications" — routes, matrix, eight canonical roles, coordinator scope and the history / cancel exceptions, verifier guarantees; §140 note. Documentation only; follow-up permissions still PROPOSED |
 | 1.2.76 | 2026-10-19 | Approved | FB-NOTIFY-01E.3-F1 (AUTH-ADR-097 amended): the four follow-up permissions seeded locally (SUPER_ADMIN, ADMINISTRATOR: `notification-followup.*`; COORDINATOR: `coordinator-notification-followup.*`); view in the current scope, primary-coordinator-only management, never for the own household, CENTRAL fallback; §22a rows, §22b table, §140 note. Catalog 158 → 162; no role added; no other mapping change |
 | 1.2.77 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U1 (AUTH-ADR-098): §61c — `civil-import.view`, `civil-import.locations.view` and `civil-import.audit.view` seeded locally to SUPER_ADMIN only; nine read-only `/civil-registry` routes; verifier extended. Catalog 162 → 165; no role added; no other mapping change |
+| 1.2.78 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U2 (AUTH-ADR-098 amended): `civil-import.stage` and `civil-import.validate` seeded locally to SUPER_ADMIN only; execution-request routes (202, recorded only) and the cancel rule; verifier extended. Catalog 165 → 167; no role added; no other mapping change |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |
 | 1.2.30 | 2026-10-02 | Approved | PWA-1D hardening (AUTH-ADR-066): the `staff.side` boundary fails closed — the Staff API requires `AccountSide::STAFF`; FAMILY, INVALID and NONE (role-less or custom-role accounts) are refused even with a direct permission |

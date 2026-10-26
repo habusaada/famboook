@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportAuditController;
+use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportExecutionController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportMonitorController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -818,6 +819,25 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
             Route::get('/imports/{run}/issues', [CivilImportMonitorController::class, 'issues'])->whereUuid('run');
             Route::get('/releases', [CivilImportMonitorController::class, 'releases']);
             Route::get('/releases/{release}', [CivilImportMonitorController::class, 'release'])->whereNumber('release');
+            // U2: execution requests (read; cancel re-checks requester / civil-import.stage in the action).
+            Route::get('/requests', [CivilImportExecutionController::class, 'requests']);
+            Route::get('/requests/{request}', [CivilImportExecutionController::class, 'show'])->whereUuid('request');
+            Route::delete('/requests/{civilRequest}', [CivilImportExecutionController::class, 'cancel'])->whereUuid('civilRequest')
+                ->middleware('throttle:30,1');
+        });
+        // FB-CIVIL-01A-UI U2 — execution REQUESTS only: each write inserts a
+        // QUEUED civil_import_requests row (202); the dedicated worker executes
+        // it (S-1/S-2). Staging and validation have separate permissions.
+        Route::middleware(['can:civil-import.stage', 'throttle:30,1'])->group(function () {
+            Route::get('/sources', [CivilImportExecutionController::class, 'sources'])->withoutMiddleware('throttle:30,1');
+            Route::post('/sources/{source}/validate', [CivilImportExecutionController::class, 'validateSource'])->whereUuid('source');
+            Route::post('/imports', [CivilImportExecutionController::class, 'stage']);
+            Route::post('/imports/{run}/abort', [CivilImportExecutionController::class, 'abort'])->whereUuid('run');
+        });
+        Route::middleware(['can:civil-import.validate', 'throttle:30,1'])->group(function () {
+            Route::post('/imports/{run}/assess', [CivilImportExecutionController::class, 'assess'])->whereUuid('run');
+            Route::post('/imports/{run}/prepare', [CivilImportExecutionController::class, 'prepare'])->whereUuid('run');
+            Route::post('/releases/{release}/verify', [CivilImportExecutionController::class, 'verify'])->whereNumber('release');
         });
         Route::middleware('can:civil-import.locations.view')->group(function () {
             Route::get('/imports/{run}/files/locations', [CivilImportMonitorController::class, 'fileLocations'])->whereUuid('run');

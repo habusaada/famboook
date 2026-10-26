@@ -1446,7 +1446,15 @@ on the test instance and a real browser
     - three SUPER_ADMIN-only permissions (AUTH-ADR-098);
     - Arabic overview, history, run detail, release and audit pages.
     - Applying `06-monitor` on Production needs its own approval (S-5).
-  - **U2:** execution. **U3:** publication approval. Not started.
+  - **U1 committed** as `036d478`.
+  - **U2:** controlled execution, **local only, uncommitted**:
+    - the dedicated import worker (own entry point, non-root account, root-owned credential file);
+    - the control-plane tables and login (07-control-plane.dba.sql);
+    - the source catalogue, plus execution requests for validation, staging, resume, cancellation, abort, assessment, preparation and verification;
+    - `civil-import.stage` / `.validate`;
+    - the new-import wizard and run actions.
+    - **No publication.**
+  - **U3:** publication approval. Not started.
 - **FB-CIVIL-01B** (lookup by staff): not started; needs a separately approved baseline change (OD-09).
 
 ---
@@ -5242,6 +5250,7 @@ Date: 2026-09-24
 | 1.2.72 | 2026-10-16 | Approved | FB-GEO-01 Stage 5 progress (RM-ADR-069): Family PWA geography API and source-aware selector; RESIDENCE_UPDATE v2 and form blocked on approval |
 | 1.2.73 | 2026-10-16 | Approved | FB-GEO-01 RESIDENCE_UPDATE v2 (RM-ADR-070): v1-compatible versioned handler, family profile summaries, Family PWA selectors, PX-1 fixed; local only |
 | 1.2.74 | 2026-10-26 | Approved | FB-CIVIL program entry (X-4): FB-CIVIL-01A, FB-CIVIL-01A-UI U0 and U1 (read-only monitoring, local only), U2 / U3 and 01B not started |
+| 1.2.75 | 2026-10-26 | Approved | FB-CIVIL-01A-UI: U1 committed; U2 controlled execution implemented locally (worker, control plane, sources, requests, wizard); no publication |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

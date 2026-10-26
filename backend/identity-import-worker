@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+
+// FB-CIVIL-01A-UI U2 — entry point of the civil identity import worker
+// (docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md §4, D-UI-10). Run only by
+// deploy/systemd/famboook-identity-import-worker.service as the non-root
+// account famboook-import, with its root-owned EnvironmentFile.
+//
+// It boots Laravel WITHOUT the application's .env and WITHOUT the cached
+// configuration (which holds the application's database credentials): every
+// setting comes from the process environment the unit provides — the
+// control-plane login, the import login, the source root and the target. It
+// runs one command only: famboook:identity-ref-worker.
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+define('FAMBOOOK_IDENTITY_IMPORT_WORKER', true);
+
+if (($argv[1] ?? '') !== 'famboook:identity-ref-worker') {
+    fwrite(STDERR, "[WORKER_COMMAND_ONLY] This entry point runs famboook:identity-ref-worker only.\n");
+    exit(2);
+}
+
+// Never the cached configuration or the application's .env: point both at
+// paths that do not exist (relative to the application base path).
+foreach (['APP_CONFIG_CACHE' => 'bootstrap/cache/identity-import-worker-never-config.php'] as $key => $value) {
+    putenv("{$key}={$value}");
+    $_ENV[$key] = $_SERVER[$key] = $value;
+}
+
+require __DIR__.'/vendor/autoload.php';
+
+/** @var Application $app */
+$app = require_once __DIR__.'/bootstrap/app.php';
+$app->useEnvironmentPath(__DIR__.'/bootstrap/identity-import-worker-no-env');
+
+$status = $app->handleCommand(new ArgvInput);
+
+exit($status);

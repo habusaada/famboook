@@ -15,7 +15,7 @@ final class CivilImportAudit
 {
     public const LOCATIONS_VIEWED = 'LOCATIONS_VIEWED';
 
-    /** U1 writes LOCATIONS_VIEWED only; the other types arrive with U2/U3. */
+    /** U1 writes LOCATIONS_VIEWED; U2 the SOURCE_* and REQUEST_* events; U3 the PUBLICATION_* events. */
     public const EVENT_TYPES = [
         'SOURCE_CATALOGUED', 'SOURCE_UNAVAILABLE', 'REQUEST_QUEUED', 'REQUEST_CANCELLED', 'REQUEST_STARTED', 'REQUEST_SUCCEEDED',
         'REQUEST_FAILED', 'PUBLICATION_REQUESTED', 'PUBLICATION_WITHDRAWN', 'PUBLICATION_APPROVED', 'PUBLICATION_REJECTED',
@@ -29,7 +29,7 @@ final class CivilImportAudit
      * @param  array<string, string|int>  $details
      */
     public static function record(string $eventType, ?User $actor, ?string $runId = null, ?int $releaseId = null,
-        ?string $outcomeCode = null, array $details = []): CivilImportAuditEvent
+        ?string $outcomeCode = null, array $details = [], ?string $requestId = null): CivilImportAuditEvent
     {
         if (! in_array($eventType, self::EVENT_TYPES, true)) {
             throw new InvalidArgumentException('Unknown civil import audit event type.');
@@ -48,6 +48,7 @@ final class CivilImportAudit
             'actor_side' => $actor === null ? 'SYSTEM' : 'STAFF',
             'run_id' => $runId,
             'release_id' => $releaseId,
+            'request_id' => $requestId,
             'outcome_code' => $outcomeCode,
             'details' => $details === [] ? null : $details,
         ]);

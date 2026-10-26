@@ -92,7 +92,9 @@ class CivilRegistryMonitorAccessTest extends TestCase
     /** S-1: nothing reachable over HTTP can execute an identity import. */
     public function test_no_http_reachable_class_can_execute_an_import(): void
     {
-        $forbidden = '/identity_ref_import|IdentityImportSession|StageIdentityImportAction|PublishIdentityReleaseAction|famboook_identity_writer/';
+        // U2: the worker side (worker, catalogue, file verification) is never reachable from HTTP either.
+        $forbidden = '/identity_ref_import|IdentityImportSession|StageIdentityImportAction|PublishIdentityReleaseAction|famboook_identity_writer'
+            .'|IdentityImportWorker|CivilImportSourceCatalogue|IdentitySourceVerifier|IdentityManifest\b/';
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Http')));
         $checked = 0;
         foreach ($files as $file) {
@@ -103,12 +105,18 @@ class CivilRegistryMonitorAccessTest extends TestCase
         }
         $this->assertGreaterThan(50, $checked);
         $this->assertDoesNotMatchRegularExpression($forbidden, (string) file_get_contents(base_path('routes/api.php')));
-        $this->assertDoesNotMatchRegularExpression('/Route::(post|put|patch|delete)\([^\n]*CivilImport/', (string) file_get_contents(base_path('routes/api.php')), 'U1 is read-only');
+        // U2: writes exist only on the execution controller, whose action only records requests.
+        $routes = (string) file_get_contents(base_path('routes/api.php'));
+        $this->assertDoesNotMatchRegularExpression('/Route::(post|put|patch|delete)\([^\n]*CivilImport(Monitor|Audit)Controller/', $routes);
+        foreach (['app/Actions/QueueCivilImportRequestAction.php', 'app/Actions/CancelCivilImportRequestAction.php',
+            'app/Support/CivilImport/CivilImportControlPlane.php'] as $httpReachable) {
+            $this->assertDoesNotMatchRegularExpression($forbidden, (string) file_get_contents(base_path($httpReachable)), $httpReachable);
+        }
     }
 
-    public function test_the_permission_baseline_grants_the_three_permissions_to_super_admin_only(): void
+    public function test_the_permission_baseline_grants_the_civil_import_permissions_to_super_admin_only(): void
     {
-        $civil = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view'];
+        $civil = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view', 'civil-import.stage', 'civil-import.validate'];
         foreach ($civil as $permission) {
             $this->assertContains($permission, RolePermissionSeeder::PERMISSIONS);
         }

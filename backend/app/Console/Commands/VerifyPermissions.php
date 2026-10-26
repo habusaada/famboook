@@ -120,8 +120,9 @@ class VerifyPermissions extends Command
     /** Coordinator follow-up permissions (ADR-06 §2c): the COORDINATOR role only. */
     public const COORDINATOR_FOLLOWUP = ['coordinator-notification-followup.view', 'coordinator-notification-followup.manage'];
 
-    /** Civil identity import monitoring (FB-CIVIL-01A-UI U1, AUTH-ADR-098): SUPER_ADMIN only. */
-    public const CIVIL_IMPORT = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view'];
+    /** Civil identity import management (FB-CIVIL-01A-UI U1/U2, AUTH-ADR-098): SUPER_ADMIN only. */
+    public const CIVIL_IMPORT = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view',
+        'civil-import.stage', 'civil-import.validate'];
 
     /** The single gated permission and the only role that may ever hold it. */
     public const APPLY_PERMISSION = 'import.apply';

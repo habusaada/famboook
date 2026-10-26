@@ -1,5 +1,13 @@
 import type { StatusTone } from "@/components/shared/status-badge";
-import type { CivilImportFile, CivilImportPhase, CivilImportReleaseStatus, CivilImportRunStatus } from "@/lib/types/api/civil-registry";
+import type {
+  CivilImportAction,
+  CivilImportFile,
+  CivilImportPhase,
+  CivilImportReleaseStatus,
+  CivilImportRequestStatus,
+  CivilImportRequestType,
+  CivilImportRunStatus,
+} from "@/lib/types/api/civil-registry";
 
 // FB-CIVIL-01A-UI U1 — Arabic labels for the civil identity import screens.
 // Every value shown is a fixed code or a count; an unknown code is shown
@@ -17,6 +25,7 @@ export function dateLabel(iso: string | null | undefined): string {
 
 export const PHASE_LABELS: Record<CivilImportPhase, string> = {
   STAGING: "جارٍ التحميل",
+  STAGING_INTERRUPTED: "توقف التحميل — قابل للاستئناف",
   STAGED: "تم التحميل",
   PREPARING: "جارٍ التحضير",
   PREPARED: "تم التحضير",
@@ -30,6 +39,7 @@ export const PHASE_LABELS: Record<CivilImportPhase, string> = {
 
 export const PHASE_TONES: Record<CivilImportPhase, StatusTone> = {
   STAGING: "info",
+  STAGING_INTERRUPTED: "warning",
   STAGED: "neutral",
   PREPARING: "info",
   PREPARED: "neutral",
@@ -168,3 +178,99 @@ export const SCOPE_LABELS: Record<string, string> = {
 };
 
 export const label = (map: Record<string, string>, code: string | null | undefined) => (code ? (map[code] ?? code) : "—");
+
+// ---- U2: execution requests
+
+export const REQUEST_TYPE_LABELS: Record<CivilImportRequestType, string> = {
+  VALIDATE_SOURCE: "التحقق من المصدر",
+  STAGE: "التحميل",
+  ABORT: "إلغاء العملية",
+  ASSESS: "التقييم والمعاينة",
+  PREPARE: "تحضير الإصدار",
+  VERIFY: "التحقق من الإصدار",
+};
+
+export const REQUEST_STATUS_LABELS: Record<CivilImportRequestStatus, string> = {
+  QUEUED: "في الانتظار",
+  RUNNING: "قيد التنفيذ",
+  SUCCEEDED: "نجح",
+  FAILED: "فشل",
+  CANCELLED: "أُوقف",
+};
+
+export const REQUEST_STATUS_TONES: Record<CivilImportRequestStatus, StatusTone> = {
+  QUEUED: "info",
+  RUNNING: "info",
+  SUCCEEDED: "success",
+  FAILED: "danger",
+  CANCELLED: "neutral",
+};
+
+/** The operator's actions; each records a request that the worker executes. */
+export const ACTION_LABELS: Record<CivilImportAction, string> = {
+  STAGE: "استئناف التحميل",
+  ASSESS: "تقييم ومعاينة",
+  PREPARE: "تحضير الإصدار",
+  VERIFY: "التحقق من الإصدار",
+  ABORT: "إلغاء العملية",
+};
+
+export const ACTION_CONFIRMATIONS: Record<CivilImportAction, string> = {
+  STAGE: "سيستأنف عامل الاستيراد تحميل الملفات من آخر نقطة محفوظة.",
+  ASSESS: "سيقيّم عامل الاستيراد البيانات المحمّلة ويقارنها بالإصدار النشط دون كتابة أي شيء.",
+  PREPARE: "سيبني عامل الاستيراد الإصدار المرشح وفق السياسة المعتمدة. لا يتغير الإصدار النشط ولا يُنشر شيء.",
+  VERIFY: "سيتحقق عامل الاستيراد من أن الإصدار المرشح يطابق تصنيفه تمامًا. لا يُنشر شيء.",
+  ABORT: "ستُغلق العملية نهائيًا ويُترك إصدارها المرشح ويُحذف تحميلها. لا يتأثر الإصدار النشط. لا يمكن التراجع.",
+};
+
+export const ABORT_REASON_LABELS: Record<string, string> = {
+  OPERATOR_DECISION: "قرار المشغّل",
+  SOURCE_REPLACED: "استُبدل المصدر بآخر",
+  DATA_PROBLEM: "مشكلة في البيانات",
+};
+
+export const SOURCE_PROBLEM_LABELS: Record<string, string> = {
+  CHECKSUM_MISMATCH: "بصمة ملف لا تطابق ملف البيان",
+  ROW_COUNT_MISMATCH: "عدد السطور لا يطابق ملف البيان",
+  HEADER_MISMATCH: "ترويسة الأعمدة غير مطابقة",
+  BOM_MISSING: "علامة الترميز مفقودة",
+  EMPTY_FILE: "ملف فارغ",
+  UNREADABLE: "ملف غير قابل للقراءة",
+  FILE_MISSING: "ملف مذكور في البيان غير موجود",
+  FILE_IS_SYMLINK: "ملف هو رابط رمزي (مرفوض)",
+  FILE_OUTSIDE_DIRECTORY: "ملف خارج مجلد المصدر (مرفوض)",
+  UNEXPECTED_ENTRIES: "ملفات غير مذكورة في البيان",
+  MANIFEST_MISSING: "ملف البيان مفقود",
+  MANIFEST_NOT_JSON: "ملف البيان ليس JSON صالحًا",
+  MANIFEST_NOT_AN_OBJECT: "بنية ملف البيان غير صالحة",
+  MANIFEST_TOO_LARGE: "ملف البيان أكبر من المسموح",
+  MANIFEST_TABLE_INVALID: "اسم الجدول في البيان غير صالح",
+  MANIFEST_COLUMNS_MISMATCH: "أعمدة البيان لا تطابق الأعمدة المعتمدة",
+  MANIFEST_ENCODING_NOT_UTF8: "ترميز البيان ليس UTF-8",
+  MANIFEST_TOTAL_ROWS_INVALID: "إجمالي السطور في البيان غير صالح",
+  MANIFEST_TOTAL_ROWS_MISMATCH: "إجمالي السطور لا يساوي مجموع الملفات",
+  MANIFEST_FILES_INVALID: "قائمة الملفات في البيان غير صالحة",
+  MANIFEST_FILE_NAME_UNSAFE: "اسم ملف غير آمن في البيان",
+  MANIFEST_FILE_DUPLICATED: "ملف مكرر في البيان",
+  MANIFEST_FILE_ENTRY_INVALID: "مدخل ملف غير صالح في البيان",
+  MANIFEST_FILE_COUNT_NOT_APPROVED: "عدد الملفات غير المعتمد",
+  MANIFEST_ROW_COUNT_NOT_APPROVED: "عدد السطور غير المعتمد",
+  DIRECTORY_INVALID: "مجلد المصدر غير صالح",
+  SOURCE_CHANGED: "تغيّر ملف أثناء التحميل",
+  OTHER: "ملاحظة أخرى",
+};
+
+export const FATAL_LABELS: Record<string, string> = {
+  RUN_NOT_FOUND: "العملية غير موجودة",
+  RUN_NOT_RUNNING: "العملية ليست مفتوحة",
+  SOURCE_TABLE_UNSUPPORTED: "الجدول المصدر غير مدعوم",
+  STAGING_INCOMPLETE: "التحميل غير مكتمل",
+  CHECKSUM_NOT_VERIFIED: "لم يُتحقق من البصمات",
+  ROW_COUNT_INCONSISTENT: "أعداد السطور غير متسقة",
+  RELEASE_STATE_INVALID: "حالة الإصدار غير صالحة",
+  COMPARISON_POLICY_UNSUPPORTED: "سياسة المقارنة غير مدعومة",
+  QUARANTINE_NOT_ALLOWED: "السياسة لا تسمح بأي سطر محجور",
+  QUARANTINE_THRESHOLD_EXCEEDED: "تجاوز حد الحجر",
+  QUARANTINE_UNRESOLVED: "سياسة الحجر غير محسومة",
+  BLANK_FIELD_UNRESOLVED: "سياسة الحقول الفارغة غير محسومة",
+};

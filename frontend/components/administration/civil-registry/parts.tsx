@@ -76,11 +76,11 @@ export function CivilRegistryNav() {
   );
 }
 
-/** U1 is monitoring only: no control here starts, changes or publishes an import. */
+/** U2: actions only record requests for the dedicated worker; nothing here publishes a release. */
 export function ReadOnlyNote() {
   return (
     <p className="text-[13px] text-muted-foreground" data-read-only-note>
-      هذه الشاشات للمتابعة فقط: لا يمكن من هنا تشغيل الاستيراد أو نشر إصدار. تُعرض الأعداد والرموز فقط، دون أي بيانات هوية.
+      الإجراءات هنا تسجّل طلبات ينفّذها عامل الاستيراد المخصص، ولا يمكن من هنا نشر إصدار. تُعرض الأعداد والرموز فقط، دون أي بيانات هوية.
     </p>
   );
 }
@@ -153,5 +153,21 @@ export function ShortId({ id }: { id: string }) {
     <bdi dir="ltr" title={id} className="font-mono text-xs tracking-wide">
       {id.slice(0, 8)}
     </bdi>
+  );
+}
+
+/** The new-import wizard entry, for civil-import.stage holders only (UX; the API authorizes). */
+export function NewImportLink() {
+  const { can } = useAuth();
+  if (!can("civil-import.stage")) return null;
+
+  return (
+    <Link
+      href="/administration/civil-registry/imports/new"
+      className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80"
+      data-new-import
+    >
+      استيراد جديد
+    </Link>
   );
 }

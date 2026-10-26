@@ -436,6 +436,21 @@ servers.
   `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. It needs its own approved deployment plan.
 - **This amendment changes nothing on the servers.**
 
+## 16-civil. Civil identity import worker (FB-CIVIL-01A-UI U2; not installed)
+
+A SEPARATE worker from the notification worker above (X-5; `docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md` §4). Nothing here is installed, enabled or started by any script; installing it is a separate, approved Production step, after the FB-CIVIL-01A real-data gates.
+
+| Item | Value |
+|---|---|
+| Unit | `deploy/systemd/famboook-identity-import-worker.service` (`Restart=on-failure`, `ProtectSystem=strict`, source root read-only, `backend/.env` and `bootstrap/cache/config.php` inaccessible) |
+| Account | `famboook-import`: system user, non-root, no login shell; reads the application code, owns the source root `/var/lib/famboook-import` (0700) |
+| Credentials | `/etc/famboook/identity-import-worker.env`, `root:root 0600` (template `deploy/env/identity-import-worker.env.example`): the control-plane login, the import login, the target database, the source root. Never `backend/.env`. |
+| Entry point | `backend/identity-import-worker famboook:identity-ref-worker`: boots without `backend/.env` and without the cached configuration; refuses any other command; plain `artisan` refuses the worker |
+| Database | `07-control-plane.dba.sql` (DBA, after the migrations; re-run after a restore): `famboook_civil_control_login` → `famboook_civil_control` (requests, catalogue, heartbeats, audit only). The import login is the FB-CIVIL-01A `famboook_identity_import`. The worker refuses to start if the logins share roles or the control login is a superuser. |
+| Health | `civil_import_worker_heartbeats`: the overview shows IDLE / BUSY / STALE (no heartbeat for 120 s) / NOT_INSTALLED. A RUNNING request without a heartbeat for 10 minutes is closed `WORKER_LOST` at the next start; its operation is resumable. |
+| Stop | `systemctl stop famboook-identity-import-worker`: stops after the current request; a running staging or preparation resumes from its last committed chunk on the next request |
+| Production gate | Without `IDENTITY_REF_PRODUCTION_APPROVAL` in the credential file the worker refuses every request in production (`NOT_APPROVED`). Publication is not implemented in U2. |
+
 ---
 
 # 16a. Family Portal activation prerequisites (not yet applicable)

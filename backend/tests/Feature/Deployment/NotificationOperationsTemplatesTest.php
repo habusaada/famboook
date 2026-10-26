@@ -151,7 +151,9 @@ class NotificationOperationsTemplatesTest extends TestCase
         $this->assertDirectoryDoesNotExist(base_path('../deploy/cron'), 'no cron scheduler in parallel with the timer (O2)');
         $units = array_map('basename', glob(base_path('../deploy/systemd/*')));
         sort($units);
-        $this->assertSame(['famboook-notifications-worker.service', 'famboook-scheduler.service', 'famboook-scheduler.timer'], $units);
+        // The civil identity import worker (FB-CIVIL-01A-UI U2, ADR §4) is a separate, non-queue unit.
+        $this->assertSame(['famboook-identity-import-worker.service', 'famboook-notifications-worker.service', 'famboook-scheduler.service',
+            'famboook-scheduler.timer'], $units);
         // The health script watches the one worker unit (O1).
         $this->assertStringContainsString('UNIT="famboook-notifications-worker"', $this->deploy('scripts/notifications-health.sh'));
     }

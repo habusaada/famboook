@@ -8,6 +8,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
 use PDO;
+use Tests\Support\CivilImport\CivilImportHarness;
 use Tests\Support\IdentityRef\IdentityRefDatabase;
 use Tests\Support\IdentityRef\IdentityRefRelease;
 use Tests\Support\IdentityRef\IdentityRefStaging;
@@ -86,6 +87,7 @@ class CivilRegistryMonitorApiPostgresTest extends TestCase
             return;
         }
         DB::purge('identity_ref_monitor');
+        CivilImportHarness::truncateCivilImportTables();
         $this->tearDownIdentityRefStaging();
         $this->tearDownIdentityRef();
         parent::tearDown();

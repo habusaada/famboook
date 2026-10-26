@@ -14,6 +14,7 @@ import {
   CivilRegistryNav,
   LoadingBlock,
   MonitorError,
+  NewImportLink,
   Num,
   PhaseBadge,
   ReadOnlyNote,
@@ -23,7 +24,7 @@ import { RUN_STATUS_LABELS, dateLabel } from "@/components/administration/civil-
 
 const FILTERS: (CivilImportRunStatus | null)[] = [null, "RUNNING", "SUCCEEDED", "FAILED", "REJECTED", "NOTHING_TO_DO"];
 
-/** /administration/civil-registry/imports — every import run, newest first (U1, read-only). */
+/** /administration/civil-registry/imports — every import run, newest first (U1; U2: the active request and the new-import entry). */
 export function ImportHistory() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<CivilImportRunStatus | null>(null);
@@ -31,7 +32,11 @@ export function ImportHistory() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="سجل الاستيراد" description="عمليات استيراد مرجع الهوية المدنية: المرحلة والأعداد والملاحظات." />
+      <PageHeader
+        title="سجل الاستيراد"
+        description="عمليات استيراد مرجع الهوية المدنية: المرحلة والأعداد والملاحظات."
+        actions={<NewImportLink />}
+      />
       <CivilRegistryNav />
       <ReadOnlyNote />
 

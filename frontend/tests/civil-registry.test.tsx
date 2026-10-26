@@ -55,6 +55,7 @@ function overview(overrides: Partial<CivilImportOverview> = {}): CivilImportOver
     worker: { state: "NOT_INSTALLED", last_seen_at: null },
     publication_enabled: false,
     pending_publication_requests: 0,
+    active_request: null,
     ...overrides,
   };
 }
@@ -88,6 +89,7 @@ function detail(overrides: Partial<CivilImportRunDetail> = {}): CivilImportRunDe
     ],
     release: { id: 4, status: "BUILDING", base_release_id: 3, preparation_status: "VERIFIED" },
     allowed_actions: [],
+    source: null,
     active_request: null,
     ...overrides,
   };

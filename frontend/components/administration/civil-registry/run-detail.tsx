@@ -17,12 +17,15 @@ import {
   useCivilImportIssueLocations,
   useCivilImportIssues,
   useCivilImportRelease,
+  useCivilImportRequests,
   useCivilImportRun,
   useRevealFileLocations,
 } from "@/lib/api/civil-registry";
 import type { CivilImportPhase, CivilImportRunDetail } from "@/lib/types/api/civil-registry";
 import { AuditTimeline } from "@/components/administration/civil-registry/audit-history";
 import { ComparisonCounts, ReleaseSummary } from "@/components/administration/civil-registry/releases";
+import { ActiveRequestCard, RequestHistory, RequestResultView } from "@/components/administration/civil-registry/request-panel";
+import { RunActions } from "@/components/administration/civil-registry/run-actions";
 import {
   CivilRegistryNav,
   LoadingBlock,
@@ -46,7 +49,8 @@ type StepState = "done" | "active" | "current" | "waiting";
 
 function stepStates(phase: CivilImportPhase): StepState[] | null {
   if (phase === "NOTHING_TO_DO") return PHASE_STEPS.map((_, i) => (i <= 1 ? "done" : "waiting"));
-  const at = PHASE_STEPS.indexOf(phase);
+  // An interrupted staging is the staging step, paused (resumable).
+  const at = PHASE_STEPS.indexOf(phase === "STAGING_INTERRUPTED" ? "STAGING" : phase);
   if (at < 0) return null;
   return PHASE_STEPS.map((_, i) =>
     i < at ? "done" : i > at ? "waiting" : ACTIVE_PHASES.has(phase) ? "active" : phase === "PUBLISHED" ? "done" : "current",
@@ -346,7 +350,25 @@ function ReleaseTabs({ releaseId, view }: { releaseId: number | null; view: "com
   return <ComparisonCounts counts={release.data.preparation.counts} warnings={release.data.preparation.warnings} />;
 }
 
-/** /administration/civil-registry/imports/[runId] (U1, read-only: allowed_actions is always empty). */
+/** The latest successful assessment of the run: the comparison preview before (and besides) preparation. */
+function AssessmentPreview({ runId }: { runId: string }) {
+  const requests = useCivilImportRequests(runId, 1);
+  const latest = requests.data?.data.find((r) => r.type === "ASSESS" && r.status === "SUCCEEDED");
+  if (!latest) return null;
+
+  return (
+    <div className="flex flex-col gap-2" data-assessment-preview>
+      <SectionHeader title="آخر تقييم ومعاينة" description="نتيجة آخر طلب تقييم: أعداد ورموز فقط، دون كتابة أي شيء." />
+      <RequestResultView request={latest} />
+    </div>
+  );
+}
+
+/**
+ * /administration/civil-registry/imports/[runId]. U2: the allowed actions
+ * (each records a request for the worker), the active request and the run's
+ * request history. No publication action.
+ */
 export function RunDetail({ runId }: { runId: string }) {
   const { can } = useAuth();
   const run = useCivilImportRun(runId);
@@ -366,6 +388,8 @@ export function RunDetail({ runId }: { runId: string }) {
       />
       <CivilRegistryNav />
       <ReadOnlyNote />
+      {run.data && <RunActions run={run.data} />}
+      {run.data?.active_request && <ActiveRequestCard request={run.data.active_request} />}
 
       {run.isPending ? (
         <LoadingBlock rows={6} />
@@ -379,6 +403,7 @@ export function RunDetail({ runId }: { runId: string }) {
             <TabsTrigger value="validation">التحقق</TabsTrigger>
             <TabsTrigger value="comparison">المقارنة</TabsTrigger>
             <TabsTrigger value="release">الإصدار</TabsTrigger>
+            <TabsTrigger value="requests">الطلبات</TabsTrigger>
             {canAudit && <TabsTrigger value="audit">التدقيق</TabsTrigger>}
           </TabsList>
           <Panel className="mt-3">
@@ -392,10 +417,16 @@ export function RunDetail({ runId }: { runId: string }) {
               <IssueSummary runId={run.data.id} canLocate={canLocate} />
             </TabsContent>
             <TabsContent value="comparison">
-              <ReleaseTabs releaseId={run.data.release_id} view="comparison" />
+              <div className="flex flex-col gap-5">
+                <AssessmentPreview runId={run.data.id} />
+                <ReleaseTabs releaseId={run.data.release_id} view="comparison" />
+              </div>
             </TabsContent>
             <TabsContent value="release">
               <ReleaseTabs releaseId={run.data.release_id} view="release" />
+            </TabsContent>
+            <TabsContent value="requests">
+              <RequestHistory runId={run.data.id} />
             </TabsContent>
             {canAudit && (
               <TabsContent value="audit">

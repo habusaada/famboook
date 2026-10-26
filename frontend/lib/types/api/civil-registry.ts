@@ -1,10 +1,22 @@
-// FB-CIVIL-01A-UI U1 — civil identity import monitoring (read-only, metadata
-// only). Mirrors CivilImportRunResource, CivilImportRunDetailResource,
-// CivilImportReleaseResource and CivilImportAuditEventResource. These types
-// hold no identity value by construction: the API never returns one.
+// FB-CIVIL-01A-UI — civil identity import management (metadata only). U1:
+// CivilImportRunResource, CivilImportRunDetailResource,
+// CivilImportReleaseResource, CivilImportAuditEventResource. U2: execution
+// requests (CivilImportRequestResource) and catalogued sources
+// (CivilImportSourceResource). These types hold no identity value, path or
+// file name by construction: the API never returns one.
 
 export type CivilImportPhase =
-  "STAGING" | "STAGED" | "PREPARING" | "PREPARED" | "VERIFIED" | "PUBLISHED" | "REJECTED" | "ABORTED" | "FAILED" | "NOTHING_TO_DO";
+  | "STAGING"
+  | "STAGING_INTERRUPTED"
+  | "STAGED"
+  | "PREPARING"
+  | "PREPARED"
+  | "VERIFIED"
+  | "PUBLISHED"
+  | "REJECTED"
+  | "ABORTED"
+  | "FAILED"
+  | "NOTHING_TO_DO";
 
 export type CivilImportRunStatus = "RUNNING" | "SUCCEEDED" | "FAILED" | "REJECTED" | "NOTHING_TO_DO";
 
@@ -26,6 +38,7 @@ export interface CivilImportOverview {
   };
   publication_enabled: boolean;
   pending_publication_requests: number;
+  active_request: CivilImportRequest | null;
 }
 
 export interface CivilImportRun {
@@ -69,8 +82,11 @@ export interface CivilImportRunDetail extends CivilImportRun {
     base_release_id: number | null;
     preparation_status: string | null;
   } | null;
-  allowed_actions: string[];
-  active_request: null;
+  /** A hint (phase ∩ permissions); the API and the worker re-check everything. */
+  allowed_actions: CivilImportAction[];
+  active_request: CivilImportRequest | null;
+  /** The catalogued source of a run staged from the UI; label only for civil-import.stage holders (O-2). */
+  source: { id: string; label: string | null; available: boolean } | null;
 }
 
 export interface CivilImportIssueCount {
@@ -142,4 +158,81 @@ export interface CivilImportPageMeta {
   last_page: number;
   per_page: number;
   total: number;
+}
+
+// ---- U2: execution requests and sources
+
+export type CivilImportAction = "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY";
+
+export type CivilImportRequestType = "VALIDATE_SOURCE" | "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY";
+
+export type CivilImportRequestStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+
+/** Counts and codes only (CivilImportResult allow-list). */
+export interface CivilImportRequestResult {
+  run_id?: string;
+  release_id?: number;
+  resumed?: boolean;
+  publishable?: boolean;
+  manifest?: string;
+  files?: number;
+  total_rows?: number;
+  rows_staged?: number;
+  rows_loaded_now?: number;
+  files_staged_now?: number;
+  chunks_loaded?: number;
+  base_release?: number;
+  rows_purged?: number;
+  counts?: Partial<CivilImportCounts>;
+  issues?: Record<string, number>;
+  conflicts?: Record<string, number>;
+  warnings?: Record<string, number>;
+  problems?: Record<string, number>;
+  fatal?: string[];
+  blocked?: string[];
+  policy_id?: string;
+  duration_seconds?: number;
+}
+
+export interface CivilImportRequest {
+  id: string;
+  type: CivilImportRequestType;
+  status: CivilImportRequestStatus;
+  requested_by: { name: string } | null;
+  source: { id: string; label: string | null } | null;
+  run_id: string | null;
+  release_id: number | null;
+  attempts: number;
+  reason_code: string | null;
+  /** Fixed Arabic text of reason_code (never source data). */
+  message: string | null;
+  result: CivilImportRequestResult;
+  cancel_requested: boolean;
+  can_cancel: boolean;
+  queued_at: string | null;
+  started_at: string | null;
+  heartbeat_at: string | null;
+  finished_at: string | null;
+}
+
+export interface CivilImportSource {
+  id: string;
+  /** The directory's safe label (O-2); never a path. */
+  label: string;
+  table: string | null;
+  files: number | null;
+  total_rows: number | null;
+  available: boolean;
+  manifest_status: "VALID" | "INVALID";
+  manifest_problems: Record<string, number>;
+  discovered_at: string | null;
+  last_seen_at: string | null;
+  last_validation: {
+    request_id: string;
+    status: CivilImportRequestStatus;
+    reason_code: string | null;
+    problems: Record<string, number>;
+    finished_at: string | null;
+  } | null;
+  staged_run_id: string | null;
 }

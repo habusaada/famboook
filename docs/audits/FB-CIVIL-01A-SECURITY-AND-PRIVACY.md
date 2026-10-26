@@ -31,6 +31,16 @@ This is **population-scale, highly sensitive personal data**, far beyond the ope
   - The API reads only the `identity_ref_monitor` views, through the dedicated `famboook_identity_monitor` role. These are counts, codes, ordinals and timestamps; file names and line numbers need `locations.view` and are audited.
   - Identity values remain unreachable from any API, page or export. `famboook_app` still has no privilege on `identity_ref`.
   - Imports are still run from the shell (execution arrives with U2).
+- **Amended 2026-10-26 (FB-CIVIL-01A-UI U2, local):**
+  - Authorized staff (`civil-import.stage` / `.validate`, SUPER_ADMIN only) can REQUEST validation, staging, abort, assessment, preparation and verification. The web application only records the request.
+  - A dedicated worker executes it:
+    - as the non-root `famboook-import` account;
+    - with credentials only from a root-owned file;
+    - never reading `backend/.env` or the cached configuration;
+    - through two separate least-privilege logins (control plane / identity import).
+  - Sources are server-side directories only (opaque id and safe label; no path, no upload).
+  - Results, audit events and API responses hold counts and codes only.
+  - Publication stays shell-only and gated (U3).
 - **Immutability (FB-CIVIL-D01):** privileges plus triggers. No edit or delete path exists for any user, SUPER_ADMIN included [APPROVED].
 - **Future (01B):**
   - only with a separately approved baseline change (OD-09: `docs/03` §47e forbids global National ID search);

@@ -49,6 +49,10 @@ operator (server shell, approved window)
 
   A later web trigger can enqueue the same command on a dedicated queue; that's out of scope here.
 
+  *Recorded 2026-10-26 (FB-CIVIL-01A-UI U2, X-2):* the later web trigger is a **dedicated import worker**, not the notification queue worker and not a Laravel queue:
+  - `backend/identity-import-worker` / `famboook:identity-ref-worker`, run by systemd as the non-root `famboook-import` account;
+  - it executes requests recorded by the Staff application in `civil_import_requests`, through the same FB-CIVIL-01A actions (`docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md` §4).
+
 **Orchestration code [PROPOSED]:**
 
 | Class | Role |

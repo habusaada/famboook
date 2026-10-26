@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 /**
  * A run with its files (by ordinal only, D-UI-8), counters and release
  * (FB-CIVIL-01A-UI U1). File names are served only by the locations endpoint.
+ * U2 adds allowed_actions (a hint: phase ∩ permissions), the active request
+ * and the run's source.
  *
  * @property array<string, mixed> $resource
  */
@@ -41,6 +43,8 @@ class CivilImportRunDetailResource extends CivilImportRunResource
             ],
             'allowed_actions' => $r['allowed_actions'],
             'active_request' => $r['active_request'],
+            // U2: the catalogued source of a run staged from the UI (label for civil-import.stage holders only).
+            'source' => $r['source'] ?? null,
         ];
     }
 }

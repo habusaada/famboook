@@ -1,0 +1,76 @@
+# Famboook — civil identity import worker (FB-CIVIL-01A-UI U2 TEMPLATE).
+#
+# Executes the import requests the Staff application records
+# (civil_import_requests): source validation, staging, abort, assessment,
+# preparation and verification through the FB-CIVIL-01A engine. NEVER
+# publication (not implemented in U2). It is NOT the notification worker
+# (docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md §4, D-UI-5, D-UI-10).
+#
+# NOT INSTALLED, NOT ENABLED, NOT STARTED by any script. Installing it is a
+# separate, approved Production step (docs/08 §16a) and needs, first:
+#   - the OS account (non-root, no login shell):
+#       sudo useradd --system --no-create-home --shell /usr/sbin/nologin famboook-import
+#   - the source root, owned by it (operators place exports with sudo -u famboook-import):
+#       sudo install -d -m 700 -o famboook-import -g famboook-import /var/lib/famboook-import
+#   - the root-owned credential file (never in the repository, never backend/.env):
+#       sudo install -m 600 -o root -g root /dev/null /etc/famboook/identity-import-worker.env
+#     filled from deploy/env/identity-import-worker.env.example;
+#   - 07-control-plane.dba.sql applied and both logins enabled by the DBA;
+#   - read access for famboook-import to the application code, but NOT to
+#     backend/.env or backend/bootstrap/cache/config.php (both 640 deploy:www-data).
+#
+#   sudo cp deploy/systemd/famboook-identity-import-worker.service /etc/systemd/system/
+#   sudo systemd-analyze verify /etc/systemd/system/famboook-identity-import-worker.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now famboook-identity-import-worker
+#
+# The entry point backend/identity-import-worker boots Laravel WITHOUT
+# backend/.env and WITHOUT the cached configuration: every setting comes from
+# the EnvironmentFile below, which systemd reads as root before dropping to
+# famboook-import. Adjust <PHP_BINARY> (e.g. /usr/bin/php8.3); `pcntl` is
+# needed for a clean stop after the current request.
+
+[Unit]
+Description=Famboook civil identity import worker
+Documentation=file:///var/www/famboook/docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=famboook-import
+Group=famboook-import
+WorkingDirectory=/var/www/famboook/backend
+EnvironmentFile=/etc/famboook/identity-import-worker.env
+UMask=0077
+ExecStart=<PHP_BINARY> identity-import-worker famboook:identity-ref-worker --no-interaction
+Restart=on-failure
+RestartSec=30
+# A running staging or preparation stops at its next committed chunk on the
+# next start anyway (resumable); give the current chunk time to commit.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+# Logs (redacted identity_ref.* events: ids, counts, codes, safe file names)
+# go to the journal only: journalctl -u famboook-identity-import-worker.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=famboook-identity-import-worker
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# The source root is read-only for the worker; nothing in the application is writable.
+ReadOnlyPaths=/var/lib/famboook-import
+InaccessiblePaths=-/var/www/famboook/backend/.env -/var/www/famboook/backend/bootstrap/cache/config.php
+
+[Install]
+WantedBy=multi-user.target

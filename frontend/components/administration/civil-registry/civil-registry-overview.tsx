@@ -11,20 +11,22 @@ import {
   CivilRegistryNav,
   LoadingBlock,
   MonitorError,
+  NewImportLink,
   Num,
   PhaseBadge,
   ReadOnlyNote,
   ShortId,
 } from "@/components/administration/civil-registry/parts";
 import { WORKER_LABELS, dateLabel, label } from "@/components/administration/civil-registry/labels";
+import { ActiveRequestCard } from "@/components/administration/civil-registry/request-panel";
 
-/** /administration/civil-registry — the state of civil identity imports at a glance (U1, read-only). */
+/** /administration/civil-registry — the state of civil identity imports at a glance (U1; U2: the active request and the new-import entry). */
 export function CivilRegistryOverview() {
   const overview = useCivilImportOverview();
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="استيراد السجل المدني" description="متابعة استيراد مرجع الهوية المدنية وإصداراته." />
+      <PageHeader title="استيراد السجل المدني" description="متابعة استيراد مرجع الهوية المدنية وإصداراته." actions={<NewImportLink />} />
       <CivilRegistryNav />
       <ReadOnlyNote />
 
@@ -42,6 +44,7 @@ export function CivilRegistryOverview() {
 function OverviewBody({ data }: { data: CivilImportOverview }) {
   return (
     <>
+      {data.active_request && <ActiveRequestCard request={data.active_request} />}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           icon={Archive}

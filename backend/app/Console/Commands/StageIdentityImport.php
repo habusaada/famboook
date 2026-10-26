@@ -6,6 +6,7 @@ use App\Actions\PublishIdentityReleaseAction;
 use App\Actions\StageIdentityImportAction;
 use App\Exceptions\IdentityImportException;
 use App\Support\IdentityRef\IdentityImportPolicy;
+use App\Support\IdentityRef\IdentityRefProductionGate;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -60,7 +61,7 @@ class StageIdentityImport extends Command
     private const READ_ONLY_MODES = ['validate', 'preview', 'status'];
 
     /** Shell variable carrying the Production approval reference (read from the process environment, not from config). */
-    public const PRODUCTION_APPROVAL_VARIABLE = 'IDENTITY_REF_PRODUCTION_APPROVAL';
+    public const PRODUCTION_APPROVAL_VARIABLE = IdentityRefProductionGate::VARIABLE;
 
     public function handle(StageIdentityImportAction $stager, PublishIdentityReleaseAction $releases): int
     {
@@ -72,8 +73,9 @@ class StageIdentityImport extends Command
         }
         $mode = $modes[0] ?? 'stage';
         if (app()->environment('production')) {
-            $approval = (string) getenv(self::PRODUCTION_APPROVAL_VARIABLE);
-            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:\/-]{2,63}$/', $approval) !== 1) {
+            // The shared Production gate (FB-CIVIL-01A-UI X-7): the worker applies the same rule.
+            $approval = (string) IdentityRefProductionGate::reference();
+            if (! IdentityRefProductionGate::allows()) {
                 $this->error('[NOT_APPROVED] Production use needs an approval reference in '.self::PRODUCTION_APPROVAL_VARIABLE.' (operator shell only).');
 
                 return self::FAILURE;
