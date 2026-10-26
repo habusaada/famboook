@@ -44,6 +44,8 @@ class CivilImportMonitorController extends Controller
             $overview['current_run']['phase'] = $this->control->phase($overview['current_run']['phase'], $overview['current_run']['id'], $active);
         }
 
+        $overview['pending_publication_requests'] = $this->control->pendingPublications();
+
         return response()->json(['data' => $overview + [
             'active_request' => $active === null ? null : (new CivilImportRequestResource($active->load(['requester', 'source'])))->toArray($request),
         ]]);

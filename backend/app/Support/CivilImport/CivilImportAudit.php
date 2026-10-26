@@ -29,7 +29,7 @@ final class CivilImportAudit
      * @param  array<string, string|int>  $details
      */
     public static function record(string $eventType, ?User $actor, ?string $runId = null, ?int $releaseId = null,
-        ?string $outcomeCode = null, array $details = [], ?string $requestId = null): CivilImportAuditEvent
+        ?string $outcomeCode = null, array $details = [], ?string $requestId = null, ?string $publicationRequestId = null): CivilImportAuditEvent
     {
         if (! in_array($eventType, self::EVENT_TYPES, true)) {
             throw new InvalidArgumentException('Unknown civil import audit event type.');
@@ -49,6 +49,7 @@ final class CivilImportAudit
             'run_id' => $runId,
             'release_id' => $releaseId,
             'request_id' => $requestId,
+            'publication_request_id' => $publicationRequestId,
             'outcome_code' => $outcomeCode,
             'details' => $details === [] ? null : $details,
         ]);

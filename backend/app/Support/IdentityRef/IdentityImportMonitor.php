@@ -64,7 +64,7 @@ final class IdentityImportMonitor
             ],
             'worker' => ['state' => 'NOT_INSTALLED', 'last_seen_at' => null],   // U2
             'publication_enabled' => config('civil_import.publish_enabled') === true,
-            'pending_publication_requests' => 0,                                  // U3
+            'pending_publication_requests' => 0,     // filled from the control plane (U3)
         ];
     }
 

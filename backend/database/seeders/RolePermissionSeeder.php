@@ -254,16 +254,18 @@ class RolePermissionSeeder extends Seeder
         'import.review',
         'import.apply',
 
-        // §61c Civil identity import management (FB-CIVIL-01A-UI U1/U2,
+        // §61c Civil identity import management (FB-CIVIL-01A-UI U1–U3,
         // AUTH-ADR-098): metadata-only monitoring; no identity value is ever
         // exposed. U2: queue staging (and abort) and validation requests,
-        // executed by the dedicated worker. Publication permissions arrive
-        // with U3.
+        // executed by the dedicated worker. U3: request publication, and
+        // approve another user's request (gated, PUBLICATION_GATED_ROLE_PERMISSIONS).
         'civil-import.view',
         'civil-import.locations.view',
         'civil-import.audit.view',
         'civil-import.stage',
         'civil-import.validate',
+        'civil-import.publish.request',
+        'civil-import.publish.approve',
 
         // §62 System Administration Permissions
         'system.settings.view',
@@ -501,6 +503,8 @@ class RolePermissionSeeder extends Seeder
             'civil-import.audit.view',
             'civil-import.stage',
             'civil-import.validate',
+            // U3: requesting publication; approving is gated (PUBLICATION_GATED_ROLE_PERMISSIONS).
+            'civil-import.publish.request',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
             'system.settings.update',
@@ -827,6 +831,17 @@ class RolePermissionSeeder extends Seeder
     ];
 
     /**
+     * FB-CIVIL-01A-UI U3 (D-UI-7, D-UI-12, S-4): approving another user's
+     * civil identity publication request exists only while
+     * config('civil_import.publish_enabled') is true — closed by default, so
+     * nobody can approve a publication in any default configuration. Its own
+     * gate, independent of the Apply gate. SUPER_ADMIN only.
+     */
+    public const PUBLICATION_GATED_ROLE_PERMISSIONS = [
+        'SUPER_ADMIN' => ['civil-import.publish.approve'],
+    ];
+
+    /**
      * The effective baseline of one role: ROLE_PERMISSIONS, plus its gated
      * grants while the Apply gate is open. Used by run() and by
      * famboook:verify-permissions, so both always agree.
@@ -836,8 +851,9 @@ class RolePermissionSeeder extends Seeder
     public static function rolePermissions(string $roleName): array
     {
         $gated = config('import.apply_enabled') === true ? (self::GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
+        $publication = config('civil_import.publish_enabled') === true ? (self::PUBLICATION_GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
 
-        return [...self::ROLE_PERMISSIONS[$roleName], ...$gated];
+        return [...self::ROLE_PERMISSIONS[$roleName], ...$gated, ...$publication];
     }
 
     public function run(): void

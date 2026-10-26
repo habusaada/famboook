@@ -2,6 +2,7 @@
 
 namespace App\Support\CivilImport;
 
+use App\Models\CivilImportPublicationRequest;
 use App\Models\CivilImportRequest;
 use App\Models\CivilImportSource;
 use App\Models\CivilImportWorkerHeartbeat;
@@ -16,13 +17,14 @@ use Illuminate\Support\Carbon;
  */
 final class CivilImportControlPlane
 {
-    /** UI phase → actions it allows (ADR §3.1). Publication actions arrive with U3. */
+    /** UI phase → actions it allows (ADR §3.1). Approve / reject / withdraw live on the publication request. */
     private const PHASE_ACTIONS = [
         'STAGING_INTERRUPTED' => ['STAGE', 'ABORT'],
         'STAGED' => ['ASSESS', 'PREPARE', 'ABORT'],
         'PREPARING' => ['PREPARE', 'ASSESS', 'ABORT'],
         'PREPARED' => ['VERIFY', 'ASSESS', 'ABORT'],
-        'VERIFIED' => ['ASSESS', 'ABORT'],
+        'VERIFIED' => ['REQUEST_PUBLICATION', 'ASSESS', 'ABORT'],
+        'AWAITING_APPROVAL' => ['ABORT'],
     ];
 
     private const ACTION_PERMISSION = [
@@ -31,6 +33,7 @@ final class CivilImportControlPlane
         'ASSESS' => 'civil-import.validate',
         'PREPARE' => 'civil-import.validate',
         'VERIFY' => 'civil-import.validate',
+        'REQUEST_PUBLICATION' => 'civil-import.publish.request',
     ];
 
     /** @return array{state: string, last_seen_at: ?string} */
@@ -73,15 +76,30 @@ final class CivilImportControlPlane
             ->orderBy('queued_at')->first()?->requester;
     }
 
+    /** The open (pending or approved) publication request of a run, if any. */
+    public function openPublication(string $runId): ?CivilImportPublicationRequest
+    {
+        return CivilImportPublicationRequest::query()->where('run_id', $runId)->whereIn('status', CivilImportPublicationRequest::OPEN)->first();
+    }
+
+    public function pendingPublications(): int
+    {
+        return CivilImportPublicationRequest::query()->where('status', CivilImportPublicationRequest::PENDING)->count();
+    }
+
     /**
      * The phase refined with the control plane: an incomplete staging with no
-     * active STAGE request is STAGING_INTERRUPTED (resumable).
+     * active STAGE request is STAGING_INTERRUPTED (resumable); a VERIFIED run
+     * with an open publication request is AWAITING_APPROVAL or APPROVED (U3).
      */
     public function phase(string $phase, string $runId, ?CivilImportRequest $active): string
     {
         if ($phase === 'STAGING' && ! ($active !== null && $active->type === CivilImportRequest::STAGE
             && ($active->run_id === null || $active->run_id === $runId))) {
             return 'STAGING_INTERRUPTED';
+        }
+        if ($phase === 'VERIFIED' && ($open = $this->openPublication($runId)) !== null) {
+            return $open->status === CivilImportPublicationRequest::PENDING ? 'AWAITING_APPROVAL' : 'APPROVED';
         }
 
         return $phase;
@@ -105,12 +123,14 @@ final class CivilImportControlPlane
         return array_values($actions);
     }
 
-    /** The permission that queues a request type. */
+    /** The permission that queues a request type (PUBLISH: created by an approval only). */
     public static function permissionFor(string $type): string
     {
-        return in_array($type, [CivilImportRequest::ASSESS, CivilImportRequest::PREPARE, CivilImportRequest::VERIFY], true)
-            ? 'civil-import.validate'
-            : 'civil-import.stage';
+        return match ($type) {
+            CivilImportRequest::ASSESS, CivilImportRequest::PREPARE, CivilImportRequest::VERIFY => 'civil-import.validate',
+            CivilImportRequest::PUBLISH => 'civil-import.publish.approve',
+            default => 'civil-import.stage',
+        };
     }
 
     /**

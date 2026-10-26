@@ -14,6 +14,9 @@
 --                                       (never INSERT or DELETE: requests come from the web application)
 --       civil_import_worker_heartbeats  SELECT, INSERT, UPDATE
 --       civil_import_audit_events       INSERT (+ SELECT of id, for INSERT … RETURNING; + its sequence)
+--       civil_import_publication_requests  SELECT, UPDATE of status / outcome_code / finished_at only
+--                                       (U3: the worker closes an approved request EXECUTED / FAILED and
+--                                       expires stale ones; it never creates, approves or rejects one)
 --   famboook_civil_control_login  the worker's control-plane login: NOINHERIT,
 --                                 member of the group only, created NOLOGIN. The DBA
 --                                 enables it and sets the password interactively:
@@ -34,11 +37,12 @@ BEGIN
     SELECT count(DISTINCT n.nspname), min(n.nspname) INTO tables_found, app_schema
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE c.relkind = 'r' AND c.relname IN ('civil_import_sources', 'civil_import_requests',
-                                             'civil_import_worker_heartbeats', 'civil_import_audit_events')
+                                             'civil_import_worker_heartbeats', 'civil_import_audit_events',
+                                             'civil_import_publication_requests')
        AND n.nspname NOT LIKE 'pg\_%' AND n.nspname <> 'information_schema';
     IF tables_found <> 1 OR (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
             WHERE n.nspname = app_schema AND c.relkind = 'r' AND c.relname IN ('civil_import_sources', 'civil_import_requests',
-                'civil_import_worker_heartbeats', 'civil_import_audit_events')) <> 4 THEN
+                'civil_import_worker_heartbeats', 'civil_import_audit_events', 'civil_import_publication_requests')) <> 5 THEN
         RAISE EXCEPTION 'CIVIL_IMPORT_CONTROL_RUN_MIGRATIONS_FIRST';
     END IF;
 
@@ -64,7 +68,8 @@ BEGIN
     -- Exactly the privileges listed above (revoke first: re-running converges).
     EXECUTE format('GRANT USAGE ON SCHEMA %I TO famboook_civil_control', app_schema);
     EXECUTE format('REVOKE ALL ON %I.civil_import_sources, %I.civil_import_requests, %I.civil_import_worker_heartbeats, '
-        '%I.civil_import_audit_events FROM famboook_civil_control', app_schema, app_schema, app_schema, app_schema);
+        '%I.civil_import_audit_events, %I.civil_import_publication_requests FROM famboook_civil_control',
+        app_schema, app_schema, app_schema, app_schema, app_schema);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE ON %I.civil_import_sources TO famboook_civil_control', app_schema);
     EXECUTE format('GRANT SELECT ON %I.civil_import_requests TO famboook_civil_control', app_schema);
     EXECUTE format('GRANT UPDATE (status, attempts, worker_instance, run_id, release_id, reason_code, message, result, '
@@ -72,6 +77,8 @@ BEGIN
     EXECUTE format('GRANT SELECT, INSERT, UPDATE ON %I.civil_import_worker_heartbeats TO famboook_civil_control', app_schema);
     EXECUTE format('GRANT INSERT ON %I.civil_import_audit_events TO famboook_civil_control', app_schema);
     EXECUTE format('GRANT SELECT (id) ON %I.civil_import_audit_events TO famboook_civil_control', app_schema);
+    EXECUTE format('GRANT SELECT ON %I.civil_import_publication_requests TO famboook_civil_control', app_schema);
+    EXECUTE format('GRANT UPDATE (status, outcome_code, finished_at) ON %I.civil_import_publication_requests TO famboook_civil_control', app_schema);
     seq := pg_get_serial_sequence(format('%I.civil_import_audit_events', app_schema), 'id');
     IF seq IS NOT NULL THEN
         EXECUTE format('GRANT USAGE ON SEQUENCE %s TO famboook_civil_control', seq);

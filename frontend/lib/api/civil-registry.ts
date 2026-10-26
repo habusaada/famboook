@@ -8,9 +8,13 @@ import type {
   CivilImportFileLocation,
   CivilImportIssueCount,
   CivilImportIssueLocation,
+  CivilImportJustification,
   CivilImportOverview,
   CivilImportPageMeta,
   CivilImportPhase,
+  CivilImportPublicationRequest,
+  CivilImportPublicationStatus,
+  CivilImportRejectionReason,
   CivilImportRelease,
   CivilImportRequest,
   CivilImportRequestStatus,
@@ -40,6 +44,8 @@ export const civilImportKeys = {
   sources: () => [...civilImportKeys.all, "sources"] as const,
   requests: (run: string | null, page: number) => [...civilImportKeys.all, "requests", run, page] as const,
   request: (id: string) => [...civilImportKeys.all, "request", id] as const,
+  publications: (status: string | null, page: number) => [...civilImportKeys.all, "publications", status, page] as const,
+  publication: (id: string) => [...civilImportKeys.all, "publication", id] as const,
 };
 
 /** Request statuses during which the worker may still change state (D-UI-13). */
@@ -271,6 +277,87 @@ export function useCancelCivilImportRequest() {
   return useMutation({
     mutationFn: async (id: string) =>
       (await apiClient.delete<{ data: CivilImportRequest }>(`${BASE}/requests/${encodeURIComponent(id)}`)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: civilImportKeys.all }),
+  });
+}
+
+// ---------------------------------------------------------------- U3: two-person publication
+
+/** Publication statuses that may still change (pending a decision, or approved and awaiting the worker). */
+export const OPEN_PUBLICATION_STATUSES: ReadonlySet<CivilImportPublicationStatus> = new Set<CivilImportPublicationStatus>([
+  "PENDING_APPROVAL",
+  "APPROVED",
+]);
+
+export function useCivilImportPublications(status: CivilImportPublicationStatus | null, page: number) {
+  return useQuery({
+    queryKey: civilImportKeys.publications(status, page),
+    queryFn: () =>
+      apiClient.get<PaginatedResponse<CivilImportPublicationRequest>>(
+        `${BASE}/publication-requests?page=${page}${status ? `&status=${status}` : ""}`,
+      ),
+    placeholderData: keepPreviousData,
+    retry: false,
+    refetchInterval: (query) =>
+      civilImportPollInterval(
+        [],
+        query.state.error !== null,
+        (query.state.data?.data ?? []).some((p) => p.status === "APPROVED"),
+      ),
+    refetchIntervalInBackground: false,
+  });
+}
+
+/** One publication request; polled while approved (the worker is about to act) and the page is visible. */
+export function useCivilImportPublication(id: string) {
+  return useQuery({
+    queryKey: civilImportKeys.publication(id),
+    queryFn: async () =>
+      (await apiClient.get<{ data: CivilImportPublicationRequest }>(`${BASE}/publication-requests/${encodeURIComponent(id)}`)).data,
+    enabled: id.length > 0,
+    retry: false,
+    refetchInterval: (query) => civilImportPollInterval([], query.state.error !== null, query.state.data?.status === "APPROVED"),
+    refetchIntervalInBackground: false,
+  });
+}
+
+/** Opens a publication request (civil-import.publish.request). Publishes nothing. */
+export function useRequestCivilImportPublication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ releaseId, justification }: { releaseId: number; justification: CivilImportJustification }) =>
+      (
+        await apiClient.post<{ data: CivilImportPublicationRequest }>(`${BASE}/releases/${releaseId}/publication-requests`, {
+          justification_code: justification,
+        })
+      ).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: civilImportKeys.all }),
+  });
+}
+
+export type CivilImportDecision =
+  | { kind: "APPROVE"; id: string; confirmReleaseId: number; confirmExpectedPresence: number }
+  | { kind: "REJECT"; id: string; reasonCode: CivilImportRejectionReason }
+  | { kind: "WITHDRAW"; id: string };
+
+/** Approve (queues the worker's PUBLISH request), reject or withdraw. Nothing here publishes. */
+export function useDecideCivilImportPublication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (decision: CivilImportDecision) => {
+      const path = `${BASE}/publication-requests/${encodeURIComponent(decision.id)}`;
+      switch (decision.kind) {
+        case "APPROVE":
+          return apiClient.post(`${path}/approve`, {
+            confirm_release_id: decision.confirmReleaseId,
+            confirm_expected_presence: decision.confirmExpectedPresence,
+          });
+        case "REJECT":
+          return apiClient.post(`${path}/reject`, { reason_code: decision.reasonCode });
+        case "WITHDRAW":
+          return apiClient.post(`${path}/withdraw`, {});
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: civilImportKeys.all }),
   });
 }

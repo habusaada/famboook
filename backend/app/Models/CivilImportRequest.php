@@ -43,7 +43,8 @@ class CivilImportRequest extends Model
 
     public const FINISHED = [self::SUCCEEDED, self::FAILED, self::CANCELLED];
 
-    // Types (U2). PUBLISH arrives with U3 and is never created by the API.
+    // Types (U2). PUBLISH (U3) is created ONLY by the approval of a publication
+    // request (ApproveCivilImportPublicationAction) — never by the queue action.
     public const VALIDATE_SOURCE = 'VALIDATE_SOURCE';
 
     public const STAGE = 'STAGE';
@@ -56,6 +57,9 @@ class CivilImportRequest extends Model
 
     public const VERIFY = 'VERIFY';
 
+    public const PUBLISH = 'PUBLISH';
+
+    /** The types QueueCivilImportRequestAction accepts. PUBLISH is deliberately absent. */
     public const TYPES = [self::VALIDATE_SOURCE, self::STAGE, self::ABORT, self::ASSESS, self::PREPARE, self::VERIFY];
 
     /** Types the operator may stop while RUNNING (at the next committed chunk). */
@@ -66,10 +70,10 @@ class CivilImportRequest extends Model
         self::RUNNING => [self::SUCCEEDED, self::FAILED, self::CANCELLED],
     ];
 
-    private const IMMUTABLE = ['id', 'type', 'requested_by', 'source_id', 'idempotency_key', 'queued_at'];
+    private const IMMUTABLE = ['id', 'type', 'requested_by', 'source_id', 'idempotency_key', 'queued_at', 'publication_request_id'];
 
     protected $fillable = [
-        'type', 'requested_by', 'source_id', 'run_id', 'release_id', 'idempotency_key',
+        'type', 'requested_by', 'source_id', 'run_id', 'release_id', 'idempotency_key', 'publication_request_id',
     ];
 
     protected static function booted(): void

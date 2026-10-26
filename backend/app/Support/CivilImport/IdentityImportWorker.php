@@ -5,6 +5,7 @@ namespace App\Support\CivilImport;
 use App\Actions\PublishIdentityReleaseAction;
 use App\Actions\StageIdentityImportAction;
 use App\Exceptions\IdentityImportException;
+use App\Models\CivilImportPublicationRequest;
 use App\Models\CivilImportRequest;
 use App\Models\CivilImportSource;
 use App\Models\CivilImportWorkerHeartbeat;
@@ -45,7 +46,16 @@ use Throwable;
  * operation stays resumable by a new request. Cancellation of a RUNNING
  * request takes effect at the next committed chunk (or file).
  *
- * PUBLICATION IS NOT IMPLEMENTED: no code path here calls publish().
+ * PUBLICATION (U3, S-3): a PUBLISH request exists only through the approval
+ * of a publication request by a second user. Immediately before calling the
+ * engine the worker re-checks, in order: an APPROVED publication request
+ * decided by another user than its requester, for this release; the
+ * publication gate open in THIS process; a well-formed real-data
+ * authorization reference in THIS process; the approval window; the
+ * baseline still the active release; the release still a VERIFIED
+ * candidate. The engine then activates the release atomically and refuses
+ * anything not VERIFIED on its own. A crash after the activation is
+ * reconciled from the engine state; a PUBLISH request is never retried.
  */
 final class IdentityImportWorker
 {
@@ -119,6 +129,11 @@ final class IdentityImportWorker
             $this->catalogue->scan();
         } catch (Throwable $e) {
             Log::warning('civil_import.worker.catalogue_failed', ['error' => self::redact($e)]);
+        }
+        try {
+            $this->sweepPublications();
+        } catch (Throwable $e) {
+            Log::warning('civil_import.worker.publication_sweep_failed', ['error' => self::redact($e)]);
         }
         $request = $this->claim();
         if ($request === null) {
@@ -197,6 +212,7 @@ final class IdentityImportWorker
                 CivilImportRequest::PREPARE => $this->releases->prepare($this->importDb(), (string) $request->run_id, self::policy(), $target,
                     max(1, (int) config('civil_import.worker.chunk_size', 5000)), $this->logger(), $this->hook()),
                 CivilImportRequest::VERIFY => $this->releases->verify($this->importDb(), (int) $request->release_id, $target, $this->logger()),
+                CivilImportRequest::PUBLISH => $this->publish($request, $target),
                 default => throw new CivilImportSourceException(CivilImportReason::UNSUPPORTED_REQUEST),
             };
             $this->finish($request, CivilImportRequest::SUCCEEDED, null, $result);
@@ -271,6 +287,89 @@ final class IdentityImportWorker
         }
 
         return $this->stager->abort($db, $target, $this->logger());
+    }
+
+    /**
+     * Publishes an approved release after re-checking every S-3 condition.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws CivilImportSourceException a refusal (nothing was changed)
+     */
+    private function publish(CivilImportRequest $request, string $target): array
+    {
+        $publication = CivilImportPublicationRequest::query()->find($request->publication_request_id);
+        $refuse = static fn (string $code) => throw new CivilImportSourceException($code);
+        if ($publication === null || $publication->status !== CivilImportPublicationRequest::APPROVED || $publication->decided_by === null
+            || (int) $publication->decided_by === (int) $publication->requested_by || $publication->release_id !== $request->release_id) {
+            $refuse(CivilImportReason::NOT_APPROVED_FOR_PUBLICATION);
+        }
+        if (config('civil_import.publish_enabled') !== true) {
+            $refuse(CivilImportReason::PUBLICATION_GATE_CLOSED);
+        }
+        if (IdentityRefProductionGate::reference() === null) {
+            $refuse(CivilImportReason::AUTHORIZATION_MISSING);
+        }
+        if ($publication->isExpiredAt(Carbon::now())) {
+            $refuse(CivilImportReason::PUBLICATION_EXPIRED);
+        }
+        $db = $this->importDb();
+        $state = $this->releases->status($db, $target);
+        if ($state['active_release'] !== $publication->base_release_id) {
+            $refuse(CivilImportReason::BASE_CHANGED);
+        }
+        $release = collect($state['releases'])->first(fn (array $r) => (int) $r['id'] === $publication->release_id);
+        if ($release === null || $release['status'] !== 'BUILDING' || $release['preparation'] !== 'VERIFIED') {
+            $refuse(CivilImportReason::RELEASE_CHANGED);
+        }
+
+        return $this->releases->publish($db, $publication->release_id, $target, $this->logger(), $this->hook());
+    }
+
+    /**
+     * Publication upkeep: pending requests past their 24 hours expire; an
+     * approved request whose PUBLISH request ended without closing it (a
+     * lost worker) is reconciled from the engine state — EXECUTED if its
+     * release is the active one, FAILED otherwise. Never publishes.
+     */
+    private function sweepPublications(): void
+    {
+        foreach (CivilImportPublicationRequest::query()->where('status', CivilImportPublicationRequest::PENDING)
+            ->where('expires_at', '<=', Carbon::now())->get() as $stale) {
+            CivilImportPublications::expire($stale, 'TIMEOUT');
+        }
+        foreach (CivilImportPublicationRequest::query()->where('status', CivilImportPublicationRequest::APPROVED)->get() as $approved) {
+            $publish = CivilImportRequest::query()->where('publication_request_id', $approved->id)->first();
+            if ($publish === null || $publish->isActive()) {
+                continue;
+            }
+            $target = (string) config('civil_import.worker.target');
+            try {
+                $active = $target === '' ? null : $this->releases->status($this->importDb(), $target)['active_release'];
+            } finally {
+                if ($this->importConnection !== DB::getDefaultConnection()) {
+                    DB::purge($this->importConnection);
+                }
+            }
+            $published = $active !== null && $active === $approved->release_id;
+            $this->closePublication($approved, $published ? CivilImportPublicationRequest::EXECUTED : CivilImportPublicationRequest::FAILED,
+                $published ? 'RECONCILED_PUBLISHED' : ($publish->reason_code ?? CivilImportReason::WORKER_LOST), $publish->id);
+        }
+    }
+
+    /** APPROVED → EXECUTED | FAILED, audited (RELEASE_PUBLISHED or PUBLICATION_REFUSED). */
+    private function closePublication(CivilImportPublicationRequest $publication, string $status, string $outcome, string $requestId, int $seconds = 0): void
+    {
+        DB::transaction(function () use ($publication, $status, $outcome, $requestId, $seconds) {
+            $locked = CivilImportPublicationRequest::query()->lockForUpdate()->find($publication->id);
+            if ($locked === null || $locked->status !== CivilImportPublicationRequest::APPROVED) {
+                return;
+            }
+            $locked->forceFill(['status' => $status, 'outcome_code' => $outcome, 'finished_at' => Carbon::now()])->save();
+            CivilImportAudit::record($status === CivilImportPublicationRequest::EXECUTED ? 'RELEASE_PUBLISHED' : 'PUBLICATION_REFUSED', null,
+                $locked->run_id, $locked->release_id, $outcome, $status === CivilImportPublicationRequest::EXECUTED ? ['duration_seconds' => $seconds] : [],
+                $requestId, $locked->id);
+        });
     }
 
     private function source(CivilImportRequest $request): CivilImportSource
@@ -378,7 +477,25 @@ final class IdentityImportWorker
             CivilImportRequest::SUCCEEDED => 'REQUEST_SUCCEEDED',
             CivilImportRequest::CANCELLED => 'REQUEST_CANCELLED',
             default => 'REQUEST_FAILED',
-        }, null, $runId, $releaseId, $reason, ['type' => $request->type, 'duration_seconds' => $duration], $request->id);
+        }, null, $runId, $releaseId, $reason, ['type' => $request->type, 'duration_seconds' => $duration], $request->id,
+            $request->publication_request_id);
+
+        // U3: the publication request follows its PUBLISH request — except after a lost
+        // worker, whose outcome is reconciled from the engine state (sweepPublications).
+        if ($request->type === CivilImportRequest::PUBLISH && $reason !== CivilImportReason::WORKER_LOST) {
+            $publication = CivilImportPublicationRequest::query()->find($request->publication_request_id);
+            if ($publication !== null) {
+                $this->closePublication($publication, $status === CivilImportRequest::SUCCEEDED ? CivilImportPublicationRequest::EXECUTED : CivilImportPublicationRequest::FAILED,
+                    $status === CivilImportRequest::SUCCEEDED ? (string) ($clean['outcome'] ?? 'PUBLISHED') : (string) $reason, $request->id,
+                    (int) ($clean['activation_seconds'] ?? 0));
+            }
+        }
+        // An aborted run's pending publication request cannot be approved any more.
+        if ($request->type === CivilImportRequest::ABORT && $status === CivilImportRequest::SUCCEEDED) {
+            foreach (CivilImportPublicationRequest::query()->where('run_id', $request->run_id)->where('status', CivilImportPublicationRequest::PENDING)->get() as $p) {
+                CivilImportPublications::expire($p, 'RELEASE_ABANDONED');
+            }
+        }
     }
 
     // ---------------------------------------------------------------- helpers

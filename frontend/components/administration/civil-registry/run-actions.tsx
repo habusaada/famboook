@@ -9,16 +9,23 @@ import {
   civilImportErrorCode,
   newIdempotencyKey,
   useQueueCivilImportRequest,
+  useRequestCivilImportPublication,
   type CivilImportAbortReason,
   type CivilImportCommand,
 } from "@/lib/api/civil-registry";
-import type { CivilImportAction, CivilImportRunDetail } from "@/lib/types/api/civil-registry";
-import { ABORT_REASON_LABELS, ACTION_CONFIRMATIONS, ACTION_LABELS } from "@/components/administration/civil-registry/labels";
+import type { CivilImportAction, CivilImportJustification, CivilImportRunDetail } from "@/lib/types/api/civil-registry";
+import {
+  ABORT_REASON_LABELS,
+  ACTION_CONFIRMATIONS,
+  ACTION_LABELS,
+  JUSTIFICATION_LABELS,
+} from "@/components/administration/civil-registry/labels";
 
 // FB-CIVIL-01A-UI U2 — the operator's actions on a run. Each one RECORDS a
 // request (the API answers 202); the dedicated worker executes it. Buttons
 // follow allowed_actions (phase ∩ permissions) — a hint only: the API and the
-// worker re-check everything. No publication action exists in U2.
+// worker re-check everything. U3: REQUEST_PUBLICATION opens a publication
+// request — it publishes nothing; another user must approve it.
 
 /** Fixed Arabic text for a refused request, by stable code (never server text). */
 const COMMAND_ERRORS: Record<string, string> = {
@@ -31,6 +38,14 @@ const COMMAND_ERRORS: Record<string, string> = {
   NOT_ALLOWED: "لا تملك صلاحية تنفيذ هذا الإجراء.",
   MONITOR_NOT_CONFIGURED: "لم تُضبط متابعة استيراد السجل المدني على هذا الخادم بعد.",
   MONITOR_UNAVAILABLE: "متابعة استيراد السجل المدني غير متاحة مؤقتًا.",
+  PUBLICATION_ALREADY_OPEN: "يوجد طلب نشر آخر مفتوح.",
+  PUBLICATION_NOT_PENDING: "طلب النشر لم يعد بانتظار القرار. حدّث الصفحة.",
+  SAME_USER_APPROVAL: "لا يمكن لمقدّم طلب النشر أن يقرر فيه؛ يلزم مستخدم آخر.",
+  PUBLICATION_GATE_CLOSED: "بوابة النشر مغلقة؛ لا يمكن اعتماد أي نشر.",
+  PUBLICATION_EXPIRED: "انتهت صلاحية طلب النشر؛ يلزم طلب جديد.",
+  BASE_CHANGED: "تغيّر الإصدار النشط منذ تقديم الطلب؛ يلزم طلب جديد.",
+  RELEASE_CHANGED: "لم يعد الإصدار متحققًا منه؛ يلزم طلب جديد.",
+  CONFIRMATION_MISMATCH: "رقم الإصدار أو الحضور المتوقع المُدخل لا يطابق الطلب.",
 };
 
 export function CommandError({ error }: { error: unknown }) {
@@ -58,7 +73,56 @@ function commandFor(action: CivilImportAction, run: CivilImportRunDetail, reason
       return { kind: "PREPARE", runId: run.id };
     case "VERIFY":
       return run.release ? { kind: "VERIFY", releaseId: run.release.id } : null;
+    case "REQUEST_PUBLICATION":
+      return null; // not an execution request: RequestPublication below
   }
+}
+
+/** U3: open a publication request for the run's VERIFIED release, with a justification code. */
+function RequestPublication({ run, onClose }: { run: CivilImportRunDetail; onClose: () => void }) {
+  const request = useRequestCivilImportPublication();
+  const [justification, setJustification] = useState<CivilImportJustification | null>(null);
+
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-w-lg" data-action-confirm="REQUEST_PUBLICATION">
+        <DialogHeader>
+          <DialogTitle>{ACTION_LABELS.REQUEST_PUBLICATION}</DialogTitle>
+          <DialogDescription>{ACTION_CONFIRMATIONS.REQUEST_PUBLICATION}</DialogDescription>
+        </DialogHeader>
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1 text-sm font-medium">المبرر</legend>
+          {(Object.keys(JUSTIFICATION_LABELS) as CivilImportJustification[]).map((code) => (
+            <label key={code} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="justification"
+                className="size-4 accent-brand-600"
+                checked={justification === code}
+                onChange={() => setJustification(code)}
+              />
+              {JUSTIFICATION_LABELS[code]}
+            </label>
+          ))}
+        </fieldset>
+        <CommandError error={request.error} />
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onClose}>
+            رجوع
+          </Button>
+          <Button
+            disabled={justification === null || run.release === null || request.isPending}
+            onClick={() =>
+              justification && run.release && request.mutate({ releaseId: run.release.id, justification }, { onSuccess: onClose })
+            }
+          >
+            {request.isPending && <Loader2 className="size-4 animate-spin" />}
+            تأكيد
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ConfirmAction({ action, run, onClose }: { action: CivilImportAction; run: CivilImportRunDetail; onClose: () => void }) {
@@ -129,7 +193,9 @@ function ConfirmAction({ action, run, onClose }: { action: CivilImportAction; ru
 /** The actions allowed now, each behind a confirmation. Renders nothing when none is allowed. */
 export function RunActions({ run }: { run: CivilImportRunDetail }) {
   const [confirming, setConfirming] = useState<CivilImportAction | null>(null);
-  const actions = run.allowed_actions.filter((a) => commandFor(a, run, "OPERATOR_DECISION") !== null);
+  const actions = run.allowed_actions.filter(
+    (a) => commandFor(a, run, "OPERATOR_DECISION") !== null || (a === "REQUEST_PUBLICATION" && run.release !== null),
+  );
   if (actions.length === 0) return null;
 
   return (
@@ -145,7 +211,10 @@ export function RunActions({ run }: { run: CivilImportRunDetail }) {
           {ACTION_LABELS[action]}
         </Button>
       ))}
-      {confirming && <ConfirmAction action={confirming} run={run} onClose={() => setConfirming(null)} />}
+      {confirming === "REQUEST_PUBLICATION" && <RequestPublication run={run} onClose={() => setConfirming(null)} />}
+      {confirming && confirming !== "REQUEST_PUBLICATION" && (
+        <ConfirmAction action={confirming} run={run} onClose={() => setConfirming(null)} />
+      )}
     </div>
   );
 }

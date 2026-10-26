@@ -24,6 +24,7 @@ class CivilImportRequestException extends RuntimeException
         $status = match ($this->reason) {
             CivilImportReason::REQUEST_NOT_FOUND => 404,
             CivilImportReason::NOT_ALLOWED => 403,
+            CivilImportReason::CONFIRMATION_MISMATCH => 422,
             default => 409,
         };
 

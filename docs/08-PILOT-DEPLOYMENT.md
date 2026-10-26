@@ -449,7 +449,8 @@ A SEPARATE worker from the notification worker above (X-5; `docs/adr/FB-CIVIL-01
 | Database | `07-control-plane.dba.sql` (DBA, after the migrations; re-run after a restore): `famboook_civil_control_login` → `famboook_civil_control` (requests, catalogue, heartbeats, audit only). The import login is the FB-CIVIL-01A `famboook_identity_import`. The worker refuses to start if the logins share roles or the control login is a superuser. |
 | Health | `civil_import_worker_heartbeats`: the overview shows IDLE / BUSY / STALE (no heartbeat for 120 s) / NOT_INSTALLED. A RUNNING request without a heartbeat for 10 minutes is closed `WORKER_LOST` at the next start; its operation is resumable. |
 | Stop | `systemctl stop famboook-identity-import-worker`: stops after the current request; a running staging or preparation resumes from its last committed chunk on the next request |
-| Production gate | Without `IDENTITY_REF_PRODUCTION_APPROVAL` in the credential file the worker refuses every request in production (`NOT_APPROVED`). Publication is not implemented in U2. |
+| Production gate | Without `IDENTITY_REF_PRODUCTION_APPROVAL` in the credential file the worker refuses every request in production (`NOT_APPROVED`). |
+| Publication (U3) | **Disabled.** The worker publishes only an APPROVED two-person request, and only when **its own** process has `CIVIL_IMPORT_PUBLISH_ENABLED=true` **and** a well-formed `IDENTITY_REF_PRODUCTION_APPROVAL` (any environment). It also re-checks the 24 h window, the unchanged baseline and the VERIFIED release. Neither value is set by any template or script. The web application's own gate (`backend/.env`) must also be open for anyone to hold `civil-import.publish.approve`. Opening either on Production is a separate decision after the real-data gates (G1, G3). |
 
 ---
 

@@ -41,6 +41,27 @@ final class CivilImportReason
 
     public const NOT_ALLOWED = 'NOT_ALLOWED';
 
+    // U3: publication (API refusals and worker outcomes).
+    public const PUBLICATION_ALREADY_OPEN = 'PUBLICATION_ALREADY_OPEN';
+
+    public const PUBLICATION_NOT_PENDING = 'PUBLICATION_NOT_PENDING';
+
+    public const SAME_USER_APPROVAL = 'SAME_USER_APPROVAL';
+
+    public const PUBLICATION_GATE_CLOSED = 'PUBLICATION_GATE_CLOSED';
+
+    public const PUBLICATION_EXPIRED = 'PUBLICATION_EXPIRED';
+
+    public const BASE_CHANGED = 'BASE_CHANGED';
+
+    public const RELEASE_CHANGED = 'RELEASE_CHANGED';
+
+    public const CONFIRMATION_MISMATCH = 'CONFIRMATION_MISMATCH';
+
+    public const AUTHORIZATION_MISSING = 'AUTHORIZATION_MISSING';
+
+    public const NOT_APPROVED_FOR_PUBLICATION = 'NOT_APPROVED_FOR_PUBLICATION';
+
     private const MESSAGES = [
         // FB-CIVIL-01A (IdentityImportException reasons)
         'NOT_CONFIGURED' => 'اتصال الاستيراد غير مضبوط على الخادم.',
@@ -78,6 +99,18 @@ final class CivilImportReason
         self::REQUEST_NOT_CANCELLABLE => 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
         self::REQUEST_NOT_FOUND => 'الطلب غير موجود.',
         self::NOT_ALLOWED => 'لا تملك صلاحية تنفيذ هذا الإجراء.',
+        // U3
+        self::PUBLICATION_ALREADY_OPEN => 'يوجد طلب نشر آخر مفتوح.',
+        self::PUBLICATION_NOT_PENDING => 'طلب النشر لم يعد بانتظار القرار.',
+        self::SAME_USER_APPROVAL => 'لا يمكن لمقدّم طلب النشر أن يقرر فيه؛ يلزم مستخدم آخر.',
+        self::PUBLICATION_GATE_CLOSED => 'بوابة النشر مغلقة.',
+        self::PUBLICATION_EXPIRED => 'انتهت صلاحية طلب النشر.',
+        self::BASE_CHANGED => 'تغيّر الإصدار النشط منذ تقديم الطلب؛ يلزم طلب جديد.',
+        self::RELEASE_CHANGED => 'لم يعد الإصدار متحققًا منه؛ يلزم طلب جديد.',
+        self::CONFIRMATION_MISMATCH => 'رقم الإصدار أو الحضور المتوقع المُدخل لا يطابق الطلب.',
+        self::AUTHORIZATION_MISSING => 'لا يوجد مرجع تفويض بالبيانات الحقيقية لدى عامل الاستيراد؛ رُفض النشر.',
+        self::NOT_APPROVED_FOR_PUBLICATION => 'لا يوجد اعتماد صالح لهذا النشر؛ رُفض.',
+        'PUBLICATION_FAILED' => 'تعذّر النشر وأُلغي؛ الإصدار النشط السابق لم يتغير.',
     ];
 
     public static function message(?string $code): ?string

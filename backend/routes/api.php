@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\ChangeRequestController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportAuditController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportExecutionController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportMonitorController;
+use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportPublicationController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorAnnouncementController;
@@ -824,6 +825,19 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
             Route::get('/requests/{request}', [CivilImportExecutionController::class, 'show'])->whereUuid('request');
             Route::delete('/requests/{civilRequest}', [CivilImportExecutionController::class, 'cancel'])->whereUuid('civilRequest')
                 ->middleware('throttle:30,1');
+            // U3: publication requests (read).
+            Route::get('/publication-requests', [CivilImportPublicationController::class, 'index']);
+            Route::get('/publication-requests/{publication}', [CivilImportPublicationController::class, 'show'])->whereUuid('publication');
+        });
+        // FB-CIVIL-01A-UI U3 — two-person publication approval. Nothing here
+        // publishes: an approval queues the worker's PUBLISH request (S-1/S-3).
+        Route::middleware(['can:civil-import.publish.request', 'throttle:30,1'])->group(function () {
+            Route::post('/releases/{release}/publication-requests', [CivilImportPublicationController::class, 'store'])->whereNumber('release');
+            Route::post('/publication-requests/{publication}/withdraw', [CivilImportPublicationController::class, 'withdraw'])->whereUuid('publication');
+        });
+        Route::middleware(['can:civil-import.publish.approve', 'throttle:30,1'])->group(function () {
+            Route::post('/publication-requests/{publication}/approve', [CivilImportPublicationController::class, 'approve'])->whereUuid('publication');
+            Route::post('/publication-requests/{publication}/reject', [CivilImportPublicationController::class, 'reject'])->whereUuid('publication');
         });
         // FB-CIVIL-01A-UI U2 — execution REQUESTS only: each write inserts a
         // QUEUED civil_import_requests row (202); the dedicated worker executes

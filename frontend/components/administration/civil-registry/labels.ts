@@ -30,6 +30,8 @@ export const PHASE_LABELS: Record<CivilImportPhase, string> = {
   PREPARING: "جارٍ التحضير",
   PREPARED: "تم التحضير",
   VERIFIED: "تم التحقق",
+  AWAITING_APPROVAL: "بانتظار اعتماد النشر",
+  APPROVED: "اعتُمد النشر — بانتظار التنفيذ",
   PUBLISHED: "منشور",
   REJECTED: "مرفوض",
   ABORTED: "أُلغي",
@@ -44,6 +46,8 @@ export const PHASE_TONES: Record<CivilImportPhase, StatusTone> = {
   PREPARING: "info",
   PREPARED: "neutral",
   VERIFIED: "success",
+  AWAITING_APPROVAL: "warning",
+  APPROVED: "info",
   PUBLISHED: "success",
   REJECTED: "danger",
   ABORTED: "neutral",
@@ -188,6 +192,7 @@ export const REQUEST_TYPE_LABELS: Record<CivilImportRequestType, string> = {
   ASSESS: "التقييم والمعاينة",
   PREPARE: "تحضير الإصدار",
   VERIFY: "التحقق من الإصدار",
+  PUBLISH: "نشر الإصدار",
 };
 
 export const REQUEST_STATUS_LABELS: Record<CivilImportRequestStatus, string> = {
@@ -213,6 +218,7 @@ export const ACTION_LABELS: Record<CivilImportAction, string> = {
   PREPARE: "تحضير الإصدار",
   VERIFY: "التحقق من الإصدار",
   ABORT: "إلغاء العملية",
+  REQUEST_PUBLICATION: "طلب نشر",
 };
 
 export const ACTION_CONFIRMATIONS: Record<CivilImportAction, string> = {
@@ -220,6 +226,7 @@ export const ACTION_CONFIRMATIONS: Record<CivilImportAction, string> = {
   ASSESS: "سيقيّم عامل الاستيراد البيانات المحمّلة ويقارنها بالإصدار النشط دون كتابة أي شيء.",
   PREPARE: "سيبني عامل الاستيراد الإصدار المرشح وفق السياسة المعتمدة. لا يتغير الإصدار النشط ولا يُنشر شيء.",
   VERIFY: "سيتحقق عامل الاستيراد من أن الإصدار المرشح يطابق تصنيفه تمامًا. لا يُنشر شيء.",
+  REQUEST_PUBLICATION: "سيُفتح طلب نشر لهذا الإصدار. لا يُنشر شيء حتى يعتمده مستخدم آخر خلال 24 ساعة وتتحقق كل الشروط لدى عامل الاستيراد.",
   ABORT: "ستُغلق العملية نهائيًا ويُترك إصدارها المرشح ويُحذف تحميلها. لا يتأثر الإصدار النشط. لا يمكن التراجع.",
 };
 
@@ -273,4 +280,56 @@ export const FATAL_LABELS: Record<string, string> = {
   QUARANTINE_THRESHOLD_EXCEEDED: "تجاوز حد الحجر",
   QUARANTINE_UNRESOLVED: "سياسة الحجر غير محسومة",
   BLANK_FIELD_UNRESOLVED: "سياسة الحقول الفارغة غير محسومة",
+};
+
+// ---- U3: two-person publication
+
+export const PUBLICATION_STATUS_LABELS: Record<string, string> = {
+  PENDING_APPROVAL: "بانتظار الاعتماد",
+  APPROVED: "معتمد — بانتظار التنفيذ",
+  REJECTED: "مرفوض",
+  WITHDRAWN: "مسحوب",
+  EXPIRED: "منتهي الصلاحية",
+  EXECUTED: "نُشر",
+  FAILED: "لم يُنشر",
+};
+
+export const PUBLICATION_STATUS_TONES: Record<string, StatusTone> = {
+  PENDING_APPROVAL: "warning",
+  APPROVED: "info",
+  REJECTED: "danger",
+  WITHDRAWN: "neutral",
+  EXPIRED: "neutral",
+  EXECUTED: "success",
+  FAILED: "danger",
+};
+
+export const JUSTIFICATION_LABELS: Record<string, string> = {
+  ROUTINE_REFRESH: "تحديث دوري",
+  INITIAL_LOAD: "تحميل أولي",
+  CORRECTION: "تصحيح",
+};
+
+export const REJECTION_LABELS: Record<string, string> = {
+  COUNTS_UNEXPECTED: "أعداد غير متوقعة",
+  NOT_AUTHORIZED_NOW: "غير مأذون به حاليًا",
+  NEEDS_REVIEW: "يحتاج إلى مراجعة",
+  OTHER_DECISION: "قرار آخر",
+};
+
+export const PUBLICATION_OUTCOME_LABELS: Record<string, string> = {
+  PUBLISHED: "نُشر الإصدار",
+  ALREADY_PUBLISHED: "كان منشورًا مسبقًا",
+  RECONCILED_PUBLISHED: "نُشر (تمت المطابقة بعد انقطاع العامل)",
+  TIMEOUT: "انقضت 24 ساعة دون قرار",
+  BASE_CHANGED: "تغيّر الإصدار النشط منذ تقديم الطلب",
+  RELEASE_CHANGED: "لم يعد الإصدار متحققًا منه",
+  RELEASE_ABANDONED: "أُلغيت العملية",
+  AUTHORIZATION_MISSING: "لا يوجد مرجع تفويض بالبيانات الحقيقية لدى العامل",
+  PUBLICATION_GATE_CLOSED: "بوابة النشر مغلقة لدى العامل",
+  PUBLICATION_EXPIRED: "انتهت صلاحية الاعتماد قبل التنفيذ",
+  NOT_APPROVED_FOR_PUBLICATION: "لا يوجد اعتماد صالح",
+  PUBLICATION_FAILED: "تعذّر النشر وأُلغي؛ الإصدار السابق لم يتغير",
+  WORKER_LOST: "توقف العامل قبل النشر",
+  CANCELLED_BY_OPERATOR: "أُوقف بطلب من المشغّل",
 };

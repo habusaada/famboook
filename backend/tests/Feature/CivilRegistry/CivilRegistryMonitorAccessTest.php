@@ -109,14 +109,16 @@ class CivilRegistryMonitorAccessTest extends TestCase
         $routes = (string) file_get_contents(base_path('routes/api.php'));
         $this->assertDoesNotMatchRegularExpression('/Route::(post|put|patch|delete)\([^\n]*CivilImport(Monitor|Audit)Controller/', $routes);
         foreach (['app/Actions/QueueCivilImportRequestAction.php', 'app/Actions/CancelCivilImportRequestAction.php',
-            'app/Support/CivilImport/CivilImportControlPlane.php'] as $httpReachable) {
+            'app/Support/CivilImport/CivilImportControlPlane.php', 'app/Actions/RequestCivilImportPublicationAction.php',
+            'app/Actions/DecideCivilImportPublicationAction.php', 'app/Support/CivilImport/CivilImportPublications.php'] as $httpReachable) {
             $this->assertDoesNotMatchRegularExpression($forbidden, (string) file_get_contents(base_path($httpReachable)), $httpReachable);
         }
     }
 
     public function test_the_permission_baseline_grants_the_civil_import_permissions_to_super_admin_only(): void
     {
-        $civil = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view', 'civil-import.stage', 'civil-import.validate'];
+        $civil = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view', 'civil-import.stage', 'civil-import.validate',
+            'civil-import.publish.request'];
         foreach ($civil as $permission) {
             $this->assertContains($permission, RolePermissionSeeder::PERMISSIONS);
         }
@@ -125,6 +127,33 @@ class CivilRegistryMonitorAccessTest extends TestCase
             $this->assertSame($role === 'SUPER_ADMIN' ? $civil : [], $held, $role);
         }
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
+
+        // U3: approving publication exists only while the publication gate is open, for SUPER_ADMIN only (S-4).
+        $this->assertContains('civil-import.publish.approve', RolePermissionSeeder::PERMISSIONS);
+        foreach (RolePermissionSeeder::ROLES as $role) {
+            $this->assertNotContains('civil-import.publish.approve', RolePermissionSeeder::rolePermissions($role), $role);
+        }
+        config(['civil_import.publish_enabled' => true]);
+        foreach (RolePermissionSeeder::ROLES as $role) {
+            $this->assertSame($role === 'SUPER_ADMIN', in_array('civil-import.publish.approve', RolePermissionSeeder::rolePermissions($role), true), $role);
+        }
+        // The seeded database (gate closed) no longer matches an open gate: the verifier says so.
+        $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
+        $this->assertStringContainsString('must have civil-import.publish.approve', Artisan::output());
+        $this->seed(RolePermissionSeeder::class);
+        $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
+        config(['civil_import.publish_enabled' => false]);
+        $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
+        $this->assertStringContainsString('must NOT have civil-import.publish.approve', Artisan::output());
+        $this->seed(RolePermissionSeeder::class);
+        $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
+
+        // Never a direct grant.
+        $user = User::factory()->create();
+        $user->assignRole('REPORTS_VIEWER');
+        $user->givePermissionTo('civil-import.publish.request');
+        $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
+        $this->assertStringContainsString('publication permission grant(s) made directly', Artisan::output());
     }
 
     public function test_audit_details_accept_codes_and_counts_only_and_events_are_immutable(): void

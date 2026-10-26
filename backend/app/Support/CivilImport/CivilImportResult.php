@@ -18,14 +18,14 @@ final class CivilImportResult
     /** Non-negative integers. */
     private const COUNTS = ['files', 'files_staged_now', 'files_reset', 'chunks_verified', 'chunks_loaded', 'rows_loaded_now', 'rows_staged',
         'total_rows', 'record_count', 'rows_purged', 'chunks_materialized', 'release_id', 'base_release', 'active_release',
-        'abandoned_release', 'duration_seconds'];
+        'abandoned_release', 'duration_seconds', 'activation_seconds'];
 
     private const FLAGS = ['resumed', 'publishable'];
 
     private const UUIDS = ['run_id', 'aborted_run'];
 
     /** A single code. */
-    private const CODES = ['release_status', 'preparation', 'manifest'];
+    private const CODES = ['release_status', 'preparation', 'manifest', 'outcome'];
 
     /** Policy ids (IdentityImportPolicy: IDREF-POLICY-1). */
     private const POLICY = '/^[A-Z][A-Z0-9_-]{0,63}$/';

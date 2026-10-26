@@ -78,6 +78,7 @@ function OverviewBody({ data }: { data: CivilImportOverview }) {
           icon={ShieldCheck}
           tone={data.publication_enabled ? "warning" : "success"}
           label="بوابة النشر"
+          href="/administration/civil-registry/approvals"
           value={
             <span className="text-lg" data-publication-gate={data.publication_enabled ? "open" : "closed"}>
               {data.publication_enabled ? "مفتوحة" : "مغلقة"}

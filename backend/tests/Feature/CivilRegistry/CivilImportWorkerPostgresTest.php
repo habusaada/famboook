@@ -145,7 +145,8 @@ class CivilImportWorkerPostgresTest extends TestCase
 
         $verify = $this->queueAndWork("/releases/{$releaseId}/verify");
         $this->assertSame(CivilImportRequest::SUCCEEDED, $verify->status, (string) $verify->reason_code);
-        $this->apiGet("/imports/{$runId}")->assertJsonPath('data.phase', 'VERIFIED')->assertJsonPath('data.allowed_actions', ['ASSESS', 'ABORT']);
+        // U3: a VERIFIED run can be put forward for (two-person) publication.
+        $this->apiGet("/imports/{$runId}")->assertJsonPath('data.phase', 'VERIFIED')->assertJsonPath('data.allowed_actions', ['REQUEST_PUBLICATION', 'ASSESS', 'ABORT']);
 
         // No publication in U2: nothing is active, the release stays BUILDING and VERIFIED.
         $this->assertNull($this->activeReleaseId());

@@ -41,6 +41,11 @@ This is **population-scale, highly sensitive personal data**, far beyond the ope
   - Sources are server-side directories only (opaque id and safe label; no path, no upload).
   - Results, audit events and API responses hold counts and codes only.
   - Publication stays shell-only and gated (U3).
+- **Amended 2026-10-26 (FB-CIVIL-01A-UI U3, local):** publication from the UI needs two different authorized users:
+  - one requests (`civil-import.publish.request`); another approves (`civil-import.publish.approve`), which exists only while the publication gate is open, and is closed by default;
+  - the request expires after 24 h, or when the baseline or the release changes;
+  - the worker publishes only with its own gate open and a real-data authorization reference, after re-checking every condition, through the engine's atomic activation.
+  - Requests hold codes and counts only. Production publication stays disabled.
 - **Immutability (FB-CIVIL-D01):** privileges plus triggers. No edit or delete path exists for any user, SUPER_ADMIN included [APPROVED].
 - **Future (01B):**
   - only with a separately approved baseline change (OD-09: `docs/03` §47e forbids global National ID search);

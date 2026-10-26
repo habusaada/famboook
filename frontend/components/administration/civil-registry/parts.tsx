@@ -41,6 +41,11 @@ const SECTIONS = [
     permission: "civil-import.view",
   },
   {
+    href: "/administration/civil-registry/approvals",
+    label: "الموافقات",
+    permission: "civil-import.view",
+  },
+  {
     href: "/administration/civil-registry/audit",
     label: "سجل التدقيق",
     permission: "civil-import.audit.view",
@@ -80,7 +85,8 @@ export function CivilRegistryNav() {
 export function ReadOnlyNote() {
   return (
     <p className="text-[13px] text-muted-foreground" data-read-only-note>
-      الإجراءات هنا تسجّل طلبات ينفّذها عامل الاستيراد المخصص، ولا يمكن من هنا نشر إصدار. تُعرض الأعداد والرموز فقط، دون أي بيانات هوية.
+      الإجراءات هنا تسجّل طلبات ينفّذها عامل الاستيراد المخصص. لا يُنشر إصدار إلا باعتماد مستخدم ثانٍ وتحقق العامل من كل الشروط. تُعرض
+      الأعداد والرموز فقط، دون أي بيانات هوية.
     </p>
   );
 }

@@ -120,9 +120,12 @@ class VerifyPermissions extends Command
     /** Coordinator follow-up permissions (ADR-06 §2c): the COORDINATOR role only. */
     public const COORDINATOR_FOLLOWUP = ['coordinator-notification-followup.view', 'coordinator-notification-followup.manage'];
 
-    /** Civil identity import management (FB-CIVIL-01A-UI U1/U2, AUTH-ADR-098): SUPER_ADMIN only. */
+    /** Civil identity import management (FB-CIVIL-01A-UI U1–U3, AUTH-ADR-098): SUPER_ADMIN only. */
     public const CIVIL_IMPORT = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view',
-        'civil-import.stage', 'civil-import.validate'];
+        'civil-import.stage', 'civil-import.validate', 'civil-import.publish.request'];
+
+    /** U3: approving publication is gated (config civil_import.publish_enabled, closed by default; S-4). */
+    public const PUBLISH_APPROVE_PERMISSION = 'civil-import.publish.approve';
 
     /** The single gated permission and the only role that may ever hold it. */
     public const APPLY_PERMISSION = 'import.apply';
@@ -134,6 +137,7 @@ class VerifyPermissions extends Command
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $problems = [];
         $applyEnabled = config('import.apply_enabled') === true;
+        $publishEnabled = config('civil_import.publish_enabled') === true;
 
         $missingPermissions = array_diff(RolePermissionSeeder::PERMISSIONS, Permission::pluck('name')->all());
         foreach ($missingPermissions as $name) {
@@ -177,7 +181,25 @@ class VerifyPermissions extends Command
                 $problems[] = "CRITICAL: {$roleName} must NOT have ".self::APPLY_PERMISSION.($applyEnabled ? '' : ' (Apply gate is disabled)');
             }
 
+            // Publication approval: SUPER_ADMIN only, and only while the publication gate is open.
+            $mayApprove = $publishEnabled && $roleName === self::APPLY_ROLE;
+            if ($mayApprove && ! in_array(self::PUBLISH_APPROVE_PERMISSION, $actual, true)) {
+                $problems[] = "CRITICAL: {$roleName} must have ".self::PUBLISH_APPROVE_PERMISSION.' (publication gate is enabled)';
+            }
+            if (! $mayApprove && in_array(self::PUBLISH_APPROVE_PERMISSION, $actual, true)) {
+                $problems[] = "CRITICAL: {$roleName} must NOT have ".self::PUBLISH_APPROVE_PERMISSION.($publishEnabled ? '' : ' (publication gate is disabled)');
+            }
+
             $rows[] = [$roleName, count($actual), count($expected)];
+        }
+
+        // Publication permissions only ever come from the role (D-UI-12): a direct grant would bypass the gate.
+        $directPublicationGrants = DB::table(config('permission.table_names.model_has_permissions'))
+            ->join(config('permission.table_names.permissions').' as p', 'p.id', '=', config('permission.column_names.permission_pivot_key') ?? 'permission_id')
+            ->whereIn('p.name', ['civil-import.publish.request', self::PUBLISH_APPROVE_PERMISSION])
+            ->count();
+        if ($directPublicationGrants > 0) {
+            $problems[] = "CRITICAL: {$directPublicationGrants} civil import publication permission grant(s) made directly to a model; they may only come from the role";
         }
 
         // Apply is never granted to a user directly — only through the gated role.
@@ -213,6 +235,7 @@ class VerifyPermissions extends Command
         }
 
         $this->line('Import Apply gate: '.($applyEnabled ? 'ENABLED ('.self::APPLY_ROLE.' only)' : 'DISABLED (no role holds '.self::APPLY_PERMISSION.')'));
+        $this->line('Civil import publication gate: '.($publishEnabled ? 'ENABLED ('.self::APPLY_ROLE.' only)' : 'DISABLED (no role holds '.self::PUBLISH_APPROVE_PERMISSION.')'));
 
         $this->table(['Role', 'Permissions in DB', 'Expected'], $rows);
 

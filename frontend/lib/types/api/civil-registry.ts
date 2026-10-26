@@ -12,6 +12,8 @@ export type CivilImportPhase =
   | "PREPARING"
   | "PREPARED"
   | "VERIFIED"
+  | "AWAITING_APPROVAL"
+  | "APPROVED"
   | "PUBLISHED"
   | "REJECTED"
   | "ABORTED"
@@ -162,9 +164,9 @@ export interface CivilImportPageMeta {
 
 // ---- U2: execution requests and sources
 
-export type CivilImportAction = "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY";
+export type CivilImportAction = "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY" | "REQUEST_PUBLICATION";
 
-export type CivilImportRequestType = "VALIDATE_SOURCE" | "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY";
+export type CivilImportRequestType = "VALIDATE_SOURCE" | "STAGE" | "ABORT" | "ASSESS" | "PREPARE" | "VERIFY" | "PUBLISH";
 
 export type CivilImportRequestStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
@@ -235,4 +237,38 @@ export interface CivilImportSource {
     finished_at: string | null;
   } | null;
   staged_run_id: string | null;
+}
+
+// ---- U3: two-person publication
+
+export type CivilImportPublicationStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "EXPIRED" | "EXECUTED" | "FAILED";
+
+export type CivilImportJustification = "ROUTINE_REFRESH" | "INITIAL_LOAD" | "CORRECTION";
+
+export type CivilImportRejectionReason = "COUNTS_UNEXPECTED" | "NOT_AUTHORIZED_NOW" | "NEEDS_REVIEW" | "OTHER_DECISION";
+
+/** Codes, counts, ids, two names and times — never an identity value or free text. */
+export interface CivilImportPublicationRequest {
+  id: string;
+  status: CivilImportPublicationStatus;
+  release_id: number;
+  run_id: string;
+  /** The active release when requested; a change invalidates the request. */
+  base_release_id: number | null;
+  justification_code: CivilImportJustification;
+  decision_reason_code: string | null;
+  outcome_code: string | null;
+  snapshot: Partial<CivilImportCounts>;
+  requested_by: { name: string } | null;
+  decided_by: { name: string } | null;
+  requested_at: string | null;
+  expires_at: string | null;
+  decided_at: string | null;
+  finished_at: string | null;
+  publish_request: { id: string; status: CivilImportRequestStatus; reason_code: string | null; message: string | null } | null;
+  is_own: boolean;
+  /** UX hints for the current user; the API and the worker re-check everything. */
+  can_approve: boolean;
+  can_reject: boolean;
+  can_withdraw: boolean;
 }

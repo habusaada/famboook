@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **PROPOSED implementation contract (U0 finalized 2026-10-26).** Decisions D-UI-1 … D-UI-13 and security requirements S-1 … S-7 are approved in `docs/decisions/FB-CIVIL-01A-UI-DECISIONS.md`. *Progress:* U1 committed (`036d478`); U2 implemented locally (uncommitted, not deployed); U3 not started. |
+| Status | **PROPOSED implementation contract (U0 finalized 2026-10-26).** Decisions D-UI-1 … D-UI-13 and security requirements S-1 … S-7 are approved in `docs/decisions/FB-CIVIL-01A-UI-DECISIONS.md`. *Progress:* U1 committed (`036d478`); U2 committed (`7ae7488`); U3 implemented locally (uncommitted, not deployed). Production publication disabled. |
 | Builds on | FB-CIVIL-01A P1–P4 (commit `13897e3`): schemas `identity_ref` / `identity_ref_staging`, the staging and publication actions, the database publication gate, policy `IDREF-POLICY-1`, and the P4 Production approval reference |
 | Companion | `docs/adr/FB-CIVIL-01A-UI-API-AND-SCREENS.md` |
 | Schema / data change | None in U0. **Proposed:** a metadata-only monitor schema (U1, DBA script, local first; S-5) and application-side control tables (U2/U3, Laravel migrations). No existing `identity_ref` object changes. |
