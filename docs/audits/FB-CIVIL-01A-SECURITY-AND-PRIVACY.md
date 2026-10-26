@@ -26,6 +26,11 @@ This is **population-scale, highly sensitive personal data**, far beyond the ope
   - no API, page, Filament resource, export, report or search;
   - `famboook_app` has no privilege on `identity_ref` (database proposal §3).
 - **Who runs imports:** an authorized server operator, from the shell, with the import role's credentials kept outside the application `.env` or in a separate secret (OD-12). There is no `identity.*` permission in 01A, so the RBAC baseline and the 162-permission matrix stay unchanged.
+- **Amended 2026-10-26 (FB-CIVIL-01A-UI U1, X-1; AUTH-ADR-098):**
+  - FB-CIVIL-01A-UI adds metadata-only import management under `civil-import.*` (`civil-import.view`, `civil-import.locations.view`, `civil-import.audit.view`; SUPER_ADMIN only). The catalog is now 165.
+  - The API reads only the `identity_ref_monitor` views, through the dedicated `famboook_identity_monitor` role. These are counts, codes, ordinals and timestamps; file names and line numbers need `locations.view` and are audited.
+  - Identity values remain unreachable from any API, page or export. `famboook_app` still has no privilege on `identity_ref`.
+  - Imports are still run from the shell (execution arrives with U2).
 - **Immutability (FB-CIVIL-D01):** privileges plus triggers. No edit or delete path exists for any user, SUPER_ADMIN included [APPROVED].
 - **Future (01B):**
   - only with a separately approved baseline change (OD-09: `docs/03` §47e forbids global National ID search);

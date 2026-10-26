@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\AssistanceExportController;
 use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChangeRequestController;
+use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportAuditController;
+use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportMonitorController;
 use App\Http\Controllers\Api\V1\ClanStructureController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\Family\CoordinatorAnnouncementController;
@@ -802,5 +804,25 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
             Route::post('/{importBatch}/apply/run', [ImportApplyController::class, 'run']);
             Route::post('/{importBatch}/apply/resume', [ImportApplyController::class, 'resume']);
         });
+    });
+    // FB-CIVIL-01A-UI U1 — read-only, metadata-only civil identity import
+    // monitoring (docs/adr/FB-CIVIL-01A-UI-API-AND-SCREENS.md §2). Nothing here
+    // executes, changes or publishes an import (S-1); no identity value is ever
+    // returned. File names and line numbers need civil-import.locations.view
+    // and every such read is audited (D-UI-8).
+    Route::prefix('civil-registry')->group(function () {
+        Route::middleware('can:civil-import.view')->group(function () {
+            Route::get('/overview', [CivilImportMonitorController::class, 'overview']);
+            Route::get('/imports', [CivilImportMonitorController::class, 'index']);
+            Route::get('/imports/{run}', [CivilImportMonitorController::class, 'show'])->whereUuid('run');
+            Route::get('/imports/{run}/issues', [CivilImportMonitorController::class, 'issues'])->whereUuid('run');
+            Route::get('/releases', [CivilImportMonitorController::class, 'releases']);
+            Route::get('/releases/{release}', [CivilImportMonitorController::class, 'release'])->whereNumber('release');
+        });
+        Route::middleware('can:civil-import.locations.view')->group(function () {
+            Route::get('/imports/{run}/files/locations', [CivilImportMonitorController::class, 'fileLocations'])->whereUuid('run');
+            Route::get('/imports/{run}/issues/locations', [CivilImportMonitorController::class, 'issueLocations'])->whereUuid('run');
+        });
+        Route::get('/audit', [CivilImportAuditController::class, 'index'])->middleware('can:civil-import.audit.view');
     });
 });

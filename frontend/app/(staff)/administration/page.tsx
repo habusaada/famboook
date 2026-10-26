@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ExternalLink, FileSpreadsheet, Network, UserCog, UsersRound } from "lucide-react";
+import { ChevronLeft, DatabaseZap, ExternalLink, FileSpreadsheet, Network, UserCog, UsersRound } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/auth-context";
 
@@ -63,6 +63,22 @@ export default function AdministrationPage() {
                 </CardTitle>
                 <CardDescription>
                   تعيين أرباب الأسر منسقين وإدارة نطاقاتهم التنظيمية: العشيرة، مجموعة الفروع أو الفرع، والإلغاء.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
+        {can("civil-import.view") && (
+          <Link href="/administration/civil-registry" className="group" data-admin-card="civil-registry">
+            <Card className="transition-colors group-hover:bg-muted/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DatabaseZap className="size-5 text-muted-foreground" />
+                  استيراد السجل المدني
+                  <ChevronLeft className="ms-auto size-4 text-muted-foreground" />
+                </CardTitle>
+                <CardDescription>
+                  متابعة عمليات استيراد مرجع الهوية المدنية وإصداراته وسجل تدقيقها — للمتابعة فقط، دون أي بيانات هوية.
                 </CardDescription>
               </CardHeader>
             </Card>

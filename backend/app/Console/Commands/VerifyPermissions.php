@@ -40,7 +40,7 @@ class VerifyPermissions extends Command
     public const CRITICAL = [
         'DATA_ENTRY' => [
             'has' => ['family-membership.update'],
-            'lacks' => ['family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic',
+            'lacks' => [...self::CIVIL_IMPORT, 'family-membership.end', 'person.national-id.update', 'person.national-id.view', 'assistance.approve', 'export.basic',
                 'family-card.issue', 'family-card.revoke', 'family-card.reissue', ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT,
                 ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP],
         ],
@@ -49,17 +49,17 @@ class VerifyPermissions extends Command
         'ADMINISTRATOR' => [
             'has' => ['family-membership.end', 'person.national-id.update', 'person-mobile-trust.grant', 'family-card.reissue',
                 'announcement.view', 'announcement.create', 'announcement.send', ...self::FOLLOWUP],
-            'lacks' => ['person.national-id.view', 'announcement.send-all', ...self::COORDINATOR_ANNOUNCEMENT, ...self::COORDINATOR_FOLLOWUP],
+            'lacks' => [...self::CIVIL_IMPORT, 'person.national-id.view', 'announcement.send-all', ...self::COORDINATOR_ANNOUNCEMENT, ...self::COORDINATOR_FOLLOWUP],
         ],
         'SUPER_ADMIN' => [
             'has' => ['family-membership.end', 'person.national-id.update', 'system-admin.access', 'import.upload', 'import.review', 'person-mobile-trust.grant', 'family-card.reissue',
-                ...self::ANNOUNCEMENT, ...self::FOLLOWUP],
+                ...self::ANNOUNCEMENT, ...self::FOLLOWUP, ...self::CIVIL_IMPORT],
             // import.apply is gated: see the explicit check in handle().
             'lacks' => ['person.national-id.view', ...self::COORDINATOR_ANNOUNCEMENT, ...self::COORDINATOR_FOLLOWUP],
         ],
         // ADR FB-NOTIFY-01 ADR-04: no follow-up access for SOCIAL_WORKER until a Staff assignment model exists.
-        'SOCIAL_WORKER' => ['has' => [], 'lacks' => [...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT, ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP]],
-        'REPORTS_VIEWER' => ['has' => [], 'lacks' => [...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT, ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP]],
+        'SOCIAL_WORKER' => ['has' => [], 'lacks' => [...self::CIVIL_IMPORT, ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT, ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP]],
+        'REPORTS_VIEWER' => ['has' => [], 'lacks' => [...self::CIVIL_IMPORT, ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT, ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP]],
         // Family Portal identity (docs/06 §22b). Mobile trust is granted by
         // SUPER_ADMIN and ADMINISTRATOR only; the COORDINATOR role must not
         // hold assist before coordinator scope authorization exists (PWA-1H).
@@ -68,13 +68,13 @@ class VerifyPermissions extends Command
         'REVIEWER' => [
             'has' => ['change-request.view', 'change-request.review', 'change-request.return', 'change-request.reject',
                 'change-request.approve', 'change-request.apply'],
-            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist',
+            'lacks' => [...self::CIVIL_IMPORT, 'person-mobile-trust.grant', 'person-mobile-trust.revoke', 'person-mobile-trust.assist',
                 'family-card.issue', 'family-card.revoke', 'family-card.reissue', ...self::ANNOUNCEMENT, ...self::COORDINATOR_ANNOUNCEMENT,
                 ...self::FOLLOWUP, ...self::COORDINATOR_FOLLOWUP],
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
-            'lacks' => ['person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
+            'lacks' => [...self::CIVIL_IMPORT, 'person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
                 'coordinator-member.view', 'coordinator-member.view-sensitive',
                 'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel',
                 'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
@@ -96,7 +96,7 @@ class VerifyPermissions extends Command
                 // AUTH-ADR-097: own scope-bound announcements, never announcement.*;
                 // follow-ups of the current scope (manage as primary owner only).
                 ...self::COORDINATOR_ANNOUNCEMENT, ...self::COORDINATOR_FOLLOWUP],
-            'lacks' => [...self::ANNOUNCEMENT, ...self::FOLLOWUP, 'person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
+            'lacks' => [...self::CIVIL_IMPORT, ...self::ANNOUNCEMENT, ...self::FOLLOWUP, 'person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
                 'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
@@ -119,6 +119,9 @@ class VerifyPermissions extends Command
 
     /** Coordinator follow-up permissions (ADR-06 §2c): the COORDINATOR role only. */
     public const COORDINATOR_FOLLOWUP = ['coordinator-notification-followup.view', 'coordinator-notification-followup.manage'];
+
+    /** Civil identity import monitoring (FB-CIVIL-01A-UI U1, AUTH-ADR-098): SUPER_ADMIN only. */
+    public const CIVIL_IMPORT = ['civil-import.view', 'civil-import.locations.view', 'civil-import.audit.view'];
 
     /** The single gated permission and the only role that may ever hold it. */
     public const APPLY_PERMISSION = 'import.apply';

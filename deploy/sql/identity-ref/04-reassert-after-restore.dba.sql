@@ -9,7 +9,8 @@
 --     and could disable the immutability triggers.
 -- This script puts every identity object back under famboook_identity_owner
 -- and re-applies exactly the privileges of 01-schema.sql, 02-staging.sql and
--- 03-publication.sql. It changes no data. Idempotent.
+-- 03-publication.sql (and of 06-monitor.dba.sql when installed). It changes
+-- no data. Idempotent.
 --
 -- Run by the database ADMINISTRATOR, connected to the restored database,
 -- after 00-roles.dba.sql (roles are cluster objects and are not in a dump):
@@ -34,23 +35,28 @@ BEGIN
     IF to_regnamespace('identity_ref') IS NULL THEN
         RAISE EXCEPTION 'IDENTITY_REF_REASSERT_NO_IDENTITY_SCHEMA';
     END IF;
+    -- FB-CIVIL-01A-UI U1: the monitor group role (06-monitor.dba.sql) when its schema was restored.
+    IF to_regnamespace('identity_ref_monitor') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'famboook_identity_monitor') THEN
+        CREATE ROLE famboook_identity_monitor NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+    END IF;
 
     -- 1. Ownership: schemas, tables / views (identity sequences follow their table), functions.
-    FOR obj IN SELECT nspname FROM pg_namespace WHERE nspname IN ('identity_ref', 'identity_ref_staging') LOOP
+    FOR obj IN SELECT nspname FROM pg_namespace WHERE nspname IN ('identity_ref', 'identity_ref_staging', 'identity_ref_monitor') LOOP
         EXECUTE format('ALTER SCHEMA %I OWNER TO famboook_identity_owner', obj.nspname);
     END LOOP;
     FOR obj IN SELECT n.nspname, c.relname, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname IN ('identity_ref', 'identity_ref_staging') AND c.relkind IN ('r', 'v', 'p') LOOP
+                WHERE n.nspname IN ('identity_ref', 'identity_ref_staging', 'identity_ref_monitor') AND c.relkind IN ('r', 'v', 'p') LOOP
         EXECUTE format('ALTER %s %I.%I OWNER TO famboook_identity_owner',
                        CASE obj.relkind WHEN 'v' THEN 'VIEW' ELSE 'TABLE' END, obj.nspname, obj.relname);
     END LOOP;
     FOR obj IN SELECT p.oid::regprocedure AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-                WHERE n.nspname IN ('identity_ref', 'identity_ref_staging') LOOP
+                WHERE n.nspname IN ('identity_ref', 'identity_ref_staging', 'identity_ref_monitor') LOOP
         EXECUTE format('ALTER FUNCTION %s OWNER TO famboook_identity_owner', obj.fn);
     END LOOP;
 
     -- 2. Nothing for anyone but what is re-granted below.
-    FOR obj IN SELECT nspname FROM pg_namespace WHERE nspname IN ('identity_ref', 'identity_ref_staging') LOOP
+    FOR obj IN SELECT nspname FROM pg_namespace WHERE nspname IN ('identity_ref', 'identity_ref_staging', 'identity_ref_monitor') LOOP
         EXECUTE format('REVOKE ALL ON SCHEMA %I FROM PUBLIC', obj.nspname);
         EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM PUBLIC, famboook_identity_writer, famboook_identity_reader', obj.nspname);
         EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA %I FROM PUBLIC, famboook_identity_writer, famboook_identity_reader', obj.nspname);
@@ -59,6 +65,11 @@ BEGIN
         EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE famboook_identity_owner IN SCHEMA %I REVOKE ALL ON TABLES FROM PUBLIC', obj.nspname);
         EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE famboook_identity_owner IN SCHEMA %I REVOKE ALL ON SEQUENCES FROM PUBLIC', obj.nspname);
         EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE famboook_identity_owner IN SCHEMA %I REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC', obj.nspname);
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'famboook_identity_monitor') THEN
+            EXECUTE format('REVOKE ALL ON SCHEMA %I FROM famboook_identity_monitor', obj.nspname);
+            EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM famboook_identity_monitor', obj.nspname);
+            EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA %I FROM famboook_identity_monitor', obj.nspname);
+        END IF;
         IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'famboook_app') THEN
             EXECUTE format('REVOKE ALL ON SCHEMA %I FROM famboook_app', obj.nspname);
             EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM famboook_app', obj.nspname);
@@ -95,4 +106,14 @@ GRANT EXECUTE ON FUNCTION identity_ref_staging.assess_run(uuid, bigint, text), i
                           identity_ref.complete_preparation(bigint), identity_ref.verify_release(bigint),
                           identity_ref.refresh_statistics()
     TO famboook_identity_writer;
+
+-- 06-monitor.dba.sql (FB-CIVIL-01A-UI U1): metadata views only, when installed.
+DO $monitor$
+BEGIN
+    IF to_regnamespace('identity_ref_monitor') IS NOT NULL THEN
+        GRANT USAGE ON SCHEMA identity_ref_monitor TO famboook_identity_monitor;
+        GRANT SELECT ON ALL TABLES IN SCHEMA identity_ref_monitor TO famboook_identity_monitor;
+    END IF;
+END
+$monitor$;
 RESET ROLE;

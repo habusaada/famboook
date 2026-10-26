@@ -1436,6 +1436,19 @@ on the test instance and a real browser
 - PX-1 fixed (stale Staff residence dialogs).
 - No RBAC, theme or coordinator change; no backfill.
 
+2026-10-26: **FB-CIVIL program** (civil identity reference; OD-11, X-4).
+- **FB-CIVIL-01A:** identity reference store, staging loader and gated publication, operated from the shell (commit `13897e3`). Real data still needs the lawful-basis gate.
+- **FB-CIVIL-01A-UI** (`docs/adr/FB-CIVIL-01A-UI-IMPORT-MANAGEMENT.md`): import management in the Staff application, delivered in stages:
+  - **U0:** decisions, architecture and API contracts (commit `6529532`).
+  - **U1:** read-only, metadata-only monitoring, **local only**:
+    - the `06-monitor` views and the `famboook_identity_monitor` role;
+    - nine read APIs and an append-only audit trail;
+    - three SUPER_ADMIN-only permissions (AUTH-ADR-098);
+    - Arabic overview, history, run detail, release and audit pages.
+    - Applying `06-monitor` on Production needs its own approval (S-5).
+  - **U2:** execution. **U3:** publication approval. Not started.
+- **FB-CIVIL-01B** (lookup by staff): not started; needs a separately approved baseline change (OD-09).
+
 ---
 
 # 22. Phase 10 — Staff Registry Experience
@@ -5228,6 +5241,7 @@ Date: 2026-09-24
 | 1.2.71 | 2026-10-16 | Approved | FB-GEO-01 Stage 4C (RM-ADR-068): integration verification (real API, disposable PostgreSQL, real browser); D-1 / D-2 fixed; PX-1 and OBS-1 recorded; Stage 5 CONDITIONAL |
 | 1.2.72 | 2026-10-16 | Approved | FB-GEO-01 Stage 5 progress (RM-ADR-069): Family PWA geography API and source-aware selector; RESIDENCE_UPDATE v2 and form blocked on approval |
 | 1.2.73 | 2026-10-16 | Approved | FB-GEO-01 RESIDENCE_UPDATE v2 (RM-ADR-070): v1-compatible versioned handler, family profile summaries, Family PWA selectors, PX-1 fixed; local only |
+| 1.2.74 | 2026-10-26 | Approved | FB-CIVIL program entry (X-4): FB-CIVIL-01A, FB-CIVIL-01A-UI U0 and U1 (read-only monitoring, local only), U2 / U3 and 01B not started |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

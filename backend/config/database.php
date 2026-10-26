@@ -120,6 +120,24 @@ return [
             'sslmode' => env('IDENTITY_REF_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
         ],
 
+        // FB-CIVIL-01A-UI: metadata-only monitoring (D-UI-4/9). Reads only the
+        // identity_ref_monitor views, as a member of famboook_identity_monitor.
+        // The login and password are set at run time by IdentityImportMonitor
+        // from config('civil_import.monitor_credentials_file'), never here.
+        'identity_ref_monitor' => [
+            'driver' => 'pgsql',
+            'host' => env('IDENTITY_REF_MONITOR_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('IDENTITY_REF_MONITOR_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('IDENTITY_REF_MONITOR_DB_DATABASE', env('DB_DATABASE')),
+            'username' => null,
+            'password' => null,
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'identity_ref_monitor',
+            'sslmode' => env('IDENTITY_REF_MONITOR_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

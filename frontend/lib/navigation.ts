@@ -56,7 +56,7 @@ export const navItems: NavItem[] = [
     label: "الإدارة",
     icon: Settings,
     // clan.view alone only feeds selectors: no administration screen.
-    permissions: ["clan.manage", "coordinator-scope.manage", "system-admin.access"],
+    permissions: ["clan.manage", "coordinator-scope.manage", "system-admin.access", "civil-import.view"],
     group: "system",
   },
 ];

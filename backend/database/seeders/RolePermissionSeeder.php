@@ -254,6 +254,14 @@ class RolePermissionSeeder extends Seeder
         'import.review',
         'import.apply',
 
+        // §61c Civil identity import management (FB-CIVIL-01A-UI U1,
+        // AUTH-ADR-098): metadata-only monitoring; no identity value is ever
+        // exposed. Staging, validation and publication permissions arrive
+        // with U2/U3.
+        'civil-import.view',
+        'civil-import.locations.view',
+        'civil-import.audit.view',
+
         // §62 System Administration Permissions
         'system.settings.view',
         'system.settings.update',
@@ -482,6 +490,12 @@ class RolePermissionSeeder extends Seeder
             'import.upload',
             'import.validate',
             'import.review',
+            // Civil identity import monitoring (FB-CIVIL-01A-UI U1, AUTH-ADR-098):
+            // SUPER_ADMIN only (D-UI-7/8/12). File names and line numbers and the
+            // audit history are separate permissions.
+            'civil-import.view',
+            'civil-import.locations.view',
+            'civil-import.audit.view',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
             'system.settings.update',

@@ -39,10 +39,12 @@ trait IdentityRefDatabase
      * $withPublication also applies 03-publication.sql (P3). P1 and P2 tests
      * exercise their own primitives WITHOUT the P3 publication gate (which
      * deliberately refuses any release that was not prepared and verified);
-     * P3 tests run on the complete 00–03 set.
+     * P3 tests run on the complete 00–03 set. $withMonitor (FB-CIVIL-01A-UI
+     * U1) additionally applies 06-monitor.dba.sql, as the administrator.
      */
-    protected function setUpIdentityRef(bool $withPublication = false): void
+    protected function setUpIdentityRef(bool $withPublication = false, bool $withMonitor = false): void
     {
+        $withPublication = $withPublication || $withMonitor;
         if (DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('PostgreSQL only — run with phpunit.pgsql.xml against the disposable *_test cluster.');
         }
@@ -68,6 +70,9 @@ trait IdentityRefDatabase
             }
         } finally {
             DB::unprepared('RESET ROLE');
+        }
+        if ($withMonitor) {
+            DB::unprepared($this->sqlFile('06-monitor.dba.sql'));
         }
     }
 

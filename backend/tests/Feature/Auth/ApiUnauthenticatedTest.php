@@ -73,8 +73,9 @@ class ApiUnauthenticatedTest extends TestCase
         foreach ($routes as $route) {
             // A parameter value the route accepts: the first literal of a
             // constrained alternation (e.g. a report name); a hyphenated uuid
-            // where the constraint requires one (whereUuid, FB-GEO-01); else a
-            // uuid without hyphens (fits the alphanumeric constraints too).
+            // where the constraint requires one (whereUuid, FB-GEO-01); a number
+            // where only digits fit (whereNumber, FB-CIVIL-01A-UI); else a uuid
+            // without hyphens (fits the alphanumeric constraints too).
             $uri = '/'.preg_replace_callback('/\{([^}?]+)\??\}/', function (array $m) use ($route) {
                 $pattern = $route->wheres[$m[1]] ?? null;
                 $uuid = (string) Str::uuid();
@@ -83,6 +84,7 @@ class ApiUnauthenticatedTest extends TestCase
                 return match (true) {
                     $pattern !== null && preg_match('/\A[a-z][a-z\-]*(\|[a-z][a-z\-]*)+\z/', $pattern) === 1 => explode('|', $pattern)[0],
                     $accepts($uuid) && ! $accepts(str_replace('-', '', $uuid)) => $uuid,
+                    $accepts('1') && ! $accepts(str_replace('-', '', $uuid)) => '1',
                     default => str_replace('-', '', $uuid),
                 };
             }, $route->uri());
