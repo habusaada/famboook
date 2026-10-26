@@ -113,6 +113,9 @@ class CivilImportWorkerPostgresTest extends TestCase
         $source = $this->catalogued('export-2026-11-01');
         $this->assertSame([CivilImportSource::VALID, 2, 8], [$source->manifest_status, $source->file_count, $source->total_rows]);
 
+        // The overview shows the worker's heartbeat (it just ran an iteration).
+        $this->apiGet('/overview')->assertOk()->assertJsonPath('data.worker.state', 'IDLE');
+
         $sources = $this->apiGet('/sources')->assertOk()->assertJsonPath('data.0.label', 'export-2026-11-01')->assertJsonPath('data.0.files', 2);
         $this->assertRedacted($sources->getContent(), 'sources');
 

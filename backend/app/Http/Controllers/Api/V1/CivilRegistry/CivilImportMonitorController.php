@@ -45,6 +45,8 @@ class CivilImportMonitorController extends Controller
         }
 
         $overview['pending_publication_requests'] = $this->control->pendingPublications();
+        // The worker's liveness comes from its heartbeats (U2), not from the identity monitor.
+        $overview['worker'] = $this->control->worker();
 
         return response()->json(['data' => $overview + [
             'active_request' => $active === null ? null : (new CivilImportRequestResource($active->load(['requester', 'source'])))->toArray($request),

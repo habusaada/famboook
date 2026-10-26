@@ -101,6 +101,11 @@ final class IdentityImportWorker
         if ($db->getDriverName() !== 'pgsql') {
             throw new CivilImportWorkerException('CONTROL_NOT_POSTGRESQL');
         }
+        try {
+            $db->getPdo();
+        } catch (Throwable) {
+            throw new CivilImportWorkerException('CONTROL_UNREACHABLE');
+        }
         $db->setReconnector(static function (): void {
             throw new RuntimeException('CIVIL_IMPORT_CONTROL_CONNECTION_LOST');
         });

@@ -99,7 +99,7 @@ export const FILE_STATUS_TONES: Record<CivilImportFile["status"], StatusTone> = 
 };
 
 export const WORKER_LABELS: Record<string, string> = {
-  IDLE: "متوقف (جاهز)",
+  IDLE: "يعمل — بانتظار الطلبات",
   BUSY: "يعمل",
   STALE: "لا يستجيب",
   NOT_INSTALLED: "غير مثبّت بعد",

@@ -26,7 +26,18 @@ export default function config(phase: string): NextConfig {
     );
   }
 
+  // Optional isolated build output (FB-CIVIL-01A-UI U4 local acceptance): `next dev`
+  // takes a lock in <distDir>/ (one dev server per distDir), so a second dev server
+  // from this directory needs its own distDir. Restricted to a sub-folder of .next/
+  // (git-ignored); unset, the default .next is used.
+  const distDir = process.env.FAMBOOOK_NEXT_DIST_DIR?.trim();
+  if (distDir && !/^\.next\/[a-z0-9-]{1,40}$/.test(distDir)) {
+    throw new Error("FAMBOOOK_NEXT_DIST_DIR must be a sub-folder of .next/ (e.g. .next/u4-acceptance).");
+  }
+
   return {
+    ...(distDir ? { distDir } : {}),
+
     // Always inlined as a literal (the validated date or ""), so an unset date
     // lets the bundler drop the unpublished policy text from the client code.
     env: { NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE: effectiveDate ?? "" },

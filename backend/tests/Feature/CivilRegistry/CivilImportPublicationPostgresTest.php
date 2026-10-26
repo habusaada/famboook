@@ -320,10 +320,24 @@ class CivilImportPublicationPostgresTest extends TestCase
         DB::statement("UPDATE civil_import_publication_requests SET status = 'FAILED', outcome_code = 'TEST_CLOSED', finished_at = now() WHERE id = ?", [$p]);
         $short = (string) Str::uuid();
         DB::statement("INSERT INTO civil_import_publication_requests (id, release_id, run_id, requested_by, justification_code, snapshot, expires_at)
-            VALUES (?, ?, ?, ?, 'ROUTINE_REFRESH', '{}', clock_timestamp() + interval '1 second')", [$short, $releaseId, (string) Str::uuid(), $this->requester->id]);
+            VALUES (?, ?, ?, ?, 'ROUTINE_REFRESH', '{}', (clock_timestamp() AT TIME ZONE 'UTC') + interval '1 second')", [$short, $releaseId, (string) Str::uuid(), $this->requester->id]);
         DB::statement('SELECT pg_sleep(2.1)');   // timestamp(0): expires_at is rounded to the second
         $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?",
             [$this->approver->id, $short]));
+
+        // U4 regression: the window is UTC whatever the session time zone (the application writes UTC).
+        DB::statement("UPDATE civil_import_publication_requests SET status = 'EXPIRED', outcome_code = 'TIMEOUT', finished_at = now() WHERE id = ?", [$short]);
+        foreach (['Asia/Jerusalem', 'America/Los_Angeles', 'UTC'] as $zone) {
+            DB::statement("SET TIME ZONE '{$zone}'");
+            $open = (string) Str::uuid();
+            DB::table('civil_import_publication_requests')->insert(['id' => $open, 'release_id' => $releaseId, 'run_id' => (string) Str::uuid(),
+                'requested_by' => $this->requester->id, 'justification_code' => 'ROUTINE_REFRESH', 'snapshot' => '{}',
+                'requested_at' => now()->subMinutes(30), 'expires_at' => now()->addMinutes(30)]);   // as the application writes them (UTC)
+            $this->assertNull($sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?",
+                [$this->approver->id, $open]), "approvable inside its window in a {$zone} session");
+            DB::statement("UPDATE civil_import_publication_requests SET status = 'FAILED', outcome_code = 'TEST_CLOSED', finished_at = now() WHERE id = ?", [$open]);
+        }
+        DB::statement('SET TIME ZONE DEFAULT');
     }
 
     /** A worker claims the queued request, optionally does $work, and dies (heartbeat 30 minutes old). */
