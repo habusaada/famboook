@@ -13,6 +13,7 @@ use App\Support\IdentityRef\IdentityImportPolicy;
 use App\Support\IdentityRef\IdentityRefErrorRedactor;
 use App\Support\IdentityRef\IdentityRefProductionGate;
 use App\Support\IdentityRef\IdentitySourceVerifier;
+use App\Support\IdentityRef\IdentityStagingPurger;
 use Closure;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Carbon;
@@ -293,7 +294,7 @@ final class IdentityImportWorker
             throw new CivilImportSourceException(CivilImportReason::PHASE_NOT_ALLOWED);
         }
 
-        return $this->stager->abort($db, $target, $this->logger());
+        return $this->stager->abort($db, $target, $this->logger(), $this->hook(), self::purgeBatchSize());
     }
 
     /**
@@ -330,7 +331,12 @@ final class IdentityImportWorker
             $refuse(CivilImportReason::RELEASE_CHANGED);
         }
 
-        return $this->releases->publish($db, $publication->release_id, $target, $this->logger(), $this->hook());
+        return $this->releases->publish($db, $publication->release_id, $target, $this->logger(), $this->hook(), self::purgeBatchSize());
+    }
+
+    private static function purgeBatchSize(): int
+    {
+        return max(1, (int) config('civil_import.worker.purge_batch_size', IdentityStagingPurger::DEFAULT_BATCH_SIZE));
     }
 
     /**
@@ -425,6 +431,10 @@ final class IdentityImportWorker
             if (in_array($event, ['chunk.committed', 'prepare.chunk_committed'], true)) {
                 $this->beat();
             }
+            // A staging purge (after an abort, rejection or publication) is never cancelled: liveness only.
+            if ($event === 'purge.batch_committed') {
+                $this->beat(cancellable: false);
+            }
             if ($this->testHook !== null) {
                 ($this->testHook)($event, $context);
             }
@@ -437,7 +447,7 @@ final class IdentityImportWorker
      *
      * @throws CivilImportCancelled
      */
-    private function beat(): void
+    private function beat(bool $cancellable = true): void
     {
         $now = microtime(true);
         if ($now - $this->lastBeat >= (int) config('civil_import.worker.heartbeat_seconds', 30)) {
@@ -445,6 +455,9 @@ final class IdentityImportWorker
             CivilImportRequest::query()->whereKey($this->current->id)->where('status', CivilImportRequest::RUNNING)
                 ->update(['heartbeat_at' => Carbon::now()]);
             $this->heartbeat('BUSY', $this->current->id);
+        }
+        if (! $cancellable) {
+            return;
         }
         $cancel = CivilImportRequest::query()->whereKey($this->current->id)->value('cancel_requested_at');
         if ($cancel !== null && in_array($this->current->type, CivilImportRequest::CANCELLABLE_WHILE_RUNNING, true)) {

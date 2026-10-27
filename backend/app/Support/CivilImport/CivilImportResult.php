@@ -20,7 +20,7 @@ final class CivilImportResult
         'total_rows', 'record_count', 'rows_purged', 'chunks_materialized', 'release_id', 'base_release', 'active_release',
         'abandoned_release', 'duration_seconds', 'activation_seconds'];
 
-    private const FLAGS = ['resumed', 'publishable'];
+    private const FLAGS = ['resumed', 'publishable', 'staging_purge_complete'];
 
     private const UUIDS = ['run_id', 'aborted_run'];
 

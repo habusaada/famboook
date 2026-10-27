@@ -376,6 +376,32 @@ class CivilImportPublicationPostgresTest extends TestCase
         $this->assertTrue(CivilImportAuditEvent::query()->where('event_type', 'RELEASE_PUBLISHED')->where('outcome_code', 'RECONCILED_PUBLISHED')->exists());
     }
 
+    /** Staging purge remediation: a post-publication purge that stops never turns the executed publication into a failure. */
+    public function test_a_publication_stays_executed_when_its_staging_purge_is_interrupted(): void
+    {
+        putenv(IdentityRefProductionGate::VARIABLE.'='.self::REFERENCE);
+        config(['civil_import.worker.heartbeat_seconds' => 0]);
+        [$runId, $releaseId] = $this->verifiedRelease();
+        $p1 = $this->requestPublication($releaseId);
+        $publish = $this->confirm($p1, $releaseId);
+
+        $purgeEvents = 0;
+        $this->workOnce($this->worker()->withTestHook(function (string $event) use (&$purgeEvents) {
+            if ($event === 'purge.batch_committed' && ++$purgeEvents === 1) {
+                throw new RuntimeException('simulated crash during the staging purge');
+            }
+        }));
+        $request = CivilImportRequest::query()->findOrFail($publish);
+        $this->assertSame(1, $purgeEvents, 'the purge reports its batches to the worker (heartbeat)');
+        $this->assertSame(CivilImportRequest::SUCCEEDED, $request->status, (string) $request->reason_code);
+        $this->assertNotNull($request->heartbeat_at);
+        $this->assertSame('PUBLISHED', $request->result['outcome']);
+        $this->assertSame(['EXECUTED', 'PUBLISHED'], [$this->publication($p1)->status, $this->publication($p1)->outcome_code]);
+        $this->assertSame($releaseId, $this->activeReleaseId());
+        $this->assertSame('SUCCEEDED', $this->importRun($runId)->status);
+        $this->assertSame(4, $this->stagedCount($runId), 'the first file went in one batch; the second waits for the next purge');
+    }
+
     public function test_the_control_role_can_only_close_publication_requests(): void
     {
         [, $releaseId] = $this->verifiedRelease();

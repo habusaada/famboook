@@ -34,6 +34,10 @@ return [
         'target' => env('CIVIL_IMPORT_TARGET_DATABASE'),
 
         'chunk_size' => (int) env('CIVIL_IMPORT_CHUNK_SIZE', 5000),
+
+        // Staged records deleted per committed batch when staging is purged
+        // (after an abort, a rejection or a publication).
+        'purge_batch_size' => (int) env('CIVIL_IMPORT_PURGE_BATCH_SIZE', 1000),
         'idle_poll_seconds' => 30,
         'heartbeat_seconds' => 30,
 

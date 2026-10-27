@@ -265,12 +265,33 @@ class IdentityRefStagingPostgresTest extends TestCase
         $this->assertSame(6, $this->stagedCount());
 
         $result = app(StageIdentityImportAction::class)->abort($this->writerConnection(), 'famboook_test');
-        $this->assertSame([$report['run_id'], 6], [$result['aborted_run'], $result['rows_purged']]);
+        $this->assertSame([$report['run_id'], 6, true], [$result['aborted_run'], $result['rows_purged'], $result['staging_purge_complete']]);
         $this->assertSame(['FAILED', 'ABORTED'], [$this->importRun($report['run_id'])->status, $this->importRun($report['run_id'])->error_code]);
         $this->assertSame(0, $this->stagedCount());
         $this->assertSame(0, (int) DB::selectOne('SELECT count(*) AS n FROM identity_ref_staging.file_chunks')->n);
 
         // A new run can start afterwards.
         $this->assertSame(6, $this->stage($export)['rows_staged']);
+    }
+
+    /** 11 — without the P3 assessments table (P2 only), an interrupted abort purge resumes in batches. */
+    public function test_the_batched_purge_works_without_the_assessments_table(): void
+    {
+        $this->assertNull(DB::selectOne("SELECT to_regclass('identity_ref_staging.assessments') AS t")->t);
+        $report = $this->stage($this->syntheticExport(SyntheticIdentityExport::generated(2, 9)), ['chunk_size' => 4]);
+        $crashed = 0;
+        $result = app(StageIdentityImportAction::class)->abort($this->writerConnection(), 'famboook_test', null, function (string $event, array $context) use (&$crashed) {
+            if ($context['rows'] > 0 && ++$crashed === 2) {
+                throw new RuntimeException('simulated crash after a committed purge batch');
+            }
+        }, 4);
+        $this->assertSame([$report['run_id'], 8, false], [$result['aborted_run'], $result['rows_purged'], $result['staging_purge_complete']]);
+        $this->assertSame(['FAILED', 'ABORTED'], [$this->importRun($report['run_id'])->status, $this->importRun($report['run_id'])->error_code]);
+        $this->assertSame(10, $this->stagedCount());
+
+        $purge = app(StageIdentityImportAction::class)->purge($this->writerConnection(), 'famboook_test', 4);
+        $this->assertSame([true, 10, 0, 6], [$purge['complete'], $purge['rows_purged'], $purge['assessments_purged'], $purge['chunks_purged']]);
+        $this->assertSame(['files' => 0, 'rows' => 0, 'assessments' => 0, 'chunks' => 0, 'protected_rows' => 0], $purge['remaining']);
+        $this->assertSame(0, $this->stagedCount());
     }
 }

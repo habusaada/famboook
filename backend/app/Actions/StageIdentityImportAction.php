@@ -10,6 +10,7 @@ use App\Support\IdentityRef\IdentityRefErrorRedactor;
 use App\Support\IdentityRef\IdentitySourceChangedException;
 use App\Support\IdentityRef\IdentitySourceVerifier;
 use App\Support\IdentityRef\IdentityStagingLoader;
+use App\Support\IdentityRef\IdentityStagingPurger;
 use Closure;
 use Illuminate\Database\Connection;
 use Psr\Log\LoggerInterface;
@@ -32,8 +33,8 @@ use Throwable;
  *    failure). A RUNNING run with the same manifest is RESUMED; one with a
  *    different manifest is refused (abort it first).
  * 4. Every file is fully re-validated (BOM, header, structure, row count,
- *    SHA-256) — also on resume. A failure records issues, marks the run
- *    REJECTED and purges its staging.
+ *    SHA-256) — also on resume. A failure records issues and marks the run
+ *    REJECTED (committed), then purges its staging in batches.
  * 5. Files are loaded chunk by chunk (IdentityStagingLoader). A source file
  *    that changes while staging → REJECTED and purged.
  * 6. The last file is marked STAGED in the same transaction that records
@@ -96,7 +97,7 @@ final class StageIdentityImportAction
 
             $problems = $this->verifier->verify($manifest);
             if ($problems !== []) {
-                $this->reject($db, $runId, 'SOURCE_INVALID', $problems);
+                $this->reject($db, $runId, 'SOURCE_INVALID', $problems, $logger, $hook);
                 $logger->warning('identity_ref.stage.source_rejected', ['run_id' => $runId, 'problems' => self::describe($problems)]);
                 $this->fail(IdentityImportException::SOURCE_INVALID, 'Source validation failed; the run is REJECTED and its staging purged.', self::describe($problems), $runId);
             }
@@ -119,18 +120,27 @@ final class StageIdentityImportAction
 
     /**
      * Closes a RUNNING run as FAILED (ABORTED) — abandoning its BUILDING release,
-     * if P3 prepared one — and purges the staging of every finished run. Completed staging of a RUNNING run is never touched
-     * except by aborting that run.
+     * if P3 prepared one — in one committed transaction, then purges the staging
+     * of every finished run in batches (IdentityStagingPurger). Completed staging
+     * of a RUNNING run is never touched except by aborting that run.
      *
-     * @return array{aborted_run: ?string, abandoned_release: ?int, rows_purged: int}
+     * A failed closure changes nothing (the run stays RUNNING; STAGING_INTERRUPTED).
+     * A purge interrupted after the closure does not undo the abort: the result
+     * says staging_purge_complete = false and rows_purged counts what was
+     * committed; the leftovers belong to a finished run only, and the next abort,
+     * purge or publication removes them.
+     *
+     * @param  ?Closure(string, array<string, mixed>): void  $hook  'purge.batch_committed' (heartbeat, test seam)
+     * @return array{aborted_run: ?string, abandoned_release: ?int, rows_purged: int, staging_purge_complete: bool}
      *
      * @throws IdentityImportException
      */
-    public function abort(Connection $db, string $target, ?LoggerInterface $logger = null): array
+    public function abort(Connection $db, string $target, ?LoggerInterface $logger = null, ?Closure $hook = null,
+        int $purgeBatchSize = IdentityStagingPurger::DEFAULT_BATCH_SIZE): array
     {
         $logger ??= new NullLogger;
 
-        return IdentityImportSession::run($db, $target, function () use ($db, $logger) {
+        return IdentityImportSession::run($db, $target, function () use ($db, $logger, $hook, $purgeBatchSize) {
             try {
                 $result = $db->transaction(function () use ($db) {
                     $running = $db->selectOne("SELECT id FROM identity_ref.import_runs WHERE status = 'RUNNING'");
@@ -144,17 +154,66 @@ final class StageIdentityImportAction
                         $db->update("UPDATE identity_ref.import_runs SET status = 'FAILED', finished_at = now(), error_code = 'ABORTED' WHERE id = ?", [$running->id]);
                     }
 
-                    return ['aborted_run' => $running?->id, 'abandoned_release' => $abandoned === null ? null : (int) $abandoned,
-                        'rows_purged' => self::purgeFinishedRuns($db)];
+                    return ['aborted_run' => $running?->id, 'abandoned_release' => $abandoned === null ? null : (int) $abandoned];
                 });
-                $logger->info('identity_ref.stage.aborted', $result);
-
-                return $result;
             } catch (Throwable $e) {
                 $redacted = IdentityRefErrorRedactor::redact($e);
                 $logger->error('identity_ref.stage.abort_failed', ['error' => $redacted]);
                 $this->fail(IdentityImportException::STAGING_INTERRUPTED, 'Abort failed. '.$redacted, [], null);
             }
+            $purge = (new IdentityStagingPurger($db, $purgeBatchSize, $logger, $hook))->purge();
+            $result += ['rows_purged' => $purge['rows_purged'], 'staging_purge_complete' => $purge['complete']];
+            $purge['complete']
+                ? $logger->info('identity_ref.stage.aborted', $result)
+                : $logger->warning('identity_ref.stage.aborted_purge_incomplete', $result);
+
+            return $result;
+        });
+    }
+
+    /**
+     * Purges the staging of finished runs only — no run, release or reference
+     * data is changed — holding the import lock. Safe to interrupt and repeat.
+     *
+     * @param  ?Closure(string, array<string, mixed>): void  $hook
+     * @return array{complete: bool, files_purged: int, rows_purged: int, assessments_purged: int, chunks_purged: int, batches: int,
+     *               remaining: array{files: int, rows: int, assessments: int, chunks: int, protected_rows: int}}
+     *
+     * @throws IdentityImportException
+     */
+    public function purge(Connection $db, string $target, int $batchSize = IdentityStagingPurger::DEFAULT_BATCH_SIZE,
+        ?LoggerInterface $logger = null, ?Closure $hook = null): array
+    {
+        $logger ??= new NullLogger;
+
+        return IdentityImportSession::run($db, $target, function () use ($db, $batchSize, $logger, $hook) {
+            $purger = new IdentityStagingPurger($db, $batchSize, $logger, $hook);
+            $report = $purger->purge();
+            try {
+                $report['remaining'] = $purger->remaining();
+            } catch (Throwable $e) {
+                $this->fail(IdentityImportException::STAGING_INTERRUPTED, 'The staging purge stopped; re-run it to resume. '.IdentityRefErrorRedactor::redact($e), [], null);
+            }
+            $logger->info('identity_ref.staging.purged', $report);
+
+            return $report;
+        });
+    }
+
+    /**
+     * Read-only (no lock, nothing deleted): what a purge would delete, in total and per eligible run.
+     *
+     * @return array{files: int, rows: int, assessments: int, chunks: int, protected_rows: int,
+     *               runs: list<array{run_id: string, status: string, error_code: ?string, files: int, chunks: int, rows: int}>}
+     *
+     * @throws IdentityImportException
+     */
+    public function purgePreview(Connection $db, string $target): array
+    {
+        return IdentityImportSession::readOnly($db, $target, function () use ($db) {
+            $purger = new IdentityStagingPurger($db);
+
+            return $purger->remaining() + ['runs' => $purger->eligibleRuns()];
         });
     }
 
@@ -206,7 +265,7 @@ final class StageIdentityImportAction
                 $result = $loader->load($manifest->path($file['file_name']), $file);
             } catch (IdentitySourceChangedException $e) {
                 $problem = [['file' => $e->fileName, 'code' => 'SOURCE_CHANGED', 'line' => null]];
-                $this->reject($db, $runId, 'SOURCE_CHANGED', $problem);
+                $this->reject($db, $runId, 'SOURCE_CHANGED', $problem, $logger, $hook);
                 $logger->warning('identity_ref.stage.source_changed', ['run_id' => $runId, 'file' => $e->fileName]);
                 $this->fail(IdentityImportException::SOURCE_CHANGED, 'A source file changed while staging; the run is REJECTED and its staging purged.', self::describe($problem), $runId);
             }
@@ -260,12 +319,15 @@ final class StageIdentityImportAction
     }
 
     /**
-     * Records the problems, fails their files, closes the run REJECTED and
-     * purges its staging — one transaction.
+     * Records the problems, fails their files and closes the run REJECTED —
+     * one committed transaction — then purges the staging in batches. An
+     * interrupted purge is logged and leaves only finished-run staging behind;
+     * the rejection stands either way.
      *
      * @param  list<array{file: string, code: string, line: ?int}>  $problems
+     * @param  Closure(string, array<string, mixed>): void  $hook
      */
-    private function reject(Connection $db, string $runId, string $errorCode, array $problems): void
+    private function reject(Connection $db, string $runId, string $errorCode, array $problems, LoggerInterface $logger, Closure $hook): void
     {
         $db->transaction(function () use ($db, $runId, $errorCode, $problems) {
             foreach ($problems as $p) {
@@ -275,24 +337,8 @@ final class StageIdentityImportAction
             }
             $db->update("UPDATE identity_ref.import_runs SET status = 'REJECTED', finished_at = now(), error_code = ?,
                 issues = (SELECT count(*) FROM identity_ref.import_issues WHERE run_id = ?) WHERE id = ?", [$errorCode, $runId, $runId]);
-            self::purgeFinishedRuns($db);
         });
-    }
-
-    /**
-     * Deletes the staging of every run that is no longer RUNNING (P3
-     * assessments first, when installed); returns the number of rows removed.
-     */
-    public static function purgeFinishedRuns(Connection $db): int
-    {
-        $finished = "SELECT f.id FROM identity_ref.import_files f JOIN identity_ref.import_runs r ON r.id = f.run_id WHERE r.status <> 'RUNNING'";
-        if ($db->selectOne("SELECT to_regclass('identity_ref_staging.assessments') IS NOT NULL AS p3")->p3) {
-            $db->delete("DELETE FROM identity_ref_staging.assessments WHERE file_id IN ({$finished})");
-        }
-        $rows = $db->delete("DELETE FROM identity_ref_staging.rows WHERE file_id IN ({$finished})");
-        $db->delete("DELETE FROM identity_ref_staging.file_chunks WHERE file_id IN ({$finished})");
-
-        return $rows;
+        (new IdentityStagingPurger($db, IdentityStagingPurger::DEFAULT_BATCH_SIZE, $logger, $hook))->purge();
     }
 
     /**

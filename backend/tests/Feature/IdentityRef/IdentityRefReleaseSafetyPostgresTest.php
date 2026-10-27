@@ -179,7 +179,10 @@ class IdentityRefReleaseSafetyPostgresTest extends TestCase
         $this->verifyRelease($release);
 
         $seen = new \ArrayObject;
-        $report = $this->publishRelease($release, function () use ($release, $seen) {
+        $report = $this->publishRelease($release, function (string $event) use ($release, $seen) {
+            if ($event !== 'publish.before_commit') {
+                return; // the post-commit staging purge also reports its batches through the hook
+            }
             // While the first activation transaction is open: a second process and a direct call.
             $seen['process'] = $this->refused(fn () => $this->publishRelease($release))->reason;
             $direct = $this->connection(self::WRITER);

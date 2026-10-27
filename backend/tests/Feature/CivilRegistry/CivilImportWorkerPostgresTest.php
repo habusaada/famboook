@@ -233,6 +233,29 @@ class CivilImportWorkerPostgresTest extends TestCase
         $this->apiGet("/imports/{$runId}")->assertJsonPath('data.phase', 'ABORTED')->assertJsonPath('data.allowed_actions', []);
     }
 
+    /** Decision 1: an ABORT whose purge stops still SUCCEEDS (the run is aborted) and says the purge is incomplete. */
+    public function test_an_abort_with_an_interrupted_purge_succeeds_and_reports_it(): void
+    {
+        $this->placeSource($this->generatedExport(), 'export-abort-purge');
+        $source = $this->catalogued('export-abort-purge');
+        $runId = $this->queueAndWork('/imports', ['source_id' => $source->id])->run_id;
+        $this->assertSame(8, $this->stagedCount($runId));
+
+        $id = $this->apiPost("/imports/{$runId}/abort", ['reason_code' => 'OPERATOR_DECISION'])->assertStatus(202)->json('data.id');
+        config(['civil_import.worker.purge_batch_size' => 3]);
+        $this->workOnce($this->worker()->withTestHook(function (string $event, array $context) {
+            if ($event === 'purge.batch_committed' && $context['rows'] > 0) {
+                throw new RuntimeException('simulated crash during the staging purge');
+            }
+        }));
+        $abort = CivilImportRequest::query()->findOrFail($id);
+        $this->assertSame(CivilImportRequest::SUCCEEDED, $abort->status, (string) $abort->reason_code);
+        $this->assertSame([3, false, $runId], [$abort->result['rows_purged'], $abort->result['staging_purge_complete'], $abort->result['aborted_run']]);
+        $this->assertSame(['FAILED', 'ABORTED'], [$this->importRun($runId)->status, $this->importRun($runId)->error_code]);
+        $this->assertSame(5, $this->stagedCount($runId));
+        $this->apiGet("/imports/{$runId}")->assertJsonPath('data.phase', 'ABORTED')->assertJsonPath('data.allowed_actions', []);
+    }
+
     public function test_a_lost_worker_is_detected_and_the_operation_stays_resumable(): void
     {
         $this->placeSource($this->generatedExport(), 'export-lost');

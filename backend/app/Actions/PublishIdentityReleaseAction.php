@@ -6,6 +6,7 @@ use App\Exceptions\IdentityImportException;
 use App\Support\IdentityRef\IdentityImportPolicy;
 use App\Support\IdentityRef\IdentityImportSession;
 use App\Support\IdentityRef\IdentityRefErrorRedactor;
+use App\Support\IdentityRef\IdentityStagingPurger;
 use Closure;
 use Illuminate\Database\Connection;
 use Psr\Log\LoggerInterface;
@@ -28,7 +29,9 @@ use Throwable;
  *            and proves the release equals it exactly.
  *   publish  ONE short transaction: publish_release() (lock, stale-base,
  *            coverage checks, publication gate, pointer switch) + the run
- *            closed SUCCEEDED. Then the run's staging is purged.
+ *            closed SUCCEEDED. Then the staging of finished runs is purged
+ *            in committed batches; a purge failure is logged and never
+ *            affects the publication.
  *   status   read-only inspection.
  *
  * Logged and returned: run and release ids, statuses, counts, codes and
@@ -174,17 +177,18 @@ final class PublishIdentityReleaseAction
     /**
      * Activates a VERIFIED release. Idempotent: an already published release is reported, not re-published.
      *
-     * @param  ?Closure(string, array<string, mixed>): void  $hook  test seam: 'publish.before_commit'
+     * @param  ?Closure(string, array<string, mixed>): void  $hook  test seam: 'publish.before_commit'; 'purge.batch_committed' (heartbeat)
      * @return array<string, mixed>
      *
      * @throws IdentityImportException
      */
-    public function publish(Connection $db, int $releaseId, string $target, ?LoggerInterface $logger = null, ?Closure $hook = null): array
+    public function publish(Connection $db, int $releaseId, string $target, ?LoggerInterface $logger = null, ?Closure $hook = null,
+        int $purgeBatchSize = IdentityStagingPurger::DEFAULT_BATCH_SIZE): array
     {
         $logger ??= new NullLogger;
         $hook ??= static function (): void {};
 
-        return IdentityImportSession::run($db, $target, function () use ($db, $releaseId, $logger, $hook) {
+        return IdentityImportSession::run($db, $target, function () use ($db, $releaseId, $logger, $hook, $purgeBatchSize) {
             $rel = $db->selectOne('SELECT d.id, d.run_id, d.status, p.status AS prep_status, p.policy_id, p.comparison_policy
                 FROM identity_ref.dataset_releases d LEFT JOIN identity_ref.release_preparations p ON p.release_id = d.id WHERE d.id = ?', [$releaseId]);
             if ($rel === null) {
@@ -219,12 +223,12 @@ final class PublishIdentityReleaseAction
             }
             $activation = round(microtime(true) - $started, 3);
 
-            $purged = null;
-            try {
-                $purged = StageIdentityImportAction::purgeFinishedRuns($db);
-            } catch (Throwable $e) {
-                // The release is active; leftover staging is purged by the next abort/purge.
-                $logger->warning('identity_ref.release.staging_purge_failed', ['release_id' => $releaseId, 'error' => IdentityRefErrorRedactor::redact($e)]);
+            // After the commit, outside any transaction: batches commit on their own and never touch the publication.
+            $purge = (new IdentityStagingPurger($db, $purgeBatchSize, $logger, $hook))->purge();
+            $purged = $purge['complete'] ? $purge['rows_purged'] : null;
+            if (! $purge['complete']) {
+                // The release is active; leftover staging is purged by the next abort, purge or publication.
+                $logger->warning('identity_ref.release.staging_purge_failed', ['release_id' => $releaseId, 'rows_purged_before_interruption' => $purge['rows_purged']]);
             }
             $report = ['outcome' => 'PUBLISHED', 'activation_seconds' => $activation, 'staging_rows_purged' => $purged] + $this->releaseReport($db, $releaseId);
             $logger->info('identity_ref.release.published', $report);

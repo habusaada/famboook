@@ -7,6 +7,7 @@ use App\Actions\StageIdentityImportAction;
 use App\Exceptions\IdentityImportException;
 use App\Support\IdentityRef\IdentityImportPolicy;
 use App\Support\IdentityRef\IdentityRefProductionGate;
+use App\Support\IdentityRef\IdentityStagingPurger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,8 @@ use InvalidArgumentException;
  *
  *   <directory>                      validate and stage an export (P2); re-run to resume
  *   --abort                          close the RUNNING run (abandoning its BUILDING release) and purge staging
+ *   --purge [--dry-run]              purge the staging of finished runs only, in committed batches (resumable);
+ *                                    --dry-run only counts what would be purged (read-only)
  *   --validate --run=<uuid>          release-level checks, quarantine and warnings (read-only)
  *   --preview  --run=<uuid>          NEW / CHANGED / UNCHANGED / carried-forward counts (read-only)
  *   --prepare  --run=<uuid>          build the candidate release under --policy (resumable)
@@ -30,7 +33,7 @@ use InvalidArgumentException;
  * change ticket — which is logged with every run. Never put it in .env. In
  * production every mode that writes (staging, abort, prepare, verify,
  * publish) also asks for confirmation (--yes to confirm non-interactively);
- * validate, preview and status are read-only. Output: ids, statuses, counts,
+ * validate, preview, status and purge --dry-run are read-only. Output: ids, statuses, counts,
  * codes and timings only — never a value from the source.
  */
 class StageIdentityImport extends Command
@@ -43,6 +46,9 @@ class StageIdentityImport extends Command
         {--expected-rows= : Approved total number of rows (e.g. 2399891)}
         {--chunk='.StageIdentityImportAction::DEFAULT_CHUNK_SIZE.' : Rows per committed chunk (staging and preparation)}
         {--abort : Close the RUNNING run as FAILED and purge the staging of finished runs}
+        {--purge : Purge the staging of finished runs only (no run, release or reference data changes)}
+        {--dry-run : With --purge: count what would be purged; delete nothing}
+        {--purge-batch='.IdentityStagingPurger::DEFAULT_BATCH_SIZE.' : Staged records deleted per committed purge batch}
         {--validate : Validate a staged run (read-only)}
         {--preview : Preview comparison counts of a staged run (read-only)}
         {--prepare : Prepare the candidate release of a staged run}
@@ -56,7 +62,7 @@ class StageIdentityImport extends Command
 
     protected $description = 'Stage, validate, prepare, verify and publish identity reference releases (FB-CIVIL-01A).';
 
-    private const MODES = ['abort', 'validate', 'preview', 'prepare', 'verify', 'publish', 'status'];
+    private const MODES = ['abort', 'purge', 'validate', 'preview', 'prepare', 'verify', 'publish', 'status'];
 
     private const READ_ONLY_MODES = ['validate', 'preview', 'status'];
 
@@ -72,6 +78,12 @@ class StageIdentityImport extends Command
             return self::FAILURE;
         }
         $mode = $modes[0] ?? 'stage';
+        if ($this->option('dry-run') && $mode !== 'purge') {
+            $this->error('[INVALID_USAGE] --dry-run applies to --purge only.');
+
+            return self::FAILURE;
+        }
+        $readOnly = in_array($mode, self::READ_ONLY_MODES, true) || ($mode === 'purge' && $this->option('dry-run'));
         if (app()->environment('production')) {
             // The shared Production gate (FB-CIVIL-01A-UI X-7): the worker applies the same rule.
             $approval = (string) IdentityRefProductionGate::reference();
@@ -82,7 +94,7 @@ class StageIdentityImport extends Command
             }
             Log::channel(config('logging.default'))->info('identity_ref.production_run', ['mode' => $mode, 'approval' => $approval]);
             $this->line("PRODUCTION — approval {$approval}");
-            if (! in_array($mode, self::READ_ONLY_MODES, true) && $mode !== 'publish'
+            if (! $readOnly && $mode !== 'publish'
                 && ! $this->option('yes') && ! $this->confirm("Run '{$mode}' on the PRODUCTION database {$this->option('target')}?", false)) {
                 $this->error('[NOT_CONFIRMED] Not confirmed; nothing changed.');
 
@@ -110,6 +122,7 @@ class StageIdentityImport extends Command
             return match ($mode) {
                 'stage' => $this->stage($stager, $db, $target, $logger),
                 'abort' => $this->abort($stager, $db, $target, $logger),
+                'purge' => $this->purge($stager, $db, $target, $logger),
                 'validate', 'preview' => $this->assess($releases, $db, $target, $modes[0]),
                 'prepare' => $this->prepare($releases, $db, $target, $logger),
                 'verify' => $this->verify($releases, $db, $target, $logger),
@@ -174,6 +187,47 @@ class StageIdentityImport extends Command
         $this->line('Aborted run: '.($result['aborted_run'] ?? 'none'));
         $this->line('Abandoned release: '.($result['abandoned_release'] ?? 'none'));
         $this->line('Staging rows purged: '.$result['rows_purged']);
+        if (! $result['staging_purge_complete']) {
+            $this->warn('The run is aborted, but the staging purge stopped early; run --purge to finish it.');
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function purge(StageIdentityImportAction $stager, $db, string $target, $logger): int
+    {
+        if ($this->option('dry-run')) {
+            $preview = $stager->purgePreview($db, $target);
+            $this->table(['Eligible run (finished)', 'Status', 'Error', 'Files', 'Chunks', 'Rows'],
+                array_map(fn ($r) => [$r['run_id'], $r['status'], $r['error_code'], $r['files'], $r['chunks'], $r['rows']], $preview['runs']));
+            $this->table(['Staging of finished runs (would be purged)', 'Count'], [
+                ['Files', $preview['files']], ['Rows', $preview['rows']], ['Assessments', $preview['assessments']], ['Chunks', $preview['chunks']],
+            ]);
+            $this->line('Rows of a RUNNING run (never purged): '.$preview['protected_rows']);
+            $this->info('Dry run; nothing was deleted.');
+
+            return self::SUCCESS;
+        }
+        $batch = (int) $this->option('purge-batch');
+        if ($batch < 1) {
+            $this->error('[INVALID_USAGE] --purge-batch must be a positive number.');
+
+            return self::FAILURE;
+        }
+        $report = $stager->purge($db, $target, $batch, $logger);
+        $this->table(['Staging purge', 'Deleted', 'Remaining'], [
+            ['Files', $report['files_purged'], $report['remaining']['files']],
+            ['Rows', $report['rows_purged'], $report['remaining']['rows']],
+            ['Assessments', $report['assessments_purged'], $report['remaining']['assessments']],
+            ['Chunks', $report['chunks_purged'], $report['remaining']['chunks']],
+        ]);
+        $this->line('Committed batches: '.$report['batches'].'; rows of a RUNNING run (never purged): '.$report['remaining']['protected_rows']);
+        if (! $report['complete']) {
+            $this->error('[STAGING_INTERRUPTED] The staging purge stopped; re-run --purge to resume (already deleted rows stay deleted).');
+
+            return self::FAILURE;
+        }
+        $this->info('Staging purge complete.');
 
         return self::SUCCESS;
     }
