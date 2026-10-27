@@ -101,11 +101,18 @@ class RecordPersonDeathTest extends TestCase
         $this->assertSame(now()->toDateString(), $this->spouse->fresh()->death_date->toDateString());
     }
 
+    /**
+     * Placeholder for "tomorrow", resolved when the test RUNS: data providers are
+     * evaluated when the suite starts, so a date computed there is "today" for a
+     * test that runs after midnight (UTC) and the run would be wrongly accepted.
+     */
+    private const TOMORROW = '__TOMORROW__';
+
     /** @return array<string, array{string}> */
     public static function invalidDates(): array
     {
         return [
-            'future' => [now()->addDay()->toDateString()],
+            'future' => [self::TOMORROW],
             'before birth date' => ['1980-01-14'],
             'not a calendar date' => ['2020-02-30'],
             'wrong format' => ['15/01/2020'],
@@ -115,6 +122,7 @@ class RecordPersonDeathTest extends TestCase
     #[DataProvider('invalidDates')]
     public function test_rejects_an_invalid_death_date_and_changes_nothing(string $date): void
     {
+        $date = $date === self::TOMORROW ? now()->addDay()->toDateString() : $date;
         try {
             $this->record($this->head, $date);
             $this->fail('Expected a validation error.');

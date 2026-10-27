@@ -201,6 +201,13 @@ class RecordHouseholdDeclarationEndpointTest extends TestCase
 
     // ----------------------------------------------------------------- input
 
+    /**
+     * Placeholder for "tomorrow", resolved when the test RUNS: data providers are
+     * evaluated when the suite starts, so a date computed there is "today" for a
+     * test that runs after midnight (UTC) and the run would be wrongly accepted.
+     */
+    private const TOMORROW = '__TOMORROW__';
+
     /** @return array<string, array{0: array<string, mixed>, 1: string}> */
     public static function invalidBodies(): array
     {
@@ -212,7 +219,7 @@ class RecordHouseholdDeclarationEndpointTest extends TestCase
             'fractional size' => [['declared_household_size' => 2.5], 'declared_household_size'],
             'text size' => [['declared_household_size' => 'سبعة'], 'declared_household_size'],
             'above the domain maximum' => [['declared_household_size' => 32768], 'declared_household_size'],
-            'future declared_at' => [['declared_at' => now()->addDay()->toDateString()], 'declared_at'],
+            'future declared_at' => [['declared_at' => self::TOMORROW], 'declared_at'],
             'invalid declared_at' => [['declared_at' => '2026-02-30'], 'declared_at'],
             'missing source' => [['source' => null], 'source'],
             'IMPORT source' => [['source' => 'IMPORT'], 'source'],
@@ -230,6 +237,7 @@ class RecordHouseholdDeclarationEndpointTest extends TestCase
     #[DataProvider('invalidBodies')]
     public function test_invalid_input_is_refused_and_writes_nothing(array $body, string $field): void
     {
+        $body = array_map(fn ($value) => $value === self::TOMORROW ? now()->addDay()->toDateString() : $value, $body);
         $this->declareVia($this->staff, $body)->assertUnprocessable()->assertJsonValidationErrors($field);
 
         $this->assertSame([], $this->declarations());

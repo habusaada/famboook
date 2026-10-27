@@ -150,12 +150,19 @@ class RecordPersonDeathEndpointTest extends TestCase
 
     // --------------------------------------------------------------- input
 
+    /**
+     * Placeholder for "tomorrow", resolved when the test RUNS: data providers are
+     * evaluated when the suite starts, so a date computed there is "today" for a
+     * test that runs after midnight (UTC) and the run would be wrongly accepted.
+     */
+    private const TOMORROW = '__TOMORROW__';
+
     /** @return array<string, array{0: array<string, mixed>, 1: string}> */
     public static function invalidBodies(): array
     {
         return [
             'omitted death date' => [['verification_method' => 'IN_PERSON'], 'death_date'],
-            'future death date' => [['death_date' => now()->addDay()->toDateString(), 'verification_method' => 'IN_PERSON'], 'death_date'],
+            'future death date' => [['death_date' => self::TOMORROW, 'verification_method' => 'IN_PERSON'], 'death_date'],
             'before the birth date' => [['death_date' => '1989-12-31', 'verification_method' => 'IN_PERSON'], 'death_date'],
             'not a calendar date' => [['death_date' => '2020-02-30', 'verification_method' => 'IN_PERSON'], 'death_date'],
             'wrong format' => [['death_date' => '20/11/2024', 'verification_method' => 'IN_PERSON'], 'death_date'],
@@ -171,6 +178,7 @@ class RecordPersonDeathEndpointTest extends TestCase
     #[DataProvider('invalidBodies')]
     public function test_invalid_input_is_refused_and_changes_nothing(array $body, string $field): void
     {
+        $body = array_map(fn ($value) => $value === self::TOMORROW ? now()->addDay()->toDateString() : $value, $body);
         [, $member] = $this->member();
 
         $this->recordVia($this->staff, $member, $body)->assertUnprocessable()->assertJsonValidationErrors($field);

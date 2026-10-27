@@ -140,6 +140,13 @@ class HouseholdDeclarationTest extends TestCase
         $this->assertTrue($declaration->exists);
     }
 
+    /**
+     * Placeholder for "tomorrow", resolved when the test RUNS: data providers are
+     * evaluated when the suite starts, so a date computed there is "today" for a
+     * test that runs after midnight (UTC) and the run would be wrongly accepted.
+     */
+    private const TOMORROW = '__TOMORROW__';
+
     /** @return array<string, array{array<string, mixed>, string}> */
     public static function invalidDeclarations(): array
     {
@@ -149,7 +156,7 @@ class HouseholdDeclarationTest extends TestCase
             'negative daughters' => [['declared_living_daughters' => -3], 'declared_living_daughters'],
             'non-integer size' => [['declared_household_size' => 'سبعة'], 'declared_household_size'],
             'nothing declared' => [['declared_household_size' => null, 'declared_living_sons' => null, 'declared_living_daughters' => null], 'declared_household_size'],
-            'future declared_at' => [['declared_at' => now()->addDay()->toDateString()], 'declared_at'],
+            'future declared_at' => [['declared_at' => self::TOMORROW], 'declared_at'],
             'unknown source' => [['source' => 'EXCEL'], 'source'],
         ];
     }
@@ -158,6 +165,7 @@ class HouseholdDeclarationTest extends TestCase
     #[DataProvider('invalidDeclarations')]
     public function test_rejects_invalid_declarations_and_writes_nothing(array $data, string $field): void
     {
+        $data = array_map(fn ($value) => $value === self::TOMORROW ? now()->addDay()->toDateString() : $value, $data);
         $this->declare(['declared_household_size' => 4]);
 
         try {
