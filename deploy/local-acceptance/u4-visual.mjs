@@ -9,6 +9,10 @@
 //
 //   node deploy/local-acceptance/u4-visual.mjs            # main pass
 //   node deploy/local-acceptance/u4-visual.mjs --monitor-error   # only: overview while the monitor is unavailable
+//   node deploy/local-acceptance/u4-visual.mjs --confirm-dialog --release=<id>
+//       # only: the operator's own request and the confirmation dialog (D-UI-12a). Needs the gate OPEN
+//       # (u4.sh gate open + API restart) and a VERIFIED requestable release; opens a request, shows the
+//       # dialog WITHOUT submitting it, then withdraws the request. Close the gate afterwards.
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -20,6 +24,8 @@ const OUT = `${STATE}/visual`;
 const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
 const PORT = 9333;
 const monitorErrorOnly = process.argv.includes("--monitor-error");
+const confirmDialogOnly = process.argv.includes("--confirm-dialog");
+const dialogRelease = Number((process.argv.find((a) => a.startsWith("--release=")) ?? "").slice("--release=".length));
 
 mkdirSync(OUT, { recursive: true });
 const facts = [];
@@ -145,8 +151,56 @@ async function passwordLogin(p, email, password) {
 
 const me = (p) => p.evaluate(`fetch('${API}/api/v1/me', { credentials: 'include', headers: { Accept: 'application/json' } }).then((r) => r.status)`);
 
+/** A JSON POST from the page, as the Staff Portal sends it (session cookie + XSRF header); returns { status, body }. */
+const apiPost = (p, path, body) => p.evaluate(`(async () => {
+  await fetch('${API}/sanctum/csrf-cookie', { credentials: 'include' });
+  const xsrf = decodeURIComponent((document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/) || [])[1] || '');
+  const r = await fetch('${API}${path}', { method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrf }, body: ${JSON.stringify(JSON.stringify(body))} });
+  return { status: r.status, body: await r.json().catch(() => null) };
+})()`);
+
+const readAccounts = () => Object.fromEntries(readFileSync(`${STATE}/accounts.txt`, "utf8").split(/\r?\n/)
+  .filter((l) => l && !l.startsWith("#")).map((l) => l.split("\t")).map(([email, , password]) => [email, password]));
+
 try {
-  // ---------------------------------------------------------------- requester (dev, SUPER_ADMIN)
+  if (confirmDialogOnly) {
+    // ---------------------------------------------------------------- D-UI-12a: the operator's own confirmation dialog
+    if (!Number.isInteger(dialogRelease) || dialogRelease < 1) throw new Error("--confirm-dialog needs --release=<id>");
+    const operator = await persona();
+    console.log(`operator login: ${await passwordLogin(operator, "u4-operator@famboook.test", readAccounts()["u4-operator@famboook.test"])}`);
+    const gateOpen = await operator.evaluate(`fetch('${API}/api/v1/civil-registry/overview', { credentials: 'include', headers: { Accept: 'application/json' } })
+      .then((r) => r.json()).then((j) => j.data.publication_enabled === true)`);
+    if (!gateOpen) throw new Error("the publication gate is closed: run u4.sh gate open and restart the API first");
+    const opened = await apiPost(operator, `/api/v1/civil-registry/releases/${dialogRelease}/publication-requests`, { justification_code: "ROUTINE_REFRESH" });
+    console.log(`operator request: ${opened.status}`);
+    const id = opened.body?.data?.id;
+    if (!id) throw new Error(`no publication request opened (${opened.status} ${opened.body?.code ?? ""})`);
+    try {
+      await visit(operator, "operator", `/administration/civil-registry/approvals/${id}`, "18-operator-own-request");
+      await operator.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'تأكيد النشر')?.click()`);
+      await sleep(1500);
+      const dialog = await operator.evaluate(`(() => {
+        const d = document.querySelector('[role="dialog"]');
+        const text = (el) => (el?.innerText ?? '').replace(/\\s+/g, ' ').trim();
+        return d && {
+          title: text(d.querySelector('h2')),
+          release: text(d.querySelector('[data-confirm-release]')),
+          count: text(d.querySelector('[data-confirm-count]')),
+          passwordField: d.querySelector('input[type="password"]')?.getAttribute('autocomplete') ?? null,
+          submitDisabled: [...d.querySelectorAll('button')].find((b) => b.textContent.trim() === 'تأكيد النشر')?.disabled ?? null,
+          dir: getComputedStyle(d).direction,
+        };
+      })()`);
+      facts.push({ who: "operator", name: "19-operator-confirm-dialog", dialog });
+      await shoot(operator, "19-operator-confirm-dialog");
+      console.log(`operator  confirmation dialog: ${JSON.stringify(dialog)}`);
+    } finally {
+      // Never submitted: the request is withdrawn again.
+      console.log(`operator withdraw: ${(await apiPost(operator, `/api/v1/civil-registry/publication-requests/${id}/withdraw`, {})).status}`);
+    }
+  } else {
+  // ---------------------------------------------------------------- staging operator (dev, SUPER_ADMIN)
   const dev = await persona();
   await dev.goto("/dev-login");
   await sleep(2000);
@@ -167,7 +221,7 @@ try {
     facts.push({ who: "dev", name: "06-dev-imports-empty", ...(await dev.evaluate(FACTS)) });
     await shoot(dev, "06-dev-imports-empty");
     await dev.goto("/administration/civil-registry/approvals");
-    await dev.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'معتمد — بانتظار التنفيذ')?.click()`);
+    await dev.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'مؤكَّد — بانتظار التنفيذ')?.click()`);
     await sleep(2500);
     facts.push({ who: "dev", name: "07-dev-approvals-empty", ...(await dev.evaluate(FACTS)) });
     await shoot(dev, "07-dev-approvals-empty");
@@ -194,8 +248,7 @@ try {
     console.log(`dev       loading skeleton rendered: ${sawLoading}`);
 
     // ---------------------------------------------------------------- other users
-    const accounts = Object.fromEntries(readFileSync(`${STATE}/accounts.txt`, "utf8").split(/\r?\n/)
-      .filter((l) => l && !l.startsWith("#")).map((l) => l.split("\t")).map(([email, , password]) => [email, password]));
+    const accounts = readAccounts();
     const viewer = await persona();
     console.log(`viewer login: ${await passwordLogin(viewer, "u4-viewer@famboook.test", accounts["u4-viewer@famboook.test"])}`);
     await visit(viewer, "viewer", "/administration/civil-registry", "11-viewer-overview");
@@ -208,12 +261,15 @@ try {
     await visit(outsider, "outsider", "/administration/civil-registry", "15-outsider-overview");
     await visit(outsider, "outsider", "/administration/civil-registry/approvals", "16-outsider-approvals");
 
-    const approver = await persona();
-    console.log(`approver login: ${await passwordLogin(approver, "u4-approver@famboook.test", accounts["u4-approver@famboook.test"])}`);
-    if (firstPublication) await visit(approver, "approver", `/administration/civil-registry/approvals/${firstPublication}`, "17-approver-approval-detail");
+    // D-UI-12a: the publication operator (requester and confirmer) sees the history; no second approver.
+    const operator = await persona();
+    console.log(`operator login: ${await passwordLogin(operator, "u4-operator@famboook.test", accounts["u4-operator@famboook.test"])}`);
+    await visit(operator, "operator", "/administration/civil-registry/approvals", "17-operator-approvals");
+    if (firstPublication) await visit(operator, "operator", `/administration/civil-registry/approvals/${firstPublication}`, "17b-operator-publication-detail");
+  }
   }
 } finally {
-  writeFileSync(`${OUT}/${monitorErrorOnly ? "facts-monitor-error" : "facts"}.json`, JSON.stringify(facts, null, 2));
+  writeFileSync(`${OUT}/${monitorErrorOnly ? "facts-monitor-error" : confirmDialogOnly ? "facts-confirm-dialog" : "facts"}.json`, JSON.stringify(facts, null, 2));
   try { await send("Browser.close"); } catch { /* already closed */ }
   edge.kill();
   await sleep(1500);

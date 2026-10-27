@@ -278,6 +278,51 @@ function http(?Staff $s, string $method, string $path, ?array $body = null, stri
     return [$status, json_decode($raw, true), $raw];
 }
 
+/**
+ * Several POSTs in flight at once (curl_multi), as a double-submit or two tabs would send them;
+ * $whileWaiting runs once the requests are on the wire (e.g. to release a database lock).
+ *
+ * @param  list<array{0: Staff, 1: string, 2: array}>  $calls
+ * @return list<array{0: int, 1: mixed}>
+ */
+function httpConcurrently(array $calls, callable $whileWaiting): array
+{
+    global $CAPTURED;
+    $multi = curl_multi_init();
+    $handles = [];
+    foreach ($calls as [$s, $path, $body]) {
+        http($s, 'GET', '/sanctum/csrf-cookie');
+        $ch = curl_init(API.$path);
+        curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'POST', CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 120,
+            CURLOPT_POSTFIELDS => json_encode($body), CURLOPT_COOKIEFILE => $s->jar,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json', 'Origin: '.UI, 'Referer: '.UI.'/', 'X-XSRF-TOKEN: '.$s->xsrf()]]);
+        curl_multi_add_handle($multi, $ch);
+        $handles[] = $ch;
+    }
+    $started = microtime(true);
+    $released = false;
+    do {
+        curl_multi_exec($multi, $running);
+        curl_multi_select($multi, 0.2);
+        if (! $released && microtime(true) - $started > 2) {
+            $whileWaiting();
+            $released = true;
+        }
+    } while ($running > 0 || ! $released);
+    $results = [];
+    foreach ($handles as $i => $ch) {
+        $raw = (string) curl_multi_getcontent($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $CAPTURED[] = ['what' => "POST {$calls[$i][1]} {$status} (concurrent)", 'raw' => $raw];
+        $results[] = [$status, json_decode($raw, true)];
+        curl_multi_remove_handle($multi, $ch);
+        curl_close($ch);
+    }
+    curl_multi_close($multi);
+
+    return $results;
+}
+
 /** Queues through the API (expects 202), runs one worker iteration, returns the finished request. */
 function queueAndRun(Staff $s, string $path, array $body = []): array
 {
@@ -423,15 +468,22 @@ try {
             $accounts[$email] = $password;
         }
     }
+    // D-UI-12a: the operator (SUPER_ADMIN, password) requests AND confirms publication; dev (another
+    // SUPER_ADMIN, dev-login, no known password) stages and prepares, and can never confirm.
     $dev = new Staff('dev');
-    $approver = new Staff('approver');
+    $operator = new Staff('operator');
     $viewer = new Staff('viewer');
     $outsider = new Staff('outsider');
-    check('B', '0 dev-login (requester, SUPER_ADMIN)', $dev->devLogin() === 200);
-    check('B', '0 password logins', $approver->login('u4-approver@famboook.test', $accounts['u4-approver@famboook.test']) === 200
+    $operatorPassword = $accounts['u4-operator@famboook.test'] ?? throw new RuntimeException('NO_OPERATOR_ACCOUNT (re-run u4-setup.php --reset)');
+    check('B', '0 dev-login (staging operator, SUPER_ADMIN)', $dev->devLogin() === 200);
+    check('B', '0 password logins', $operator->login('u4-operator@famboook.test', $operatorPassword) === 200
         && $viewer->login('u4-viewer@famboook.test', $accounts['u4-viewer@famboook.test']) === 200
         && $outsider->login('u4-outsider@famboook.test', $accounts['u4-outsider@famboook.test']) === 200);
     $accounts = [];
+    /** The confirmation call (D-UI-12a): password re-entered, release id and verified record count typed back. */
+    $confirm = fn (Staff $s, string $id, int $rel, int $presence, ?string $password = null) => http($s, 'POST',
+        "/api/v1/civil-registry/publication-requests/{$id}/confirm",
+        ['password' => $password ?? $operatorPassword, 'confirm_release_id' => $rel, 'confirm_expected_presence' => $presence]);
     // A request left RUNNING by an earlier, interrupted attempt (its worker was killed) is recovered as
     // WORKER_LOST, and a RUNNING run of that attempt is aborted — as an operator would.
     if (one("SELECT count(*) FROM civil_import_requests WHERE status = 'RUNNING'") > 0) {
@@ -462,8 +514,14 @@ try {
     $fake = '00000000-0000-4000-8000-000000000000';
     check('B', '2 viewer cannot queue or request', http($viewer, 'POST', "/api/v1/civil-registry/sources/{$fake}/validate")[0] === 403
         && http($viewer, 'POST', '/api/v1/civil-registry/releases/1/publication-requests', ['justification_code' => 'ROUTINE_REFRESH'])[0] === 403);
-    check('B', '2 approver cannot approve while the gate is closed (no permission)',
-        http($approver, 'POST', "/api/v1/civil-registry/publication-requests/{$fake}/approve", ['confirm_release_id' => 1, 'confirm_expected_presence' => 1])[0] === 403);
+    check('B', '2 operator cannot confirm while the gate is closed, even with the right password (403: nobody holds the permission)',
+        $confirm($operator, $fake, 1, 1)[0] === 403);
+    check('B', '2 outsider (ADMINISTRATOR) and viewer cannot request or confirm (403)',
+        $confirm($outsider, $fake, 1, 1)[0] === 403 && $confirm($viewer, $fake, 1, 1)[0] === 403
+        && http($outsider, 'POST', '/api/v1/civil-registry/releases/1/publication-requests', ['justification_code' => 'ROUTINE_REFRESH'])[0] === 403);
+    check('B', '2 the second-approver endpoints are gone (approve / reject: 404)',
+        http($operator, 'POST', "/api/v1/civil-registry/publication-requests/{$fake}/approve", ['confirm_release_id' => 1, 'confirm_expected_presence' => 1])[0] === 404
+        && http($operator, 'POST', "/api/v1/civil-registry/publication-requests/{$fake}/reject", ['reason_code' => 'NEEDS_REVIEW'])[0] === 404);
     $uiOk = waitUntil(fn () => http(null, 'GET', '/login', null, UI)[0] === 200
         || str_contains((string) @file_get_contents("{$STATE}/u4-ui.log"), 'Another next dev server is already running'), 180);
     $pages = [];
@@ -586,12 +644,14 @@ try {
     check('E', '3 verification: VERIFIED, publication can be requested', $dA['phase'] === 'VERIFIED' && in_array('REQUEST_PUBLICATION', $dA['allowed_actions'], true));
 
     // ============================================================ F. gate CLOSED: the active release must not change
-    [$ps, $pj] = requestPublication($dev, $relA);
+    [$ps, $pj] = requestPublication($operator, $relA);
     $pubF = $pj['data']['id'] ?? null;
-    check('F', '1 request opened; run AWAITING_APPROVAL', $ps === 201 && run($dev, $runA)['phase'] === 'AWAITING_APPROVAL');
-    $asApprover = http($approver, 'GET', "/api/v1/civil-registry/publication-requests/{$pubF}")[1]['data'];
-    check('F', '2 approver: no approval possible (403, can_approve=false)', $asApprover['can_approve'] === false
-        && http($approver, 'POST', "/api/v1/civil-registry/publication-requests/{$pubF}/approve", ['confirm_release_id' => $relA, 'confirm_expected_presence' => 100])[0] === 403);
+    check('F', '1 operator opens the request; run AWAITING_APPROVAL', $ps === 201 && run($dev, $runA)['phase'] === 'AWAITING_APPROVAL');
+    $asOperator = http($operator, 'GET', "/api/v1/civil-registry/publication-requests/{$pubF}")[1]['data'];
+    check('F', '2 gate closed: the operator cannot confirm their own request (can_confirm=false, 403 with the right password)',
+        $asOperator['is_own'] === true && $asOperator['can_confirm'] === false && $asOperator['can_withdraw'] === true
+        && $confirm($operator, $pubF, $relA, 100)[0] === 403 && $confirm($dev, $pubF, $relA, 100)[0] === 403
+        && http($dev, 'GET', "/api/v1/civil-registry/publication-requests/{$pubF}")[1]['data']['status'] === 'PENDING_APPROVAL');
     workerOnce();
     $ov = http($dev, 'GET', '/api/v1/civil-registry/overview')[1]['data'];
     check('F', '3 active release unchanged (none); gate shown closed', $ov['active_release'] === null && $ov['publication_enabled'] === false && activeRelease() === null);
@@ -605,78 +665,154 @@ try {
         $w = envFile('worker.env');
         check('G', '0 gates opened (acceptance only): web + worker + reference', envFile('web.env')['CIVIL_IMPORT_PUBLISH_ENABLED'] === 'true'
             && $w['CIVIL_IMPORT_PUBLISH_ENABLED'] === 'true' && ($w['IDENTITY_REF_PRODUCTION_APPROVAL'] ?? '') === 'U4-LOCAL-ACCEPTANCE');
-        $approve = fn (Staff $s, string $id, int $rel, int $presence) => http($s, 'POST', "/api/v1/civil-registry/publication-requests/{$id}/approve",
-            ['confirm_release_id' => $rel, 'confirm_expected_presence' => $presence]);
+        $base = '/api/v1/civil-registry/publication-requests';
+        $status = fn (string $id) => one('SELECT status FROM civil_import_publication_requests WHERE id = ?', [$id]);
+        $publishes = fn (?string $id = null) => (int) ($id === null
+            ? one("SELECT count(*) FROM civil_import_requests WHERE type = 'PUBLISH'")
+            : one("SELECT count(*) FROM civil_import_requests WHERE type = 'PUBLISH' AND publication_request_id = ?", [$id]));
+        $reauthFailures = fn () => (int) one("SELECT count(*) FROM civil_import_audit_events WHERE event_type = 'PUBLICATION_REAUTH_FAILED'");
 
-        // G.1 same user
-        $own = http($dev, 'GET', "/api/v1/civil-registry/publication-requests/{$pubF}")[1]['data'];
-        [$ss, $sj] = $approve($dev, $pubF, $relA, 100);
-        check('G', '1 requester can never approve their own request', $ss === 409 && $sj['code'] === 'SAME_USER_APPROVAL'
-            && $own['is_own'] === true && $own['can_approve'] === false && $own['can_withdraw'] === true);
-        // G.2 reject; no reuse
-        [$rs, $rj] = http($approver, 'POST', "/api/v1/civil-registry/publication-requests/{$pubF}/reject", ['reason_code' => 'NEEDS_REVIEW']);
-        check('G', '2 rejected by the second user; never reusable', $rs === 200 && $rj['data']['status'] === 'REJECTED'
-            && $approve($approver, $pubF, $relA, 100)[1]['code'] === 'PUBLICATION_NOT_PENDING'
-            && http($dev, 'POST', "/api/v1/civil-registry/publication-requests/{$pubF}/withdraw")[1]['code'] === 'PUBLICATION_NOT_PENDING');
-        // G.3 withdraw
-        $pubW = requestPublication($dev, $relA)[1]['data']['id'];
-        [$ws, $wj] = http($dev, 'POST', "/api/v1/civil-registry/publication-requests/{$pubW}/withdraw");
-        check('G', '3 withdrawn by the requester; never reusable', $ws === 200 && $wj['data']['status'] === 'WITHDRAWN'
-            && $approve($approver, $pubW, $relA, 100)[1]['code'] === 'PUBLICATION_NOT_PENDING');
-        // G.5 typed confirmation
-        $pubA = requestPublication($dev, $relA)[1]['data']['id'];
-        check('G', '5 wrong typed confirmation refused (422)', $approve($approver, $pubA, $relA, 99)[0] === 422 && $approve($approver, $pubA, $relA + 1, 100)[0] === 422);
+        // G.1 only the requester confirms (D-UI-12a): no other SUPER_ADMIN, and nobody without the role.
+        $own = http($operator, 'GET', "{$base}/{$pubF}")[1]['data'];
+        $asDev = http($dev, 'GET', "{$base}/{$pubF}")[1]['data'];
+        [$ds, $dj] = $confirm($dev, $pubF, $relA, 100);
+        check('G', '1 another SUPER_ADMIN cannot confirm the operator\'s request (403 CONFIRMATION_BY_REQUESTER_ONLY)',
+            $ds === 403 && ($dj['code'] ?? null) === 'CONFIRMATION_BY_REQUESTER_ONLY' && $asDev['can_confirm'] === false
+            && $own['is_own'] === true && $own['can_confirm'] === true && $own['can_withdraw'] === true);
+        check('G', '1 outsider (ADMINISTRATOR) and viewer cannot confirm (403); request still pending, nothing queued',
+            $confirm($outsider, $pubF, $relA, 100)[0] === 403 && $confirm($viewer, $pubF, $relA, 100)[0] === 403
+            && $status($pubF) === 'PENDING_APPROVAL' && $publishes() === 0);
 
-        // H.1 the first synthetic publication, atomic
+        // G.2 fresh password re-authentication: a wrong or missing password confirms nothing, and is audited.
+        $failuresBefore = $reauthFailures();
+        [$ws, $wj, $wraw] = $confirm($operator, $pubF, $relA, 100, 'not-the-password');
+        $missing = http($operator, 'POST', "{$base}/{$pubF}/confirm", ['confirm_release_id' => $relA, 'confirm_expected_presence' => 100]);
+        check('G', '2 wrong password 422 REAUTH_FAILED (audited, never echoed); missing password 422; nothing queued',
+            $ws === 422 && ($wj['code'] ?? null) === 'REAUTH_FAILED' && ! str_contains($wraw, 'not-the-password')
+            && $missing[0] === 422 && isset($missing[1]['errors']['password'])
+            && $reauthFailures() === $failuresBefore + 1 && $status($pubF) === 'PENDING_APPROVAL' && $publishes() === 0);
+
+        // G.3 withdraw; a closed request is never reused (and spends no password attempt).
+        [$wds, $wdj] = http($operator, 'POST', "{$base}/{$pubF}/withdraw");
+        $failuresBefore = $reauthFailures();
+        check('G', '3 withdrawn by the requester; never confirmable or withdrawable again', $wds === 200 && $wdj['data']['status'] === 'WITHDRAWN'
+            && ($confirm($operator, $pubF, $relA, 100)[1]['code'] ?? null) === 'PUBLICATION_NOT_PENDING'
+            && (http($operator, 'POST', "{$base}/{$pubF}/withdraw")[1]['code'] ?? null) === 'PUBLICATION_NOT_PENDING'
+            && $reauthFailures() === $failuresBefore);
+
+        // G.2b lockout: five wrong passwords lock confirmation for 15 minutes, even with the right password.
+        // On dev's own request (dev has no known password), so the operator is never locked out of this run.
+        $pubL = requestPublication($dev, $relA)[1]['data']['id'];
+        $failuresBefore = $reauthFailures();
+        $wrong = array_map(fn (int $i) => $confirm($dev, $pubL, $relA, 100, "wrong-{$i}")[0], range(1, 5));
+        [$ls, $lj] = $confirm($dev, $pubL, $relA, 100, 'wrong-6');
+        check('G', '2b five wrong passwords: 422 each, then 429 REAUTH_LOCKED; five audited failures; nothing queued',
+            $wrong === [422, 422, 422, 422, 422] && $ls === 429 && ($lj['code'] ?? null) === 'REAUTH_LOCKED'
+            && $reauthFailures() === $failuresBefore + 5 && $publishes() === 0, json_encode($wrong)." then {$ls}");
+        http($dev, 'POST', "{$base}/{$pubL}/withdraw");
+
+        // G.4 24-hour window: a request whose window has passed cannot be confirmed (here a 2-second window,
+        // inserted by the DBA as the application would; the database clock enforces it too).
+        $operatorId = (int) one("SELECT id FROM users WHERE email = 'u4-operator@famboook.test'");
+        $pubT = (string) one("INSERT INTO civil_import_publication_requests (id, release_id, run_id, requested_by, justification_code, snapshot, expires_at)
+            VALUES (gen_random_uuid(), ?, ?, ?, 'ROUTINE_REFRESH', '{\"expected_presence\": 100}', (clock_timestamp() AT TIME ZONE 'UTC') + interval '2 seconds') RETURNING id",
+            [$relA, $runA, $operatorId]);
+        sleep(3);
+        [$ts, $tj] = $confirm($operator, $pubT, $relA, 100);
+        check('G', '4 window passed: confirmation refused (409 PUBLICATION_EXPIRED), request EXPIRED TIMEOUT, nothing queued',
+            $ts === 409 && ($tj['code'] ?? null) === 'PUBLICATION_EXPIRED' && $status($pubT) === 'EXPIRED'
+            && one('SELECT outcome_code FROM civil_import_publication_requests WHERE id = ?', [$pubT]) === 'TIMEOUT' && $publishes() === 0);
+
+        // G.5 typed confirmation: the release id and verified record count must match.
+        $pubA = requestPublication($operator, $relA)[1]['data']['id'];
+        [$m1, $mj] = $confirm($operator, $pubA, $relA, 99);
+        check('G', '5 wrong typed release id or record count refused (422 CONFIRMATION_MISMATCH)', $m1 === 422 && ($mj['code'] ?? null) === 'CONFIRMATION_MISMATCH'
+            && $confirm($operator, $pubA, $relA + 1, 100)[0] === 422 && $status($pubA) === 'PENDING_APPROVAL');
+
+        // G.6 the audit trail and the publication history are immutable, even for the database superuser.
+        check('G', '6 audit events and publication requests cannot be changed or deleted (23001)',
+            sqlState(dba(), "UPDATE civil_import_audit_events SET outcome_code = 'TAMPERED' WHERE id = (SELECT max(id) FROM civil_import_audit_events)") === '23001'
+            && sqlState(dba(), 'DELETE FROM civil_import_audit_events WHERE id = (SELECT max(id) FROM civil_import_audit_events)') === '23001'
+            && sqlState(dba(), "DELETE FROM civil_import_publication_requests WHERE id = '{$pubT}'") === '23001');
+
+        // H.1 the operator confirms their own request; the worker publishes, atomically, once.
         $before = activeRelease();
-        [$as, $aj] = $approve($approver, $pubA, $relA, 100);
+        [$as, $aj] = $confirm($operator, $pubA, $relA, 100);
         $queuedPhase = run($dev, $runA)['phase'];
-        check('H', '1 approval queues the worker (202); nothing active yet', $as === 202 && $aj['data']['publish_request']['type'] === 'PUBLISH'
+        check('H', '1 operator confirms (202): PUBLISH queued, confirmed by the requester; nothing active yet', $as === 202
+            && $aj['data']['publish_request']['type'] === 'PUBLISH' && $aj['data']['publication_request']['decided_by']['name'] === 'Publication operator (U4)'
+            && $aj['data']['publication_request']['requested_by']['name'] === 'Publication operator (U4)'
             && $queuedPhase === 'APPROVED' && activeRelease() === $before);
+        [$rs, $rj] = $confirm($operator, $pubA, $relA, 100);
+        check('H', '1 repeated confirmation refused (409 PUBLICATION_NOT_PENDING); exactly one PUBLISH request',
+            $rs === 409 && ($rj['code'] ?? null) === 'PUBLICATION_NOT_PENDING' && $publishes($pubA) === 1);
         workerOnce();
-        $pa = http($dev, 'GET', "/api/v1/civil-registry/publication-requests/{$pubA}")[1]['data'];
+        $pa = http($dev, 'GET', "{$base}/{$pubA}")[1]['data'];
         $ov = http($dev, 'GET', '/api/v1/civil-registry/overview')[1]['data'];
         check('H', '1 published atomically: release A active, 100 records, run PUBLISHED', $pa['status'] === 'EXECUTED' && activeRelease() === $relA
             && $ov['active_release']['id'] === $relA && $ov['active_release']['record_count'] === 100 && run($dev, $runA)['phase'] === 'PUBLISHED'
             && one('SELECT status FROM identity_ref.dataset_releases WHERE id = ?', [$relA]) === 'PUBLISHED',
             "active {$before} -> ".activeRelease());
 
-        // H.2 second release B over A
-        [$runB, $relB] = verifiedCandidate($dev, 'u4-export-b');
-        [$bs, $bj] = requestPublication($dev, $relB);
-        $snap = $bj['data']['snapshot'];
-        check('H', '2 snapshot B: 15 new, 10 changed, 5 carried, 115 expected', $bs === 201 && $snap['new'] === 15 && $snap['changed'] === 10
-            && $snap['carried_forward'] === 5 && $snap['expected_presence'] === 115 && $bj['data']['base_release_id'] === $relA, json_encode($snap));
-        $approve($approver, $bj['data']['id'], $relB, 115);
+        // H.2 second release B over A — first refused while not yet VERIFIED.
+        $stageB = queueAndRun($dev, '/api/v1/civil-registry/imports', ['source_id' => sourceId($dev, 'u4-export-b')]);
+        $runB = $stageB['run_id'];
+        $relB = (int) queueAndRun($dev, "/api/v1/civil-registry/imports/{$runB}/prepare")['release_id'];
+        [$us, $uj] = requestPublication($operator, $relB);
+        check('H', '2 prepared but not VERIFIED: no publication request (409 PHASE_NOT_ALLOWED)', $us === 409 && ($uj['code'] ?? null) === 'PHASE_NOT_ALLOWED');
+        $verifyB = queueAndRun($dev, "/api/v1/civil-registry/releases/{$relB}/verify");
+        [$bs, $bj] = requestPublication($operator, $relB);
+        $snap = $bj['data']['snapshot'] ?? [];
+        check('H', '2 snapshot B: 15 new, 10 changed, 5 carried, 115 expected', $verifyB['status'] === 'SUCCEEDED' && $bs === 201 && $snap['new'] === 15
+            && $snap['changed'] === 10 && $snap['carried_forward'] === 5 && $snap['expected_presence'] === 115 && $bj['data']['base_release_id'] === $relA, json_encode($snap));
+        // H.2b concurrency: two confirmations sent at once while another session holds the request row.
+        // The first waits for the lock and wins; the second is refused; exactly one PUBLISH request.
+        $pubB = $bj['data']['id'];
+        $locker = pg('postgres');
+        $locker->beginTransaction();
+        $locker->exec("SELECT id FROM civil_import_publication_requests WHERE id = '{$pubB}' FOR UPDATE");
+        $body = ['password' => $operatorPassword, 'confirm_release_id' => $relB, 'confirm_expected_presence' => 115];
+        $waited = null;
+        $race = httpConcurrently([[$operator, "{$base}/{$pubB}/confirm", $body], [$operator, "{$base}/{$pubB}/confirm", $body]],
+            function () use ($locker, $status, $pubB, &$waited) {
+                $waited = $status($pubB);   // still pending while the row is held
+                $locker->commit();
+            });
+        $codes = array_map(fn ($r) => $r[0], $race);
+        sort($codes);
+        $refused = array_values(array_filter($race, fn ($r) => $r[0] === 409))[0][1]['code'] ?? null;
+        check('H', '2b concurrent confirmations behind a held row lock: one 202, one 409; exactly one PUBLISH',
+            $waited === 'PENDING_APPROVAL' && $codes === [202, 409] && in_array($refused, ['PUBLICATION_NOT_PENDING', 'REQUEST_ALREADY_ACTIVE'], true)
+            && $publishes($pubB) === 1, json_encode($codes)." {$refused}");
         workerOnce();
         $ov = http($dev, 'GET', '/api/v1/civil-registry/overview')[1]['data'];
         check('H', '2 release B active, 115 records', activeRelease() === $relB && $ov['active_release']['record_count'] === 115, "active {$relA} -> ".activeRelease());
 
         // H.3a baseline change while pending
         [$run3, $rel3] = verifiedCandidate($dev, 'u4-export-a');
-        $pub3 = requestPublication($dev, $rel3)[1]['data'];
+        $pub3 = requestPublication($operator, $rel3)[1]['data'];
         $cli = cliPublish($rel3);
-        $p3 = http($approver, 'GET', "/api/v1/civil-registry/publication-requests/{$pub3['id']}")[1]['data'];
+        $p3 = http($operator, 'GET', "{$base}/{$pub3['id']}")[1]['data'];
         check('H', '3a operator publishes from the shell: pending request EXPIRED BASE_CHANGED', str_contains($cli, 'Published') && activeRelease() === $rel3
             && $p3['status'] === 'EXPIRED' && $p3['outcome_code'] === 'BASE_CHANGED'
-            && $approve($approver, $pub3['id'], $rel3, (int) $pub3['snapshot']['expected_presence'])[1]['code'] === 'PUBLICATION_EXPIRED');
-        // H.3b baseline change after approval, before the worker
+            && ($confirm($operator, $pub3['id'], $rel3, (int) $pub3['snapshot']['expected_presence'])[1]['code'] ?? null) === 'PUBLICATION_EXPIRED');
+        // H.3b baseline change after the confirmation, before the worker
         [$run4, $rel4] = verifiedCandidate($dev, 'u4-export-b');
-        $pub4 = requestPublication($dev, $rel4)[1]['data'];
-        $approve($approver, $pub4['id'], $rel4, (int) $pub4['snapshot']['expected_presence']);
+        $pub4 = requestPublication($operator, $rel4)[1]['data'];
+        $confirm($operator, $pub4['id'], $rel4, (int) $pub4['snapshot']['expected_presence']);
         cliPublish($rel4);
         workerOnce();
-        $p4 = http($dev, 'GET', "/api/v1/civil-registry/publication-requests/{$pub4['id']}")[1]['data'];
-        check('H', '3b approved then baseline changed: worker refuses BASE_CHANGED', $p4['status'] === 'FAILED' && $p4['outcome_code'] === 'BASE_CHANGED'
+        $p4 = http($dev, 'GET', "{$base}/{$pub4['id']}")[1]['data'];
+        check('H', '3b confirmed then baseline changed: worker refuses BASE_CHANGED', $p4['status'] === 'FAILED' && $p4['outcome_code'] === 'BASE_CHANGED'
             && activeRelease() === $rel4);
         // H.4 missing authorization reference in the worker
         [$run5, $rel5] = verifiedCandidate($dev, 'u4-export-a');
-        $pub5 = requestPublication($dev, $rel5)[1]['data'];
-        $approve($approver, $pub5['id'], $rel5, (int) $pub5['snapshot']['expected_presence']);
+        $pub5 = requestPublication($operator, $rel5)[1]['data'];
+        $confirm($operator, $pub5['id'], $rel5, (int) $pub5['snapshot']['expected_presence']);
         setEnvKey('worker.env', 'IDENTITY_REF_PRODUCTION_APPROVAL', null);
         workerOnce();
         setEnvKey('worker.env', 'IDENTITY_REF_PRODUCTION_APPROVAL', 'U4-LOCAL-ACCEPTANCE');
-        $p5 = http($dev, 'GET', "/api/v1/civil-registry/publication-requests/{$pub5['id']}")[1]['data'];
+        $p5 = http($dev, 'GET', "{$base}/{$pub5['id']}")[1]['data'];
         check('H', '4 no authorization reference: refused, active unchanged', $p5['status'] === 'FAILED' && $p5['outcome_code'] === 'AUTHORIZATION_MISSING'
             && activeRelease() === $rel4);
         $finalActive = activeRelease();
@@ -689,8 +825,13 @@ try {
     check('H', '5 gates CLOSED again; verifier DISABLED', envFile('web.env')['CIVIL_IMPORT_PUBLISH_ENABLED'] === 'false'
         && $w['CIVIL_IMPORT_PUBLISH_ENABLED'] === 'false' && ! isset($w['IDENTITY_REF_PRODUCTION_APPROVAL'])
         && str_contains($verify, 'Civil import publication gate: DISABLED') && str_contains($verify, 'verification passed'));
-    check('H', '5 approval impossible again (403)', http($approver, 'POST', "/api/v1/civil-registry/publication-requests/{$fake}/approve",
-        ['confirm_release_id' => 1, 'confirm_expected_presence' => 1])[0] === 403);
+    // H.5 a verified, requestable candidate exists again (release 5); with the gate closed nobody can confirm it.
+    $pub6 = requestPublication($operator, $rel5)[1]['data']['id'] ?? null;
+    check('H', '5 gate closed: the operator\'s own request cannot be confirmed (403, can_confirm=false)', $pub6 !== null
+        && $confirm($operator, $pub6, $rel5, 115)[0] === 403 && http($operator, 'GET', "{$base}/{$pub6}")[1]['data']['can_confirm'] === false);
+    if ($pub6 !== null) {
+        http($operator, 'POST', "{$base}/{$pub6}/withdraw");
+    }
 
     // ============================================================ I. audit and redaction
     $events = [];
@@ -707,7 +848,7 @@ try {
     $afterLoc = http($dev, 'GET', '/api/v1/civil-registry/audit')[1]['data'][0]['event_type'] ?? null;
     ksort($events);
     $needed = ['SOURCE_CATALOGUED', 'REQUEST_QUEUED', 'REQUEST_STARTED', 'REQUEST_SUCCEEDED', 'REQUEST_FAILED', 'REQUEST_CANCELLED',
-        'PUBLICATION_REQUESTED', 'PUBLICATION_APPROVED', 'PUBLICATION_REJECTED', 'PUBLICATION_WITHDRAWN', 'PUBLICATION_EXPIRED',
+        'PUBLICATION_REQUESTED', 'PUBLICATION_CONFIRMED', 'PUBLICATION_REAUTH_FAILED', 'PUBLICATION_WITHDRAWN', 'PUBLICATION_EXPIRED',
         'PUBLICATION_REFUSED', 'RELEASE_PUBLISHED'];
     check('I', '1 audit trail holds every lifecycle event', array_diff($needed, array_keys($events)) === [], json_encode($events));
     check('I', '3 file names only through locations, and the read is audited', count($loc['data'] ?? []) === 2 && $afterLoc === 'LOCATIONS_VIEWED');
@@ -717,6 +858,8 @@ try {
         .json_encode(dba()->query('SELECT snapshot, outcome_code FROM civil_import_publication_requests')->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
     $leaks = [];
     foreach (['/\b900[1-4]0\d{4}\b/' => 'national id', '/اسم-(تجريبي|معدل)/u' => 'name', '/[0-9a-f]{64}/' => 'sha256', '/U4-LOCAL-ACCEPTANCE/' => 'reference',
+        // D-UI-12a: neither the operator's password nor any password tried is ever echoed or recorded.
+        '/'.preg_quote($operatorPassword, '/').'|not-the-password|\bwrong-[1-6]\b/' => 'password',
         '/@famboook\.test/' => 'e-mail', '/famboook-u4|AppData|\\\\Users\\\\/' => 'path', '/t03maindata_part/' => 'file name'] as $pattern => $what) {
         if (preg_match($pattern, $all) === 1 || preg_match($pattern, $auditRows) === 1) {
             $leaks[] = $what;
@@ -734,7 +877,7 @@ try {
             $where[] = 'control-plane rows';
         }
     }
-    check('I', '2 no identity value, name, path, file name, checksum, e-mail or reference in '.count($CAPTURED).' API responses and the control-plane rows',
+    check('I', '2 no identity value, name, path, file name, checksum, e-mail, reference or password in '.count($CAPTURED).' API responses and the control-plane rows',
         $leaks === [], implode(',', $leaks).($where === [] ? '' : ' | '.implode(' || ', array_slice($where, 0, 3))));
 
     // ============================================================ J.

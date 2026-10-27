@@ -48,9 +48,11 @@ case "${1:-}" in
     # the normal development server (.next). next dev also rewrites next-env.d.ts and
     # adds its distDir's type paths to tsconfig.json: keep the developer's copies and
     # put them back when this server stops (after a forced kill: u4.sh restore-frontend).
-    cp -p next-env.d.ts "$STATE/next-env.d.ts.backup" 2>/dev/null || true
-    cp -p tsconfig.json "$STATE/tsconfig.json.backup" 2>/dev/null || true
-    trap 'cp -p "$STATE/next-env.d.ts.backup" next-env.d.ts 2>/dev/null; cp -p "$STATE/tsconfig.json.backup" tsconfig.json 2>/dev/null || true' EXIT
+    # A pending backup (an earlier server killed before restoring) is the developer's copy:
+    # never overwrite it with files this server may already have rewritten.
+    [[ -f "$STATE/next-env.d.ts.backup" ]] || cp -p next-env.d.ts "$STATE/next-env.d.ts.backup" 2>/dev/null || true
+    [[ -f "$STATE/tsconfig.json.backup" ]] || cp -p tsconfig.json "$STATE/tsconfig.json.backup" 2>/dev/null || true
+    trap 'cp -p "$STATE/next-env.d.ts.backup" next-env.d.ts 2>/dev/null && rm -f "$STATE/next-env.d.ts.backup"; cp -p "$STATE/tsconfig.json.backup" tsconfig.json 2>/dev/null && rm -f "$STATE/tsconfig.json.backup"; true' EXIT
     FAMBOOOK_NEXT_DIST_DIR=.next/u4-acceptance NEXT_PUBLIC_API_URL=http://localhost:8010 npx next dev -p 3010
     ;;
   worker)
@@ -94,7 +96,7 @@ case "${1:-}" in
     ls "$STATE/sources"
     ;;
   restore-frontend)
-    cp -p "$STATE/next-env.d.ts.backup" "$ROOT/frontend/next-env.d.ts" && cp -p "$STATE/tsconfig.json.backup" "$ROOT/frontend/tsconfig.json"       && echo "frontend/next-env.d.ts and tsconfig.json restored"
+    cp -p "$STATE/next-env.d.ts.backup" "$ROOT/frontend/next-env.d.ts" && cp -p "$STATE/tsconfig.json.backup" "$ROOT/frontend/tsconfig.json"       && rm -f "$STATE/next-env.d.ts.backup" "$STATE/tsconfig.json.backup" && echo "frontend/next-env.d.ts and tsconfig.json restored"
     ;;
   teardown)
     php "$ROOT/deploy/local-acceptance/u4-teardown.php"

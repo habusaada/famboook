@@ -229,7 +229,7 @@ function DecisionDialog({
         </DialogHeader>
         {kind === "CONFIRM" && (
           <div className="flex flex-col gap-3">
-            <DetailList className="rounded-lg border border-stroke-subtle bg-surface-2 p-3" data-confirm-summary>
+            <DetailList className="rounded-lg border border-stroke-subtle bg-surface-2 px-3 py-1 sm:grid-cols-1" data-confirm-summary>
               <DetailItem label="رقم الإصدار">
                 <span data-confirm-release>
                   <Num value={publication.release_id} />

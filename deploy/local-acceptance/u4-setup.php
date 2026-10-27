@@ -114,9 +114,11 @@ out('identity schemas: 00–03 + 06 applied');
 // ---------------------------------------------------------------- application schema (as the application login)
 $env = [
     // APP_DEBUG=false as in Production (deploy/env): error responses carry no exception details or paths.
+    // CACHE_STORE=database as in Production: the publication re-authentication lockout (D-UI-12a) counts
+    // failures in the cache, which must survive between requests (php artisan serve runs each in a new process).
     'APP_ENV' => 'local', 'APP_DEBUG' => 'false', 'DB_CONNECTION' => 'pgsql', 'DB_HOST' => HOST, 'DB_PORT' => (string) PORT, 'DB_DATABASE' => DATABASE,
     'DB_USERNAME' => 'famboook_u4_app', 'DB_PASSWORD' => $passwords['app'], 'CIVIL_IMPORT_PUBLISH_ENABLED' => 'false',
-    'CACHE_STORE' => 'array', 'SESSION_DRIVER' => 'database', 'QUEUE_CONNECTION' => 'database',
+    'CACHE_STORE' => 'database', 'SESSION_DRIVER' => 'database', 'QUEUE_CONNECTION' => 'database',
 ];
 $cmd = function (array $args) use ($backend, $env): void {
     $line = escapeshellarg(PHP_BINARY).' artisan '.implode(' ', array_map('escapeshellarg', $args));
@@ -154,13 +156,14 @@ require $backend.'/vendor/autoload.php';
 $app = require $backend.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
+// D-UI-12a: one SUPER_ADMIN requests AND confirms publication (password re-entered); no second approver.
 $accounts = [
-    ['u4-approver@famboook.test', 'Second approver (U4)', 'SUPER_ADMIN', []],
+    ['u4-operator@famboook.test', 'Publication operator (U4)', 'SUPER_ADMIN', []],
     ['u4-viewer@famboook.test', 'Monitoring viewer (U4)', 'REPORTS_VIEWER', ['civil-import.view']],
     ['u4-outsider@famboook.test', 'Administrator without civil import (U4)', 'ADMINISTRATOR', []],
 ];
 $lines = ["# FB-CIVIL-01A-UI U4 local acceptance accounts (SYNTHETIC). Local only; never commit.",
-    '# dev@famboook.test (SUPER_ADMIN, requester): sign in through /dev-login (no password).'];
+    '# dev@famboook.test (SUPER_ADMIN, staging operator): sign in through /dev-login (no password; it can never confirm a publication).'];
 foreach ($accounts as [$email, $name, $role, $direct]) {
     $password = secret();
     $user = App\Models\User::query()->updateOrCreate(['email' => $email], ['name' => $name, 'password' => Illuminate\Support\Facades\Hash::make($password), 'is_active' => true]);
