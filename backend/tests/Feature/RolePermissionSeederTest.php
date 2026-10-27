@@ -324,7 +324,7 @@ class RolePermissionSeederTest extends TestCase
         //      + notification-followup.view/manage (ADR FB-NOTIFY-01 ADR-06 §2c, 01E.3-F1)
         //      + civil-import.view/locations.view/audit.view (AUTH-ADR-098, FB-CIVIL-01A-UI U1)
         //      + civil-import.stage/validate (AUTH-ADR-098, FB-CIVIL-01A-UI U2)
-        //      + civil-import.publish.request (U3; publish.approve only through the publication gate).
+        //      + civil-import.publish.request (U3; publish.confirm only through the publication gate, D-UI-12a).
         $this->assertSame(106, $superAdmin->getAllPermissions()->count());
         foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
             $this->assertTrue($superAdmin->hasPermissionTo($permission));

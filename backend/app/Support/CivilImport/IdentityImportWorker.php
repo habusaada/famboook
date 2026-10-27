@@ -46,11 +46,13 @@ use Throwable;
  * operation stays resumable by a new request. Cancellation of a RUNNING
  * request takes effect at the next committed chunk (or file).
  *
- * PUBLICATION (U3, S-3): a PUBLISH request exists only through the approval
- * of a publication request by a second user. Immediately before calling the
- * engine the worker re-checks, in order: an APPROVED publication request
- * decided by another user than its requester, for this release; the
- * publication gate open in THIS process; a well-formed real-data
+ * PUBLICATION (U3, S-3, D-UI-12a): a PUBLISH request exists only through
+ * the confirmation of a publication request by its own requester (a
+ * SUPER_ADMIN, password re-entered). Immediately before calling the engine
+ * the worker re-checks, in order: an APPROVED publication request confirmed
+ * by its requester, for this release (an approval recorded under the former
+ * two-person rule, without that confirmation, is refused); the publication
+ * gate open in THIS process; a well-formed real-data
  * authorization reference in THIS process; the approval window; the
  * baseline still the active release; the release still a VERIFIED
  * candidate. The engine then activates the release atomically and refuses
@@ -295,7 +297,7 @@ final class IdentityImportWorker
     }
 
     /**
-     * Publishes an approved release after re-checking every S-3 condition.
+     * Publishes a confirmed release after re-checking every S-3 condition.
      *
      * @return array<string, mixed>
      *
@@ -306,7 +308,7 @@ final class IdentityImportWorker
         $publication = CivilImportPublicationRequest::query()->find($request->publication_request_id);
         $refuse = static fn (string $code) => throw new CivilImportSourceException($code);
         if ($publication === null || $publication->status !== CivilImportPublicationRequest::APPROVED || $publication->decided_by === null
-            || (int) $publication->decided_by === (int) $publication->requested_by || $publication->release_id !== $request->release_id) {
+            || (int) $publication->decided_by !== (int) $publication->requested_by || $publication->release_id !== $request->release_id) {
             $refuse(CivilImportReason::NOT_APPROVED_FOR_PUBLICATION);
         }
         if (config('civil_import.publish_enabled') !== true) {

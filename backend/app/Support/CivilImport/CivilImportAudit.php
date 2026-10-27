@@ -15,11 +15,16 @@ final class CivilImportAudit
 {
     public const LOCATIONS_VIEWED = 'LOCATIONS_VIEWED';
 
-    /** U1 writes LOCATIONS_VIEWED; U2 the SOURCE_* and REQUEST_* events; U3 the PUBLICATION_* events. */
+    /**
+     * U1 writes LOCATIONS_VIEWED; U2 the SOURCE_* and REQUEST_* events; U3 the PUBLICATION_* events.
+     * PUBLICATION_APPROVED / _REJECTED are history of the former two-person rule (D-UI-12); the
+     * single-operator confirmation (D-UI-12a) writes PUBLICATION_CONFIRMED and PUBLICATION_REAUTH_FAILED.
+     */
     public const EVENT_TYPES = [
         'SOURCE_CATALOGUED', 'SOURCE_UNAVAILABLE', 'REQUEST_QUEUED', 'REQUEST_CANCELLED', 'REQUEST_STARTED', 'REQUEST_SUCCEEDED',
         'REQUEST_FAILED', 'PUBLICATION_REQUESTED', 'PUBLICATION_WITHDRAWN', 'PUBLICATION_APPROVED', 'PUBLICATION_REJECTED',
         'PUBLICATION_EXPIRED', 'PUBLICATION_REFUSED', 'RELEASE_PUBLISHED', self::LOCATIONS_VIEWED,
+        'PUBLICATION_CONFIRMED', 'PUBLICATION_REAUTH_FAILED',
     ];
 
     /** Allowed detail keys: a code (uppercase) or a non-negative integer each. */

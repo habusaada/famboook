@@ -829,15 +829,15 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
             Route::get('/publication-requests', [CivilImportPublicationController::class, 'index']);
             Route::get('/publication-requests/{publication}', [CivilImportPublicationController::class, 'show'])->whereUuid('publication');
         });
-        // FB-CIVIL-01A-UI U3 — two-person publication approval. Nothing here
-        // publishes: an approval queues the worker's PUBLISH request (S-1/S-3).
+        // FB-CIVIL-01A-UI U3 / D-UI-12a — single-operator publication. Nothing
+        // here publishes: the requester's confirmation (password re-entered)
+        // queues the worker's PUBLISH request (S-1/S-3).
         Route::middleware(['can:civil-import.publish.request', 'throttle:30,1'])->group(function () {
             Route::post('/releases/{release}/publication-requests', [CivilImportPublicationController::class, 'store'])->whereNumber('release');
             Route::post('/publication-requests/{publication}/withdraw', [CivilImportPublicationController::class, 'withdraw'])->whereUuid('publication');
         });
-        Route::middleware(['can:civil-import.publish.approve', 'throttle:30,1'])->group(function () {
-            Route::post('/publication-requests/{publication}/approve', [CivilImportPublicationController::class, 'approve'])->whereUuid('publication');
-            Route::post('/publication-requests/{publication}/reject', [CivilImportPublicationController::class, 'reject'])->whereUuid('publication');
+        Route::middleware(['can:civil-import.publish.confirm', 'throttle:30,1'])->group(function () {
+            Route::post('/publication-requests/{publication}/confirm', [CivilImportPublicationController::class, 'confirm'])->whereUuid('publication');
         });
         // FB-CIVIL-01A-UI U2 — execution REQUESTS only: each write inserts a
         // QUEUED civil_import_requests row (202); the dedicated worker executes

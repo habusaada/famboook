@@ -46,7 +46,12 @@ final class CivilImportReason
 
     public const PUBLICATION_NOT_PENDING = 'PUBLICATION_NOT_PENDING';
 
-    public const SAME_USER_APPROVAL = 'SAME_USER_APPROVAL';
+    // D-UI-12a: single-operator confirmation.
+    public const CONFIRMATION_BY_REQUESTER_ONLY = 'CONFIRMATION_BY_REQUESTER_ONLY';
+
+    public const REAUTH_FAILED = 'REAUTH_FAILED';
+
+    public const REAUTH_LOCKED = 'REAUTH_LOCKED';
 
     public const PUBLICATION_GATE_CLOSED = 'PUBLICATION_GATE_CLOSED';
 
@@ -101,15 +106,17 @@ final class CivilImportReason
         self::NOT_ALLOWED => 'لا تملك صلاحية تنفيذ هذا الإجراء.',
         // U3
         self::PUBLICATION_ALREADY_OPEN => 'يوجد طلب نشر آخر مفتوح.',
-        self::PUBLICATION_NOT_PENDING => 'طلب النشر لم يعد بانتظار القرار.',
-        self::SAME_USER_APPROVAL => 'لا يمكن لمقدّم طلب النشر أن يقرر فيه؛ يلزم مستخدم آخر.',
+        self::PUBLICATION_NOT_PENDING => 'طلب النشر لم يعد بانتظار التأكيد.',
+        self::CONFIRMATION_BY_REQUESTER_ONLY => 'يؤكد طلبَ النشر مقدّمُه فقط.',
+        self::REAUTH_FAILED => 'كلمة المرور غير صحيحة؛ لم يُؤكَّد النشر.',
+        self::REAUTH_LOCKED => 'محاولات كثيرة بكلمة مرور غير صحيحة؛ أعد المحاولة بعد 15 دقيقة.',
         self::PUBLICATION_GATE_CLOSED => 'بوابة النشر مغلقة.',
         self::PUBLICATION_EXPIRED => 'انتهت صلاحية طلب النشر.',
         self::BASE_CHANGED => 'تغيّر الإصدار النشط منذ تقديم الطلب؛ يلزم طلب جديد.',
         self::RELEASE_CHANGED => 'لم يعد الإصدار متحققًا منه؛ يلزم طلب جديد.',
-        self::CONFIRMATION_MISMATCH => 'رقم الإصدار أو الحضور المتوقع المُدخل لا يطابق الطلب.',
+        self::CONFIRMATION_MISMATCH => 'رقم الإصدار أو عدد السجلات المتحقَّق منها المُدخل لا يطابق الطلب.',
         self::AUTHORIZATION_MISSING => 'لا يوجد مرجع تفويض بالبيانات الحقيقية لدى عامل الاستيراد؛ رُفض النشر.',
-        self::NOT_APPROVED_FOR_PUBLICATION => 'لا يوجد اعتماد صالح لهذا النشر؛ رُفض.',
+        self::NOT_APPROVED_FOR_PUBLICATION => 'لا يوجد تأكيد صالح لهذا النشر؛ رُفض.',
         'PUBLICATION_FAILED' => 'تعذّر النشر وأُلغي؛ الإصدار النشط السابق لم يتغير.',
     ];
 

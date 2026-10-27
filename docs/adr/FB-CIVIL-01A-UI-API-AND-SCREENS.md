@@ -149,8 +149,7 @@ Request resource:
 |---|---|---|---|
 | `POST /civil-registry/releases/{release}/publication-requests` | `civil-import.publish.request` | `{"note_code": "ROUTINE_REFRESH"}` (codes only) | Release VERIFIED; no other open request; expires_at = now + 24 h |
 | `POST /civil-registry/publication-requests/{id}/withdraw` | the requester | — | PENDING_APPROVAL |
-| `POST /civil-registry/publication-requests/{id}/approve` | `civil-import.publish.approve` | `{"confirm_release_id": 4, "confirm_expected_presence": 2401091}` | User ≠ requester (`SAME_USER_APPROVAL`); gate open (`PUBLICATION_GATE_CLOSED`); not expired; base unchanged. Creates the PUBLISH request (202) |
-| `POST /civil-registry/publication-requests/{id}/reject` | `civil-import.publish.approve` | `{"reason_code": "COUNTS_UNEXPECTED"}` | User ≠ requester |
+| `POST /civil-registry/publication-requests/{id}/confirm` (D-UI-12a; replaces `/approve`) | `civil-import.publish.confirm` | `{"password": "…", "confirm_release_id": 4, "confirm_expected_presence": 2401091}` | **The requester only**, an active SUPER_ADMIN; fresh password (wrong: 422 `REAUTH_FAILED`, audited; 5 per 15 min, then 429 `REAUTH_LOCKED`); another user: 403 `CONFIRMATION_BY_REQUESTER_ONLY`
 | `GET /civil-registry/publication-requests?status=PENDING_APPROVAL` | `civil-import.view` | — | — |
 
 An approved publication can still be refused by the worker (S-3). For example, the real-data authorization reference may be missing, the gate may be closed in the worker's configuration, or the base may have changed. The PUBLISH request then ends `FAILED` with the reason code (`AUTHORIZATION_MISSING`, `PUBLICATION_GATE_CLOSED`, `BASE_CHANGED`, `NOT_VERIFIED`), a `PUBLICATION_REFUSED` audit event is written, and the previous release stays active.

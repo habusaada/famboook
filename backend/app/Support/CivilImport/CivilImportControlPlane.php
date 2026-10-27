@@ -123,12 +123,12 @@ final class CivilImportControlPlane
         return array_values($actions);
     }
 
-    /** The permission that queues a request type (PUBLISH: created by an approval only). */
+    /** The permission that queues a request type (PUBLISH: created by the requester's confirmation only). */
     public static function permissionFor(string $type): string
     {
         return match ($type) {
             CivilImportRequest::ASSESS, CivilImportRequest::PREPARE, CivilImportRequest::VERIFY => 'civil-import.validate',
-            CivilImportRequest::PUBLISH => 'civil-import.publish.approve',
+            CivilImportRequest::PUBLISH => 'civil-import.publish.confirm',
             default => 'civil-import.stage',
         };
     }

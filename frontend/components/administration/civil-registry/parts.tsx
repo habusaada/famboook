@@ -42,7 +42,7 @@ const SECTIONS = [
   },
   {
     href: "/administration/civil-registry/approvals",
-    label: "الموافقات",
+    label: "تأكيد النشر",
     permission: "civil-import.view",
   },
   {

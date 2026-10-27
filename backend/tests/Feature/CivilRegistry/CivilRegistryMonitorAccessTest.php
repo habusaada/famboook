@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use InvalidArgumentException;
 use LogicException;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 /**
@@ -128,24 +129,32 @@ class CivilRegistryMonitorAccessTest extends TestCase
         }
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
 
-        // U3: approving publication exists only while the publication gate is open, for SUPER_ADMIN only (S-4).
-        $this->assertContains('civil-import.publish.approve', RolePermissionSeeder::PERMISSIONS);
+        // U3 / D-UI-12a: confirming publication exists only while the publication gate is open, for SUPER_ADMIN only (S-4);
+        // the former second-approver permission is gone.
+        $this->assertNotContains('civil-import.publish.approve', RolePermissionSeeder::PERMISSIONS);
+        $this->assertContains('civil-import.publish.confirm', RolePermissionSeeder::PERMISSIONS);
         foreach (RolePermissionSeeder::ROLES as $role) {
-            $this->assertNotContains('civil-import.publish.approve', RolePermissionSeeder::rolePermissions($role), $role);
+            $this->assertNotContains('civil-import.publish.confirm', RolePermissionSeeder::rolePermissions($role), $role);
         }
         config(['civil_import.publish_enabled' => true]);
         foreach (RolePermissionSeeder::ROLES as $role) {
-            $this->assertSame($role === 'SUPER_ADMIN', in_array('civil-import.publish.approve', RolePermissionSeeder::rolePermissions($role), true), $role);
+            $this->assertSame($role === 'SUPER_ADMIN', in_array('civil-import.publish.confirm', RolePermissionSeeder::rolePermissions($role), true), $role);
         }
         // The seeded database (gate closed) no longer matches an open gate: the verifier says so.
         $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
-        $this->assertStringContainsString('must have civil-import.publish.approve', Artisan::output());
+        $this->assertStringContainsString('must have civil-import.publish.confirm', Artisan::output());
         $this->seed(RolePermissionSeeder::class);
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
         config(['civil_import.publish_enabled' => false]);
         $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
-        $this->assertStringContainsString('must NOT have civil-import.publish.approve', Artisan::output());
+        $this->assertStringContainsString('must NOT have civil-import.publish.confirm', Artisan::output());
         $this->seed(RolePermissionSeeder::class);
+        $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
+        // The second-approver permission must not come back (removed by the D-UI-12a migration).
+        $obsolete = Permission::findOrCreate('civil-import.publish.approve', 'web');
+        $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
+        $this->assertStringContainsString('civil-import.publish.approve still exists', Artisan::output());
+        $obsolete->delete();
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'), Artisan::output());
 
         // Never a direct grant.

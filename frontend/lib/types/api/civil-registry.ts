@@ -239,7 +239,7 @@ export interface CivilImportSource {
   staged_run_id: string | null;
 }
 
-// ---- U3: two-person publication
+// ---- U3: publication (single operator, D-UI-12a)
 
 export type CivilImportPublicationStatus = "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "WITHDRAWN" | "EXPIRED" | "EXECUTED" | "FAILED";
 
@@ -247,7 +247,7 @@ export type CivilImportJustification = "ROUTINE_REFRESH" | "INITIAL_LOAD" | "COR
 
 export type CivilImportRejectionReason = "COUNTS_UNEXPECTED" | "NOT_AUTHORIZED_NOW" | "NEEDS_REVIEW" | "OTHER_DECISION";
 
-/** Codes, counts, ids, two names and times — never an identity value or free text. */
+/** Codes, counts, ids, the requester's and confirmer's names and times — never an identity value or free text. */
 export interface CivilImportPublicationRequest {
   id: string;
   status: CivilImportPublicationStatus;
@@ -268,7 +268,7 @@ export interface CivilImportPublicationRequest {
   publish_request: { id: string; status: CivilImportRequestStatus; reason_code: string | null; message: string | null } | null;
   is_own: boolean;
   /** UX hints for the current user; the API and the worker re-check everything. */
-  can_approve: boolean;
-  can_reject: boolean;
+  /** Only the requester, an active SUPER_ADMIN, while the publication gate is open. */
+  can_confirm: boolean;
   can_withdraw: boolean;
 }

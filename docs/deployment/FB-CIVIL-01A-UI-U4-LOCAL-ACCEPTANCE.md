@@ -186,6 +186,8 @@ php vendor/bin/phpunit -c phpunit.pgsql.xml --display-skipped tests/Feature/Civi
 
 ## 8. Approver-permission revocation gap and proposal
 
+> **Revised 2026-10-27 by D-UI-12a (single-operator publication).** There is no second approver any more: the requester confirms their own request. The gap below remains, for **one** user instead of two: the worker cannot re-check, at execution time, that the requester who confirmed is still active and still holds `civil-import.publish.request` and `civil-import.publish.confirm`. The proposal reduces to the same function checking `requested_by = decided_by` and that one user. Its exact SQL in §8.1 still names `publish.approve` and two users, and **must be revised before any approval**. The `u4-approver` account and the two-person scenarios (B.2, F.2, G, H) of `u4-acceptance.php` and `u4-visual.mjs` record the U4 acceptance under the former rule; they no longer match the API (see the cleanup plan in the D-UI-12a change).
+
 **Gap.** The two users are authorized when the request is created and when it is decided. The worker cannot re-check, at execution time, that they are still active and still hold their permissions, because the control role has no access to `users` or the permission tables.
 
 Execution normally follows within one worker cycle (about 30 s). If the worker is down, the window lasts up to the 24 hours of the request. Today the only remedy is cancelling the queued PUBLISH request.

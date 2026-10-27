@@ -25,8 +25,8 @@ use Tests\TestCase;
  * FB-CIVIL-01A-UI U4 preparation — the gate-closed invariant: with the
  * publication gate in its DEFAULT state (closed) the active identity release
  * cannot change through the UI path, whatever is attempted — not through the
- * API (nobody holds the approval permission), not with a forbidden direct
- * grant (the action refuses), and not by forcing an approval and a PUBLISH
+ * API (nobody holds the confirmation permission), not with a forbidden direct
+ * grant (the action refuses), and not by forcing a confirmation and a PUBLISH
  * request straight into the database (the worker refuses), even with a
  * real-data authorization reference present. PostgreSQL only; SYNTHETIC data.
  */
@@ -74,13 +74,11 @@ class CivilImportGateClosedInvariantPostgresTest extends TestCase
     {
         $requester = User::factory()->create();
         $requester->assignRole('SUPER_ADMIN');
-        $approver = User::factory()->create();
-        $approver->assignRole('SUPER_ADMIN');
 
-        // Nobody can approve: the permission is not part of any role while the gate is closed.
+        // Nobody can confirm (D-UI-12a): the permission is not part of any role while the gate is closed.
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'));
         $this->assertStringContainsString('Civil import publication gate: DISABLED', Artisan::output());
-        $this->assertFalse($approver->fresh()->can('civil-import.publish.approve'));
+        $this->assertFalse($requester->fresh()->can('civil-import.publish.confirm'));
 
         // A VERIFIED release, through the worker.
         $this->placeSource($this->syntheticExport(SyntheticIdentityExport::generated(2, 4, 900_000_701)), 'export-gate');
@@ -97,27 +95,28 @@ class CivilImportGateClosedInvariantPostgresTest extends TestCase
         $this->assertSame(CivilImportRequest::SUCCEEDED, $work($this->apiAs($requester, 'POST', "/releases/{$releaseId}/verify"))->status);
         $before = $this->activeReleaseId();
 
-        // Requesting is allowed; approving through the API is not (403: no one holds the permission).
+        // Requesting is allowed; confirming through the API is not (403: no one holds the permission),
+        // even with the right password.
         $pid = $this->apiAs($requester, 'POST', "/releases/{$releaseId}/publication-requests", ['justification_code' => 'ROUTINE_REFRESH'])
             ->assertStatus(201)->json('data.id');
-        $this->apiAs($approver, 'POST', "/publication-requests/{$pid}/approve", ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8])
-            ->assertForbidden();
-        $this->apiAs($requester, 'GET', "/publication-requests/{$pid}")->assertJsonPath('data.can_approve', false);
+        $confirm = ['password' => 'password', 'confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8];
+        $this->apiAs($requester, 'POST', "/publication-requests/{$pid}/confirm", $confirm)->assertForbidden();
+        $this->apiAs($requester, 'GET', "/publication-requests/{$pid}")->assertJsonPath('data.can_confirm', false);
 
         // A forbidden direct grant does not help: the action refuses with the gate closed (and the verifier flags it).
-        $approver->givePermissionTo('civil-import.publish.approve');
-        $this->apiAs($approver->fresh(), 'POST', "/publication-requests/{$pid}/approve", ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8])
+        $requester->givePermissionTo('civil-import.publish.confirm');
+        $this->apiAs($requester->fresh(), 'POST', "/publication-requests/{$pid}/confirm", $confirm)
             ->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_GATE_CLOSED');
         $this->assertSame(1, Artisan::call('famboook:verify-permissions'));
-        $approver->revokePermissionTo('civil-import.publish.approve');
+        $requester->revokePermissionTo('civil-import.publish.confirm');
         $this->assertSame(CivilImportPublicationRequest::PENDING, CivilImportPublicationRequest::query()->find($pid)->status);
 
-        // Forcing it into the database as the DBA — approval and PUBLISH request — with an
+        // Forcing it into the database as the DBA — confirmation and PUBLISH request — with an
         // authorization reference present: the worker still refuses, its gate is closed.
         putenv(IdentityRefProductionGate::VARIABLE.'=U4-LOCAL-ACCEPTANCE');
-        DB::statement("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?", [$approver->id, $pid]);
+        DB::statement("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?", [$requester->id, $pid]);
         $publish = (string) Str::uuid();
-        DB::table('civil_import_requests')->insert(['id' => $publish, 'type' => 'PUBLISH', 'requested_by' => $approver->id,
+        DB::table('civil_import_requests')->insert(['id' => $publish, 'type' => 'PUBLISH', 'requested_by' => $requester->id,
             'release_id' => $releaseId, 'run_id' => $runId, 'publication_request_id' => $pid]);
         $this->workOnce();
         $refused = CivilImportRequest::query()->findOrFail($publish);

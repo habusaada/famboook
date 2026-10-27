@@ -10,16 +10,18 @@ use Illuminate\Support\Carbon;
 use LogicException;
 
 /**
- * A two-person publication request for a VERIFIED identity release
- * (FB-CIVIL-01A-UI U3, ADR §3.3, D-UI-6/11/12). Enforced here and, on
+ * A publication request for a VERIFIED identity release (FB-CIVIL-01A-UI
+ * U3, ADR §3.3, D-UI-6/11; single operator: D-UI-12a). Enforced here and, on
  * PostgreSQL, by trg_civil_import_publication_guard:
  *
- *   PENDING_APPROVAL → APPROVED | REJECTED (another user) | WITHDRAWN (requester) | EXPIRED
+ *   PENDING_APPROVAL → APPROVED (confirmed by its own requester) | WITHDRAWN (requester) | EXPIRED
  *   APPROVED         → EXECUTED | FAILED (the worker)
  *
- * Closed requests are never reused; the identity of a request (release,
- * baseline, requester, justification, snapshot, window) is immutable.
- * Codes and counts only — never an identity value or free text.
+ * REJECTED (and an APPROVED decided by another user) exist only in history
+ * recorded under the former two-person rule (D-UI-12). Closed requests are
+ * never reused; the identity of a request (release, baseline, requester,
+ * justification, snapshot, window) is immutable. Codes and counts only —
+ * never an identity value or free text.
  */
 class CivilImportPublicationRequest extends Model
 {
@@ -52,10 +54,8 @@ class CivilImportPublicationRequest extends Model
 
     public const JUSTIFICATIONS = ['ROUTINE_REFRESH', 'INITIAL_LOAD', 'CORRECTION'];
 
-    public const REJECTION_REASONS = ['COUNTS_UNEXPECTED', 'NOT_AUTHORIZED_NOW', 'NEEDS_REVIEW', 'OTHER_DECISION'];
-
     private const TRANSITIONS = [
-        self::PENDING => [self::APPROVED, self::REJECTED, self::WITHDRAWN, self::EXPIRED],
+        self::PENDING => [self::APPROVED, self::WITHDRAWN, self::EXPIRED],
         self::APPROVED => [self::EXECUTED, self::FAILED],
     ];
 
@@ -80,8 +80,9 @@ class CivilImportPublicationRequest extends Model
             if ($to !== $from && ! in_array($to, self::TRANSITIONS[$from] ?? [], true)) {
                 throw new LogicException("Publication request transition {$from} -> {$to} is not allowed.");
             }
-            if ($request->decided_by !== null && (int) $request->decided_by === (int) $request->requested_by) {
-                throw new LogicException('The requester never decides their own publication request.');
+            if ($to === self::APPROVED && $from === self::PENDING
+                && ($request->decided_by === null || (int) $request->decided_by !== (int) $request->requested_by)) {
+                throw new LogicException('Only the requester confirms their own publication request.');
             }
         });
         static::deleting(function () {
@@ -122,7 +123,7 @@ class CivilImportPublicationRequest extends Model
         return $this->belongsTo(User::class, 'decided_by');
     }
 
-    /** The worker's PUBLISH request, created by the approval. */
+    /** The worker's PUBLISH request, created by the confirmation. */
     public function publishRequest(): HasOne
     {
         return $this->hasOne(CivilImportRequest::class, 'publication_request_id');

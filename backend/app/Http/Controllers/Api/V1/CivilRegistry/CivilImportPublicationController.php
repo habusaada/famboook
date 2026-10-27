@@ -17,11 +17,11 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
 /**
- * Two-person publication approval (FB-CIVIL-01A-UI U3;
+ * Single-operator publication (FB-CIVIL-01A-UI U3, D-UI-12a;
  * docs/adr/FB-CIVIL-01A-UI-API-AND-SCREENS.md §4). Nothing here publishes:
- * an approval only queues the worker's PUBLISH request, which re-checks every
- * condition (S-3). Requesting and approving are separate permissions, held by
- * different users; reads expire stale requests first.
+ * the requester's confirmation (password re-entered) only queues the worker's
+ * PUBLISH request, which re-checks every condition (S-3). Confirming needs
+ * its own gated permission; reads expire stale requests first.
  */
 class CivilImportPublicationController extends Controller
 {
@@ -59,25 +59,20 @@ class CivilImportPublicationController extends Controller
         return (new CivilImportPublicationRequestResource($publication->load(['requester', 'decider'])))->response()->setStatusCode(201);
     }
 
-    public function approve(Request $request, string $publication, DecideCivilImportPublicationAction $decide): JsonResponse
+    public function confirm(Request $request, string $publication, DecideCivilImportPublicationAction $decide): JsonResponse
     {
         $data = $request->validate([
+            'password' => ['required', 'string', 'max:255'],
             'confirm_release_id' => ['required', 'integer', 'min:1'],
             'confirm_expected_presence' => ['required', 'integer', 'min:0'],
         ]);
-        $result = $decide->approve($request->user(), $publication, (int) $data['confirm_release_id'], (int) $data['confirm_expected_presence']);
+        $result = $decide->confirm($request->user(), $publication, $data['password'], (int) $data['confirm_release_id'],
+            (int) $data['confirm_expected_presence']);
 
         return response()->json(['data' => [
             'publication_request' => (new CivilImportPublicationRequestResource($result['publication']->load(['requester', 'decider'])))->toArray($request),
             'publish_request' => (new CivilImportRequestResource($result['request']->load(['requester', 'source'])))->toArray($request),
         ]], 202);
-    }
-
-    public function reject(Request $request, string $publication, DecideCivilImportPublicationAction $decide): CivilImportPublicationRequestResource
-    {
-        $data = $request->validate(['reason_code' => ['required', 'string', Rule::in(CivilImportPublicationRequest::REJECTION_REASONS)]]);
-
-        return new CivilImportPublicationRequestResource($decide->reject($request->user(), $publication, $data['reason_code'])->load(['requester', 'decider']));
     }
 
     public function withdraw(Request $request, string $publication, DecideCivilImportPublicationAction $decide): CivilImportPublicationRequestResource

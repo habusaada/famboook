@@ -1460,6 +1460,10 @@ on the test instance and a real browser
     - the worker's PUBLISH with every S-3 condition re-checked and crash reconciliation;
     - the approvals screens.
     - The publication gate stays closed by default; Production publication stays disabled.
+  - **D-UI-12a (2026-10-27, owner policy), local only:** single-operator publication replaces the two-person rule:
+    - a SUPER_ADMIN confirms their own request with a fresh password, the typed release id and the verified record count;
+    - `civil-import.publish.confirm` replaces `.approve` (still gated, closed by default); reject is removed;
+    - pending two-person requests expire (`POLICY_CHANGED`); the worker still publishes and re-checks everything.
 - **FB-CIVIL-01B** (lookup by staff): not started; needs a separately approved baseline change (OD-09).
 
 ---

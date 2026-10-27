@@ -14,7 +14,6 @@ import type {
   CivilImportPhase,
   CivilImportPublicationRequest,
   CivilImportPublicationStatus,
-  CivilImportRejectionReason,
   CivilImportRelease,
   CivilImportRequest,
   CivilImportRequestStatus,
@@ -281,9 +280,9 @@ export function useCancelCivilImportRequest() {
   });
 }
 
-// ---------------------------------------------------------------- U3: two-person publication
+// ---------------------------------------------------------------- U3: publication (single operator, D-UI-12a)
 
-/** Publication statuses that may still change (pending a decision, or approved and awaiting the worker). */
+/** Publication statuses that may still change (pending confirmation, or confirmed and awaiting the worker). */
 export const OPEN_PUBLICATION_STATUSES: ReadonlySet<CivilImportPublicationStatus> = new Set<CivilImportPublicationStatus>([
   "PENDING_APPROVAL",
   "APPROVED",
@@ -308,7 +307,7 @@ export function useCivilImportPublications(status: CivilImportPublicationStatus 
   });
 }
 
-/** One publication request; polled while approved (the worker is about to act) and the page is visible. */
+/** One publication request; polled while confirmed (the worker is about to act) and the page is visible. */
 export function useCivilImportPublication(id: string) {
   return useQuery({
     queryKey: civilImportKeys.publication(id),
@@ -336,24 +335,25 @@ export function useRequestCivilImportPublication() {
 }
 
 export type CivilImportDecision =
-  | { kind: "APPROVE"; id: string; confirmReleaseId: number; confirmExpectedPresence: number }
-  | { kind: "REJECT"; id: string; reasonCode: CivilImportRejectionReason }
+  | { kind: "CONFIRM"; id: string; password: string; confirmReleaseId: number; confirmExpectedPresence: number }
   | { kind: "WITHDRAW"; id: string };
 
-/** Approve (queues the worker's PUBLISH request), reject or withdraw. Nothing here publishes. */
+/**
+ * Confirm one's own request (password re-entered; queues the worker's PUBLISH request) or withdraw it.
+ * Nothing here publishes. The password is sent once, in the request body, and never kept.
+ */
 export function useDecideCivilImportPublication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (decision: CivilImportDecision) => {
       const path = `${BASE}/publication-requests/${encodeURIComponent(decision.id)}`;
       switch (decision.kind) {
-        case "APPROVE":
-          return apiClient.post(`${path}/approve`, {
+        case "CONFIRM":
+          return apiClient.post(`${path}/confirm`, {
+            password: decision.password,
             confirm_release_id: decision.confirmReleaseId,
             confirm_expected_presence: decision.confirmExpectedPresence,
           });
-        case "REJECT":
-          return apiClient.post(`${path}/reject`, { reason_code: decision.reasonCode });
         case "WITHDRAW":
           return apiClient.post(`${path}/withdraw`, {});
       }

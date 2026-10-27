@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\CivilRegistry;
 
+use App\Actions\DecideCivilImportPublicationAction;
 use App\Models\CivilImportAuditEvent;
 use App\Models\CivilImportPublicationRequest;
 use App\Models\CivilImportRequest;
@@ -11,6 +12,7 @@ use App\Support\IdentityRef\IdentityRefProductionGate;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PDO;
@@ -23,9 +25,10 @@ use Tests\Support\IdentityRef\SyntheticIdentityExport;
 use Tests\TestCase;
 
 /**
- * FB-CIVIL-01A-UI U3 — two-person publication end to end (ADR §9
- * PostgreSQL 6): two real users through the API, the worker with its two
- * separate real logins, the FB-CIVIL-01A engine and its database gate.
+ * FB-CIVIL-01A-UI U3 / D-UI-12a — single-operator publication end to end
+ * (ADR §9 PostgreSQL 6): one SUPER_ADMIN requests and confirms (password
+ * re-entered) through the API; the worker, with its two separate real
+ * logins, publishes through the FB-CIVIL-01A engine and its database gate.
  *
  * The publication gate and the real-data authorization reference are set
  * ONLY inside this disposable test process (config / putenv), never in any
@@ -43,9 +46,13 @@ class CivilImportPublicationPostgresTest extends TestCase
 
     private const REFERENCE = 'TEST-LOCAL-0001';
 
+    /** UserFactory's synthetic password. */
+    private const PASSWORD = 'password';
+
     private User $requester;
 
-    private User $approver;
+    /** Another SUPER_ADMIN: may view, never confirms somebody else's request. */
+    private User $otherAdmin;
 
     private int $exports = 0;
 
@@ -60,8 +67,8 @@ class CivilImportPublicationPostgresTest extends TestCase
         $this->setUpCivilImport();
         $this->requester = User::factory()->create();
         $this->requester->assignRole('SUPER_ADMIN');
-        $this->approver = User::factory()->create();
-        $this->approver->assignRole('SUPER_ADMIN');
+        $this->otherAdmin = User::factory()->create();
+        $this->otherAdmin->assignRole('SUPER_ADMIN');
         putenv(IdentityRefProductionGate::VARIABLE);
     }
 
@@ -72,6 +79,7 @@ class CivilImportPublicationPostgresTest extends TestCase
 
             return;
         }
+        RateLimiter::clear(DecideCivilImportPublicationAction::reauthKey($this->requester));
         putenv(IdentityRefProductionGate::VARIABLE);
         $this->tearDownCivilImport();
         $this->tearDownIdentityRefStaging();
@@ -84,8 +92,8 @@ class CivilImportPublicationPostgresTest extends TestCase
         return $this->actingAs($user)->json($method, '/api/v1/civil-registry'.$uri, $body);
     }
 
-    /** Stages, prepares and verifies a synthetic export through the API and the worker; returns [runId, releaseId]. */
-    private function verifiedRelease(int $first = 900_000_501): array
+    /** Stages and prepares a synthetic export through the API and the worker; returns [runId, releaseId]. */
+    private function preparedRelease(int $first = 900_000_501): array
     {
         $label = 'export-'.(++$this->exports);
         $this->placeSource($this->syntheticExport(SyntheticIdentityExport::generated(2, 4, $first)), $label);
@@ -93,6 +101,14 @@ class CivilImportPublicationPostgresTest extends TestCase
         $source = CivilImportSource::query()->where('label', $label)->firstOrFail();
         $runId = $this->executed($this->as($this->requester, 'POST', '/imports', ['source_id' => $source->id]))->run_id;
         $releaseId = $this->executed($this->as($this->requester, 'POST', "/imports/{$runId}/prepare"))->release_id;
+
+        return [$runId, $releaseId];
+    }
+
+    /** Stages, prepares and verifies a synthetic export; returns [runId, releaseId]. */
+    private function verifiedRelease(int $first = 900_000_501): array
+    {
+        [$runId, $releaseId] = $this->preparedRelease($first);
         $this->executed($this->as($this->requester, 'POST', "/releases/{$releaseId}/verify"));
 
         return [$runId, $releaseId];
@@ -115,12 +131,18 @@ class CivilImportPublicationPostgresTest extends TestCase
             ->assertStatus(201)->assertJsonPath('data.status', 'PENDING_APPROVAL')->json('data.id');
     }
 
-    /** The approver approves (202); returns the queued PUBLISH request id. */
-    private function approve(string $publication, int $releaseId, int $expected = 8): string
+    private function confirmAs(User $user, string $publication, int $releaseId, int $expected = 8, string $password = self::PASSWORD): TestResponse
     {
-        return $this->as($this->approver, 'POST', "/publication-requests/{$publication}/approve",
-            ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => $expected])
+        return $this->as($user, 'POST', "/publication-requests/{$publication}/confirm",
+            ['password' => $password, 'confirm_release_id' => $releaseId, 'confirm_expected_presence' => $expected]);
+    }
+
+    /** The requester confirms their own request (202); returns the queued PUBLISH request id. */
+    private function confirm(string $publication, int $releaseId, int $expected = 8): string
+    {
+        return $this->confirmAs($this->requester, $publication, $releaseId, $expected)
             ->assertStatus(202)->assertJsonPath('data.publication_request.status', 'APPROVED')
+            ->assertJsonPath('data.publication_request.decided_by.name', $this->requester->name)
             ->assertJsonPath('data.publish_request.type', 'PUBLISH')->assertJsonPath('data.publish_request.status', 'QUEUED')
             ->json('data.publish_request.id');
     }
@@ -130,7 +152,7 @@ class CivilImportPublicationPostgresTest extends TestCase
         return CivilImportPublicationRequest::query()->findOrFail($id);
     }
 
-    public function test_two_people_publish_atomically_and_only_after_every_check(): void
+    public function test_one_super_admin_publishes_atomically_and_only_after_every_check(): void
     {
         [$runId, $releaseId] = $this->verifiedRelease();
         $this->assertNull($this->activeReleaseId());
@@ -141,24 +163,26 @@ class CivilImportPublicationPostgresTest extends TestCase
         $this->as($this->requester, 'GET', '/overview')->assertJsonPath('data.pending_publication_requests', 1);
         $this->as($this->requester, 'POST', "/releases/{$releaseId}/publication-requests", ['justification_code' => 'ROUTINE_REFRESH'])
             ->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_ALREADY_OPEN');
-        $this->as($this->requester, 'POST', "/publication-requests/{$p1}/approve", ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8])
-            ->assertStatus(409)->assertJsonPath('code', 'SAME_USER_APPROVAL');
+        // Nobody else confirms it; a wrong password confirms nothing.
+        $this->confirmAs($this->otherAdmin, $p1, $releaseId)->assertStatus(403)->assertJsonPath('code', 'CONFIRMATION_BY_REQUESTER_ONLY');
+        $this->confirmAs($this->requester, $p1, $releaseId, password: 'wrong')->assertStatus(422)->assertJsonPath('code', 'REAUTH_FAILED');
+        $this->assertSame([CivilImportPublicationRequest::PENDING, 0],
+            [$this->publication($p1)->status, CivilImportRequest::query()->where('type', 'PUBLISH')->count()]);
 
         // 1. No real-data authorization reference in the worker: refused, nothing changes.
-        $publish = $this->approve($p1, $releaseId);
+        $publish = $this->confirm($p1, $releaseId);
         $this->as($this->requester, 'GET', "/imports/{$runId}")->assertJsonPath('data.phase', 'APPROVED');
         $this->workOnce();
         $this->assertSame([CivilImportRequest::FAILED, 'AUTHORIZATION_MISSING'], [CivilImportRequest::query()->find($publish)->status, CivilImportRequest::query()->find($publish)->reason_code]);
         $this->assertSame(['FAILED', 'AUTHORIZATION_MISSING'], [$this->publication($p1)->status, $this->publication($p1)->outcome_code]);
         $this->assertNull($this->activeReleaseId());
-        // A closed request is never reused: approving it again is refused.
-        $this->as($this->approver, 'POST', "/publication-requests/{$p1}/approve", ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8])
-            ->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_NOT_PENDING');
+        // A closed request is never reused: confirming it again is refused.
+        $this->confirmAs($this->requester, $p1, $releaseId)->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_NOT_PENDING');
 
         // 2. A malformed reference is no reference.
         putenv(IdentityRefProductionGate::VARIABLE.'=bad value!');
         $p2 = $this->requestPublication($releaseId);
-        $this->approve($p2, $releaseId);
+        $this->confirm($p2, $releaseId);
         $this->workOnce();
         $this->assertSame('AUTHORIZATION_MISSING', $this->publication($p2)->outcome_code);
         $this->assertNull($this->activeReleaseId());
@@ -166,7 +190,7 @@ class CivilImportPublicationPostgresTest extends TestCase
         // 3. The gate closed in the worker's process at execution time.
         putenv(IdentityRefProductionGate::VARIABLE.'='.self::REFERENCE);
         $p3 = $this->requestPublication($releaseId);
-        $this->approve($p3, $releaseId);
+        $this->confirm($p3, $releaseId);
         config(['civil_import.publish_enabled' => false]);
         $this->workOnce();
         config(['civil_import.publish_enabled' => true]);
@@ -175,7 +199,7 @@ class CivilImportPublicationPostgresTest extends TestCase
 
         // 4. Every condition holds: the release becomes active, atomically, once.
         $p4 = $this->requestPublication($releaseId);
-        $publish = $this->approve($p4, $releaseId);
+        $publish = $this->confirm($p4, $releaseId);
         $this->workOnce();
         $done = CivilImportRequest::query()->find($publish);
         $this->assertSame([CivilImportRequest::SUCCEEDED, null], [$done->status, $done->reason_code]);
@@ -185,69 +209,133 @@ class CivilImportPublicationPostgresTest extends TestCase
         $this->as($this->requester, 'GET', "/imports/{$runId}")->assertJsonPath('data.phase', 'PUBLISHED')->assertJsonPath('data.allowed_actions', []);
         $this->assertSame(3, CivilImportAuditEvent::query()->where('event_type', 'PUBLICATION_REFUSED')->count());
         $this->assertSame(1, CivilImportAuditEvent::query()->where('event_type', 'RELEASE_PUBLISHED')->where('release_id', $releaseId)->count());
+        $this->assertSame(4, CivilImportAuditEvent::query()->where('event_type', 'PUBLICATION_CONFIRMED')->where('actor_user_id', $this->requester->id)->count());
+        $this->assertSame(1, CivilImportAuditEvent::query()->where('event_type', 'PUBLICATION_REAUTH_FAILED')->count());
 
         // No second publication can be queued for an executed request.
         $this->assertSame('23514', $this->sqlStateOf(fn () => DB::table('civil_import_requests')->insert(['id' => (string) Str::uuid(),
-            'type' => 'PUBLISH', 'requested_by' => $this->approver->id, 'release_id' => $releaseId, 'publication_request_id' => $p4])));
+            'type' => 'PUBLISH', 'requested_by' => $this->requester->id, 'release_id' => $releaseId, 'publication_request_id' => $p4])));
 
-        // Redaction: nothing but codes, counts, ids and names.
+        // Redaction: nothing but codes, counts, ids and names — and never the password.
         $json = $this->as($this->requester, 'GET', '/publication-requests')->assertOk()->getContent()
             .CivilImportAuditEvent::query()->get()->toJson().CivilImportPublicationRequest::query()->get()->toJson();
-        foreach (['900000501', 'اسم-تجريبي', 't03maindata_part', $this->sourceRoot, self::REFERENCE, $this->requester->email] as $needle) {
+        foreach (['900000501', 'اسم-تجريبي', 't03maindata_part', $this->sourceRoot, self::REFERENCE, $this->requester->email, '"wrong"'] as $needle) {
             $this->assertStringNotContainsString($needle, $json);
         }
     }
 
-    public function test_a_baseline_change_invalidates_pending_and_approved_requests(): void
+    public function test_a_baseline_change_invalidates_pending_and_confirmed_requests(): void
     {
-        // Pending: an operator activates the release from the shell; the request expires, it cannot be approved.
+        // Pending: an operator activates the release from the shell; the request expires, it cannot be confirmed.
         putenv(IdentityRefProductionGate::VARIABLE.'='.self::REFERENCE);
         [, $first] = $this->verifiedRelease();
         $pending = $this->requestPublication($first);
         $this->releases()->publish($this->writerConnection(), $first, 'famboook_test');
-        $this->as($this->approver, 'GET', "/publication-requests/{$pending}")->assertJsonPath('data.status', 'EXPIRED')
+        $this->as($this->requester, 'GET', "/publication-requests/{$pending}")->assertJsonPath('data.status', 'EXPIRED')
             ->assertJsonPath('data.outcome_code', 'BASE_CHANGED');
-        $this->as($this->approver, 'POST', "/publication-requests/{$pending}/approve", ['confirm_release_id' => $first, 'confirm_expected_presence' => 8])
-            ->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_EXPIRED');
+        $this->confirmAs($this->requester, $pending, $first)->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_EXPIRED');
 
-        // Approved: the baseline changes before the worker runs; the worker refuses, nothing is replaced.
+        // Confirmed: the baseline changes before the worker runs; the worker refuses, nothing is replaced.
         [, $second] = $this->verifiedRelease(900_000_601);
-        $approved = $this->requestPublication($second);
-        $this->assertSame($first, $this->publication($approved)->base_release_id);
-        $expected = (int) $this->publication($approved)->snapshot['expected_presence'];
-        $this->approve($approved, $second, $expected);
+        $confirmed = $this->requestPublication($second);
+        $this->assertSame($first, $this->publication($confirmed)->base_release_id);
+        $expected = (int) $this->publication($confirmed)->snapshot['expected_presence'];
+        $this->confirm($confirmed, $second, $expected);
         // An operator publishes the candidate first: the active release is no longer the request's baseline.
         $this->releases()->publish($this->writerConnection(), $second, 'famboook_test');
         $this->workOnce();
-        $this->assertSame(['FAILED', 'BASE_CHANGED'], [$this->publication($approved)->status, $this->publication($approved)->outcome_code]);
+        $this->assertSame(['FAILED', 'BASE_CHANGED'], [$this->publication($confirmed)->status, $this->publication($confirmed)->outcome_code]);
         $this->assertSame($second, $this->activeReleaseId());
     }
 
-    public function test_concurrent_approvals_queue_one_publication(): void
+    public function test_an_unverified_release_cannot_be_requested_or_confirmed(): void
+    {
+        // Prepared but not verified: no publication request.
+        [, $releaseId] = $this->preparedRelease();
+        $this->as($this->requester, 'POST', "/releases/{$releaseId}/publication-requests", ['justification_code' => 'ROUTINE_REFRESH'])
+            ->assertStatus(409)->assertJsonPath('code', 'PHASE_NOT_ALLOWED');
+        $this->assertSame(0, CivilImportPublicationRequest::query()->count());
+
+        // Verified, requested, then no longer a VERIFIED candidate when confirming: the request expires instead.
+        $this->executed($this->as($this->requester, 'POST', "/releases/{$releaseId}/verify"));
+        $p = $this->requestPublication($releaseId);
+        $this->releases()->publish($this->writerConnection(), $releaseId, 'famboook_test');   // no longer BUILDING (and the baseline changed)
+        $this->confirmAs($this->requester, $p, $releaseId)->assertStatus(409);
+        $this->assertSame('EXPIRED', $this->publication($p)->status);
+        $this->assertSame(0, CivilImportRequest::query()->where('type', 'PUBLISH')->count());
+    }
+
+    public function test_repeated_and_concurrent_confirmations_queue_one_publication(): void
     {
         [, $releaseId] = $this->verifiedRelease();
         $p = $this->requestPublication($releaseId);
-        $third = User::factory()->create();
-        $third->assignRole('SUPER_ADMIN');
 
-        // Two sessions race for the same pending row: the second waits for the first, then finds nothing to approve.
+        // Two sessions race for the same pending row (two tabs of the same operator): the
+        // second waits for the first and cannot confirm it as well.
         $a = $this->connection();
         $b = $this->connection();
-        $approve = "UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = %d, decided_at = now()
+        $confirm = "UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = {$this->requester->id}, decided_at = now()
             WHERE id = '{$p}' AND status = 'PENDING_APPROVAL'";
         $a->beginTransaction();
-        $this->assertSame(1, $a->exec(sprintf($approve, $this->approver->id)));
+        $this->assertSame(1, $a->exec($confirm));
         $b->exec("SET lock_timeout = '500ms'");
-        $this->assertSame('55P03', $this->sqlStateOf(fn () => $b->exec(sprintf($approve, $third->id))));
-        $a->rollBack();
+        $this->assertSame('55P03', $this->sqlStateOf(fn () => $b->exec($confirm)));
+        // Once the first one commits, the second finds nothing pending; so does the API.
+        $a->commit();
+        $this->assertSame(0, $b->exec($confirm));
+        $this->confirmAs($this->requester, $p, $releaseId)->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_NOT_PENDING');
+        $this->assertSame(0, CivilImportRequest::query()->where('publication_request_id', $p)->count());
+        DB::statement("UPDATE civil_import_publication_requests SET status = 'FAILED', outcome_code = 'TEST_CLOSED', finished_at = now() WHERE id = ?", [$p]);
 
-        // Through the API: one approval wins, the other is refused; exactly one PUBLISH request exists.
-        $this->approve($p, $releaseId);
-        $this->as($third, 'POST', "/publication-requests/{$p}/approve", ['confirm_release_id' => $releaseId, 'confirm_expected_presence' => 8])
-            ->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_NOT_PENDING');
+        // Through the API: the first confirmation wins, a repeated one is refused; exactly one PUBLISH request exists.
+        $p = $this->requestPublication($releaseId);
+        $this->confirm($p, $releaseId);
+        $this->confirmAs($this->requester, $p, $releaseId)->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_NOT_PENDING');
         $this->assertSame(1, CivilImportRequest::query()->where('publication_request_id', $p)->count());
+        $this->assertSame(1, CivilImportAuditEvent::query()->where('event_type', 'PUBLICATION_CONFIRMED')->where('publication_request_id', $p)->count());
         $this->assertSame('23505', $this->sqlStateOf(fn () => DB::table('civil_import_requests')->insert(['id' => (string) Str::uuid(),
-            'type' => 'PUBLISH', 'requested_by' => $this->approver->id, 'release_id' => $releaseId, 'publication_request_id' => $p])));
+            'type' => 'PUBLISH', 'requested_by' => $this->requester->id, 'release_id' => $releaseId, 'publication_request_id' => $p])));
+    }
+
+    public function test_an_approval_recorded_under_the_two_person_rule_is_refused_by_the_worker(): void
+    {
+        putenv(IdentityRefProductionGate::VARIABLE.'='.self::REFERENCE);
+        [, $releaseId] = $this->verifiedRelease();
+        $p = $this->requestPublication($releaseId);
+        // The database no longer accepts an approval by another user …
+        $this->assertSame('23514', $this->sqlStateOf(fn () => DB::statement(
+            "UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?", [$this->otherAdmin->id, $p])));
+        // … so simulate history from the former rule with the guards off: APPROVED by ANOTHER user, PUBLISH queued by that user.
+        DB::statement('ALTER TABLE civil_import_publication_requests DISABLE TRIGGER trg_civil_import_publication_guard');
+        DB::statement('ALTER TABLE civil_import_requests DISABLE TRIGGER trg_civil_import_publish_request_guard');
+        try {
+            DB::statement("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?", [$this->otherAdmin->id, $p]);
+            $publish = (string) Str::uuid();
+            DB::table('civil_import_requests')->insert(['id' => $publish, 'type' => 'PUBLISH', 'requested_by' => $this->otherAdmin->id,
+                'run_id' => $this->publication($p)->run_id, 'release_id' => $releaseId, 'publication_request_id' => $p]);
+        } finally {
+            DB::statement('ALTER TABLE civil_import_publication_requests ENABLE TRIGGER trg_civil_import_publication_guard');
+            DB::statement('ALTER TABLE civil_import_requests ENABLE TRIGGER trg_civil_import_publish_request_guard');
+        }
+
+        // The worker refuses it (fail closed): only a confirmation by the requester publishes.
+        $this->workOnce();
+        $this->assertSame([CivilImportRequest::FAILED, 'NOT_APPROVED_FOR_PUBLICATION'],
+            [CivilImportRequest::query()->find($publish)->status, CivilImportRequest::query()->find($publish)->reason_code]);
+        $this->assertSame(['FAILED', 'NOT_APPROVED_FOR_PUBLICATION'], [$this->publication($p)->status, $this->publication($p)->outcome_code]);
+        $this->assertNull($this->activeReleaseId());
+    }
+
+    public function test_the_policy_migration_expires_pending_requests_on_postgresql(): void
+    {
+        [, $releaseId] = $this->verifiedRelease();
+        $p = $this->requestPublication($releaseId);
+        (require database_path('migrations/2026_10_27_090000_civil_import_single_operator_publication.php'))->up();
+        $this->assertSame(['EXPIRED', 'POLICY_CHANGED'], [$this->publication($p)->status, $this->publication($p)->outcome_code]);
+        $this->assertTrue(CivilImportAuditEvent::query()->where('event_type', 'PUBLICATION_EXPIRED')->where('outcome_code', 'POLICY_CHANGED')->exists());
+        $this->confirmAs($this->requester, $p, $releaseId)->assertStatus(409)->assertJsonPath('code', 'PUBLICATION_EXPIRED');
+        $this->assertSame(0, CivilImportRequest::query()->where('type', 'PUBLISH')->count());
+        $this->assertNull($this->activeReleaseId());
     }
 
     public function test_a_failed_activation_rolls_back_and_a_lost_worker_is_reconciled(): void
@@ -257,7 +345,7 @@ class CivilImportPublicationPostgresTest extends TestCase
 
         // The activation fails inside its transaction: rolled back, the previous state stays.
         $p1 = $this->requestPublication($releaseId);
-        $this->approve($p1, $releaseId);
+        $this->confirm($p1, $releaseId);
         $this->workOnce($this->worker()->withTestHook(function (string $event) {
             if ($event === 'publish.before_commit') {
                 throw new RuntimeException('simulated failure before commit');
@@ -270,7 +358,7 @@ class CivilImportPublicationPostgresTest extends TestCase
 
         // The worker dies before activating: the request is lost, the publication fails, nothing is active.
         $p2 = $this->requestPublication($releaseId);
-        $lost = $this->approve($p2, $releaseId);
+        $lost = $this->confirm($p2, $releaseId);
         $this->claimAndDie();
         $this->workOnce($this->worker(instance: 'worker-new'));
         $this->assertSame([CivilImportRequest::FAILED, 'WORKER_LOST'], [CivilImportRequest::query()->find($lost)->status, CivilImportRequest::query()->find($lost)->reason_code]);
@@ -279,7 +367,7 @@ class CivilImportPublicationPostgresTest extends TestCase
 
         // The worker dies after activating: reconciled from the engine state, never published twice.
         $p3 = $this->requestPublication($releaseId);
-        $this->approve($p3, $releaseId);
+        $this->confirm($p3, $releaseId);
         $this->claimAndDie(fn () => $this->releases()->publish($this->writerConnection(), $releaseId, 'famboook_test'));
         $this->workOnce($this->worker(instance: 'worker-newer'));
         $this->assertSame(['EXECUTED', 'RECONCILED_PUBLISHED'], [$this->publication($p3)->status, $this->publication($p3)->outcome_code]);
@@ -304,26 +392,30 @@ class CivilImportPublicationPostgresTest extends TestCase
         $this->assertSame('42501', $state("INSERT INTO civil_import_publication_requests (id, release_id, run_id, requested_by, justification_code, snapshot, expires_at)
             VALUES ('".Str::uuid()."', 1, '".Str::uuid()."', 1, 'ROUTINE_REFRESH', '{}', now() + interval '1 hour')"));
 
-        // The database: two people, approved-only PUBLISH, queued by its approver, within the window.
+        // The database: only the requester confirms; confirmed-only PUBLISH, queued by that user; no REJECTED; within the window.
         $sql = fn (string $q, array $b = []) => $this->sqlStateOf(fn () => DB::statement($q, $b));
-        $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = requested_by, decided_at = now() WHERE id = ?", [$p]));
+        $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?",
+            [$this->otherAdmin->id, $p]));   // somebody else
+        $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'REJECTED', decided_by = ?, decided_at = now(), finished_at = now() WHERE id = ?",
+            [$this->otherAdmin->id, $p]));   // rejection is gone
         $this->assertSame('23514', $sql("INSERT INTO civil_import_requests (id, type, requested_by, release_id, publication_request_id) VALUES (?, 'PUBLISH', ?, ?, ?)",
-            [(string) Str::uuid(), $this->approver->id, $releaseId, $p]));   // not approved
-        DB::statement("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?", [$this->approver->id, $p]);
+            [(string) Str::uuid(), $this->requester->id, $releaseId, $p]));   // not confirmed
+        DB::statement("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = requested_by, decided_at = now() WHERE id = ?", [$p]);
         $this->assertSame('23514', $sql("INSERT INTO civil_import_requests (id, type, requested_by, release_id, publication_request_id) VALUES (?, 'PUBLISH', ?, ?, ?)",
-            [(string) Str::uuid(), $this->requester->id, $releaseId, $p]));   // not queued by the approver
+            [(string) Str::uuid(), $this->otherAdmin->id, $releaseId, $p]));   // not queued by the confirming user
         $this->assertSame('23001', $sql('UPDATE civil_import_publication_requests SET release_id = 999 WHERE id = ?', [$p]));
+        $this->assertSame('23001', $sql('UPDATE civil_import_publication_requests SET decided_by = ? WHERE id = ?', [$this->otherAdmin->id, $p]));
         $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'PENDING_APPROVAL' WHERE id = ?", [$p]));
         $this->assertSame('23001', $sql('DELETE FROM civil_import_publication_requests WHERE id = ?', [$p]));
 
-        // The approval window is enforced by the database clock too.
+        // The confirmation window is enforced by the database clock too.
         DB::statement("UPDATE civil_import_publication_requests SET status = 'FAILED', outcome_code = 'TEST_CLOSED', finished_at = now() WHERE id = ?", [$p]);
         $short = (string) Str::uuid();
         DB::statement("INSERT INTO civil_import_publication_requests (id, release_id, run_id, requested_by, justification_code, snapshot, expires_at)
             VALUES (?, ?, ?, ?, 'ROUTINE_REFRESH', '{}', (clock_timestamp() AT TIME ZONE 'UTC') + interval '1 second')", [$short, $releaseId, (string) Str::uuid(), $this->requester->id]);
         DB::statement('SELECT pg_sleep(2.1)');   // timestamp(0): expires_at is rounded to the second
         $this->assertSame('23514', $sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?",
-            [$this->approver->id, $short]));
+            [$this->requester->id, $short]));
 
         // U4 regression: the window is UTC whatever the session time zone (the application writes UTC).
         DB::statement("UPDATE civil_import_publication_requests SET status = 'EXPIRED', outcome_code = 'TIMEOUT', finished_at = now() WHERE id = ?", [$short]);
@@ -334,7 +426,7 @@ class CivilImportPublicationPostgresTest extends TestCase
                 'requested_by' => $this->requester->id, 'justification_code' => 'ROUTINE_REFRESH', 'snapshot' => '{}',
                 'requested_at' => now()->subMinutes(30), 'expires_at' => now()->addMinutes(30)]);   // as the application writes them (UTC)
             $this->assertNull($sql("UPDATE civil_import_publication_requests SET status = 'APPROVED', decided_by = ?, decided_at = now() WHERE id = ?",
-                [$this->approver->id, $open]), "approvable inside its window in a {$zone} session");
+                [$this->requester->id, $open]), "confirmable inside its window in a {$zone} session");
             DB::statement("UPDATE civil_import_publication_requests SET status = 'FAILED', outcome_code = 'TEST_CLOSED', finished_at = now() WHERE id = ?", [$open]);
         }
         DB::statement('SET TIME ZONE DEFAULT');

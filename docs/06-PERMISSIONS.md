@@ -2961,7 +2961,7 @@ privilege.
 | `civil-import.stage` | U2: list catalogued sources (their safe labels, O-2); queue source validation, staging (and its resume) and abort; cancel any active request | SUPER_ADMIN only |
 | `civil-import.validate` | U2: queue assessment, preparation and verification | SUPER_ADMIN only |
 | `civil-import.publish.request` | U3: open a publication request for a VERIFIED release; withdraw one's own pending request | SUPER_ADMIN only |
-| `civil-import.publish.approve` | U3: approve or reject ANOTHER user's pending request (an approval queues the worker's PUBLISH request) | SUPER_ADMIN, **only while** `civil_import.publish_enabled = true` (closed by default; never held otherwise) |
+| `civil-import.publish.confirm` | U3 / D-UI-12a: confirm ONE'S OWN pending request after re-entering the password (queues the worker's PUBLISH request). Replaces `civil-import.publish.approve`, removed by migration | SUPER_ADMIN, **only while** `civil_import.publish_enabled = true` (closed by default; never held otherwise) |
 
 ```text
 GET /api/v1/civil-registry/overview                          civil-import.view
@@ -2987,19 +2987,19 @@ GET    /api/v1/civil-registry/publication-requests           civil-import.view
 GET    /api/v1/civil-registry/publication-requests/{id}      civil-import.view
 POST   /api/v1/civil-registry/releases/{release}/publication-requests   civil-import.publish.request   (201)
 POST   /api/v1/civil-registry/publication-requests/{id}/withdraw        civil-import.publish.request   (requester only)
-POST   /api/v1/civil-registry/publication-requests/{id}/approve         civil-import.publish.approve   (another user; 202 queues PUBLISH)
-POST   /api/v1/civil-registry/publication-requests/{id}/reject          civil-import.publish.approve   (another user)
+POST   /api/v1/civil-registry/publication-requests/{id}/confirm         civil-import.publish.confirm   (requester only, active SUPER_ADMIN, password; 202 queues PUBLISH)
 ```
 
 All routes sit behind `auth:sanctum` and `staff.side`. U2 write routes only
 RECORD a request (202); the dedicated import worker executes it, with its
-own logins (S-1/S-2). No route publishes: an approval only queues the
-worker's PUBLISH request, which re-checks every condition (S-3).
+own logins (S-1/S-2). No route publishes: the requester's confirmation only
+queues the worker's PUBLISH request, which re-checks every condition (S-3).
 `famboook:verify-permissions` requires SUPER_ADMIN to hold the six ungated
 permissions, refuses them on every other role, requires
-`civil-import.publish.approve` on SUPER_ADMIN exactly while the publication
-gate is open (and on nobody otherwise), and refuses any direct grant of a
-publication permission.
+`civil-import.publish.confirm` on SUPER_ADMIN exactly while the publication
+gate is open (and on nobody otherwise), refuses any direct grant of a
+publication permission, and fails while the removed
+`civil-import.publish.approve` still exists.
 
 ---
 
@@ -4745,6 +4745,11 @@ Civil identity import management — read-only monitoring permissions (2026-10-2
   - **Two people (D-UI-12):** the requester can never approve or reject their own request. This is enforced by the action, a database CHECK, the PUBLISH trigger (queued by the approver of an APPROVED request only) and the worker.
   - **Direct grants** of either publication permission are refused by the verifier.
   - **O-3:** with SUPER_ADMIN-only defaults, publication needs two SUPER_ADMIN accounts. Verify before any Production use.
+- **Amended 2026-10-27 (FB-CIVIL-01A-UI D-UI-12a, local, uncommitted): single-operator publication, superseding the two-person rule above.**
+  - `civil-import.publish.approve` is **replaced** by `civil-import.publish.confirm` (still SUPER_ADMIN only, still only while the publication gate is open). Migration `2026_10_27_090000` removes the old permission and its role grants; a direct user grant stops it. Catalog stays 169.
+  - The **requester confirms their own request**; nobody else can, and nobody rejects any more. The action also requires an **active account and the SUPER_ADMIN role**, a **fresh password** (wrong: audited `PUBLICATION_REAUTH_FAILED`; locked after 5 attempts for 15 minutes) and the typed release id and verified record count.
+  - Enforced by the action, the model, the database guards (confirmation by the requester only; PUBLISH queued by that user only) and the worker (refuses any APPROVED request not confirmed by its requester).
+  - Pending two-person requests expire (`POLICY_CHANGED`); none is confirmed or published automatically. **O-3 is closed:** no second SUPER_ADMIN account is needed.
 
 ### AUTH-ADR-097
 Unified in-app notifications — authorization (2026-10-18, FB-NOTIFY-01A; ADR FB-NOTIFY-01 (`docs/adr/FB-NOTIFY-01-UNIFIED-NOTIFICATIONS.md`)). *Status 2026-10-19: announcement authorization IMPLEMENTED LOCALLY (FB-NOTIFY-01B.2b.4 – 2b.6d, commits `da77d93` … `022acc8`), not deployed; follow-up authorization not implemented.*
@@ -5295,6 +5300,7 @@ Date: 2026-09-24
 | 1.2.76 | 2026-10-19 | Approved | FB-NOTIFY-01E.3-F1 (AUTH-ADR-097 amended): the four follow-up permissions seeded locally (SUPER_ADMIN, ADMINISTRATOR: `notification-followup.*`; COORDINATOR: `coordinator-notification-followup.*`); view in the current scope, primary-coordinator-only management, never for the own household, CENTRAL fallback; §22a rows, §22b table, §140 note. Catalog 158 → 162; no role added; no other mapping change |
 | 1.2.77 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U1 (AUTH-ADR-098): §61c — `civil-import.view`, `civil-import.locations.view` and `civil-import.audit.view` seeded locally to SUPER_ADMIN only; nine read-only `/civil-registry` routes; verifier extended. Catalog 162 → 165; no role added; no other mapping change |
 | 1.2.78 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U2 (AUTH-ADR-098 amended): `civil-import.stage` and `civil-import.validate` seeded locally to SUPER_ADMIN only; execution-request routes (202, recorded only) and the cancel rule; verifier extended. Catalog 165 → 167; no role added; no other mapping change |
+| 1.2.80 | 2026-10-27 | Approved | FB-CIVIL-01A-UI D-UI-12a (AUTH-ADR-098 amended): single-operator publication. `civil-import.publish.approve` replaced by the gated `civil-import.publish.confirm` (SUPER_ADMIN only, gate open only); `/confirm` (requester only, active SUPER_ADMIN, fresh password) replaces `/approve` and `/reject`; verifier flags the removed permission. Catalog stays 169; no role added |
 | 1.2.79 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U3 (AUTH-ADR-098 amended): `civil-import.publish.request` (SUPER_ADMIN) and the gated `civil-import.publish.approve` (SUPER_ADMIN only while the publication gate is open); two-person publication routes; verifier: gate and direct-grant checks. Catalog 167 → 169; no role added |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |

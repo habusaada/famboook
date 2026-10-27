@@ -257,15 +257,15 @@ class RolePermissionSeeder extends Seeder
         // §61c Civil identity import management (FB-CIVIL-01A-UI U1–U3,
         // AUTH-ADR-098): metadata-only monitoring; no identity value is ever
         // exposed. U2: queue staging (and abort) and validation requests,
-        // executed by the dedicated worker. U3: request publication, and
-        // approve another user's request (gated, PUBLICATION_GATED_ROLE_PERMISSIONS).
+        // executed by the dedicated worker. U3 / D-UI-12a: request publication,
+        // and confirm one's own request (gated, PUBLICATION_GATED_ROLE_PERMISSIONS).
         'civil-import.view',
         'civil-import.locations.view',
         'civil-import.audit.view',
         'civil-import.stage',
         'civil-import.validate',
         'civil-import.publish.request',
-        'civil-import.publish.approve',
+        'civil-import.publish.confirm',
 
         // §62 System Administration Permissions
         'system.settings.view',
@@ -503,7 +503,7 @@ class RolePermissionSeeder extends Seeder
             'civil-import.audit.view',
             'civil-import.stage',
             'civil-import.validate',
-            // U3: requesting publication; approving is gated (PUBLICATION_GATED_ROLE_PERMISSIONS).
+            // U3: requesting publication; confirming is gated (PUBLICATION_GATED_ROLE_PERMISSIONS).
             'civil-import.publish.request',
             // System Settings ✓ (system configuration/maintenance)
             'system.settings.view',
@@ -831,14 +831,14 @@ class RolePermissionSeeder extends Seeder
     ];
 
     /**
-     * FB-CIVIL-01A-UI U3 (D-UI-7, D-UI-12, S-4): approving another user's
+     * FB-CIVIL-01A-UI U3 (D-UI-7, D-UI-12a, S-4): confirming one's own
      * civil identity publication request exists only while
      * config('civil_import.publish_enabled') is true — closed by default, so
-     * nobody can approve a publication in any default configuration. Its own
+     * nobody can confirm a publication in any default configuration. Its own
      * gate, independent of the Apply gate. SUPER_ADMIN only.
      */
     public const PUBLICATION_GATED_ROLE_PERMISSIONS = [
-        'SUPER_ADMIN' => ['civil-import.publish.approve'],
+        'SUPER_ADMIN' => ['civil-import.publish.confirm'],
     ];
 
     /**

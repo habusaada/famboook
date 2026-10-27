@@ -3,15 +3,17 @@
 namespace App\Http\Resources;
 
 use App\Models\CivilImportPublicationRequest;
+use App\Support\StaffRoles;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 
 /**
- * One publication request (FB-CIVIL-01A-UI U3). Every key is listed: ids,
- * statuses, codes, counts, names of the two users and times — never an
- * identity value, a path or free text. The can_* flags are UX hints for the
- * current user; the actions re-check everything.
+ * One publication request (FB-CIVIL-01A-UI U3, D-UI-12a). Every key is
+ * listed: ids, statuses, codes, counts, the names of the requester and of the
+ * user who confirmed, and times — never an identity value, a path or free
+ * text. The can_* flags are UX hints for the current user; the actions
+ * re-check everything.
  *
  * @property CivilImportPublicationRequest $resource
  */
@@ -22,6 +24,7 @@ class CivilImportPublicationRequestResource extends JsonResource
         $p = $this->resource;
         $user = $request->user();
         $pending = $p->status === CivilImportPublicationRequest::PENDING && ! $p->isExpiredAt(Carbon::now());
+        // D-UI-12a: only the requester confirms, as an active SUPER_ADMIN, while the gate is open.
         $own = $user !== null && (int) $p->requested_by === (int) $user->id;
         $publish = $p->relationLoaded('publishRequest') ? $p->publishRequest : $p->publishRequest()->first();
 
@@ -48,8 +51,8 @@ class CivilImportPublicationRequestResource extends JsonResource
                 'message' => $publish->message,
             ],
             'is_own' => $own,
-            'can_approve' => $pending && ! $own && $user?->can('civil-import.publish.approve') && config('civil_import.publish_enabled') === true,
-            'can_reject' => $pending && ! $own && (bool) $user?->can('civil-import.publish.approve'),
+            'can_confirm' => $pending && $own && (bool) $user?->is_active && (bool) $user?->hasRole(StaffRoles::SUPER_ADMIN)
+                && (bool) $user?->can('civil-import.publish.confirm') && config('civil_import.publish_enabled') === true,
             'can_withdraw' => $pending && $own && (bool) $user?->can('civil-import.publish.request'),
         ];
     }

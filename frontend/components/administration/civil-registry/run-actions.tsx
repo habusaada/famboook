@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,13 +40,15 @@ const COMMAND_ERRORS: Record<string, string> = {
   MONITOR_NOT_CONFIGURED: "لم تُضبط متابعة استيراد السجل المدني على هذا الخادم بعد.",
   MONITOR_UNAVAILABLE: "متابعة استيراد السجل المدني غير متاحة مؤقتًا.",
   PUBLICATION_ALREADY_OPEN: "يوجد طلب نشر آخر مفتوح.",
-  PUBLICATION_NOT_PENDING: "طلب النشر لم يعد بانتظار القرار. حدّث الصفحة.",
-  SAME_USER_APPROVAL: "لا يمكن لمقدّم طلب النشر أن يقرر فيه؛ يلزم مستخدم آخر.",
-  PUBLICATION_GATE_CLOSED: "بوابة النشر مغلقة؛ لا يمكن اعتماد أي نشر.",
+  PUBLICATION_NOT_PENDING: "طلب النشر لم يعد بانتظار التأكيد. حدّث الصفحة.",
+  CONFIRMATION_BY_REQUESTER_ONLY: "يؤكد طلبَ النشر مقدّمُه فقط.",
+  REAUTH_FAILED: "كلمة المرور غير صحيحة؛ لم يُؤكَّد النشر.",
+  REAUTH_LOCKED: "محاولات كثيرة بكلمة مرور غير صحيحة؛ أعد المحاولة بعد 15 دقيقة.",
+  PUBLICATION_GATE_CLOSED: "بوابة النشر مغلقة؛ لا يمكن تأكيد أي نشر.",
   PUBLICATION_EXPIRED: "انتهت صلاحية طلب النشر؛ يلزم طلب جديد.",
   BASE_CHANGED: "تغيّر الإصدار النشط منذ تقديم الطلب؛ يلزم طلب جديد.",
   RELEASE_CHANGED: "لم يعد الإصدار متحققًا منه؛ يلزم طلب جديد.",
-  CONFIRMATION_MISMATCH: "رقم الإصدار أو الحضور المتوقع المُدخل لا يطابق الطلب.",
+  CONFIRMATION_MISMATCH: "رقم الإصدار أو عدد السجلات المتحقَّق منها المُدخل لا يطابق الطلب.",
 };
 
 export function CommandError({ error }: { error: unknown }) {
@@ -80,6 +83,7 @@ function commandFor(action: CivilImportAction, run: CivilImportRunDetail, reason
 
 /** U3: open a publication request for the run's VERIFIED release, with a justification code. */
 function RequestPublication({ run, onClose }: { run: CivilImportRunDetail; onClose: () => void }) {
+  const router = useRouter();
   const request = useRequestCivilImportPublication();
   const [justification, setJustification] = useState<CivilImportJustification | null>(null);
 
@@ -113,7 +117,12 @@ function RequestPublication({ run, onClose }: { run: CivilImportRunDetail; onClo
           <Button
             disabled={justification === null || run.release === null || request.isPending}
             onClick={() =>
-              justification && run.release && request.mutate({ releaseId: run.release.id, justification }, { onSuccess: onClose })
+              justification &&
+              run.release &&
+              request.mutate(
+                { releaseId: run.release.id, justification },
+                { onSuccess: (created) => router.push(`/administration/civil-registry/approvals/${created.id}`) },
+              )
             }
           >
             {request.isPending && <Loader2 className="size-4 animate-spin" />}

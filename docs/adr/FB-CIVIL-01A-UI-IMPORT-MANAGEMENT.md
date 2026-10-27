@@ -82,14 +82,14 @@ Request types: `STAGE`, `ABORT`, `ASSESS`, `PREPARE`, `VERIFY`, `PUBLISH`. `PUBL
 | From | To | By | Condition |
 |---|---|---|---|
 | — | PENDING_APPROVAL | user A, `civil-import.publish.request` | Release VERIFIED; run RUNNING; no other open publication request |
-| PENDING_APPROVAL | APPROVED | user **B ≠ A**, `civil-import.publish.approve` | Gate open; release still VERIFIED and its base still active; within 24 h. Inserts the QUEUED `PUBLISH` request in the same transaction. |
-| PENDING_APPROVAL | REJECTED | user B ≠ A, `civil-import.publish.approve` | A reason code |
+| PENDING_APPROVAL | APPROVED (confirmed) | **the requester A**, an active SUPER_ADMIN with `civil-import.publish.confirm`, password re-entered, release id and verified record count typed back (D-UI-12a) | Gate open; release still VERIFIED and its base still active; within 24 h. Inserts the QUEUED `PUBLISH` request in the same transaction. |
+| PENDING_APPROVAL | ~~REJECTED~~ | — | Removed by D-UI-12a; rows recorded under D-UI-12 stay as history |
 | PENDING_APPROVAL | WITHDRAWN | user A | — |
 | PENDING_APPROVAL | EXPIRED | system (on read, or the worker's sweep) | 24 h passed (D-UI-11), or the base is no longer active |
 | APPROVED | EXECUTED / FAILED | worker (`PUBLISH`) | `publish_release()` result. A failure is rolled back, the previous release stays active, and a new request is needed. |
 
 **Publication preconditions (S-3).** The worker publishes only if **all** of these hold at execution time:
-1. an APPROVED publication request whose approver ≠ requester;
+1. an APPROVED publication request **confirmed by its own requester** (D-UI-12a; an approval recorded under the former two-person rule is refused);
 2. the gate `civil_import.publish_enabled = true` in the **worker's** configuration;
 3. the release is still VERIFIED and its base is still active;
 4. the real-data authorization reference `IDENTITY_REF_PRODUCTION_APPROVAL` is present in the worker's protected environment file. It is issued only after G1 (lawful basis) and G3; it is the shared Production gate (X-7).
@@ -194,12 +194,12 @@ GRANT SELECT ON ALL TABLES IN SCHEMA identity_ref_monitor TO famboook_identity_m
 | `civil-import.stage` | Queue STAGE and ABORT; cancel queued requests; see source labels (O-2) | ✔ | — | U2 |
 | `civil-import.validate` | Queue ASSESS, PREPARE and VERIFY | ✔ | — | U2 |
 | `civil-import.publish.request` | Create and withdraw a publication request | ✔ | — | U3 |
-| `civil-import.publish.approve` | Approve or reject **another user's** request | **Only while** `civil_import.publish_enabled = true` (default **false**): seeded to SUPER_ADMIN by `RolePermissionSeeder` (the `import.apply_enabled` pattern) | — | U3 |
+| `civil-import.publish.confirm` (replaces `publish.approve`, D-UI-12a) | Confirm **one's own** request (password re-entered) | **Only while** `civil_import.publish_enabled = true` (default **false**): seeded to SUPER_ADMIN by `RolePermissionSeeder` (the `import.apply_enabled` pattern) | — | U3 |
 
 **Rules:**
-- Grants change only through the seeder; `famboook:verify-permissions` fails if `publish.approve` is held while the gate is closed.
+- Grants change only through the seeder; `famboook:verify-permissions` fails if `publish.confirm` is held while the gate is closed, and if the removed `publish.approve` still exists.
 - Every route is guarded by `can:` middleware and a Policy; frontend checks are UX only.
-- The two-person rule needs at least two eligible users (O-3).
+- One active SUPER_ADMIN suffices (D-UI-12a); O-3 is closed.
 
 ## 8. Audit events
 
@@ -209,7 +209,9 @@ GRANT SELECT ON ALL TABLES IN SCHEMA identity_ref_monitor TO famboook_identity_m
 | `REQUEST_QUEUED` / `_CANCELLED` | STAFF | request id, type, target |
 | `REQUEST_STARTED` / `_SUCCEEDED` / `_FAILED` | SYSTEM | request id, outcome code, duration, counts |
 | `PUBLICATION_REQUESTED` / `_WITHDRAWN` | STAFF | publication request id, release id, counts snapshot |
-| `PUBLICATION_APPROVED` / `_REJECTED` | STAFF (≠ requester) | publication request id, reason code |
+| `PUBLICATION_APPROVED` / `_REJECTED` | STAFF (≠ requester) | History of the former two-person rule (D-UI-12); no longer written |
+| `PUBLICATION_CONFIRMED` | STAFF (the requester, D-UI-12a) | publication request id, release id, expected presence |
+| `PUBLICATION_REAUTH_FAILED` | STAFF | publication request id, `REAUTH_FAILED` (never the password) |
 | `PUBLICATION_EXPIRED` | SYSTEM | cause `TIMEOUT` / `BASE_CHANGED` |
 | `PUBLICATION_REFUSED` | SYSTEM | the S-3 precondition that failed (gate closed, no authorization reference, base changed, not VERIFIED) |
 | `RELEASE_PUBLISHED` | SYSTEM | release id, run id, activation seconds |

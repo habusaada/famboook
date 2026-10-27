@@ -16,8 +16,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Opens a publication request for a VERIFIED identity release
  * (FB-CIVIL-01A-UI U3, ADR §3.3; civil-import.publish.request). It publishes
- * NOTHING: another user must approve it within 24 hours (D-UI-11/12), and the
- * dedicated worker re-checks every condition before publishing.
+ * NOTHING: the requester confirms it within 24 hours, re-entering their
+ * password (D-UI-11/12a), and the dedicated worker re-checks every condition
+ * before publishing.
  *
  * Recorded: the release, its run, the active release it was compared with
  * (the baseline), a justification code and a counts snapshot from the

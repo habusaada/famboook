@@ -10,11 +10,13 @@ import type { CurrentUser } from "@/lib/api/auth";
 import type { CivilImportOverview, CivilImportPublicationRequest, CivilImportRunDetail } from "@/lib/types/api/civil-registry";
 import { renderWithClient } from "./helpers";
 
-// FB-CIVIL-01A-UI U3 — two-person publication in the Staff application.
-// Nothing in the UI publishes: an approval queues the worker's request.
+// FB-CIVIL-01A-UI U3 / D-UI-12a — single-operator publication in the Staff
+// application: the requester confirms their own request with their password.
+// Nothing in the UI publishes: the confirmation queues the worker's request.
 // Synthetic data only: no identity value.
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/administration/civil-registry/approvals" }));
+const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/administration/civil-registry/approvals" }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>
@@ -26,7 +28,9 @@ vi.mock("next/link", () => ({
 const BASE = "/api/v1/civil-registry";
 const PUB_ID = "00000000-0000-4000-8000-0000000000a1";
 const RUN_ID = "00000000-0000-4000-8000-0000000000c1";
-const ALL = ["civil-import.view", "civil-import.audit.view", "civil-import.publish.request", "civil-import.publish.approve"];
+const ALL = ["civil-import.view", "civil-import.audit.view", "civil-import.publish.request", "civil-import.publish.confirm"];
+/** Synthetic test password; never a real credential. */
+const PASSWORD = "synthetic-test-password";
 
 function staff(permissions: string[]): CurrentUser {
   return { name: "مسؤول تجريبي", email: "admin@example.test", role: "SUPER_ADMIN", role_label: "مدير النظام", permissions };
@@ -53,10 +57,9 @@ function publication(overrides: Partial<CivilImportPublicationRequest> = {}): Ci
     decided_at: null,
     finished_at: null,
     publish_request: null,
-    is_own: false,
-    can_approve: true,
-    can_reject: true,
-    can_withdraw: false,
+    is_own: true,
+    can_confirm: true,
+    can_withdraw: true,
     ...overrides,
   };
 }
@@ -95,8 +98,20 @@ function renderAs(permissions: string[], ui: React.ReactElement) {
   return renderWithClient(<AuthContext.Provider value={authValue(staff(permissions))}>{ui}</AuthContext.Provider>);
 }
 
+/** Opens the confirmation dialog and fills it in; returns the dialog. */
+async function fillConfirmation({ release = "4", count = "1208", password = PASSWORD, acknowledge = true } = {}) {
+  await userEvent.click(await screen.findByRole("button", { name: "تأكيد النشر" }));
+  const dialog = await screen.findByRole("dialog");
+  if (release) await userEvent.type(within(dialog).getByLabelText("رقم الإصدار"), release);
+  if (count) await userEvent.type(within(dialog).getByLabelText("عدد السجلات المتحقَّق منها"), count);
+  if (password) await userEvent.type(within(dialog).getByLabelText("كلمة المرور"), password);
+  if (acknowledge) await userEvent.click(within(dialog).getByRole("checkbox"));
+  return dialog;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
+  router.push.mockReset();
 });
 
 describe("expiry", () => {
@@ -109,97 +124,129 @@ describe("expiry", () => {
   });
 });
 
-describe("approval queue", () => {
+describe("publication queue", () => {
   it("states that Production publication is disabled and lists requests with their status and expiry", async () => {
     mockGets({
       [`${BASE}/overview`]: { data: overview(false) },
-      [`${BASE}/publication-requests`]: page([publication(), publication({ id: "00000000-0000-4000-8000-0000000000a2", status: "EXECUTED", outcome_code: "PUBLISHED", decided_by: { name: "معتمد تجريبي" } })]),
+      [`${BASE}/publication-requests`]: page([publication(), publication({ id: "00000000-0000-4000-8000-0000000000a2", status: "EXECUTED", outcome_code: "PUBLISHED", decided_by: { name: "مقدّم تجريبي" } })]),
     });
     renderAs(ALL, <CivilImportApprovalsPage />);
+    expect(await screen.findByRole("heading", { name: "تأكيد النشر وسجله" })).toBeInTheDocument();
     const notice = await findEl("[data-publication-gate]");
     expect(within(notice).getByText("النشر على بيئة الإنتاج معطّل.")).toBeInTheDocument();
     await waitFor(() => expect(notice).toHaveAttribute("data-publication-gate", "closed"));
-    expect(within(notice).getByText(/لا يمكن اعتماد أي طلب نشر/)).toBeInTheDocument();
+    expect(within(notice).getByText(/لا يمكن تأكيد أي طلب نشر/)).toBeInTheDocument();
     const table = await findEl("[data-publications-table]");
-    expect(within(table).getByText("بانتظار الاعتماد")).toBeInTheDocument();
+    expect(within(table).getByText("بانتظار التأكيد")).toBeInTheDocument();
+    expect(within(table).getByText("أكّده")).toBeInTheDocument();
     expect(within(table).getByText("نُشر")).toBeInTheDocument();
     expect(within(table).getByText(/ينتهي خلال/)).toBeInTheDocument();
+    // No rejection filter any more (history rows still appear under "all").
+    expect(screen.queryByRole("button", { name: /مرفوض/ })).toBeNull();
   });
 
   it("is forbidden without civil-import.view", () => {
     const get = vi.spyOn(apiClient, "get");
-    renderAs(["civil-import.publish.approve"], <CivilImportApprovalsPage />);
+    renderAs(["civil-import.publish.confirm"], <CivilImportApprovalsPage />);
     expect(document.querySelector("[data-forbidden]")).not.toBeNull();
     expect(get).not.toHaveBeenCalled();
   });
 });
 
-describe("approval details", () => {
+describe("publication confirmation", () => {
   const routes = (p: CivilImportPublicationRequest, enabled = true) => ({
     [`${BASE}/overview`]: { data: overview(enabled) },
     [`${BASE}/publication-requests/${PUB_ID}`]: { data: p },
     [`${BASE}/audit`]: page([]),
   });
 
-  it("approves only with the typed release id, the expected presence and an acknowledgement", async () => {
+  it("shows the release id and verified record count, and confirms only with both typed back, the password and an acknowledgement", async () => {
     mockGets(routes(publication()));
     const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} } as never);
     renderAs(ALL, <PublicationDetail id={PUB_ID} />);
-    await userEvent.click(await screen.findByRole("button", { name: "اعتماد النشر" }));
+    expect(await screen.findByText("هذا طلبك: راجع الأعداد، ثم أكّده بإعادة إدخال كلمة المرور.")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "تأكيد النشر" }));
     const dialog = await screen.findByRole("dialog");
-    const confirm = within(dialog).getByRole("button", { name: "تأكيد" });
+    const summary = dialog.querySelector("[data-confirm-summary]") as HTMLElement;
+    expect(within(summary).getByText("رقم الإصدار")).toBeInTheDocument();
+    expect(within(summary).getByText("عدد السجلات المتحقَّق منها")).toBeInTheDocument();
+    expect(summary.querySelector("[data-confirm-release]")?.textContent).toBe((4).toLocaleString("ar"));
+    expect(summary.querySelector("[data-confirm-count]")?.textContent).toBe((1208).toLocaleString("ar"));
+    const confirm = within(dialog).getByRole("button", { name: "تأكيد النشر" });
     expect(confirm).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText("رقم الإصدار"), "4");
-    await userEvent.type(within(dialog).getByLabelText("الحضور المتوقع"), "1208");
-    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText("عدد السجلات المتحقَّق منها"), "1208");
     await userEvent.click(within(dialog).getByRole("checkbox"));
+    expect(confirm).toBeDisabled(); // no password yet
+    const password = within(dialog).getByLabelText("كلمة المرور");
+    expect(password).toHaveAttribute("type", "password");
+    expect(password).toHaveAttribute("autocomplete", "current-password");
+    await userEvent.type(password, PASSWORD);
     expect(confirm).toBeEnabled();
     await userEvent.click(confirm);
     await waitFor(() =>
-      expect(post).toHaveBeenCalledWith(`${BASE}/publication-requests/${PUB_ID}/approve`, { confirm_release_id: 4, confirm_expected_presence: 1208 }),
+      expect(post).toHaveBeenCalledWith(`${BASE}/publication-requests/${PUB_ID}/confirm`, {
+        password: PASSWORD,
+        confirm_release_id: 4,
+        confirm_expected_presence: 1208,
+      }),
     );
   });
 
-  it("shows a refusal by its code, never the server text", async () => {
+  it("shows a wrong password by its code, never the server text, and clears the password", async () => {
     mockGets(routes(publication()));
-    vi.spyOn(apiClient, "post").mockRejectedValue(new ApiError(409, { message: "server text", code: "SAME_USER_APPROVAL" }));
+    vi.spyOn(apiClient, "post").mockRejectedValue(new ApiError(422, { message: "server text", code: "REAUTH_FAILED" }));
     renderAs(ALL, <PublicationDetail id={PUB_ID} />);
-    await userEvent.click(await screen.findByRole("button", { name: "اعتماد النشر" }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.type(within(dialog).getByLabelText("رقم الإصدار"), "4");
-    await userEvent.type(within(dialog).getByLabelText("الحضور المتوقع"), "1208");
-    await userEvent.click(within(dialog).getByRole("checkbox"));
-    await userEvent.click(within(dialog).getByRole("button", { name: "تأكيد" }));
-    expect(await within(dialog).findByText("لا يمكن لمقدّم طلب النشر أن يقرر فيه؛ يلزم مستخدم آخر.")).toBeInTheDocument();
+    const dialog = await fillConfirmation();
+    await userEvent.click(within(dialog).getByRole("button", { name: "تأكيد النشر" }));
+    expect(await within(dialog).findByText("كلمة المرور غير صحيحة؛ لم يُؤكَّد النشر.")).toBeInTheDocument();
     expect(screen.queryByText("server text")).toBeNull();
+    expect(within(dialog).getByLabelText("كلمة المرور")).toHaveValue("");
+    expect(within(dialog).getByRole("button", { name: "تأكيد النشر" })).toBeDisabled();
   });
 
-  it("rejects only with a reason", async () => {
+  it.each([
+    ["REAUTH_LOCKED", 429, "محاولات كثيرة بكلمة مرور غير صحيحة؛ أعد المحاولة بعد 15 دقيقة."],
+    ["PUBLICATION_EXPIRED", 409, "انتهت صلاحية طلب النشر؛ يلزم طلب جديد."],
+    ["PUBLICATION_NOT_PENDING", 409, "طلب النشر لم يعد بانتظار التأكيد. حدّث الصفحة."],
+    ["CONFIRMATION_MISMATCH", 422, "رقم الإصدار أو عدد السجلات المتحقَّق منها المُدخل لا يطابق الطلب."],
+    ["PUBLICATION_GATE_CLOSED", 409, "بوابة النشر مغلقة؛ لا يمكن تأكيد أي نشر."],
+  ])("explains the %s refusal in Arabic", async (code, status, text) => {
+    mockGets(routes(publication()));
+    vi.spyOn(apiClient, "post").mockRejectedValue(new ApiError(status, { message: "server text", code }));
+    renderAs(ALL, <PublicationDetail id={PUB_ID} />);
+    const dialog = await fillConfirmation();
+    await userEvent.click(within(dialog).getByRole("button", { name: "تأكيد النشر" }));
+    expect(await within(dialog).findByText(text)).toBeInTheDocument();
+  });
+
+  it("lets the requester withdraw", async () => {
     mockGets(routes(publication()));
     const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} } as never);
     renderAs(ALL, <PublicationDetail id={PUB_ID} />);
-    await userEvent.click(await screen.findByRole("button", { name: "رفض" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: "تأكيد" })).toBeDisabled();
-    await userEvent.click(within(dialog).getByRole("radio", { name: "يحتاج إلى مراجعة" }));
-    await userEvent.click(within(dialog).getByRole("button", { name: "تأكيد" }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/publication-requests/${PUB_ID}/reject`, { reason_code: "NEEDS_REVIEW" }));
-  });
-
-  it("lets the requester withdraw but never decide", async () => {
-    mockGets(routes(publication({ is_own: true, can_approve: false, can_reject: false, can_withdraw: true })));
-    const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: {} } as never);
-    renderAs(ALL, <PublicationDetail id={PUB_ID} />);
-    expect(await screen.findByText("هذا طلبك: يعتمده أو يرفضه مستخدم آخر مخوّل.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "اعتماد النشر" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "رفض" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "سحب الطلب" }));
+    await userEvent.click(await screen.findByRole("button", { name: "سحب الطلب" }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "تأكيد" }));
     await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/publication-requests/${PUB_ID}/withdraw`, {}));
   });
 
-  it("offers no approval while the gate is closed, and shows outcomes and counts only", async () => {
-    mockGets(routes(publication({ status: "FAILED", outcome_code: "AUTHORIZATION_MISSING", can_approve: false, can_reject: false }), false));
+  it("offers nothing to another user: only the requester confirms", async () => {
+    mockGets(routes(publication({ is_own: false, can_confirm: false, can_withdraw: false })));
+    renderAs(ALL, <PublicationDetail id={PUB_ID} />);
+    expect(await screen.findByText("يؤكد هذا الطلبَ مقدّمُه فقط.")).toBeInTheDocument();
+    expect(document.querySelector("[data-publication-actions]")).toBeNull();
+    expect(screen.queryByRole("button", { name: /رفض|اعتماد/ })).toBeNull();
+  });
+
+  it("explains that the requester cannot confirm while the gate is closed", async () => {
+    mockGets(routes(publication({ can_confirm: false }), false));
+    renderAs(ALL, <PublicationDetail id={PUB_ID} />);
+    expect(await screen.findByText("هذا طلبك: لا يمكن تأكيده ما دامت بوابة النشر مغلقة.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "تأكيد النشر" })).toBeNull();
+    expect(screen.getByRole("button", { name: "سحب الطلب" })).toBeInTheDocument();
+  });
+
+  it("shows outcomes and counts only, with no action on a closed request", async () => {
+    mockGets(routes(publication({ status: "FAILED", outcome_code: "AUTHORIZATION_MISSING", can_confirm: false, can_withdraw: false }), false));
     renderAs(ALL, <PublicationDetail id={PUB_ID} />);
     expect(await screen.findByText("لا يوجد مرجع تفويض بالبيانات الحقيقية لدى العامل")).toBeInTheDocument();
     expect(document.querySelector("[data-publication-actions]")).toBeNull();
@@ -207,10 +254,16 @@ describe("approval details", () => {
     expect(within(snapshot).getByText("الحضور المتوقع")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /نشر الآن|نشر$/ })).toBeNull();
   });
+
+  it("labels a request closed by the policy change", async () => {
+    mockGets(routes(publication({ status: "EXPIRED", outcome_code: "POLICY_CHANGED", can_confirm: false, can_withdraw: false })));
+    renderAs(ALL, <PublicationDetail id={PUB_ID} />);
+    expect(await screen.findByText("أُغلق عند اعتماد سياسة النشر الجديدة (مشغّل واحد)")).toBeInTheDocument();
+  });
 });
 
 describe("requesting publication from a verified run", () => {
-  it("asks for a justification and opens a request (no publication)", async () => {
+  it("asks for a justification, opens a request (no publication) and goes to its confirmation page", async () => {
     const run: CivilImportRunDetail = {
       id: RUN_ID,
       phase: "VERIFIED",
@@ -237,11 +290,12 @@ describe("requesting publication from a verified run", () => {
     renderAs(ALL, <RunDetail runId={RUN_ID} />);
     await userEvent.click(await screen.findByRole("button", { name: "طلب نشر" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/لا يُنشر شيء حتى يعتمده مستخدم آخر/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/لا يُنشر شيء حتى تؤكده بنفسك خلال 24 ساعة بإعادة إدخال كلمة المرور/)).toBeInTheDocument();
     const confirm = within(dialog).getByRole("button", { name: "تأكيد" });
     expect(confirm).toBeDisabled();
     await userEvent.click(within(dialog).getByRole("radio", { name: "تحديث دوري" }));
     await userEvent.click(confirm);
     await waitFor(() => expect(post).toHaveBeenCalledWith(`${BASE}/releases/4/publication-requests`, { justification_code: "ROUTINE_REFRESH" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(`/administration/civil-registry/approvals/${PUB_ID}`));
   });
 });

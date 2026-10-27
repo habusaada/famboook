@@ -77,7 +77,7 @@ case "${1:-}" in
         ;;
       *) echo "usage: u4.sh gate open|close" >&2; exit 2 ;;
     esac
-    # civil-import.publish.approve exists only while the web gate is open: re-seed the role baseline.
+    # civil-import.publish.confirm exists only while the web gate is open: re-seed the role baseline.
     with_web_env php artisan db:seed --class=RolePermissionSeeder --force --no-interaction
     with_web_env php artisan famboook:verify-permissions | grep -E "publication gate|Apply gate" || true
     echo "Restart 'u4.sh api' and 'u4.sh worker' for the change to take effect."

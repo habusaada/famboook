@@ -30,8 +30,8 @@ export const PHASE_LABELS: Record<CivilImportPhase, string> = {
   PREPARING: "جارٍ التحضير",
   PREPARED: "تم التحضير",
   VERIFIED: "تم التحقق",
-  AWAITING_APPROVAL: "بانتظار اعتماد النشر",
-  APPROVED: "اعتُمد النشر — بانتظار التنفيذ",
+  AWAITING_APPROVAL: "بانتظار تأكيد النشر",
+  APPROVED: "أُكِّد النشر — بانتظار التنفيذ",
   PUBLISHED: "منشور",
   REJECTED: "مرفوض",
   ABORTED: "أُلغي",
@@ -155,8 +155,10 @@ export const EVENT_LABELS: Record<string, string> = {
   REQUEST_FAILED: "فشل طلب",
   PUBLICATION_REQUESTED: "طلب نشر",
   PUBLICATION_WITHDRAWN: "سحب طلب نشر",
-  PUBLICATION_APPROVED: "اعتماد نشر",
-  PUBLICATION_REJECTED: "رفض نشر",
+  PUBLICATION_APPROVED: "اعتماد نشر (القاعدة السابقة)",
+  PUBLICATION_REJECTED: "رفض نشر (القاعدة السابقة)",
+  PUBLICATION_CONFIRMED: "تأكيد نشر",
+  PUBLICATION_REAUTH_FAILED: "كلمة مرور غير صحيحة عند تأكيد نشر",
   PUBLICATION_EXPIRED: "انتهاء صلاحية طلب نشر",
   PUBLICATION_REFUSED: "رفض النظام للنشر",
   RELEASE_PUBLISHED: "نشر إصدار",
@@ -226,7 +228,7 @@ export const ACTION_CONFIRMATIONS: Record<CivilImportAction, string> = {
   ASSESS: "سيقيّم عامل الاستيراد البيانات المحمّلة ويقارنها بالإصدار النشط دون كتابة أي شيء.",
   PREPARE: "سيبني عامل الاستيراد الإصدار المرشح وفق السياسة المعتمدة. لا يتغير الإصدار النشط ولا يُنشر شيء.",
   VERIFY: "سيتحقق عامل الاستيراد من أن الإصدار المرشح يطابق تصنيفه تمامًا. لا يُنشر شيء.",
-  REQUEST_PUBLICATION: "سيُفتح طلب نشر لهذا الإصدار. لا يُنشر شيء حتى يعتمده مستخدم آخر خلال 24 ساعة وتتحقق كل الشروط لدى عامل الاستيراد.",
+  REQUEST_PUBLICATION: "سيُفتح طلب نشر لهذا الإصدار. لا يُنشر شيء حتى تؤكده بنفسك خلال 24 ساعة بإعادة إدخال كلمة المرور، وتتحقق كل الشروط لدى عامل الاستيراد.",
   ABORT: "ستُغلق العملية نهائيًا ويُترك إصدارها المرشح ويُحذف تحميلها. لا يتأثر الإصدار النشط. لا يمكن التراجع.",
 };
 
@@ -282,12 +284,12 @@ export const FATAL_LABELS: Record<string, string> = {
   BLANK_FIELD_UNRESOLVED: "سياسة الحقول الفارغة غير محسومة",
 };
 
-// ---- U3: two-person publication
+// ---- U3: publication (single operator, D-UI-12a)
 
 export const PUBLICATION_STATUS_LABELS: Record<string, string> = {
-  PENDING_APPROVAL: "بانتظار الاعتماد",
-  APPROVED: "معتمد — بانتظار التنفيذ",
-  REJECTED: "مرفوض",
+  PENDING_APPROVAL: "بانتظار التأكيد",
+  APPROVED: "مؤكَّد — بانتظار التنفيذ",
+  REJECTED: "مرفوض (القاعدة السابقة)",
   WITHDRAWN: "مسحوب",
   EXPIRED: "منتهي الصلاحية",
   EXECUTED: "نُشر",
@@ -310,6 +312,7 @@ export const JUSTIFICATION_LABELS: Record<string, string> = {
   CORRECTION: "تصحيح",
 };
 
+/** Rejection existed only under the former two-person rule (D-UI-12); kept to display history. */
 export const REJECTION_LABELS: Record<string, string> = {
   COUNTS_UNEXPECTED: "أعداد غير متوقعة",
   NOT_AUTHORIZED_NOW: "غير مأذون به حاليًا",
@@ -321,14 +324,15 @@ export const PUBLICATION_OUTCOME_LABELS: Record<string, string> = {
   PUBLISHED: "نُشر الإصدار",
   ALREADY_PUBLISHED: "كان منشورًا مسبقًا",
   RECONCILED_PUBLISHED: "نُشر (تمت المطابقة بعد انقطاع العامل)",
-  TIMEOUT: "انقضت 24 ساعة دون قرار",
+  TIMEOUT: "انقضت 24 ساعة دون تأكيد",
+  POLICY_CHANGED: "أُغلق عند اعتماد سياسة النشر الجديدة (مشغّل واحد)",
   BASE_CHANGED: "تغيّر الإصدار النشط منذ تقديم الطلب",
   RELEASE_CHANGED: "لم يعد الإصدار متحققًا منه",
   RELEASE_ABANDONED: "أُلغيت العملية",
   AUTHORIZATION_MISSING: "لا يوجد مرجع تفويض بالبيانات الحقيقية لدى العامل",
   PUBLICATION_GATE_CLOSED: "بوابة النشر مغلقة لدى العامل",
-  PUBLICATION_EXPIRED: "انتهت صلاحية الاعتماد قبل التنفيذ",
-  NOT_APPROVED_FOR_PUBLICATION: "لا يوجد اعتماد صالح",
+  PUBLICATION_EXPIRED: "انتهت صلاحية التأكيد قبل التنفيذ",
+  NOT_APPROVED_FOR_PUBLICATION: "لا يوجد تأكيد صالح من مقدّم الطلب",
   PUBLICATION_FAILED: "تعذّر النشر وأُلغي؛ الإصدار السابق لم يتغير",
   WORKER_LOST: "توقف العامل قبل النشر",
   CANCELLED_BY_OPERATOR: "أُوقف بطلب من المشغّل",
