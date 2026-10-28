@@ -49,7 +49,12 @@ function PolicyRow({ policy, manage }: { policy: CivilLookupPolicy; manage: bool
     <TableRow data-policy={policy.role}>
       <TableCell className="font-medium">{roleLabel(policy.role)}</TableCell>
       <TableCell>
-        {manage ? (
+        {policy.unlimited_allowed ? (
+          // FB-CIVIL-02C (corrected): SUPER_ADMIN and ADMINISTRATOR — automatic, always enabled (the API refuses otherwise).
+          <span className="inline-flex" data-automatic>
+            <StatusBadge tone="success">تلقائي — مفعّلة دائمًا</StatusBadge>
+          </span>
+        ) : manage ? (
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} aria-label={`تفعيل الخدمة لدور ${roleLabel(policy.role)}`} />
             {enabled ? "مفعّلة" : "معطّلة"}

@@ -99,7 +99,8 @@ class CivilLookupApiTest extends TestCase
             ->assertJsonPath('data.outcome', 'FOUND')->assertJsonPath('data.release_id', 1)
             ->assertJsonCount(1, 'data.results')->assertJsonPath('data.results.0.national_id', '*****0001')
             ->assertJsonPath('data.results.0.fullname', 'مُحَمَّد أحمد عبد الله سالم')
-            ->assertJsonPath('data.quota.used', 1)->assertJsonPath('data.quota.remaining', 199);
+            // FB-CIVIL-02C (corrected): ADMINISTRATOR is unlimited; the lookup still counts (statistics).
+            ->assertJsonPath('data.quota.used', 1)->assertJsonPath('data.quota.unlimited', true)->assertJsonPath('data.quota.remaining', null);
         $this->assertStringNotContainsString('900000001', $response->getContent(), 'a result list never carries the clear National ID');
 
         $event = CivilLookupAuditEvent::sole();
@@ -386,6 +387,35 @@ class CivilLookupApiTest extends TestCase
         $this->actingAs($super)->getJson(self::BASE.'/admin/changes')->assertOk()->assertJsonPath('meta.total', 2)
             ->assertJsonPath('data.0.role', 'REVIEWER')->assertJsonPath('data.1.old_daily_limit', 50);
         $this->actingAs($this->staff('DATA_ENTRY'))->getJson(self::BASE.'/admin/usage')->assertStatus(403);
+    }
+
+    public function test_super_admin_and_administrator_are_automatic_and_unlimited_but_still_individually_revocable(): void
+    {
+        // FB-CIVIL-02C (corrected, ADR §L-6a).
+        $super = $this->staff('SUPER_ADMIN');
+        foreach (['SUPER_ADMIN', 'ADMINISTRATOR'] as $role) {
+            $policy = CivilLookupRolePolicy::where('role_name', $role)->sole();
+            $this->assertSame([true, null, true], [$policy->enabled, $policy->daily_limit, $policy->unlimited_allowed], $role);
+            $this->actingAs($super)->putJson(self::BASE."/admin/policies/{$role}", ['enabled' => true, 'daily_limit' => 10])->assertStatus(422);
+            $this->actingAs($super)->putJson(self::BASE."/admin/policies/{$role}", ['enabled' => false, 'daily_limit' => null])->assertStatus(422)
+                ->assertJsonValidationErrors('enabled');
+        }
+        $this->assertSame(0, CivilLookupPolicyChange::count());
+        // Other roles keep their 02A policies.
+        $this->assertSame([true, 50], [CivilLookupRolePolicy::where('role_name', 'DATA_ENTRY')->value('enabled'),
+            CivilLookupRolePolicy::where('role_name', 'DATA_ENTRY')->value('daily_limit')]);
+        $this->assertFalse((bool) CivilLookupRolePolicy::where('role_name', 'REVIEWER')->value('enabled'));
+
+        $admin = $this->staff('ADMINISTRATOR');
+        for ($i = 0; $i < 3; $i++) {
+            $this->lookup($admin, '/search/national-id', ['national_id' => '900000001'])->assertOk()->assertJsonPath('data.quota.unlimited', true);
+        }
+        $this->assertSame(3, $this->used($admin), 'unlimited lookups still count');
+        // Automatic is not unconditional: the individual block and the gate still apply.
+        $this->actingAs($super)->putJson(self::BASE.'/admin/user-access', ['email' => $admin->email, 'access' => 'REVOKED'])->assertOk();
+        $this->lookup($admin, '/search/national-id', ['national_id' => '900000001'])->assertStatus(403);
+        config(['civil_lookup.enabled' => false]);
+        $this->lookup($super, '/search/national-id', ['national_id' => '900000001'])->assertStatus(503);
     }
 
     public function test_history_is_append_only_and_no_route_carries_an_identifier(): void

@@ -480,6 +480,7 @@ changes nothing visible. Every item below is needed **in addition to** the
 | Role policies | FAMILY_USER and COORDINATOR (default disabled, 5 per day). |
 | Individual grants | Per account and per side: Administration → Civil Registry → Lookup Quotas, by person code. Nothing can be granted while a side switch is closed. |
 | Migration | `2026_10_29_090000_extend_civil_lookup_for_family_side`: grant sides, history sides, audit `lookup_context` (with CHECKs). No DBA script, no `identity_ref` change. |
+| Migration (02C, corrected) | `2026_10_30_090000_make_admin_civil_lookup_automatic`: SUPER_ADMIN and ADMINISTRATOR policies are set to enabled and unlimited; a PostgreSQL CHECK keeps them so. No `identity_ref` change. |
 
 ---
 

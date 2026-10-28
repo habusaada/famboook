@@ -289,6 +289,10 @@ describe("quota administration", () => {
     const row = await findEl(() => document.querySelector('[data-policy="DATA_ENTRY"]'));
     expect(within(row).getByText("مدخل بيانات")).toBeInTheDocument();
     expect(document.querySelector('[data-policy="SUPER_ADMIN"] [data-unlimited]')).not.toBeNull();
+    // FB-CIVIL-02C (corrected): an automatic role shows no enable switch.
+    expect(document.querySelector('[data-policy="SUPER_ADMIN"] [data-automatic]')?.textContent).toContain("تلقائي");
+    expect(document.querySelector('[data-policy="SUPER_ADMIN"] input[type="checkbox"]')).toBeNull();
+    expect(document.querySelector('[data-policy="DATA_ENTRY"] input[type="checkbox"]')).not.toBeNull();
     expect(document.querySelector('[data-lookup-state="DISABLED"]')).not.toBeNull();
     expect(document.querySelector("[data-exhausted-users]")?.textContent).toContain("مدخل تجريبي");
 

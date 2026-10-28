@@ -1471,6 +1471,15 @@ on the test instance and a real browser
     - per-role daily quotas in the database (Asia/Gaza day, atomic), per-user revocation, append-only audit and policy history, quota administration screen.
     - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
+- **FB-CIVIL-02C (2026-10-28, corrected):**
+    - SUPER_ADMIN and ADMINISTRATOR have automatic, unlimited lookup access (ADR 02A §L-6a); every other role keeps its 02A / 02B policy;
+    - the proposed person-level scope / institutional-task / reviewed-grant design was **rejected and is not implemented**;
+    - no record-level restriction; legal authorization still pending (G1 / OD-08 / OD-09); lookup stays off by default.
+    - Technical acceptance 2026-10-28:
+        - full SQLite 3400 OK;
+        - full PostgreSQL 9 errors + 1 failure, all pre-existing baseline issues unrelated to Civil Lookup (hard-coded id = 1, `sqlite_sequence`, jsonb key order, CHECK-shape factory data);
+        - CivilLookup PostgreSQL 33/33;
+        - Vitest 1100/1100; `tsc` and ESLint clean; `next build` OK.
 - **FB-CIVIL-02B (2026-10-28), local technical implementation COMPLETE (technically accepted, committed locally); real-data access and Production activation BLOCKED:** Civil Registry Lookup on the Family Portal (household head) and in Coordinator Space, `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`:
     - one service, quota and audit, mounted per side (`/family/civil-registry/lookup`, `/family/coordinator/civil-registry/lookup`), with references bound to their context;
     - separate side switches (default off) and, in production, separate side approvals plus the `EXTENDED_CONTROLLED` field-profile approval;

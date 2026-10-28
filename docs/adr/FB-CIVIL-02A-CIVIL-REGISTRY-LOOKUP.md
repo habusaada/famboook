@@ -177,6 +177,31 @@ separate privacy decision (OD-08). It is never read into a response.
   withheld and `QUOTA_EXHAUSTED` (429) is answered. A failed execution
   consumes nothing. Two concurrent requests can never exceed the limit.
 
+## L-6a. Automatic access for SUPER_ADMIN and ADMINISTRATOR (FB-CIVIL-02C, corrected — 2026-10-28)
+
+The owner confirmed these requirements, which supersede the ADMINISTRATOR
+default above:
+
+- **SUPER_ADMIN and ADMINISTRATOR:** automatic Civil Registry Lookup access
+  with an **unlimited** daily quota.
+  - Their role policy is always enabled and unlimited. It cannot be limited
+    or disabled, by the policy action or by the database
+    (`chk_civil_lookup_policy_automatic`, migration
+    `2026_10_30_090000_make_admin_civil_lookup_automatic`).
+  - Their lookups are still counted and audited.
+  - The feature gates, the permissions, the individual REVOKED block, the
+    field profiles (FULL with `civil-lookup.view-full`), the masking, the
+    references and the rate limits still apply.
+- **Every other role:** keeps its 02A / 02B policy (DATA_ENTRY 50; REVIEWER,
+  SOCIAL_WORKER and REPORTS_VIEWER disabled; FAMILY_USER and COORDINATOR 5,
+  disabled, with the 02B individual GRANTED rows and side gates).
+- **No record-level restriction:** an authorized user may search the whole
+  active release. No household, branch, person-list or task scope applies.
+  The FB-CIVIL-02C scope/task design was rejected and is not implemented.
+- **This does not establish legal authorization.** Unrestricted searching of
+  the civil registry still needs G1 / OD-08 and OD-09 (§L-0), and the lookup
+  stays off by default.
+
 ## L-7. Opaque references
 
 Search, record and link references are Laravel-encrypted (authenticated,

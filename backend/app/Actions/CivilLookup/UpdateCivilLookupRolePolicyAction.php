@@ -12,16 +12,22 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Changes the Civil Registry Lookup policy of one role (FB-CIVIL-02A, ADR §L-6):
- * enabled and the daily limit. SUPER_ADMIN is always unlimited; every other
- * role has a limit of 1–100,000. The change and its previous values are
- * recorded (append-only) in the same transaction; an unchanged policy writes
- * nothing.
+ * enabled and the daily limit. Every other role has a limit of 1–100,000.
+ * The change and its previous values are recorded (append-only) in the same
+ * transaction; an unchanged policy writes nothing.
+ *
+ * FB-CIVIL-02C (corrected, ADR §L-6a): SUPER_ADMIN and ADMINISTRATOR have
+ * automatic access with an unlimited quota. Their policy is always enabled
+ * and unlimited and cannot be limited or disabled here (nor in the database).
  */
 final class UpdateCivilLookupRolePolicyAction
 {
     public const MANAGE = 'civil-lookup.manage';
 
     public const MAX_LIMIT = 100000;
+
+    /** Roles with automatic, unlimited lookup access (ADR §L-6a). */
+    public const AUTOMATIC_ROLES = ['SUPER_ADMIN', 'ADMINISTRATOR'];
 
     public function handle(User $actor, string $roleName, bool $enabled, ?int $dailyLimit): CivilLookupRolePolicy
     {
@@ -32,6 +38,9 @@ final class UpdateCivilLookupRolePolicyAction
         return DB::transaction(function () use ($actor, $roleName, $enabled, $dailyLimit) {
             $policy = CivilLookupRolePolicy::query()->where('role_name', $roleName)->lockForUpdate()->first()
                 ?? throw (new ModelNotFoundException)->setModel(CivilLookupRolePolicy::class);
+            if (in_array($policy->role_name, self::AUTOMATIC_ROLES, true) && ! $enabled) {
+                throw ValidationException::withMessages(['enabled' => 'الاستعلام تلقائي لهذا الدور ولا يمكن تعطيله.']);
+            }
             if ($policy->unlimited_allowed && $dailyLimit !== null) {
                 throw ValidationException::withMessages(['daily_limit' => 'هذا الدور غير محدود دائمًا.']);
             }

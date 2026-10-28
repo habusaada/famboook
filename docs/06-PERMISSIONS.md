@@ -3024,6 +3024,10 @@ a per-user **REVOKED** row blocks one user without touching their roles. FAMILY_
 and COORDINATOR hold none of these permissions; a Coordinator assignment never
 implies lookup (FB-CIVIL-02B). `famboook:verify-permissions` enforces these
 boundaries (`CIVIL_LOOKUP*` in `CRITICAL`). Catalog 169 → 174 (proposed with the ADR); no role added.
+FB-CIVIL-02C (corrected, ADR 02A §L-6a): SUPER_ADMIN and ADMINISTRATOR have
+automatic access with an unlimited quota (their policy cannot be limited or
+disabled). No record-level scope applies. Legal authorization is still
+pending (G1 / OD-08 / OD-09).
 
 ### 61d-1. Family Portal and Coordinator Space (FB-CIVIL-02B — PROPOSED, local only)
 

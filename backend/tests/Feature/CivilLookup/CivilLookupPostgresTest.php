@@ -72,6 +72,9 @@ class CivilLookupPostgresTest extends TestCase
         DB::statement('TRUNCATE civil_lookup_audit_events, civil_lookup_policy_changes, civil_lookup_daily_usage, civil_lookup_user_access');
         $this->tearDownIdentityRefStaging();
         $this->tearDownIdentityRef();
+        // DatabaseTruncation leaves the last test's rows committed (family-side users, persons, families):
+        // truncate them so later RefreshDatabase classes start empty.
+        $this->truncateTablesForAllConnections();
         parent::tearDown();
     }
 
@@ -261,6 +264,13 @@ class CivilLookupPostgresTest extends TestCase
             $this->assertSame('23001', $this->sqlStateOf(fn () => DB::delete("DELETE FROM {$table}")), $table);
         }
         $this->assertSame('23514', $this->sqlStateOf(fn () => DB::update("UPDATE civil_lookup_role_policies SET daily_limit = 5 WHERE role_name = 'SUPER_ADMIN'")));
+        // FB-CIVIL-02C (corrected): ADMINISTRATOR is automatic and unlimited too; no other role may be unlimited.
+        foreach (['daily_limit = 200, unlimited_allowed = false', 'enabled = false'] as $set) {
+            foreach (['SUPER_ADMIN', 'ADMINISTRATOR'] as $role) {
+                $this->assertSame('23514', $this->sqlStateOf(fn () => DB::update("UPDATE civil_lookup_role_policies SET {$set} WHERE role_name = '{$role}'")), "{$role}: {$set}");
+            }
+        }
+        $this->assertSame('23514', $this->sqlStateOf(fn () => DB::update("UPDATE civil_lookup_role_policies SET daily_limit = NULL, unlimited_allowed = true WHERE role_name = 'DATA_ENTRY'")));
     }
 
     /**

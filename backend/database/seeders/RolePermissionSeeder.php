@@ -870,7 +870,8 @@ class RolePermissionSeeder extends Seeder
      */
     public const CIVIL_LOOKUP_DEFAULT_POLICIES = [
         'SUPER_ADMIN' => [true, null, true],
-        'ADMINISTRATOR' => [true, 200, false],
+        // FB-CIVIL-02C (corrected): automatic and unlimited, like SUPER_ADMIN.
+        'ADMINISTRATOR' => [true, null, true],
         'DATA_ENTRY' => [true, 50, false],
         'REVIEWER' => [false, 50, false],
         'SOCIAL_WORKER' => [false, 50, false],
