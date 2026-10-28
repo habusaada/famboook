@@ -50,6 +50,12 @@ const SECTIONS = [
     label: "سجل التدقيق",
     permission: "civil-import.audit.view",
   },
+  // FB-CIVIL-02A: daily lookup quotas per role (the lookup itself is /civil-registry/lookup).
+  {
+    href: "/administration/civil-registry/lookup-quotas",
+    label: "كوتة الاستعلامات",
+    permission: "civil-lookup.usage.view",
+  },
 ];
 
 /** Section navigation; each entry appears only with its permission (UX only, the API authorizes). */

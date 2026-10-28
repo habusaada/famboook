@@ -1465,6 +1465,12 @@ on the test instance and a real browser
     - `civil-import.publish.confirm` replaces `.approve` (still gated, closed by default); reject is removed;
     - pending two-person requests expire (`POLICY_CHANGED`); the worker still publishes and re-checks everything.
 - **FB-CIVIL-01B** (lookup by staff): not started; needs a separately approved baseline change (OD-09).
+- **FB-CIVIL-02A (2026-10-28), local technical implementation COMPLETE (technically accepted, committed locally); Production activation BLOCKED:** Staff Portal Civil Registry Lookup (supersedes the 01B placeholder), `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`:
+    - read boundary `08-lookup.dba.sql` (reader login, EXECUTE-only `identity_ref_lookup` functions on the active release; local only) and optional indexes `09-lookup-indexes.dba.sql` (not approved);
+    - lookup by National ID, full name and name parts; record details by field level (`relgion` never shown); father / mother / spouse links; household and children reverse links implemented but disabled;
+    - per-role daily quotas in the database (Asia/Gaza day, atomic), per-user revocation, append-only audit and policy history, quota administration screen.
+    - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space) not started.
+    - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
 
 ---
 

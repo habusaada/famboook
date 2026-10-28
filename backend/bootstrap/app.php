@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureActivationEnabled;
+use App\Http\Middleware\EnsureCivilLookupEnabled;
 use App\Http\Middleware\EnsureContactUpdateEnabled;
 use App\Http\Middleware\EnsureCoordinatorSpace;
 use App\Http\Middleware\EnsureFamilyContext;
@@ -56,6 +57,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Notification publication readiness (FB-NOTIFY-01B.2b): after
             // auth, never instead of the route's permission or policy.
             'notifications.publication-ready' => EnsureNotificationPublicationReady::class,
+            // FB-CIVIL-02A: the Civil Registry Lookup gate (off by default).
+            'civil-lookup.enabled' => EnsureCivilLookupEnabled::class,
         ]);
         // FU-16: the password-change gate runs BEFORE the route limiter (which
         // the priority list would otherwise move ahead of `can:`), so a closed
@@ -63,6 +66,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(ThrottleRequests::class, EnsurePasswordChangeEnabled::class);
         // FP-ADR-079: the same for the contact-update gate.
         $middleware->prependToPriorityList(ThrottleRequests::class, EnsureContactUpdateEnabled::class);
+        // FB-CIVIL-02A: a closed lookup gate counts nothing either.
+        $middleware->prependToPriorityList(ThrottleRequests::class, EnsureCivilLookupEnabled::class);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
         $middleware->appendToGroup('web', EnsureUserIsActive::class);

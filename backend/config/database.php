@@ -138,6 +138,24 @@ return [
             'sslmode' => env('IDENTITY_REF_MONITOR_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
         ],
 
+        // FB-CIVIL-02A: the read-only Civil Registry Lookup (ADR §L-2). Calls
+        // the identity_ref_lookup functions only, as a member of
+        // famboook_identity_reader. The login and password are set at run
+        // time by CivilRegistryReader from config('civil_lookup.credentials_file').
+        'identity_ref_lookup' => [
+            'driver' => 'pgsql',
+            'host' => env('IDENTITY_REF_LOOKUP_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('IDENTITY_REF_LOOKUP_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('IDENTITY_REF_LOOKUP_DB_DATABASE', env('DB_DATABASE')),
+            'username' => null,
+            'password' => null,
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'identity_ref_lookup',
+            'sslmode' => env('IDENTITY_REF_LOOKUP_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

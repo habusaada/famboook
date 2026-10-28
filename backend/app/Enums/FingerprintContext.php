@@ -26,4 +26,10 @@ enum FingerprintContext: string
     // a membership of a Family in the Coordinator's scope. Its own domain, so
     // it never equals the household member_ref. Never stored.
     case COORDINATOR_MEMBER_REF = 'famboook.coordinator.member-ref.v1:';
+    // Civil Registry Lookup audit (FB-CIVIL-02A, ADR §L-10): the normalized
+    // lookup criteria (a National ID or name tokens), so repeated lookups of
+    // the same value can be correlated without storing it. Never returned.
+    case CIVIL_LOOKUP_QUERY = 'famboook.civil-lookup.query.v1:';
+    // The client IP of a Civil Registry Lookup event (same audit).
+    case CIVIL_LOOKUP_IP = 'famboook.civil-lookup.ip.v1:';
 }

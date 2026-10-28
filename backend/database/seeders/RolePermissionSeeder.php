@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -266,6 +268,15 @@ class RolePermissionSeeder extends Seeder
         'civil-import.validate',
         'civil-import.publish.request',
         'civil-import.publish.confirm',
+
+        // FB-CIVIL-02A Civil Registry Lookup (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md
+        // §L-3; CIVIL_LOOKUP_ROLE_PERMISSIONS). Holding search/view is the
+        // capability; the role policy and the per-user override decide.
+        'civil-lookup.search',
+        'civil-lookup.view',
+        'civil-lookup.view-full',
+        'civil-lookup.usage.view',
+        'civil-lookup.manage',
 
         // §62 System Administration Permissions
         'system.settings.view',
@@ -837,6 +848,37 @@ class RolePermissionSeeder extends Seeder
      * nobody can confirm a publication in any default configuration. Its own
      * gate, independent of the Apply gate. SUPER_ADMIN only.
      */
+    /**
+     * FB-CIVIL-02A (ADR §L-3): search and view for every Staff role (the role
+     * policy enables it per role); the full field set and usage statistics for
+     * SUPER_ADMIN and ADMINISTRATOR; administration for SUPER_ADMIN. Never a
+     * family-side role (FB-CIVIL-02B is separate).
+     */
+    public const CIVIL_LOOKUP_ROLE_PERMISSIONS = [
+        'SUPER_ADMIN' => ['civil-lookup.search', 'civil-lookup.view', 'civil-lookup.view-full', 'civil-lookup.usage.view', 'civil-lookup.manage'],
+        'ADMINISTRATOR' => ['civil-lookup.search', 'civil-lookup.view', 'civil-lookup.view-full', 'civil-lookup.usage.view'],
+        'DATA_ENTRY' => ['civil-lookup.search', 'civil-lookup.view'],
+        'REVIEWER' => ['civil-lookup.search', 'civil-lookup.view'],
+        'SOCIAL_WORKER' => ['civil-lookup.search', 'civil-lookup.view'],
+        'REPORTS_VIEWER' => ['civil-lookup.search', 'civil-lookup.view'],
+    ];
+
+    /**
+     * FB-CIVIL-02A (ADR §L-6): the default lookup policies [enabled, daily limit
+     * (NULL = unlimited), unlimited allowed]. Inserted when missing, never
+     * overwritten — after installation the database is the source.
+     */
+    public const CIVIL_LOOKUP_DEFAULT_POLICIES = [
+        'SUPER_ADMIN' => [true, null, true],
+        'ADMINISTRATOR' => [true, 200, false],
+        'DATA_ENTRY' => [true, 50, false],
+        'REVIEWER' => [false, 50, false],
+        'SOCIAL_WORKER' => [false, 50, false],
+        'REPORTS_VIEWER' => [false, 50, false],
+        'COORDINATOR' => [false, 5, false],
+        'FAMILY_USER' => [false, 5, false],
+    ];
+
     public const PUBLICATION_GATED_ROLE_PERMISSIONS = [
         'SUPER_ADMIN' => ['civil-import.publish.confirm'],
     ];
@@ -853,7 +895,7 @@ class RolePermissionSeeder extends Seeder
         $gated = config('import.apply_enabled') === true ? (self::GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
         $publication = config('civil_import.publish_enabled') === true ? (self::PUBLICATION_GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
 
-        return [...self::ROLE_PERMISSIONS[$roleName], ...$gated, ...$publication];
+        return [...self::ROLE_PERMISSIONS[$roleName], ...(self::CIVIL_LOOKUP_ROLE_PERMISSIONS[$roleName] ?? []), ...$gated, ...$publication];
     }
 
     public function run(): void
@@ -874,6 +916,14 @@ class RolePermissionSeeder extends Seeder
             ]);
 
             $role->syncPermissions(self::rolePermissions($roleName));
+        }
+
+        if (Schema::hasTable('civil_lookup_role_policies')) {
+            $now = now();
+            DB::table('civil_lookup_role_policies')->insertOrIgnore(array_map(fn (string $role, array $p) => [
+                'role_name' => $role, 'enabled' => $p[0], 'daily_limit' => $p[1], 'unlimited_allowed' => $p[2],
+                'created_at' => $now, 'updated_at' => $now,
+            ], array_keys(self::CIVIL_LOOKUP_DEFAULT_POLICIES), self::CIVIL_LOOKUP_DEFAULT_POLICIES));
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();

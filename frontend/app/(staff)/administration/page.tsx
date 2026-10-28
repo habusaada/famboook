@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, DatabaseZap, ExternalLink, FileSpreadsheet, Network, UserCog, UsersRound } from "lucide-react";
+import { ChevronLeft, DatabaseZap, ExternalLink, FileSpreadsheet, Gauge, Network, UserCog, UsersRound } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/auth-context";
 
@@ -80,6 +80,20 @@ export default function AdministrationPage() {
                 <CardDescription>
                   متابعة عمليات استيراد مرجع الهوية المدنية وإصداراته وسجل تدقيقها — للمتابعة فقط، دون أي بيانات هوية.
                 </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
+        {can("civil-lookup.usage.view") && (
+          <Link href="/administration/civil-registry/lookup-quotas" className="group" data-admin-card="civil-lookup-quotas">
+            <Card className="transition-colors group-hover:bg-muted/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gauge className="size-5 text-muted-foreground" />
+                  كوتة الاستعلام عن السجل المدني
+                  <ChevronLeft className="ms-auto size-4 text-muted-foreground" />
+                </CardTitle>
+                <CardDescription>الحد اليومي للاستعلامات لكل دور، واستهلاك اليوم، وإيقاف الخدمة لمستخدم محدد، وسجل التغييرات.</CardDescription>
               </CardHeader>
             </Card>
           </Link>

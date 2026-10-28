@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\NotificationPublicationDispatcher;
 use App\Contracts\SmsSender;
 use App\Enums\FamilyAuthError;
+use App\Exceptions\CivilLookupException;
 use App\Exceptions\FamilyAuthException;
 use App\Models\Assessment;
 use App\Models\AssistanceBeneficiary;
@@ -16,6 +17,8 @@ use App\Models\FamilyResidence;
 use App\Models\Person;
 use App\Models\PersonHealthRecord;
 use App\Support\ChangeRequests\ChangeRequestTypes;
+use App\Support\CivilLookup\CivilRegistryReader;
+use App\Support\CivilLookup\CivilRegistrySource;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\FamilyAuth\SignInHistory;
 use App\Support\Import\Apply\ApplyRunnerLock;
@@ -70,6 +73,9 @@ class AppServiceProvider extends ServiceProvider
         // PublishNotificationJob on the notifications queue, after commit.
         // Never a synchronous publication (refused on sync / null queues).
         $this->app->bind(NotificationPublicationDispatcher::class, QueueNotificationPublicationDispatcher::class);
+
+        // FB-CIVIL-02A: the read-only civil registry of the lookup (one session per request).
+        $this->app->scoped(CivilRegistrySource::class, CivilRegistryReader::class);
     }
 
     /**
@@ -223,6 +229,17 @@ class AppServiceProvider extends ServiceProvider
         // Public Digital Family Card verification (docs/11 §19, FP-ADR-070):
         // per client IP — the browser posts directly to the API, so this is the
         // real client — per minute and per hour. Generic 429, no-store.
+        // Civil Registry Lookup (FB-CIVIL-02A, ADR §L-11): per signed-in user,
+        // per minute and per hour, independent of the daily quota.
+        RateLimiter::for('civil-lookup', fn (Request $request) => array_map(
+            fn (string $window) => ($window === 'hour'
+                ? Limit::perHour((int) config('civil_lookup.rate_limits.per_hour'))
+                : Limit::perMinute((int) config('civil_lookup.rate_limits.per_minute')))
+                ->by("civil-lookup|user|{$request->user()?->getAuthIdentifier()}|{$window}")
+                ->response(fn () => (new CivilLookupException(CivilLookupException::RATE_LIMITED))->render()),
+            ['minute', 'hour'],
+        ));
+
         RateLimiter::for('credential-verify', fn (Request $request) => array_map(
             fn (string $window) => ($window === 'hour'
                 ? Limit::perHour((int) config('credentials.verify_limits.ip_hour'))

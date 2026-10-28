@@ -10,6 +10,7 @@ BEGIN
         RAISE EXCEPTION 'IDENTITY_REF_DROP_REFUSED_NOT_A_DISPOSABLE_TEST_DATABASE';
     END IF;
     -- Triggers forbid TRUNCATE/DELETE, not DROP; the owner (or a superuser) drops the schema.
+    EXECUTE 'DROP SCHEMA IF EXISTS identity_ref_lookup CASCADE';
     EXECUTE 'DROP SCHEMA IF EXISTS identity_ref_monitor CASCADE';
     EXECUTE 'DROP SCHEMA IF EXISTS identity_ref_staging CASCADE';
     EXECUTE 'DROP SCHEMA IF EXISTS identity_ref CASCADE';

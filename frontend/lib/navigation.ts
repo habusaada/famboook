@@ -10,6 +10,7 @@ import {
   BellRing,
   BarChart3,
   Settings,
+  SearchCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,8 @@ export const navItems: NavItem[] = [
   // PWA-5d: the Staff review workspace (change-request.view — SUPER_ADMIN,
   // ADMINISTRATOR, REVIEWER). Also guards /change-requests/* in AuthGate.
   { href: "/change-requests", label: "طلبات تحديث البيانات", icon: ClipboardPen, permissions: ["change-request.view"], group: "registry" },
+  // FB-CIVIL-02A: the Civil Registry Lookup (the page itself says when the service is off for the role).
+  { href: "/civil-registry/lookup", label: "الاستعلام عن السجل المدني", icon: SearchCheck, permissions: ["civil-lookup.search"], group: "registry" },
   { href: "/assessments", label: "التقييمات", icon: ClipboardList, permissions: ["assessment.view"], group: "cases" },
   { href: "/needs", label: "الاحتياجات", icon: HeartHandshake, permissions: ["need.view"], group: "cases" },
   { href: "/assistances", label: "المساعدات", icon: HandHeart, permissions: ["assistance.view"], group: "cases" },
@@ -56,7 +59,7 @@ export const navItems: NavItem[] = [
     label: "الإدارة",
     icon: Settings,
     // clan.view alone only feeds selectors: no administration screen.
-    permissions: ["clan.manage", "coordinator-scope.manage", "system-admin.access", "civil-import.view"],
+    permissions: ["clan.manage", "coordinator-scope.manage", "system-admin.access", "civil-import.view", "civil-lookup.usage.view"],
     group: "system",
   },
 ];

@@ -325,7 +325,8 @@ class RolePermissionSeederTest extends TestCase
         //      + civil-import.view/locations.view/audit.view (AUTH-ADR-098, FB-CIVIL-01A-UI U1)
         //      + civil-import.stage/validate (AUTH-ADR-098, FB-CIVIL-01A-UI U2)
         //      + civil-import.publish.request (U3; publish.confirm only through the publication gate, D-UI-12a).
-        $this->assertSame(106, $superAdmin->getAllPermissions()->count());
+        //      + civil-lookup.search/view/view-full/usage.view/manage (FB-CIVIL-02A ADR §L-3).
+        $this->assertSame(111, $superAdmin->getAllPermissions()->count());
         foreach (['import.upload', 'import.validate', 'import.review'] as $permission) {
             $this->assertTrue($superAdmin->hasPermissionTo($permission));
         }
@@ -349,13 +350,13 @@ class RolePermissionSeederTest extends TestCase
         }
         $superAdmin = User::factory()->create();
         $superAdmin->assignRole('SUPER_ADMIN');
-        $this->assertSame(107, $superAdmin->getAllPermissions()->count());
+        $this->assertSame(112, $superAdmin->getAllPermissions()->count());
 
         // Closing the gate again and re-seeding (every deployment) revokes it.
         config(['import.apply_enabled' => false]);
         $this->seed(RolePermissionSeeder::class);
         $this->assertFalse($superAdmin->fresh()->hasPermissionTo('import.apply'));
-        $this->assertSame(106, $superAdmin->fresh()->getAllPermissions()->count());
+        $this->assertSame(111, $superAdmin->fresh()->getAllPermissions()->count());
     }
 
     public function test_only_a_strict_boolean_opens_the_apply_gate(): void

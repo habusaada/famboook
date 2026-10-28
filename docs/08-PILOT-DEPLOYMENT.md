@@ -454,6 +454,22 @@ A SEPARATE worker from the notification worker above (X-5; `docs/adr/FB-CIVIL-01
 
 ---
 
+## 16-lookup. Civil Registry Lookup (FB-CIVIL-02A; PROPOSED, not enabled)
+
+Design: `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`. **Nothing here is approved for Production** (OD-09 baseline exception, G1 / OD-08 lawful basis, the DBA scripts). Deploying the code changes nothing visible:
+
+| Item | Value |
+|---|---|
+| Gate | `CIVIL_LOOKUP_ENABLED` (default `false`): every lookup answers 503 `LOOKUP_DISABLED`. In production the lookup also needs `CIVIL_LOOKUP_PRODUCTION_APPROVAL` in the PHP process environment (never `.env`). |
+| Reverse links | `CIVIL_LOOKUP_REVERSE_LINKS_ENABLED` (default `false`): household and children lists stay disabled. |
+| Migration | `2026_10_28_090000_create_civil_lookup_tables`: policies (defaults inserted; `RolePermissionSeeder` restores missing rows, never overwrites), per-user access, daily usage, append-only policy history and audit. |
+| Permissions | `civil-lookup.*` (docs/06 §61d), granted by `RolePermissionSeeder`; checked by `famboook:verify-permissions`. |
+| Database read path | `deploy/sql/identity-ref/08-lookup.dba.sql` (DBA; **not applied**): login `famboook_identity_lookup_login` (NOLOGIN until enabled, read-only sessions, 5 s timeout) → `famboook_identity_reader` → EXECUTE on `identity_ref_lookup` functions only. Re-apply after a restore. |
+| Credentials | `/etc/famboook/identity-lookup.php` (`CIVIL_LOOKUP_CREDENTIALS_FILE`), `root:www-data 0640`, returning `['username' => …, 'password' => …]`. Never `.env`. Without it: 503 `LOOKUP_NOT_CONFIGURED`. |
+| Indexes | `09-lookup-indexes.dba.sql` (`CREATE INDEX CONCURRENTLY`, psql autocommit; **not approved**): name-search trigram and reverse-link btree indexes. |
+
+---
+
 # 16a. Family Portal activation prerequisites (not yet applicable)
 
 Recorded 2026-10-02 (docs/11 §30a). Nothing here is deployed; the Family

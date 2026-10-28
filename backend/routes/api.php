@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\AssistanceExportController;
 use App\Http\Controllers\Api\V1\AssistanceNomineeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChangeRequestController;
+use App\Http\Controllers\Api\V1\CivilLookup\CivilLookupAdminController;
+use App\Http\Controllers\Api\V1\CivilLookup\CivilLookupController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportAuditController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportExecutionController;
 use App\Http\Controllers\Api\V1\CivilRegistry\CivilImportMonitorController;
@@ -858,5 +860,30 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
             Route::get('/imports/{run}/issues/locations', [CivilImportMonitorController::class, 'issueLocations'])->whereUuid('run');
         });
         Route::get('/audit', [CivilImportAuditController::class, 'index'])->middleware('can:civil-import.audit.view');
+    });
+    // FB-CIVIL-02A — Civil Registry Lookup (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md).
+    // Off by default (civil-lookup.enabled → 503 LOOKUP_DISABLED). Criteria and
+    // references in POST bodies only, never in a URL; the action re-checks the
+    // role policy, per-user access and the daily quota on every call.
+    Route::prefix('civil-registry/lookup')->group(function () {
+        Route::get('/status', [CivilLookupController::class, 'status'])->middleware('can:civil-lookup.search');
+        Route::middleware(['civil-lookup.enabled', 'can:civil-lookup.search', 'throttle:civil-lookup'])->group(function () {
+            Route::post('/search/national-id', [CivilLookupController::class, 'byNationalId']);
+            Route::post('/search/name', [CivilLookupController::class, 'byName']);
+            Route::post('/search/parts', [CivilLookupController::class, 'byParts']);
+            Route::post('/search/page', [CivilLookupController::class, 'page']);
+        });
+        Route::middleware(['civil-lookup.enabled', 'can:civil-lookup.view', 'throttle:civil-lookup'])->group(function () {
+            Route::post('/records/open', [CivilLookupController::class, 'openRecord']);
+            Route::post('/links/open', [CivilLookupController::class, 'openLink']);
+            Route::post('/links/list', [CivilLookupController::class, 'links']);
+        });
+        Route::get('/admin/usage', [CivilLookupAdminController::class, 'usage'])->middleware('can:civil-lookup.usage.view');
+        Route::middleware('can:civil-lookup.manage')->group(function () {
+            Route::put('/admin/policies/{role}', [CivilLookupAdminController::class, 'updatePolicy'])->middleware('throttle:30,1');
+            Route::get('/admin/changes', [CivilLookupAdminController::class, 'changes']);
+            Route::get('/admin/user-access', [CivilLookupAdminController::class, 'userAccess']);
+            Route::put('/admin/user-access', [CivilLookupAdminController::class, 'setUserAccess'])->middleware('throttle:30,1');
+        });
     });
 });

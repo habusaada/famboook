@@ -3003,6 +3003,30 @@ publication permission, and fails while the removed
 
 ---
 
+## 61d. Civil Registry Lookup (FB-CIVIL-02A — PROPOSED, local only)
+
+Design: `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`. **Not approved for
+Production**: the lookup is off by default (`CIVIL_LOOKUP_ENABLED=false`), needs
+a recorded approval reference in production, and is an exception to `docs/03`
+§47e that is only PROPOSED (OD-09). G1 / OD-08 remain open.
+
+| Permission | Meaning | Roles |
+|---|---|---|
+| `civil-lookup.search` | search the active published release (result list, masked IDs) | all six Staff roles |
+| `civil-lookup.view` | open a record (standard field set) | all six Staff roles |
+| `civil-lookup.view-full` | the full field set (every field except `relgion`), IDs in clear | SUPER_ADMIN, ADMINISTRATOR |
+| `civil-lookup.usage.view` | today's usage per role and the users who used up their quota | SUPER_ADMIN, ADMINISTRATOR |
+| `civil-lookup.manage` | role policies (enabled, daily limit) and per-user revocation | SUPER_ADMIN |
+
+Holding search/view is the capability; the **role policy**
+(`civil_lookup_role_policies`, enabled + daily limit) is the operational switch;
+a per-user **REVOKED** row blocks one user without touching their roles. FAMILY_USER
+and COORDINATOR hold none of these permissions; a Coordinator assignment never
+implies lookup (FB-CIVIL-02B). `famboook:verify-permissions` enforces these
+boundaries (`CIVIL_LOOKUP*` in `CRITICAL`). Catalog 169 → 174 (proposed with the ADR); no role added.
+
+---
+
 # 62. System Administration Permissions
 
 Recommended:
