@@ -75,7 +75,8 @@ class VerifyPermissions extends Command
         ],
         'FAMILY_USER' => [
             'has' => ['family-portal.access'],
-            'lacks' => [...self::CIVIL_IMPORT, ...self::CIVIL_LOOKUP, 'person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
+            // FB-CIVIL-02B: civil-lookup.search / .view only while the Family side is open (checked below).
+            'lacks' => [...self::CIVIL_IMPORT, ...self::CIVIL_LOOKUP_PRIVILEGED, 'person-mobile-trust.grant', 'person-mobile-trust.assist', 'coordinator-space.access', 'coordinator-family.view-summary',
                 'coordinator-member.view', 'coordinator-member.view-sensitive',
                 'coordinator-request.view', 'coordinator-request.submit', 'coordinator-request.resubmit', 'coordinator-request.cancel',
                 'family-card.view', 'family-card.issue', 'family-card.revoke', 'family-card.reissue',
@@ -97,7 +98,8 @@ class VerifyPermissions extends Command
                 // AUTH-ADR-097: own scope-bound announcements, never announcement.*;
                 // follow-ups of the current scope (manage as primary owner only).
                 ...self::COORDINATOR_ANNOUNCEMENT, ...self::COORDINATOR_FOLLOWUP],
-            'lacks' => [...self::CIVIL_IMPORT, ...self::CIVIL_LOOKUP, ...self::ANNOUNCEMENT, ...self::FOLLOWUP, 'person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
+            // FB-CIVIL-02B: civil-lookup.search / .view only while the Coordinator side is open (checked below).
+            'lacks' => [...self::CIVIL_IMPORT, ...self::CIVIL_LOOKUP_PRIVILEGED, ...self::ANNOUNCEMENT, ...self::FOLLOWUP, 'person-mobile-trust.assist', 'person-mobile-trust.grant', 'person-mobile-trust.revoke',
                 'user-person-link.manage', 'coordinator-scope.manage', 'coordinator-scope.view', 'family.view', 'family.update',
                 'person.view', 'person.update', 'person.national-id.view', 'person.national-id.view-masked',
                 'change-request.review', 'export.basic', 'report.view', 'health-record.view', 'system-admin.access',
@@ -196,6 +198,17 @@ class VerifyPermissions extends Command
                 $problems[] = "CRITICAL: {$roleName} must NOT have ".self::APPLY_PERMISSION.($applyEnabled ? '' : ' (Apply gate is disabled)');
             }
 
+            // FB-CIVIL-02B: a family-side role holds lookup search / view only while its side's switch is open.
+            if (isset(RolePermissionSeeder::CIVIL_LOOKUP_FAMILY_SIDE_PERMISSIONS[$roleName])) {
+                [$switch, $sidePermissions] = RolePermissionSeeder::CIVIL_LOOKUP_FAMILY_SIDE_PERMISSIONS[$roleName];
+                $sideOpen = config($switch) === true;
+                foreach ($sidePermissions as $name) {
+                    if ($sideOpen !== in_array($name, $actual, true)) {
+                        $problems[] = "CRITICAL: {$roleName} must ".($sideOpen ? '' : 'NOT ')."have {$name} ({$switch} is ".($sideOpen ? 'open' : 'closed').')';
+                    }
+                }
+            }
+
             // Publication confirmation: SUPER_ADMIN only, and only while the publication gate is open.
             $mayConfirm = $publishEnabled && $roleName === self::APPLY_ROLE;
             if ($mayConfirm && ! in_array(self::PUBLISH_CONFIRM_PERMISSION, $actual, true)) {
@@ -228,6 +241,16 @@ class VerifyPermissions extends Command
             ->count();
         if ($directApplyGrants > 0) {
             $problems[] = 'CRITICAL: '.self::APPLY_PERMISSION.' is granted directly to a model; it may only come from the '.self::APPLY_ROLE.' role';
+        }
+
+        // Civil Registry Lookup permissions only ever come from roles (FB-CIVIL-02B, ADR 02B §B-3): the
+        // individual grant is a GRANTED row, and a direct grant would bypass the side switches.
+        $directLookupGrants = DB::table(config('permission.table_names.model_has_permissions'))
+            ->join(config('permission.table_names.permissions').' as p', 'p.id', '=', config('permission.column_names.permission_pivot_key') ?? 'permission_id')
+            ->whereIn('p.name', self::CIVIL_LOOKUP)
+            ->count();
+        if ($directLookupGrants > 0) {
+            $problems[] = "CRITICAL: {$directLookupGrants} civil lookup permission grant(s) made directly to a model; they may only come from roles";
         }
 
         // Notification permissions only ever come from their roles (AUTH-ADR-097):

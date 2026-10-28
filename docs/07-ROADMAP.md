@@ -1469,8 +1469,15 @@ on the test instance and a real browser
     - read boundary `08-lookup.dba.sql` (reader login, EXECUTE-only `identity_ref_lookup` functions on the active release; local only) and optional indexes `09-lookup-indexes.dba.sql` (not approved);
     - lookup by National ID, full name and name parts; record details by field level (`relgion` never shown); father / mother / spouse links; household and children reverse links implemented but disabled;
     - per-role daily quotas in the database (Asia/Gaza day, atomic), per-user revocation, append-only audit and policy history, quota administration screen.
-    - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space) not started.
+    - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
+- **FB-CIVIL-02B (2026-10-28), local technical implementation COMPLETE (technically accepted, committed locally); real-data access and Production activation BLOCKED:** Civil Registry Lookup on the Family Portal (household head) and in Coordinator Space, `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`:
+    - one service, quota and audit, mounted per side (`/family/civil-registry/lookup`, `/family/coordinator/civil-registry/lookup`), with references bound to their context;
+    - separate side switches (default off) and, in production, separate side approvals plus the `EXTENDED_CONTROLLED` field-profile approval;
+    - gated family-side role permissions, explicit per-side GRANTED rows (administered by person code), FAMILY_USER / COORDINATOR policies;
+    - one shared daily counter;
+    - entry cards and pages reusing `components/civil-lookup/`.
+    - Needs G1 / OD-08 (family-side purpose), OD-09 (covering these contexts), B-OD-1 (field approval), B-OD-2 (eligibility policy), B-OD-3 (docs/06 baseline) and B-OD-4 (docs/11 entries). Reverse links stay disabled.
 
 ---
 

@@ -879,6 +879,20 @@ class RolePermissionSeeder extends Seeder
         'FAMILY_USER' => [false, 5, false],
     ];
 
+    /**
+     * FB-CIVIL-02B (ADR 02B §B-3): search and view for the family-side roles,
+     * each part of the baseline ONLY while its side's switch is open
+     * (config civil_lookup.family_side_enabled / coordinator_side_enabled) —
+     * closed by default, so no family-side account holds them in any default
+     * configuration. Even then a lookup also needs that side's production
+     * approvals, an explicit per-user GRANTED row for the side and the role's
+     * enabled policy (CivilLookupAccess). Never view-full, usage or manage.
+     */
+    public const CIVIL_LOOKUP_FAMILY_SIDE_PERMISSIONS = [
+        'FAMILY_USER' => ['civil_lookup.family_side_enabled', ['civil-lookup.search', 'civil-lookup.view']],
+        'COORDINATOR' => ['civil_lookup.coordinator_side_enabled', ['civil-lookup.search', 'civil-lookup.view']],
+    ];
+
     public const PUBLICATION_GATED_ROLE_PERMISSIONS = [
         'SUPER_ADMIN' => ['civil-import.publish.confirm'],
     ];
@@ -895,7 +909,11 @@ class RolePermissionSeeder extends Seeder
         $gated = config('import.apply_enabled') === true ? (self::GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
         $publication = config('civil_import.publish_enabled') === true ? (self::PUBLICATION_GATED_ROLE_PERMISSIONS[$roleName] ?? []) : [];
 
-        return [...self::ROLE_PERMISSIONS[$roleName], ...(self::CIVIL_LOOKUP_ROLE_PERMISSIONS[$roleName] ?? []), ...$gated, ...$publication];
+        [$switch, $familySide] = self::CIVIL_LOOKUP_FAMILY_SIDE_PERMISSIONS[$roleName] ?? [null, []];
+        $civilLookupFamilySide = $switch !== null && config($switch) === true ? $familySide : [];
+
+        return [...self::ROLE_PERMISSIONS[$roleName], ...(self::CIVIL_LOOKUP_ROLE_PERMISSIONS[$roleName] ?? []), ...$civilLookupFamilySide,
+            ...$gated, ...$publication];
     }
 
     public function run(): void

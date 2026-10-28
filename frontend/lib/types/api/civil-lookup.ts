@@ -2,6 +2,15 @@
 // Values are returned raw by the API (undocumented codes are never
 // interpreted); an empty value is null. National IDs arrive masked unless the
 // user holds civil-lookup.view-full; references are opaque strings.
+// FB-CIVIL-02B: the same shapes on the Family Portal and in Coordinator Space
+// (the EXTENDED_CONTROLLED level; identifiers always masked).
+
+/** Where a lookup is made from: one API, three mounts (docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md). */
+export type CivilLookupSpace = "staff" | "family" | "coordinator";
+
+export type CivilLookupContext = "STAFF" | "FAMILY" | "COORDINATOR";
+
+export type CivilLookupSide = "FAMILY" | "COORDINATOR";
 
 export type CivilLookupMode = "national-id" | "name" | "parts";
 
@@ -19,6 +28,7 @@ export interface CivilLookupQuota {
 }
 
 export interface CivilLookupStatus {
+  context: CivilLookupContext;
   quota: CivilLookupQuota;
   capabilities: { search: boolean; view: boolean; view_full: boolean; reverse_links: boolean };
 }
@@ -69,7 +79,7 @@ export interface CivilLookupRecord {
   ref: string;
   national_id: string | null;
   fullname: string | null;
-  level: "STANDARD" | "FULL";
+  level: "STANDARD" | "FULL" | "EXTENDED_CONTROLLED";
   sections: { key: CivilLookupSectionKey; fields: { key: string; value: string | null }[] }[];
   links: CivilLookupLink[];
 }
@@ -104,6 +114,10 @@ export interface CivilLookupUsage {
   exhausted_users: { user_id: number; name: string; role: string; used: number; daily_limit: number }[];
   lookup_enabled: boolean;
   reverse_links_enabled: boolean;
+  /** FB-CIVIL-02B: the sides whose switch is open, i.e. that may be GRANTED now. */
+  grantable_sides: CivilLookupSide[];
+  /** FB-CIVIL-02B: whether each family-side lookup is open (all its gates). */
+  side_lookup_enabled: Record<CivilLookupSide, boolean>;
 }
 
 export interface CivilLookupPolicyChange {
@@ -117,6 +131,8 @@ export interface CivilLookupPolicyChange {
   new_daily_limit: number | null;
   old_access: string | null;
   new_access: string | null;
+  old_sides: CivilLookupSide[];
+  new_sides: CivilLookupSide[];
   changed_by: string | null;
   changed_at: string | null;
 }
@@ -124,6 +140,7 @@ export interface CivilLookupPolicyChange {
 export interface CivilLookupUserAccessRow {
   user: { id: number | null; name: string | null; email: string | null };
   access: "REVOKED" | "GRANTED";
+  sides: CivilLookupSide[];
   changed_by: string | null;
   changed_at: string | null;
 }

@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use App\Models\User;
 use App\Support\AccountSide;
+use App\Support\CivilLookup\CivilLookupAccess;
+use App\Support\CivilLookup\CivilLookupContext;
 use App\Support\FamilyAuth\CoordinatorScopes;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\FamilyAuth\SignInHistory;
@@ -24,7 +26,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *   the two cannot disagree. Scope details live in the coordinator context;
  * - notifications / coordinator_notifications say whether to show the
  *   notification UI (NotificationVisibility: mode, pilot lists, existing
- *   notifications) — never which list matched or any id.
+ *   notifications) — never which list matched or any id;
+ * - civil_lookup.family / civil_lookup.coordinator say whether to SHOW the
+ *   Civil Registry Lookup entry of each side (FB-CIVIL-02B): the side's
+ *   boundary (a Family context / Coordinator Space open) AND the same
+ *   CivilLookupAccess evaluation the endpoints run. Never a quota, a reason
+ *   or a policy.
  *
  * Never a National ID, a mobile, an internal id, a permission list or any
  * fingerprint. UX only: every family-data endpoint authorizes on its own.
@@ -50,18 +57,22 @@ class FamilyCurrentUserResource extends JsonResource
         $roles = array_values(array_intersect(AccountSide::FAMILY_SIDE_ROLES, $this->getRoleNames()->all()));
         $family = $context->hasFamilyContext() ? $context->family : null;
         $coordinator = in_array(AccountSide::COORDINATOR, $roles, true);
+        $coordinatorSpace = $coordinator && app(CoordinatorScopes::class)->context($this->resource)->allowed();
 
         return [
             'display_name' => $identity->allowed() ? $identity->person->full_name : null,
             'roles' => $roles,
             'coordinator' => $coordinator,
-            'coordinator_space' => $coordinator
-                && app(CoordinatorScopes::class)->context($this->resource)->allowed(),
+            'coordinator_space' => $coordinatorSpace,
             // Pilot isolation (ADR §2h): whether to SHOW the household's
             // notification UI (C1) and the coordinator's notification screens
             // (C3). Visibility only; the endpoints authorize on their own.
             'notifications' => NotificationVisibility::forFamily($family),
             'coordinator_notifications' => NotificationVisibility::forCoordinator($this->resource, $coordinator),
+            'civil_lookup' => [
+                'family' => $family !== null && CivilLookupAccess::evaluate($this->resource, CivilLookupContext::FAMILY)['allowed'],
+                'coordinator' => $coordinatorSpace && CivilLookupAccess::evaluate($this->resource, CivilLookupContext::COORDINATOR)['allowed'],
+            ],
             ...SignInHistory::forSession($request),
             'context' => [
                 'available' => $family !== null,

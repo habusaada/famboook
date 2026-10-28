@@ -10,6 +10,16 @@ use App\Support\NationalIdMask;
  * (undocumented codes are never interpreted); an empty value is NULL ("غير
  * متوفر" in the UI). `relgion` is in no level: the database functions already
  * remove it and this policy never lists it.
+ *
+ * Every level is an explicit allowlist: a source field that is not listed is
+ * never returned, so a new source column can never appear by itself.
+ *
+ *   FULL                 Staff with civil-lookup.view-full (all 35 fields, identifiers unmasked)
+ *   STANDARD             other Staff
+ *   EXTENDED_CONTROLLED  FB-CIVIL-02B, the Family Portal and Coordinator Space (ADR 02B §B-5):
+ *                        identity, family-status and place fields only; identifiers always masked.
+ *                        Each family-side context maps to it separately (CONTEXT_LEVELS), so the
+ *                        two can diverge when their legal entitlements do.
  */
 final class CivilLookupFieldPolicy
 {
@@ -18,6 +28,8 @@ final class CivilLookupFieldPolicy
     public const STANDARD = 'STANDARD';
 
     public const FULL = 'FULL';
+
+    public const EXTENDED_CONTROLLED = 'EXTENDED_CONTROLLED';
 
     /** The 35 displayable source fields by section (the 36 source columns minus relgion). */
     public const SECTIONS = [
@@ -35,6 +47,20 @@ final class CivilLookupFieldPolicy
     /** An opened record without civil-lookup.view-full. */
     public const STANDARD_FIELDS = ['mainid', 'fullname', 'name1', 'father', 'grandfath', 'family', 'gender', 'datebirth', 'age',
         'birthplace', 'maritalst', 'govern', 'city', 'householdrel'];
+
+    /**
+     * FB-CIVIL-02B: the EXTENDED_CONTROLLED allowlist, subject to the field-level privacy approval
+     * (CIVIL_LOOKUP_EXTENDED_PROFILE_APPROVAL). The father / mother / spouse references and the
+     * household reference are the record's links (masked identifiers, each opening a new lookup).
+     */
+    public const EXTENDED_CONTROLLED_FIELDS = ['mainid', 'fullname', 'name1', 'father', 'grandfath', 'family', 'gender', 'datebirth',
+        'age', 'maritalst', 'govern', 'city', 'birthplace'];
+
+    /** The profile of each family-side lookup context (the Staff level depends on civil-lookup.view-full). */
+    public const CONTEXT_LEVELS = [
+        CivilLookupContext::FAMILY => self::EXTENDED_CONTROLLED,
+        CivilLookupContext::COORDINATOR => self::EXTENDED_CONTROLLED,
+    ];
 
     /** Fields shown masked unless FULL. */
     private const IDENTIFIERS = ['mainid', 'fatherid', 'motherid', 'partnerid'];
@@ -55,7 +81,11 @@ final class CivilLookupFieldPolicy
      */
     public static function sections(CivilRecord $record, string $level): array
     {
-        $visible = $level === self::FULL ? array_merge(...array_values(self::SECTIONS)) : self::STANDARD_FIELDS;
+        $visible = match ($level) {
+            self::FULL => array_merge(...array_values(self::SECTIONS)),
+            self::STANDARD => self::STANDARD_FIELDS,
+            self::EXTENDED_CONTROLLED => self::EXTENDED_CONTROLLED_FIELDS,
+        };
         $sections = [];
         foreach (self::SECTIONS as $section => $keys) {
             $fields = [];

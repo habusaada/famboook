@@ -6,6 +6,7 @@ use App\Exceptions\CivilLookupException;
 use App\Models\User;
 use App\Support\CivilLookup\CivilLookupAccess;
 use App\Support\CivilLookup\CivilLookupAudit;
+use App\Support\CivilLookup\CivilLookupContext;
 use App\Support\CivilLookup\CivilLookupFieldPolicy;
 use App\Support\CivilLookup\CivilLookupGate;
 use App\Support\CivilLookup\CivilLookupQuota;
@@ -31,6 +32,11 @@ use Closure;
  *
  * Callers pass validated, normalized criteria; the National ID and terms
  * never leave this class except inside encrypted references.
+ *
+ * FB-CIVIL-02B (ADR 02B §B-1): every operation takes the lookup context the
+ * route fixed (CivilLookupContext). The context selects the authorization
+ * rules and the field profile, is bound into every reference and recorded in
+ * every audit row; the quota and the registry read are the same for all.
  */
 final class LookupCivilRegistryAction
 {
@@ -44,10 +50,10 @@ final class LookupCivilRegistryAction
     public function __construct(private readonly CivilRegistrySource $registry) {}
 
     /** @return array<string, mixed> */
-    public function byNationalId(User $user, #[\SensitiveParameter] string $nationalId, ?string $ip): array
+    public function byNationalId(User $user, string $context, #[\SensitiveParameter] string $nationalId, ?string $ip): array
     {
-        $policy = $this->authorize($user, CivilLookupAccess::SEARCH, 'SEARCH_BY_ID', $ip);
-        [$record, $used] = $this->charged($user, $policy, 'SEARCH_BY_ID', 'id:'.$nationalId, $ip,
+        $policy = $this->authorize($user, $context, CivilLookupAccess::SEARCH, 'SEARCH_BY_ID', $ip);
+        [$record, $used] = $this->charged($user, $context, $policy, 'SEARCH_BY_ID', 'id:'.$nationalId, $ip,
             fn () => $this->registry->byMainid($nationalId) ?? $this->requireRelease(),
             fn ($r) => $r instanceof CivilRecord ? ['FOUND', $r->releaseId, $r->recordId, 1] : ['NOT_FOUND', $r, null, 0]);
 
@@ -56,10 +62,10 @@ final class LookupCivilRegistryAction
         return [
             'release_id' => $found ? $record->releaseId : $record,
             'outcome' => $found ? 'FOUND' : 'NOT_FOUND',
-            'results' => $found ? [$this->listEntry($user, $record)] : [],
+            'results' => $found ? [$this->listEntry($user, $context, $record)] : [],
             'meta' => ['page' => 1, 'per_page' => self::PER_PAGE, 'total' => $found ? 1 : 0, 'last_page' => 1],
             'search_ref' => null,
-            'quota' => CivilLookupQuota::status($user) + ['used_after' => $used],
+            'quota' => CivilLookupQuota::status($user, $context) + ['used_after' => $used],
         ];
     }
 
@@ -67,25 +73,25 @@ final class LookupCivilRegistryAction
      * @param  list<string>  $tokens  normalized (ArabicNameNormalizer)
      * @return array<string, mixed>
      */
-    public function byName(User $user, array $tokens, ?string $ip): array
+    public function byName(User $user, string $context, array $tokens, ?string $ip): array
     {
-        return $this->search($user, 'SEARCH_BY_NAME', 'NAME', ['tokens' => $tokens], 'name:'.implode(' ', $tokens), $ip);
+        return $this->search($user, $context, 'SEARCH_BY_NAME', 'NAME', ['tokens' => $tokens], 'name:'.implode(' ', $tokens), $ip);
     }
 
     /**
      * @param  array{name1: ?string, father: ?string, grandfath: ?string, family: ?string}  $parts  normalized; NULL = not given
      * @return array<string, mixed>
      */
-    public function byParts(User $user, array $parts, ?string $ip): array
+    public function byParts(User $user, string $context, array $parts, ?string $ip): array
     {
-        return $this->search($user, 'SEARCH_BY_PARTS', 'PARTS', ['parts' => $parts], 'parts:'.json_encode($parts, JSON_UNESCAPED_UNICODE), $ip);
+        return $this->search($user, $context, 'SEARCH_BY_PARTS', 'PARTS', ['parts' => $parts], 'parts:'.json_encode($parts, JSON_UNESCAPED_UNICODE), $ip);
     }
 
     /** Another page of an authorized search: not charged (§L-6). @return array<string, mixed> */
-    public function page(User $user, mixed $searchRef, int $page, ?string $ip): array
+    public function page(User $user, string $context, mixed $searchRef, int $page, ?string $ip): array
     {
-        $this->authorize($user, CivilLookupAccess::SEARCH, 'SEARCH_PAGE', $ip);
-        $ref = CivilLookupRefs::read($searchRef, CivilLookupRefs::SEARCH, $user);
+        $this->authorize($user, $context, CivilLookupAccess::SEARCH, 'SEARCH_PAGE', $ip);
+        $ref = CivilLookupRefs::read($searchRef, CivilLookupRefs::SEARCH, $user, $context);
         $kind = (string) ($ref['data']['kind'] ?? '');
         $cap = in_array($kind, self::REVERSE_LINKS, true) ? CivilRegistrySource::LINKS_CAP : CivilRegistrySource::SEARCH_CAP;
         if ($page < 1 || $page > intdiv($cap, self::PER_PAGE)) {
@@ -98,35 +104,35 @@ final class LookupCivilRegistryAction
         if ($result->releaseId !== $ref['release_id']) {
             throw new CivilLookupException(CivilLookupException::RELEASE_CHANGED);
         }
-        CivilLookupAudit::record('SEARCH_PAGE', $user, $result->tooBroad() ? 'TOO_BROAD' : 'RESULTS', $result->releaseId,
+        CivilLookupAudit::record('SEARCH_PAGE', $user, $context, $result->tooBroad() ? 'TOO_BROAD' : 'RESULTS', $result->releaseId,
             criteria: $this->criteria($kind, $ref['data']), resultCount: count($result->rows), quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
 
-        return $this->listResponse($user, $result, $page, $searchRef);
+        return $this->listResponse($user, $context, $result, $page, $searchRef);
     }
 
     /** A record listed in an authorized result: not charged (§L-6). @return array<string, mixed> */
-    public function openRecord(User $user, mixed $recordRef, ?string $ip): array
+    public function openRecord(User $user, string $context, mixed $recordRef, ?string $ip): array
     {
-        $this->authorize($user, CivilLookupAccess::VIEW, 'RECORD_OPENED', $ip);
-        $ref = CivilLookupRefs::read($recordRef, CivilLookupRefs::RECORD, $user);
+        $this->authorize($user, $context, CivilLookupAccess::VIEW, 'RECORD_OPENED', $ip);
+        $ref = CivilLookupRefs::read($recordRef, CivilLookupRefs::RECORD, $user, $context);
         $record = $this->registry->byRecord((int) ($ref['data']['i'] ?? 0));
         if ($record === null || $record->releaseId !== $ref['release_id']) {
             throw new CivilLookupException(CivilLookupException::RELEASE_CHANGED);
         }
-        CivilLookupAudit::record('RECORD_OPENED', $user, 'FOUND', $record->releaseId, $record->recordId,
+        CivilLookupAudit::record('RECORD_OPENED', $user, $context, 'FOUND', $record->releaseId, $record->recordId,
             resultCount: 1, quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
 
-        return ['outcome' => 'FOUND', 'release_id' => $record->releaseId, 'record' => $this->detail($user, $record),
-            'quota' => CivilLookupQuota::status($user)];
+        return ['outcome' => 'FOUND', 'release_id' => $record->releaseId, 'record' => $this->detail($user, $context, $record),
+            'quota' => CivilLookupQuota::status($user, $context)];
     }
 
     /** A linked citizen: a new lookup, authorized and charged again (§L-8). @return array<string, mixed> */
-    public function openLink(User $user, mixed $linkRef, ?string $ip): array
+    public function openLink(User $user, string $context, mixed $linkRef, ?string $ip): array
     {
-        $policy = $this->authorize($user, CivilLookupAccess::VIEW, 'LINK_OPENED', $ip);
-        $ref = CivilLookupRefs::read($linkRef, CivilLookupRefs::LINK, $user);
+        $policy = $this->authorize($user, $context, CivilLookupAccess::VIEW, 'LINK_OPENED', $ip);
+        $ref = CivilLookupRefs::read($linkRef, CivilLookupRefs::LINK, $user, $context);
         $mainid = (string) ($ref['data']['m'] ?? '');
-        [$record, $used] = $this->charged($user, $policy, 'LINK_OPENED', 'id:'.$mainid, $ip,
+        [$record, $used] = $this->charged($user, $context, $policy, 'LINK_OPENED', 'id:'.$mainid, $ip,
             function () use ($mainid, $ref) {
                 $record = $this->registry->byMainid($mainid);
                 if ($record !== null && $record->releaseId !== $ref['release_id']) {
@@ -139,23 +145,23 @@ final class LookupCivilRegistryAction
         $found = $record instanceof CivilRecord;
 
         return ['outcome' => $found ? 'FOUND' : 'NOT_FOUND', 'release_id' => $found ? $record->releaseId : $record,
-            'relation' => (string) ($ref['data']['rel'] ?? ''), 'record' => $found ? $this->detail($user, $record) : null,
-            'quota' => CivilLookupQuota::status($user) + ['used_after' => $used]];
+            'relation' => (string) ($ref['data']['rel'] ?? ''), 'record' => $found ? $this->detail($user, $context, $record) : null,
+            'quota' => CivilLookupQuota::status($user, $context) + ['used_after' => $used]];
     }
 
     /** A reverse-link list (household members, children): charged; disabled unless enabled (§L-8). @return array<string, mixed> */
-    public function links(User $user, mixed $linksRef, string $relation, ?string $ip): array
+    public function links(User $user, string $context, mixed $linksRef, string $relation, ?string $ip): array
     {
         if (! CivilLookupGate::reverseLinksEnabled()) {
             throw new CivilLookupException(CivilLookupException::LINKS_DISABLED);
         }
-        $policy = $this->authorize($user, CivilLookupAccess::VIEW, 'LINKS_LISTED', $ip);
-        $ref = CivilLookupRefs::read($linksRef, CivilLookupRefs::LINKS, $user);
+        $policy = $this->authorize($user, $context, CivilLookupAccess::VIEW, 'LINKS_LISTED', $ip);
+        $ref = CivilLookupRefs::read($linksRef, CivilLookupRefs::LINKS, $user, $context);
         $data = ['mainid' => (string) ($ref['data']['m'] ?? ''), 'householdid' => (string) ($ref['data']['h'] ?? '')];
         if (! in_array($relation, self::REVERSE_LINKS, true) || ($relation === 'HOUSEHOLD' && $data['householdid'] === '')) {
             throw new CivilLookupException(CivilLookupException::REFERENCE_INVALID);
         }
-        [$result, $used] = $this->charged($user, $policy, 'LINKS_LISTED', strtolower($relation).':'.$data['mainid'], $ip,
+        [$result, $used] = $this->charged($user, $context, $policy, 'LINKS_LISTED', strtolower($relation).':'.$data['mainid'], $ip,
             function () use ($relation, $data, $ref) {
                 $result = $this->execute($relation, $data, 0);
                 if ($result->releaseId !== $ref['release_id']) {
@@ -165,9 +171,9 @@ final class LookupCivilRegistryAction
                 return $result;
             },
             fn (CivilRecordPage $p) => [$p->tooBroad() ? 'TOO_BROAD' : (count($p->rows) > 0 ? 'RESULTS' : 'NOT_FOUND'), $p->releaseId, null, count($p->rows)]);
-        $searchRef = CivilLookupRefs::issue(CivilLookupRefs::SEARCH, $user, (int) $result->releaseId, ['kind' => $relation] + $data);
+        $searchRef = CivilLookupRefs::issue(CivilLookupRefs::SEARCH, $user, $context, (int) $result->releaseId, ['kind' => $relation] + $data);
 
-        return ['relation' => $relation] + $this->listResponse($user, $result, 1, $searchRef, $used);
+        return ['relation' => $relation] + $this->listResponse($user, $context, $result, 1, $searchRef, $used);
     }
 
     // ---------------------------------------------------------------- internals
@@ -176,15 +182,15 @@ final class LookupCivilRegistryAction
      * @param  array<string, mixed>  $criteria
      * @return array<string, mixed>
      */
-    private function search(User $user, string $event, string $kind, array $criteria, string $fingerprint, ?string $ip): array
+    private function search(User $user, string $context, string $event, string $kind, array $criteria, string $fingerprint, ?string $ip): array
     {
-        $policy = $this->authorize($user, CivilLookupAccess::SEARCH, $event, $ip);
-        [$result, $used] = $this->charged($user, $policy, $event, $fingerprint, $ip,
+        $policy = $this->authorize($user, $context, CivilLookupAccess::SEARCH, $event, $ip);
+        [$result, $used] = $this->charged($user, $context, $policy, $event, $fingerprint, $ip,
             fn () => $this->execute($kind, $criteria, 0),
             fn (CivilRecordPage $p) => [$p->tooBroad() ? 'TOO_BROAD' : (count($p->rows) > 0 ? 'RESULTS' : 'NOT_FOUND'), $p->releaseId, null, count($p->rows)]);
-        $searchRef = CivilLookupRefs::issue(CivilLookupRefs::SEARCH, $user, (int) $result->releaseId, ['kind' => $kind] + $criteria);
+        $searchRef = CivilLookupRefs::issue(CivilLookupRefs::SEARCH, $user, $context, (int) $result->releaseId, ['kind' => $kind] + $criteria);
 
-        return $this->listResponse($user, $result, 1, $searchRef, $used);
+        return $this->listResponse($user, $context, $result, 1, $searchRef, $used);
     }
 
     /** @param  array<string, mixed>  $data */
@@ -221,14 +227,14 @@ final class LookupCivilRegistryAction
     }
 
     /** @throws CivilLookupException NOT_ALLOWED (audited) */
-    private function authorize(User $user, string $permission, string $event, ?string $ip): EffectivePolicy
+    private function authorize(User $user, string $context, string $permission, string $event, ?string $ip): EffectivePolicy
     {
-        $result = CivilLookupAccess::evaluate($user, $permission);
+        $result = CivilLookupAccess::evaluate($user, $context, $permission);
         if ($result['allowed']) {
             return $result['policy'];
         }
         if ($result['reason'] === CivilLookupException::NOT_ALLOWED) {
-            CivilLookupAudit::record('LOOKUP_REFUSED', $user, 'NOT_ALLOWED', ip: $ip);
+            CivilLookupAudit::record('LOOKUP_REFUSED', $user, $context, 'NOT_ALLOWED', ip: $ip);
         }
         throw new CivilLookupException((string) $result['reason']);
     }
@@ -240,7 +246,7 @@ final class LookupCivilRegistryAction
      * @param  Closure(mixed): array{0: string, 1: ?int, 2: ?int, 3: int}  $outcome  [code, release, record, count]
      * @return array{0: mixed, 1: int}
      */
-    private function charged(User $user, EffectivePolicy $policy, string $event, #[\SensitiveParameter] string $criteria, ?string $ip,
+    private function charged(User $user, string $context, EffectivePolicy $policy, string $event, #[\SensitiveParameter] string $criteria, ?string $ip,
         Closure $execute, Closure $outcome): array
     {
         try {
@@ -250,51 +256,64 @@ final class LookupCivilRegistryAction
             $used = CivilLookupQuota::consume($user, $policy);
         } catch (CivilLookupException $e) {
             if ($e->reason === CivilLookupException::QUOTA_EXHAUSTED) {
-                CivilLookupAudit::record($event, $user, 'QUOTA_EXHAUSTED', criteria: $criteria, quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
+                CivilLookupAudit::record($event, $user, $context, 'QUOTA_EXHAUSTED', criteria: $criteria, quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
             }
             throw $e;
         }
-        CivilLookupAudit::record($event, $user, $code, $release, $record, $criteria, $count, $used, $ip);
+        CivilLookupAudit::record($event, $user, $context, $code, $release, $record, $criteria, $count, $used, $ip);
 
         return [$result, $used];
     }
 
     /** @return array<string, mixed> */
-    private function listResponse(User $user, CivilRecordPage $result, int $page, string $searchRef, ?int $used = null): array
+    private function listResponse(User $user, string $context, CivilRecordPage $result, int $page, string $searchRef, ?int $used = null): array
     {
         $total = $result->tooBroad() ? null : $result->total;
 
         return [
             'release_id' => $result->releaseId,
             'outcome' => $result->tooBroad() ? 'TOO_BROAD' : ($result->total > 0 ? 'RESULTS' : 'NOT_FOUND'),
-            'results' => array_map(fn (CivilRecord $r) => $this->listEntry($user, $r), $result->rows),
+            'results' => array_map(fn (CivilRecord $r) => $this->listEntry($user, $context, $r), $result->rows),
             'meta' => ['page' => $page, 'per_page' => self::PER_PAGE, 'total' => $total,
                 'last_page' => $total === null ? 1 : max(1, (int) ceil($total / self::PER_PAGE))],
             'search_ref' => $total !== null && $total > self::PER_PAGE ? $searchRef : null,
-            'quota' => CivilLookupQuota::status($user) + ($used === null ? [] : ['used_after' => $used]),
+            'quota' => CivilLookupQuota::status($user, $context) + ($used === null ? [] : ['used_after' => $used]),
         ];
     }
 
     /** @return array<string, mixed> */
-    private function listEntry(User $user, CivilRecord $record): array
+    private function listEntry(User $user, string $context, CivilRecord $record): array
     {
-        return ['ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $record->releaseId, ['i' => $record->recordId])]
+        return ['ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $context, $record->releaseId, ['i' => $record->recordId])]
             + CivilLookupFieldPolicy::summary($record);
     }
 
     /** @return array<string, mixed> */
-    private function detail(User $user, CivilRecord $record): array
+    private function detail(User $user, string $context, CivilRecord $record): array
     {
-        $level = $user->can(CivilLookupAccess::VIEW_FULL) ? CivilLookupFieldPolicy::FULL : CivilLookupFieldPolicy::STANDARD;
+        $level = $this->level($user, $context);
 
         return [
-            'ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $record->releaseId, ['i' => $record->recordId]),
+            'ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $context, $record->releaseId, ['i' => $record->recordId]),
             'national_id' => CivilLookupFieldPolicy::identifier('mainid', $record->mainid, $level),
             'fullname' => is_string($record->payload['fullname'] ?? null) && trim($record->payload['fullname']) !== '' ? $record->payload['fullname'] : null,
             'level' => $level,
             'sections' => CivilLookupFieldPolicy::sections($record, $level),
-            'links' => $this->linkEntries($user, $record, $level),
+            'links' => $this->linkEntries($user, $context, $record, $level),
         ];
+    }
+
+    /**
+     * The field profile: Staff by civil-lookup.view-full (FULL / STANDARD); a family-side context by its own
+     * mapping (EXTENDED_CONTROLLED), never view-full — a family-side role never holds it.
+     */
+    private function level(User $user, string $context): string
+    {
+        if ($context !== CivilLookupContext::STAFF) {
+            return CivilLookupFieldPolicy::CONTEXT_LEVELS[$context];
+        }
+
+        return $user->can(CivilLookupAccess::VIEW_FULL) ? CivilLookupFieldPolicy::FULL : CivilLookupFieldPolicy::STANDARD;
     }
 
     /**
@@ -302,7 +321,7 @@ final class LookupCivilRegistryAction
      *
      * @return list<array<string, mixed>>
      */
-    private function linkEntries(User $user, CivilRecord $record, string $level): array
+    private function linkEntries(User $user, string $context, CivilRecord $record, string $level): array
     {
         $ids = [];
         foreach (self::FORWARD_LINKS as $relation => $field) {
@@ -322,12 +341,12 @@ final class LookupCivilRegistryAction
                 $links[] = ['relation' => $relation, 'status' => 'NOT_IN_RELEASE', 'national_id' => CivilLookupFieldPolicy::identifier($field, $value, $level)];
             } else {
                 $links[] = ['relation' => $relation, 'status' => 'AVAILABLE', 'national_id' => CivilLookupFieldPolicy::identifier($field, $value, $level),
-                    'ref' => CivilLookupRefs::issue(CivilLookupRefs::LINK, $user, $record->releaseId, ['m' => $value, 'rel' => $relation])];
+                    'ref' => CivilLookupRefs::issue(CivilLookupRefs::LINK, $user, $context, $record->releaseId, ['m' => $value, 'rel' => $relation])];
             }
         }
         $householdId = trim((string) ($record->payload['householdid'] ?? ''));
         $reverse = CivilLookupGate::reverseLinksEnabled();
-        $linksRef = $reverse ? CivilLookupRefs::issue(CivilLookupRefs::LINKS, $user, $record->releaseId, ['m' => $record->mainid, 'h' => $householdId]) : null;
+        $linksRef = $reverse ? CivilLookupRefs::issue(CivilLookupRefs::LINKS, $user, $context, $record->releaseId, ['m' => $record->mainid, 'h' => $householdId]) : null;
         $links[] = ['relation' => 'HOUSEHOLD', 'status' => $householdId === '' ? 'EMPTY' : ($reverse ? 'AVAILABLE' : 'DISABLED')]
             + ($reverse && $householdId !== '' ? ['ref' => $linksRef] : []);
         $links[] = ['relation' => 'CHILDREN', 'status' => $reverse ? 'AVAILABLE' : 'DISABLED'] + ($reverse ? ['ref' => $linksRef] : []);

@@ -19,7 +19,7 @@ class CivilLookupAuditEvent extends Model
     public const CREATED_AT = 'occurred_at';
 
     protected $fillable = ['event_type', 'actor_user_id', 'actor_side', 'outcome_code', 'release_id', 'record_id',
-        'query_fingerprint', 'result_count', 'quota_used_after', 'ip_hash'];
+        'query_fingerprint', 'result_count', 'quota_used_after', 'ip_hash', 'lookup_context'];
 
     protected static function booted(): void
     {

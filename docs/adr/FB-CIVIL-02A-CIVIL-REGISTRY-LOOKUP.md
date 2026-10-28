@@ -247,6 +247,10 @@ users, the legal basis (G1 / OD-08), `family_side_enabled`, an explicit
 per-user GRANTED row, and an enabled role policy. FAMILY_USER and COORDINATOR
 are never granted lookup automatically.
 
+**2026-10-28:** proposed and implemented locally (closed by default) in
+`docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`. The Staff side described
+here is unchanged.
+
 ## Open decisions (preserved; none is approved by this ADR)
 
 | Id | Decision | Status | Blocks |

@@ -31,6 +31,7 @@ export function CitizenDetail({
       <p className="text-[13px] text-muted-foreground" data-source-note>
         تُعرض القيم كما وردت في الإصدار المنشور من السجل المدني، دون تفسير للرموز.
         {record.level === "STANDARD" && " يعرض هذا المستوى حقولًا محددة، وتظهر أرقام الهوية مخفية جزئيًا."}
+        {record.level === "EXTENDED_CONTROLLED" && " تُعرض بيانات الهوية والحالة الاجتماعية والمكان فقط، وتظهر أرقام الهوية مخفية جزئيًا."}
       </p>
       {record.sections.map((section) => (
         <Panel key={section.key} data-section={section.key}>

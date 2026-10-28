@@ -13,6 +13,7 @@ use App\Http\Middleware\EnsurePasswordResetEnabled;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SendSmsAfterResponse;
+use App\Http\Middleware\SetCivilLookupContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -59,6 +60,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'notifications.publication-ready' => EnsureNotificationPublicationReady::class,
             // FB-CIVIL-02A: the Civil Registry Lookup gate (off by default).
             'civil-lookup.enabled' => EnsureCivilLookupEnabled::class,
+            // FB-CIVIL-02B: fixes the lookup context of a mount (STAFF, FAMILY, COORDINATOR).
+            'civil-lookup.context' => SetCivilLookupContext::class,
         ]);
         // FU-16: the password-change gate runs BEFORE the route limiter (which
         // the priority list would otherwise move ahead of `can:`), so a closed

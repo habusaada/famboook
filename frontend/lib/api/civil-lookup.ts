@@ -8,6 +8,8 @@ import type {
   CivilLookupPolicyChange,
   CivilLookupRecordResponse,
   CivilLookupReverseRelation,
+  CivilLookupSide,
+  CivilLookupSpace,
   CivilLookupStatus,
   CivilLookupUsage,
   CivilLookupUserAccessRow,
@@ -18,12 +20,22 @@ import type {
 // body, never in a URL. Results are never cached (gcTime 0) and never stored
 // in the browser; the page keeps them in component state only, and sign-out
 // clears the client (§L-7). The API authorizes and counts every call.
+//
+// FB-CIVIL-02B: the same hooks serve the Family Portal and Coordinator Space
+// through their own mounts of the same API (the server fixes the context and
+// binds every reference to it); the quota they show is the one shared counter.
 
 const BASE = "/api/v1/civil-registry/lookup";
 
+const SPACE_BASES: Record<CivilLookupSpace, string> = {
+  staff: BASE,
+  family: "/api/v1/family/civil-registry/lookup",
+  coordinator: "/api/v1/family/coordinator/civil-registry/lookup",
+};
+
 export const civilLookupKeys = {
   all: ["civil-lookup"] as const,
-  status: () => [...civilLookupKeys.all, "status"] as const,
+  status: (space: CivilLookupSpace = "staff") => [...civilLookupKeys.all, "status", space] as const,
   usage: () => [...civilLookupKeys.all, "usage"] as const,
   changes: (page: number) => [...civilLookupKeys.all, "changes", page] as const,
   userAccess: () => [...civilLookupKeys.all, "user-access"] as const,
@@ -63,10 +75,10 @@ export function civilLookupErrorMessage(error: unknown): string {
   return "تعذّر إتمام الاستعلام. حاول مرة أخرى.";
 }
 
-export function useCivilLookupStatus() {
+export function useCivilLookupStatus(space: CivilLookupSpace = "staff") {
   return useQuery({
-    queryKey: civilLookupKeys.status(),
-    queryFn: async () => (await apiClient.get<{ data: CivilLookupStatus }>(`${BASE}/status`)).data,
+    queryKey: civilLookupKeys.status(space),
+    queryFn: async () => (await apiClient.get<{ data: CivilLookupStatus }>(`${SPACE_BASES[space]}/status`)).data,
     retry: false,
   });
 }
@@ -77,56 +89,58 @@ const SEARCH_PATHS: Record<CivilLookupMode, string> = {
   parts: "/search/parts",
 };
 
-/** After every counted lookup the quota indicator is refreshed. */
+/** After every counted lookup the quota indicator is refreshed (every space: the counter is shared). */
 function useRefreshStatus() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: civilLookupKeys.status() });
+  return () => queryClient.invalidateQueries({ queryKey: [...civilLookupKeys.all, "status"] });
 }
 
-export function useCivilLookupSearch() {
+export function useCivilLookupSearch(space: CivilLookupSpace = "staff") {
   const refresh = useRefreshStatus();
   return useMutation({
     gcTime: 0,
     mutationFn: async ({ mode, body }: { mode: CivilLookupMode; body: Record<string, string | null> }) =>
-      (await apiClient.post<{ data: CivilLookupList }>(`${BASE}${SEARCH_PATHS[mode]}`, body)).data,
+      (await apiClient.post<{ data: CivilLookupList }>(`${SPACE_BASES[space]}${SEARCH_PATHS[mode]}`, body)).data,
     onSettled: refresh,
   });
 }
 
 /** Another page of the same search: not counted. */
-export function useCivilLookupPage() {
+export function useCivilLookupPage(space: CivilLookupSpace = "staff") {
   return useMutation({
     gcTime: 0,
     mutationFn: async ({ ref, page }: { ref: string; page: number }) =>
-      (await apiClient.post<{ data: CivilLookupList }>(`${BASE}/search/page`, { ref, page })).data,
+      (await apiClient.post<{ data: CivilLookupList }>(`${SPACE_BASES[space]}/search/page`, { ref, page })).data,
   });
 }
 
 /** A record listed in a result: not counted. */
-export function useCivilLookupOpenRecord() {
+export function useCivilLookupOpenRecord(space: CivilLookupSpace = "staff") {
   return useMutation({
     gcTime: 0,
-    mutationFn: async (ref: string) => (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${BASE}/records/open`, { ref })).data,
+    mutationFn: async (ref: string) =>
+      (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${SPACE_BASES[space]}/records/open`, { ref })).data,
   });
 }
 
 /** A linked citizen: a new, counted lookup. */
-export function useCivilLookupOpenLink() {
+export function useCivilLookupOpenLink(space: CivilLookupSpace = "staff") {
   const refresh = useRefreshStatus();
   return useMutation({
     gcTime: 0,
-    mutationFn: async (ref: string) => (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${BASE}/links/open`, { ref })).data,
+    mutationFn: async (ref: string) =>
+      (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${SPACE_BASES[space]}/links/open`, { ref })).data,
     onSettled: refresh,
   });
 }
 
 /** Household members or children (when enabled): a counted lookup. */
-export function useCivilLookupLinks() {
+export function useCivilLookupLinks(space: CivilLookupSpace = "staff") {
   const refresh = useRefreshStatus();
   return useMutation({
     gcTime: 0,
     mutationFn: async ({ ref, relation }: { ref: string; relation: CivilLookupReverseRelation }) =>
-      (await apiClient.post<{ data: CivilLookupList }>(`${BASE}/links/list`, { ref, relation })).data,
+      (await apiClient.post<{ data: CivilLookupList }>(`${SPACE_BASES[space]}/links/list`, { ref, relation })).data,
     onSettled: refresh,
   });
 }
@@ -175,11 +189,28 @@ export function useCivilLookupUserAccess(enabled: boolean) {
   });
 }
 
+/** The target is a Staff email or, for a family-side account (no email), its person code. */
+export type CivilLookupAccessTarget = { email: string } | { person_code: string };
+
 export function useSetCivilLookupUserAccess() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ email, access }: { email: string; access: "REVOKED" | "DEFAULT" }) =>
-      (await apiClient.put<{ data: { user_id: number; access: string } }>(`${BASE}/admin/user-access`, { email, access })).data,
+    mutationFn: async ({
+      target,
+      access,
+      sides,
+    }: {
+      target: CivilLookupAccessTarget;
+      access: "REVOKED" | "DEFAULT" | "GRANTED";
+      sides?: CivilLookupSide[];
+    }) =>
+      (
+        await apiClient.put<{ data: { user_id: number; access: string; sides: CivilLookupSide[] } }>(`${BASE}/admin/user-access`, {
+          ...target,
+          access,
+          ...(access === "GRANTED" ? { sides } : {}),
+        })
+      ).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: civilLookupKeys.all }),
   });
 }

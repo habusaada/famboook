@@ -3,6 +3,7 @@
 namespace Tests\Feature\CivilLookup;
 
 use App\Models\CivilLookupRolePolicy;
+use App\Models\CivilLookupUserAccess;
 use App\Models\User;
 use App\Support\CivilLookup\CivilLookupQuota;
 use App\Support\CivilLookup\EffectivePolicy;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use PDO;
 use PDOException;
+use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\IdentityRef\IdentityRefDatabase;
 use Tests\Support\IdentityRef\IdentityRefStaging;
 use Tests\TestCase;
@@ -29,6 +31,7 @@ use Tests\TestCase;
 class CivilLookupPostgresTest extends TestCase
 {
     use DatabaseTruncation;
+    use FamilyIdentityFixtures;
     use IdentityRefDatabase;
     use IdentityRefStaging;
 
@@ -258,5 +261,41 @@ class CivilLookupPostgresTest extends TestCase
             $this->assertSame('23001', $this->sqlStateOf(fn () => DB::delete("DELETE FROM {$table}")), $table);
         }
         $this->assertSame('23514', $this->sqlStateOf(fn () => DB::update("UPDATE civil_lookup_role_policies SET daily_limit = 5 WHERE role_name = 'SUPER_ADMIN'")));
+    }
+
+    /**
+     * FB-CIVIL-02B: a household head's lookup through the family mount and the real functions
+     * (EXTENDED_CONTROLLED, shared counter, FAMILY context recorded), and the database CHECKs on the
+     * per-side grant and the audit context.
+     */
+    public function test_a_granted_household_head_reads_the_extended_profile_and_the_family_side_rows_are_constrained(): void
+    {
+        config(['civil_lookup.family_side_enabled' => true]);
+        $this->seed(RolePermissionSeeder::class);
+        CivilLookupRolePolicy::where('role_name', 'FAMILY_USER')->update(['enabled' => true]);
+        $this->useFamilyAuthKey();
+        $head = $this->activatedHead('123456780')['user'];
+        CivilLookupUserAccess::create(['user_id' => $head->id, 'access' => 'GRANTED', 'sides' => 'FAMILY', 'changed_by' => $head->id, 'changed_at' => now()]);
+        $this->publishedRelease(['900000601' => ['fullname' => 'سارة عادل اختبار', 'phonenum' => '0599111111', 'worker' => '1']]);
+
+        $ref = $this->actingAs($head)->postJson('/api/v1/family/civil-registry/lookup/search/national-id', ['national_id' => '900000601'])
+            ->assertOk()->json('data.results.0.ref');
+        $record = $this->actingAs($head)->postJson('/api/v1/family/civil-registry/lookup/records/open', ['ref' => $ref])->assertOk()
+            ->assertJsonPath('data.record.level', 'EXTENDED_CONTROLLED')->json('data.record');
+        foreach (['relgion', 'phonenum', '0599111111', 'worker', '900000601'] as $hidden) {
+            $this->assertStringNotContainsString($hidden, json_encode($record, JSON_UNESCAPED_UNICODE));
+        }
+        $this->assertSame(1, $this->used($head));
+        $this->assertSame(['FAMILY'], DB::table('civil_lookup_audit_events')->where('actor_user_id', $head->id)->distinct()->pluck('lookup_context')->all());
+
+        // GRANTED always names its sides; REVOKED never does; a family-side context only for a family-side actor.
+        $other = User::factory()->create();
+        $insert = fn (array $row) => DB::table('civil_lookup_user_access')->insert($row + ['user_id' => $other->id, 'changed_by' => $other->id, 'changed_at' => now()]);
+        $this->assertSame('23514', $this->sqlStateOf(fn () => $insert(['access' => 'GRANTED', 'sides' => null])));
+        $this->assertSame('23514', $this->sqlStateOf(fn () => $insert(['access' => 'GRANTED', 'sides' => 'COORDINATOR,FAMILY'])));
+        $this->assertSame('23514', $this->sqlStateOf(fn () => $insert(['access' => 'REVOKED', 'sides' => 'FAMILY'])));
+        $this->assertSame('23514', $this->sqlStateOf(fn () => DB::table('civil_lookup_audit_events')->insert(['event_type' => 'SEARCH_BY_ID',
+            'actor_user_id' => $this->admin->id, 'actor_side' => 'STAFF', 'outcome_code' => 'FOUND', 'lookup_context' => 'FAMILY', 'occurred_at' => now()])));
+        $this->assertSame('23001', $this->sqlStateOf(fn () => DB::update("UPDATE civil_lookup_audit_events SET lookup_context = 'STAFF'")));
     }
 }

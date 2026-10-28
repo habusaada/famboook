@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
  * that only increments while used < limit), so concurrent requests can never
  * exceed the limit; when it changes nothing the result is withheld and
  * QUOTA_EXHAUSTED is answered. An unlimited policy still counts (statistics).
+ * FB-CIVIL-02B: the counter is per user, never per context — the Family
+ * Portal and Coordinator Space of one account share it.
  */
 final class CivilLookupQuota
 {
@@ -40,11 +42,13 @@ final class CivilLookupQuota
     }
 
     /**
+     * The caller's quota as seen from $context (whether that context is open for them; the counter is shared).
+     *
      * @return array{enabled: bool, unlimited: bool, daily_limit: ?int, used: int, remaining: ?int, resets_at: string, reason: ?string}
      */
-    public static function status(User $user): array
+    public static function status(User $user, string $context): array
     {
-        $access = CivilLookupAccess::evaluate($user);
+        $access = CivilLookupAccess::evaluate($user, $context);
         $policy = $access['policy'];
         $used = self::used($user);
 

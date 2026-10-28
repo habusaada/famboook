@@ -28,6 +28,7 @@ import type {
   CivilLookupRecord,
   CivilLookupResultEntry,
   CivilLookupReverseRelation,
+  CivilLookupSpace,
 } from "@/lib/types/api/civil-lookup";
 import type { PaginationMeta } from "@/lib/types/api/family";
 import { isValidNationalId } from "@/lib/utils/national-id";
@@ -41,6 +42,10 @@ import { QuotaIndicator } from "./quota-indicator";
 // breadcrumb live in this component's memory only: no URL parameter, no
 // browser storage, no query cache. Going back to something already shown
 // sends no request (and is never counted).
+//
+// FB-CIVIL-02B: the same page on the Family Portal and in Coordinator Space
+// (`space`): only the API mount and the header change. Who may use it, and
+// which fields come back, is decided by the server for that mount.
 
 type View =
   | { kind: "list"; title: string; data: CivilLookupList }
@@ -96,13 +101,31 @@ function listMeta(data: CivilLookupList): PaginationMeta {
   };
 }
 
-export function CivilLookupPage() {
-  const status = useCivilLookupStatus();
-  const search = useCivilLookupSearch();
-  const page = useCivilLookupPage();
-  const openRecord = useCivilLookupOpenRecord();
-  const openLink = useCivilLookupOpenLink();
-  const links = useCivilLookupLinks();
+const DESCRIPTION = "استعلام من الإصدار المنشور فقط. كل بحث صحيح يُحتسب من رصيدك اليومي حتى لو لم تُعثر على نتيجة.";
+
+/** The page title: the Staff page header, or the Family Portal heading style (docs/10). */
+function LookupHeader({ space }: { space: CivilLookupSpace }) {
+  if (space === "staff") return <PageHeader title="الاستعلام عن السجل المدني" description={DESCRIPTION} />;
+  return (
+    <header className="flex flex-col gap-1.5" data-lookup-header={space}>
+      <h1 className="text-2xl leading-snug font-bold text-foreground">الاستعلام عن السجل المدني</h1>
+      <p className="text-[13px] text-muted-foreground">{DESCRIPTION}</p>
+      <p className="text-[13px] text-muted-foreground" data-shared-quota-note>
+        {space === "coordinator"
+          ? "يقرأ هذا الاستعلام السجل المدني فقط، ولا يتعلق بأسر نطاق التنسيق. رصيدك اليومي واحد في بوابة الأسرة ومساحة التنسيق."
+          : "رصيدك اليومي واحد في بوابة الأسرة ومساحة التنسيق."}
+      </p>
+    </header>
+  );
+}
+
+export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace }) {
+  const status = useCivilLookupStatus(space);
+  const search = useCivilLookupSearch(space);
+  const page = useCivilLookupPage(space);
+  const openRecord = useCivilLookupOpenRecord(space);
+  const openLink = useCivilLookupOpenLink(space);
+  const links = useCivilLookupLinks(space);
 
   const [mode, setMode] = useState<CivilLookupMode>("national-id");
   const [nationalId, setNationalId] = useState("");
@@ -202,11 +225,8 @@ export function CivilLookupPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5" data-civil-lookup>
-      <PageHeader
-        title="الاستعلام عن السجل المدني"
-        description="استعلام من الإصدار المنشور فقط. كل بحث صحيح يُحتسب من رصيدك اليومي حتى لو لم تُعثر على نتيجة."
-      />
+    <div className="flex flex-col gap-5" data-civil-lookup={space}>
+      <LookupHeader space={space} />
 
       <Panel data-quota-panel>
         {quota && quota.enabled ? (

@@ -104,6 +104,8 @@ class FamilyLoginTest extends TestCase
             // Pilot isolation (ADR §2h): notifications are OFF in tests, so nothing is shown.
             'notifications' => false,
             'coordinator_notifications' => false,
+            // FB-CIVIL-02B: the Civil Registry Lookup entries stay hidden (both sides closed by default).
+            'civil_lookup' => ['family' => false, 'coordinator' => false],
             // FB-FAMILY-DASHBOARD-01: no earlier sign-in is recorded for this fixture account: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,

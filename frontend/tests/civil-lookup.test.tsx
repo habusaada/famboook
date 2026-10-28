@@ -46,7 +46,7 @@ const quota = (over: Partial<CivilLookupQuota> = {}): CivilLookupQuota => ({
 });
 
 const status = (over: Partial<CivilLookupStatus["quota"]> = {}, view = true): { data: CivilLookupStatus } => ({
-  data: { quota: quota(over), capabilities: { search: true, view, view_full: false, reverse_links: false } },
+  data: { context: "STAFF", quota: quota(over), capabilities: { search: true, view, view_full: false, reverse_links: false } },
 });
 
 const entry = (n: number) => ({
@@ -256,6 +256,8 @@ describe("quota administration", () => {
       active_users: 3,
       lookup_enabled: false,
       reverse_links_enabled: false,
+      grantable_sides: [],
+      side_lookup_enabled: { FAMILY: false, COORDINATOR: false },
       exhausted_users: [{ user_id: 7, name: "مدخل تجريبي", role: "DATA_ENTRY", used: 50, daily_limit: 50 }],
       policies: [
         { role: "SUPER_ADMIN", enabled: true, daily_limit: null, unlimited: true, unlimited_allowed: true, updated_by: null, updated_at: null, today: { lookups: 2, users: 1, exhausted: 0 } },

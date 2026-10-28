@@ -1292,6 +1292,15 @@ The standalone Coordinator Space (`/family/coordinator`) is unchanged.
 Every figure is a server aggregate, never a list length; the colors are the
 unified Kingfisher tokens (ADR FB-UI-01).
 
+**Proposed amendment 2026-10-28 (FB-CIVIL-02B; local, not approved, B-OD-4):**
+a conditional entry card «الاستعلام عن السجل المدني» appears after the
+shortcuts (slot 4), and one appears in Coordinator Space. Each is shown only
+when `/family/me` `civil_lookup.family` or `civil_lookup.coordinator` is true,
+which is the side boundary plus the lookup API's own authorization. They
+open `/family/civil-registry` and `/family/coordinator/civil-registry`. The
+bottom navigation is unchanged. With the default configuration nothing is
+shown. Design: `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`.
+
 ## Family Portal structure (approved direction 2026-10-04)
 
 ```text

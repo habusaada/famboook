@@ -29,6 +29,12 @@ export type FamilyUser = {
   /** Show the coordinator's announcement and follow-up screens (pilot isolation). */
   coordinator_notifications?: boolean;
   /**
+   * FB-CIVIL-02B: show the Civil Registry Lookup entry of each side — the
+   * side's boundary and the same authorization the lookup API runs. Visibility
+   * only; every lookup is authorized again. Absent or false = hidden.
+   */
+  civil_lookup?: { family: boolean; coordinator: boolean };
+  /**
    * FB-FAMILY-DASHBOARD-01: the previous successful sign-in before THIS
    * session (UTC ISO 8601), resolved once by the server when the session
    * started; null when unknown or on a first sign-in.

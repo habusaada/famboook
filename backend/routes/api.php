@@ -57,6 +57,28 @@ use App\Http\Controllers\Api\V1\StaffAnnouncementController;
 use App\Http\Controllers\Api\V1\StaffFollowupController;
 use Illuminate\Support\Facades\Route;
 
+// FB-CIVIL-02A / 02B — the Civil Registry Lookup endpoints, mounted once per
+// context: Staff (/civil-registry/lookup, staff.side), Family Portal
+// (/family/civil-registry/lookup, inside family.context) and Coordinator
+// Space (/family/coordinator/civil-registry/lookup, inside coordinator.space).
+// ONE controller, action, quota and audit; the mount's civil-lookup.context
+// fixes the context, which the action authorizes, profiles, binds into every
+// reference and records (docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md).
+$civilLookupEndpoints = function (string $context): void {
+    Route::get('/status', [CivilLookupController::class, 'status'])->middleware('can:civil-lookup.search');
+    Route::middleware(["civil-lookup.enabled:{$context}", 'can:civil-lookup.search', 'throttle:civil-lookup'])->group(function () {
+        Route::post('/search/national-id', [CivilLookupController::class, 'byNationalId']);
+        Route::post('/search/name', [CivilLookupController::class, 'byName']);
+        Route::post('/search/parts', [CivilLookupController::class, 'byParts']);
+        Route::post('/search/page', [CivilLookupController::class, 'page']);
+    });
+    Route::middleware(["civil-lookup.enabled:{$context}", 'can:civil-lookup.view', 'throttle:civil-lookup'])->group(function () {
+        Route::post('/records/open', [CivilLookupController::class, 'openRecord']);
+        Route::post('/links/open', [CivilLookupController::class, 'openLink']);
+        Route::post('/links/list', [CivilLookupController::class, 'links']);
+    });
+};
+
 Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
@@ -76,7 +98,7 @@ Route::post('/credentials/verify', [PublicCredentialController::class, 'verify']
 // The Family Portal API (docs/06 §22b, PWA-1F), OUTSIDE the Staff group.
 // `family.side` only says the account is family-side; it authorizes no family
 // data — family-data routes will resolve the Family context explicitly.
-Route::prefix('family')->group(function () {
+Route::prefix('family')->group(function () use ($civilLookupEndpoints) {
     // Family Auth capabilities (FU-14, FP-ADR-065): public, read-only and
     // OUTSIDE every Family Auth gate — the three global gates as booleans,
     // nothing user-specific, so the portal hides what is closed.
@@ -119,12 +141,12 @@ Route::prefix('family')->group(function () {
     // Any authenticated account may end its own session.
     Route::post('/auth/logout', [FamilySessionController::class, 'logout'])->middleware('auth:sanctum');
 
-    Route::middleware(['auth:sanctum', 'family.side'])->group(function () {
+    Route::middleware(['auth:sanctum', 'family.side'])->group(function () use ($civilLookupEndpoints) {
         Route::get('/me', [FamilySessionController::class, 'me']);
 
         // Family data (PWA-3A): the Family comes ONLY from the family.context
         // boundary (FamilyAccessResolver), never from the client.
-        Route::middleware(['can:family-portal.access', 'family.context'])->group(function () {
+        Route::middleware(['can:family-portal.access', 'family.context'])->group(function () use ($civilLookupEndpoints) {
             Route::get('/household', [FamilyHouseholdController::class, 'show']);
             Route::get('/household/members', [FamilyHouseholdController::class, 'members']);
             Route::get('/household/profile', [FamilyHouseholdController::class, 'profile']);
@@ -230,13 +252,28 @@ Route::prefix('family')->group(function () {
                 Route::post('/{contactUpdate}/resend', [FamilyContactUpdateController::class, 'resend'])
                     ->middleware('throttle:family-contact-update-resend');
             });
+
+            // FB-CIVIL-02B: the Civil Registry Lookup for an eligible household
+            // head (family.context above). Closed by default: the FAMILY gate,
+            // the gated permission, an explicit GRANTED row and the FAMILY_USER
+            // policy are all required. Shared quota and audit.
+            Route::prefix('civil-registry/lookup')->middleware('civil-lookup.context:FAMILY')
+                ->group(fn () => $civilLookupEndpoints('FAMILY'));
         });
 
         // Coordinator Space (docs/11 §8, PWA-1H): the scope comes ONLY from
         // the coordinator.space boundary, never from the client.
-        Route::prefix('coordinator')->middleware('coordinator.space')->group(function () {
+        Route::prefix('coordinator')->middleware('coordinator.space')->group(function () use ($civilLookupEndpoints) {
             Route::get('/context', [CoordinatorSpaceController::class, 'context'])
                 ->middleware('throttle:coordinator-read');
+
+            // FB-CIVIL-02B: the Civil Registry Lookup for a Coordinator with an
+            // effective assignment (coordinator.space). The assignment alone
+            // grants nothing: the COORDINATOR gate, the gated permission, an
+            // explicit GRANTED row and the COORDINATOR policy are all required.
+            // It reads the civil registry only — never the families of the scope.
+            Route::prefix('civil-registry/lookup')->middleware('civil-lookup.context:COORDINATOR')
+                ->group(fn () => $civilLookupEndpoints('COORDINATOR'));
 
             // Family SUMMARIES inside the scope. No route-model binding: the
             // code is looked up inside the authorized query only.
@@ -360,7 +397,7 @@ Route::prefix('family')->group(function () {
 // (FAMILY_USER / COORDINATOR, or either mixed with a Staff role) before any
 // permission check (docs/06 §22b, AUTH-ADR-065). The /api/v1/family routes
 // are registered OUTSIDE this group.
-Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
+Route::middleware(['auth:sanctum', 'staff.side'])->group(function () use ($civilLookupEndpoints) {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
@@ -864,20 +901,10 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () {
     // FB-CIVIL-02A — Civil Registry Lookup (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md).
     // Off by default (civil-lookup.enabled → 503 LOOKUP_DISABLED). Criteria and
     // references in POST bodies only, never in a URL; the action re-checks the
-    // role policy, per-user access and the daily quota on every call.
-    Route::prefix('civil-registry/lookup')->group(function () {
-        Route::get('/status', [CivilLookupController::class, 'status'])->middleware('can:civil-lookup.search');
-        Route::middleware(['civil-lookup.enabled', 'can:civil-lookup.search', 'throttle:civil-lookup'])->group(function () {
-            Route::post('/search/national-id', [CivilLookupController::class, 'byNationalId']);
-            Route::post('/search/name', [CivilLookupController::class, 'byName']);
-            Route::post('/search/parts', [CivilLookupController::class, 'byParts']);
-            Route::post('/search/page', [CivilLookupController::class, 'page']);
-        });
-        Route::middleware(['civil-lookup.enabled', 'can:civil-lookup.view', 'throttle:civil-lookup'])->group(function () {
-            Route::post('/records/open', [CivilLookupController::class, 'openRecord']);
-            Route::post('/links/open', [CivilLookupController::class, 'openLink']);
-            Route::post('/links/list', [CivilLookupController::class, 'links']);
-        });
+    // role policy, per-user access and the daily quota on every call. The
+    // STAFF mount of $civilLookupEndpoints; administration is Staff only.
+    Route::prefix('civil-registry/lookup')->middleware('civil-lookup.context:STAFF')->group(function () use ($civilLookupEndpoints) {
+        $civilLookupEndpoints('STAFF');
         Route::get('/admin/usage', [CivilLookupAdminController::class, 'usage'])->middleware('can:civil-lookup.usage.view');
         Route::middleware('can:civil-lookup.manage')->group(function () {
             Route::put('/admin/policies/{role}', [CivilLookupAdminController::class, 'updatePolicy'])->middleware('throttle:30,1');

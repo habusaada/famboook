@@ -17,8 +17,15 @@ return [
     // 09-lookup-indexes.dba.sql and the OD-03 / OD-10 decisions.
     'reverse_links_enabled' => (bool) env('CIVIL_LOOKUP_REVERSE_LINKS_ENABLED', false),
 
-    // §L-13: FAMILY_USER / COORDINATOR lookup (FB-CIVIL-02B). Closed in 02A.
-    'family_side_enabled' => false,
+    // FB-CIVIL-02B (docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md §B-2):
+    // the Family Portal (household head) and Coordinator Space sides, each
+    // closed by default and independent of the other. Opening one only lets
+    // its gated role permissions and per-user GRANTED rows take effect; in
+    // production each also needs its own approval reference and the
+    // EXTENDED_CONTROLLED field-profile approval in the PROCESS environment
+    // (CivilLookupGate), never a value here.
+    'family_side_enabled' => (bool) env('CIVIL_LOOKUP_FAMILY_ENABLED', false),
+    'coordinator_side_enabled' => (bool) env('CIVIL_LOOKUP_COORDINATOR_ENABLED', false),
 
     // The read-only lookup login (08-lookup.dba.sql): a PHP file returning
     // ['username' => ..., 'password' => ...], root:www-data 0640 on a server.

@@ -3025,6 +3025,34 @@ and COORDINATOR hold none of these permissions; a Coordinator assignment never
 implies lookup (FB-CIVIL-02B). `famboook:verify-permissions` enforces these
 boundaries (`CIVIL_LOOKUP*` in `CRITICAL`). Catalog 169 → 174 (proposed with the ADR); no role added.
 
+### 61d-1. Family Portal and Coordinator Space (FB-CIVIL-02B — PROPOSED, local only)
+
+Design: `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`. **Not approved for
+Production or real registry data.** This proposes a baseline change to §53
+(FAMILY_USER "may receive") and §22b (COORDINATOR), recorded as B-OD-3.
+
+| Permission | FAMILY_USER | COORDINATOR |
+|---|---|---|
+| `civil-lookup.search`, `civil-lookup.view` | only while `CIVIL_LOOKUP_FAMILY_ENABLED` is true | only while `CIVIL_LOOKUP_COORDINATOR_ENABLED` is true |
+| `civil-lookup.view-full`, `.usage.view`, `.manage` | never | never |
+
+- Both switches are `false` by default, so in every default configuration
+  the family-side role baselines are unchanged. No permission is added to the
+  catalog and no role is added.
+- Holding the permission is not access. A family-side lookup also needs:
+  - its mount's side boundary: `family.context` (an eligible household head)
+    or `coordinator.space` (an effective assignment);
+  - an explicit per-user **GRANTED** row naming that side;
+  - the side role's enabled policy (FAMILY_USER or COORDINATOR);
+  - not being REVOKED;
+  - in production, the side's own approval and the `EXTENDED_CONTROLLED`
+    field-profile approval.
+- Being a household head grants nothing, and neither does a Coordinator
+  assignment. A Family Portal grant is not a Coordinator Space grant.
+- `famboook:verify-permissions` reports as CRITICAL a family-side role
+  holding search or view against its switch, and any direct (model) grant of
+  a `civil-lookup.*` permission.
+
 ---
 
 # 62. System Administration Permissions

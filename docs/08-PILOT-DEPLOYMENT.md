@@ -468,6 +468,19 @@ Design: `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`. **Nothing here is appr
 | Credentials | `/etc/famboook/identity-lookup.php` (`CIVIL_LOOKUP_CREDENTIALS_FILE`), `root:www-data 0640`, returning `['username' => …, 'password' => …]`. Never `.env`. Without it: 503 `LOOKUP_NOT_CONFIGURED`. |
 | Indexes | `09-lookup-indexes.dba.sql` (`CREATE INDEX CONCURRENTLY`, psql autocommit; **not approved**): name-search trigram and reverse-link btree indexes. |
 
+**FB-CIVIL-02B (Family Portal / Coordinator Space; PROPOSED, not enabled).**
+Design: `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`. Deploying it
+changes nothing visible. Every item below is needed **in addition to** the
+02A ones above:
+
+| Item | Value |
+|---|---|
+| Side switches | `CIVIL_LOOKUP_FAMILY_ENABLED`, `CIVIL_LOOKUP_COORDINATOR_ENABLED` (both default `false`, independent). Run `RolePermissionSeeder` after changing one (the family-side role permissions follow the switch), then `famboook:verify-permissions`. |
+| Production approvals | In the PHP process environment, never `.env`: `CIVIL_LOOKUP_FAMILY_APPROVAL` or `CIVIL_LOOKUP_COORDINATOR_APPROVAL`, **and** `CIVIL_LOOKUP_EXTENDED_PROFILE_APPROVAL`. Issued only after G1 / OD-08, OD-09 and B-OD-1. |
+| Role policies | FAMILY_USER and COORDINATOR (default disabled, 5 per day). |
+| Individual grants | Per account and per side: Administration → Civil Registry → Lookup Quotas, by person code. Nothing can be granted while a side switch is closed. |
+| Migration | `2026_10_29_090000_extend_civil_lookup_for_family_side`: grant sides, history sides, audit `lookup_context` (with CHECKs). No DBA script, no `identity_ref` change. |
+
 ---
 
 # 16a. Family Portal activation prerequisites (not yet applicable)

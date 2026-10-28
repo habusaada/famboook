@@ -56,6 +56,8 @@ const PUBLIC_URLS = [
   "/family/coordinator/announcements",
   "/family/coordinator/announcements/[id]",
   "/family/coordinator/announcements/new",
+  // FB-CIVIL-02B: the Coordinator's Civil Registry Lookup, inside (space).
+  "/family/coordinator/civil-registry",
   "/family/coordinator/families/[code]",
   // FB-NOTIFY-01E.3-F3.3: follow-ups of the CURRENT scope, inside (space).
   "/family/coordinator/followups",

@@ -49,6 +49,8 @@ class FamilySideBoundaryTest extends TestCase
             // Pilot isolation (ADR §2h): notifications are OFF in tests, so nothing is shown.
             'notifications' => false,
             'coordinator_notifications' => false,
+            // FB-CIVIL-02B: the Civil Registry Lookup entries stay hidden (both sides closed by default).
+            'civil_lookup' => ['family' => false, 'coordinator' => false],
             // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,
@@ -150,6 +152,8 @@ class FamilySideBoundaryTest extends TestCase
             // Pilot isolation (ADR §2h): notifications are OFF in tests, so nothing is shown.
             'notifications' => false,
             'coordinator_notifications' => false,
+            // FB-CIVIL-02B: the Civil Registry Lookup entries stay hidden (both sides closed by default).
+            'civil_lookup' => ['family' => false, 'coordinator' => false],
             // FB-FAMILY-DASHBOARD-01: this session did not start with a sign-in: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,
@@ -312,6 +316,16 @@ class FamilySideBoundaryTest extends TestCase
                     : [...$space, 'can:coordinator-notification-followup.manage', 'throttle:coordinator-followup-write'];
                 $this->assertSame($expected, $middleware, $route->uri());
             }
+            // FB-CIVIL-02B: the two Civil Registry Lookup mounts, each behind its own side boundary and context.
+            if (str_starts_with($route->uri(), 'api/v1/family/civil-registry/lookup')) {
+                $this->assertContains('family.context', $middleware, $route->uri());
+                $this->assertContains('civil-lookup.context:FAMILY', $middleware, $route->uri());
+                $this->assertNotContains('coordinator.space', $middleware, $route->uri());
+            }
+            if (str_starts_with($route->uri(), 'api/v1/family/coordinator/civil-registry/lookup')) {
+                $this->assertContains('coordinator.space', $middleware, $route->uri());
+                $this->assertContains('civil-lookup.context:COORDINATOR', $middleware, $route->uri());
+            }
             $checked++;
         }
         // 28 + the six Change Request routes (PWA-5e) + the add-member
@@ -324,7 +338,8 @@ class FamilySideBoundaryTest extends TestCase
         // + the Coordinator summary (FB-FAMILY-DASHBOARD-01) + the five
         // notification routes (FB-NOTIFY-01B.2b.6b) + the seven Coordinator
         // announcement routes (FB-NOTIFY-01B.2b.6c) + the six Coordinator
-        // follow-up routes (FB-NOTIFY-01E.3-F3.2).
-        $this->assertSame(73, $checked);
+        // follow-up routes (FB-NOTIFY-01E.3-F3.2) + the eight Civil Registry
+        // Lookup routes on each of the two family-side mounts (FB-CIVIL-02B).
+        $this->assertSame(89, $checked);
     }
 }

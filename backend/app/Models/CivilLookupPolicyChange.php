@@ -22,7 +22,7 @@ class CivilLookupPolicyChange extends Model
     public const CREATED_AT = 'changed_at';
 
     protected $fillable = ['subject_type', 'role_name', 'user_id', 'old_enabled', 'new_enabled', 'old_daily_limit', 'new_daily_limit',
-        'old_access', 'new_access', 'changed_by'];
+        'old_access', 'new_access', 'old_sides', 'new_sides', 'changed_by'];
 
     protected static function booted(): void
     {

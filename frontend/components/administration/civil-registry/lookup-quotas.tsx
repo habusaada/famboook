@@ -21,7 +21,7 @@ import {
   useSetCivilLookupUserAccess,
   useUpdateCivilLookupPolicy,
 } from "@/lib/api/civil-lookup";
-import type { CivilLookupPolicy, CivilLookupPolicyChange } from "@/lib/types/api/civil-lookup";
+import type { CivilLookupPolicy, CivilLookupPolicyChange, CivilLookupSide } from "@/lib/types/api/civil-lookup";
 
 // FB-CIVIL-02A — Administration → Civil Registry → Lookup quotas
 // (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md §L-3, §L-6). Usage needs
@@ -114,10 +114,15 @@ function PolicyRow({ policy, manage }: { policy: CivilLookupPolicy; manage: bool
   );
 }
 
+const SIDE_LABELS: Record<CivilLookupSide, string> = { FAMILY: "بوابة الأسرة", COORDINATOR: "مساحة التنسيق" };
+
+const sidesText = (sides: CivilLookupSide[]) => sides.map((side) => SIDE_LABELS[side]).join(" و");
+
 function changeText(c: CivilLookupPolicyChange): string {
   if (c.subject_type === "USER") {
-    const label = (a: string | null) => (a === "REVOKED" ? "موقوف" : a === "GRANTED" ? "ممنوح" : "حسب الدور");
-    return `${c.user?.name ?? "—"}: ${label(c.old_access)} ← ${label(c.new_access)}`;
+    const label = (a: string | null, sides: CivilLookupSide[]) =>
+      a === "REVOKED" ? "موقوف" : a === "GRANTED" ? `ممنوح (${sidesText(sides)})` : "حسب الدور";
+    return `${c.user?.name ?? "—"}: ${label(c.old_access, c.old_sides ?? [])} ← ${label(c.new_access, c.new_sides ?? [])}`;
   }
   const state = (enabled: boolean | null, limit: number | null) =>
     `${enabled ? "مفعّلة" : "معطّلة"}، ${limit === null ? "غير محدود" : `${limit.toLocaleString("ar")} يوميًا`}`;
@@ -132,8 +137,13 @@ export function CivilLookupQuotas() {
   const changes = useCivilLookupChanges(changesPage, manage);
   const access = useCivilLookupUserAccess(manage);
   const setAccess = useSetCivilLookupUserAccess();
-  const [email, setEmail] = useState("");
-  const [accessValue, setAccessValue] = useState<"REVOKED" | "DEFAULT">("REVOKED");
+  const [targetKind, setTargetKind] = useState<"email" | "person_code">("email");
+  const [target, setTarget] = useState("");
+  const [accessValue, setAccessValue] = useState<"REVOKED" | "DEFAULT" | "GRANTED">("REVOKED");
+  const [sides, setSides] = useState<CivilLookupSide[]>([]);
+  // FB-CIVIL-02B: GRANTED is offered only for the sides the server says may be granted now.
+  const grantable = usage.data?.grantable_sides ?? [];
+  const granting = accessValue === "GRANTED";
 
   return (
     <div className="flex flex-col gap-5" data-lookup-quotas>
@@ -153,6 +163,12 @@ export function CivilLookupQuotas() {
                   </StatusBadge>
                 </span>
               </DetailItem>
+              <DetailItem label="الاستعلام في بوابة الأسرة">
+                <span data-side-state="FAMILY">{usage.data.side_lookup_enabled?.FAMILY ? "مفعّل" : "غير مفعّل"}</span>
+              </DetailItem>
+              <DetailItem label="الاستعلام في مساحة التنسيق">
+                <span data-side-state="COORDINATOR">{usage.data.side_lookup_enabled?.COORDINATOR ? "مفعّل" : "غير مفعّل"}</span>
+              </DetailItem>
               <DetailItem label="البحث في العلاقات العكسية (الأسرة، الأبناء)">
                 {usage.data.reverse_links_enabled ? "مفعّل" : "غير مفعّل"}
               </DetailItem>
@@ -170,7 +186,7 @@ export function CivilLookupQuotas() {
             <div className="px-4 pt-4 sm:px-5">
               <SectionHeader
                 title="الأدوار"
-                description="المنسق ومستخدم بوابة الأسرة غير مفعّلين في هذه المرحلة، ولا يمنح تعيين المنسق صلاحية الاستعلام تلقائيًا."
+                description="يحتاج المنسق ومستخدم بوابة الأسرة أيضًا إلى تفعيل جهتهما ومنح فردي صريح، ولا يمنح تعيين المنسق صلاحية الاستعلام تلقائيًا."
               />
             </div>
             <Table>
@@ -222,8 +238,8 @@ export function CivilLookupQuotas() {
       {manage && (
         <Panel data-user-access>
           <SectionHeader
-            title="إيقاف الخدمة لمستخدم محدد"
-            description="الإيقاف يمنع المستخدم من الاستعلام أيًا كان دوره، دون تغيير أدواره أو صلاحياته الأخرى. «حسب الدور» يلغي الإيقاف."
+            title="وصول مستخدم محدد"
+            description="الإيقاف يمنع المستخدم من الاستعلام أيًا كان دوره، دون تغيير أدواره أو صلاحياته الأخرى. «حسب الدور» يلغي الإيقاف. المنح الفردي لحسابات الأسر فقط، ولكل جهة على حدة، ولا يتجاوز تفعيل الجهة أو سياسة الدور أو الرصيد."
             icon={UserX}
             className="mb-3"
           />
@@ -231,12 +247,41 @@ export function CivilLookupQuotas() {
             className="flex flex-wrap items-end gap-3"
             onSubmit={(e) => {
               e.preventDefault();
-              setAccess.mutate({ email: email.trim(), access: accessValue }, { onSuccess: () => setEmail("") });
+              const value = target.trim();
+              setAccess.mutate(
+                {
+                  target: targetKind === "email" ? { email: value } : { person_code: value },
+                  access: accessValue,
+                  sides: granting ? sides : undefined,
+                },
+                { onSuccess: () => setTarget("") },
+              );
             }}
+            data-access-form
           >
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="lookup-access-email">البريد الإلكتروني للمستخدم</Label>
-              <Input id="lookup-access-email" type="email" dir="ltr" className="w-72" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Label htmlFor="lookup-access-target-kind">المستخدم حسب</Label>
+              <select
+                id="lookup-access-target-kind"
+                className="h-8 rounded-control border border-input bg-background px-2 text-sm"
+                value={targetKind}
+                onChange={(e) => setTargetKind(e.target.value as "email" | "person_code")}
+              >
+                <option value="email">البريد الإلكتروني (موظف)</option>
+                <option value="person_code">رمز الشخص (حساب أسرة)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="lookup-access-target">{targetKind === "email" ? "البريد الإلكتروني للمستخدم" : "رمز الشخص المرتبط بالحساب"}</Label>
+              <Input
+                id="lookup-access-target"
+                type={targetKind === "email" ? "email" : "text"}
+                dir="ltr"
+                className="w-72"
+                autoComplete="off"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="lookup-access-value">الوصول</Label>
@@ -244,13 +289,31 @@ export function CivilLookupQuotas() {
                 id="lookup-access-value"
                 className="h-8 rounded-control border border-input bg-background px-2 text-sm"
                 value={accessValue}
-                onChange={(e) => setAccessValue(e.target.value as "REVOKED" | "DEFAULT")}
+                onChange={(e) => setAccessValue(e.target.value as "REVOKED" | "DEFAULT" | "GRANTED")}
               >
                 <option value="REVOKED">إيقاف</option>
                 <option value="DEFAULT">حسب الدور</option>
+                {grantable.length > 0 && <option value="GRANTED">منح (حساب أسرة)</option>}
               </select>
             </div>
-            <Button type="submit" variant="outline" disabled={email.trim() === "" || setAccess.isPending}>
+            {granting && (
+              <fieldset className="flex flex-col gap-1.5" data-grant-sides>
+                <legend className="text-sm font-medium">جهة المنح</legend>
+                <div className="flex gap-3">
+                  {grantable.map((side) => (
+                    <label key={side} className="flex items-center gap-1.5 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={sides.includes(side)}
+                        onChange={(e) => setSides((current) => (e.target.checked ? [...current, side] : current.filter((s) => s !== side)))}
+                      />
+                      {SIDE_LABELS[side]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+            <Button type="submit" variant="outline" disabled={target.trim() === "" || (granting && sides.length === 0) || setAccess.isPending}>
               تطبيق
             </Button>
             {saveError(setAccess.error) && (
@@ -267,7 +330,7 @@ export function CivilLookupQuotas() {
                     {row.user.name} <bdi dir="ltr" className="text-muted-foreground">{row.user.email}</bdi>
                   </span>
                   <span className="text-muted-foreground">
-                    {row.access === "REVOKED" ? "موقوف" : "ممنوح"} — {row.changed_by} — {gazaTime(row.changed_at)}
+                    {row.access === "REVOKED" ? "موقوف" : `ممنوح (${sidesText(row.sides ?? [])})`} — {row.changed_by} — {gazaTime(row.changed_at)}
                   </span>
                 </li>
               ))}

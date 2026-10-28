@@ -10,6 +10,7 @@ import { fieldClass } from "@/components/family/auth/auth-parts";
 import { useCoordinatorContext } from "@/components/family/coordinator/coordinator-gate";
 import { useFamilyUser } from "@/components/family/family-context";
 import { type CoordinatorFamily, hierarchyLabel, scopeLabel, useCoordinatorFamiliesQuery } from "@/lib/api/coordinator";
+import { CivilLookupEntry } from "@/components/family/civil-lookup";
 
 function FamilyRow({ family }: { family: CoordinatorFamily }) {
   return (
@@ -97,6 +98,9 @@ export function CoordinatorHome() {
         </span>
         <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
+
+      {/* FB-CIVIL-02B: only when the server says the Coordinator's lookup is available (never from the assignment alone). */}
+      <CivilLookupEntry side="coordinator" />
 
       {/* Notification screens (announcements, follow-ups) only when the server shows them:
           pilot isolation, ADR FB-NOTIFY-01 §2h. The endpoints still authorize on their own. */}

@@ -13,6 +13,7 @@ import { HomeServices } from "@/components/family/home/quick-actions";
 import { WelcomeHeader } from "@/components/family/home/welcome-header";
 import { InstallFamboook } from "@/components/family/pwa/install-famboook";
 import { isAccessFailure, useFamilyHouseholdQuery } from "@/lib/api/family-household";
+import { CivilLookupEntry } from "@/components/family/civil-lookup";
 
 /**
  * The unified Family Portal home (docs/11 §23, FB-FAMILY-DASHBOARD-01):
@@ -48,6 +49,9 @@ export function FamilyHome() {
       </div>
 
       <HomeShortcuts />
+
+      {/* FB-CIVIL-02B: only when the server says the household head's lookup is available. */}
+      <CivilLookupEntry side="family" />
 
       <HomeServices />
 

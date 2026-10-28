@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Crypt;
  *   RECORD  a record listed in an authorized result: opening it is free
  *   LINK    a linked citizen (relation + National ID): opening it is a new lookup
  *   LINKS   the reverse-link lists of a record (§L-8)
+ *
+ * FB-CIVIL-02B (ADR 02B §B-1): version 2 also binds the lookup context, so a
+ * reference issued on one side (Staff, Family Portal, Coordinator Space) is
+ * REFERENCE_INVALID on any other — even for the same user.
  */
 final class CivilLookupRefs
 {
@@ -29,12 +33,12 @@ final class CivilLookupRefs
     public const LINKS = 'X';
 
     /** @param  array<string, mixed>  $data */
-    public static function issue(string $type, User $user, int $releaseId, array $data): string
+    public static function issue(string $type, User $user, string $context, int $releaseId, array $data): string
     {
         $ttl = (int) config('civil_lookup.reference_ttl_minutes', 30);
 
         return Crypt::encryptString((string) json_encode([
-            'v' => 1, 't' => $type, 'u' => $user->id, 'r' => $releaseId, 'x' => now()->addMinutes($ttl)->getTimestamp(), 'd' => $data,
+            'v' => 2, 't' => $type, 'u' => $user->id, 'c' => $context, 'r' => $releaseId, 'x' => now()->addMinutes($ttl)->getTimestamp(), 'd' => $data,
         ], JSON_UNESCAPED_UNICODE));
     }
 
@@ -43,14 +47,15 @@ final class CivilLookupRefs
      *
      * @throws CivilLookupException REFERENCE_INVALID
      */
-    public static function read(mixed $token, string $type, User $user): array
+    public static function read(mixed $token, string $type, User $user, string $context): array
     {
         try {
             $payload = is_string($token) && $token !== '' && strlen($token) <= 4096 ? json_decode(Crypt::decryptString($token), true) : null;
         } catch (DecryptException) {
             $payload = null;
         }
-        if (! is_array($payload) || ($payload['v'] ?? null) !== 1 || ($payload['t'] ?? null) !== $type || ($payload['u'] ?? null) !== $user->id
+        if (! is_array($payload) || ($payload['v'] ?? null) !== 2 || ($payload['t'] ?? null) !== $type || ($payload['u'] ?? null) !== $user->id
+            || ($payload['c'] ?? null) !== $context
             || ! is_int($payload['r'] ?? null) || ! is_int($payload['x'] ?? null) || $payload['x'] < now()->getTimestamp() || ! is_array($payload['d'] ?? null)) {
             throw new CivilLookupException(CivilLookupException::REFERENCE_INVALID);
         }
