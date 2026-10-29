@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\CivilLookup\CivilLookupAccess;
 use App\Support\CivilLookup\CivilLookupAudit;
 use App\Support\CivilLookup\CivilLookupContext;
+use App\Support\CivilLookup\CivilLookupDisclosure;
 use App\Support\CivilLookup\CivilLookupFieldPolicy;
 use App\Support\CivilLookup\CivilLookupGate;
 use App\Support\CivilLookup\CivilLookupQuota;
@@ -28,7 +29,10 @@ use Closure;
  *
  *   charged   byNationalId, byName, byParts (including NOT_FOUND / TOO_BROAD),
  *             openLink (a linked citizen), links (a reverse-link list)
- *   free      page (same search), openRecord (listed in an authorized result)
+ *   free      page (same search), openRecord (listed in an authorized result) — except
+ *             FB-CIVIL-02F: at STANDARD the first full-ID disclosure of a record each
+ *             Gaza day is charged once (CivilLookupDisclosure), unless the requester
+ *             supplied that record's exact National ID (an exact-ID result reference)
  *
  * Callers pass validated, normalized criteria; the National ID and terms
  * never leave this class except inside encrypted references.
@@ -62,7 +66,8 @@ final class LookupCivilRegistryAction
         return [
             'release_id' => $found ? $record->releaseId : $record,
             'outcome' => $found ? 'FOUND' : 'NOT_FOUND',
-            'results' => $found ? [$this->listEntry($user, $context, $record)] : [],
+            // FB-CIVIL-02F: the requester supplied this exact ID, so opening it discloses nothing new.
+            'results' => $found ? [$this->listEntry($user, $context, $record, exactId: true)] : [],
             'meta' => ['page' => 1, 'per_page' => self::PER_PAGE, 'total' => $found ? 1 : 0, 'last_page' => 1],
             'search_ref' => null,
             'quota' => CivilLookupQuota::status($user, $context) + ['used_after' => $used],
@@ -113,11 +118,22 @@ final class LookupCivilRegistryAction
     /** A record listed in an authorized result: not charged (§L-6). @return array<string, mixed> */
     public function openRecord(User $user, string $context, mixed $recordRef, ?string $ip): array
     {
-        $this->authorize($user, $context, CivilLookupAccess::VIEW, 'RECORD_OPENED', $ip);
+        $policy = $this->authorize($user, $context, CivilLookupAccess::VIEW, 'RECORD_OPENED', $ip);
         $ref = CivilLookupRefs::read($recordRef, CivilLookupRefs::RECORD, $user, $context);
         $record = $this->registry->byRecord((int) ($ref['data']['i'] ?? 0));
         if ($record === null || $record->releaseId !== $ref['release_id']) {
             throw new CivilLookupException(CivilLookupException::RELEASE_CHANGED);
+        }
+        // FB-CIVIL-02F: read → charge → disclose. A refused charge withholds the record.
+        if (CivilLookupFieldPolicy::chargesDisclosure($this->level($user, $context))) {
+            try {
+                CivilLookupDisclosure::charge($user, $policy, $record, exempt: ($ref['data']['e'] ?? null) === 1);
+            } catch (CivilLookupException $e) {
+                CivilLookupAudit::record('RECORD_OPENED', $user, $context, $e->reason, $record->releaseId, $record->recordId,
+                    quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
+
+                throw $e;
+            }
         }
         CivilLookupAudit::record('RECORD_OPENED', $user, $context, 'FOUND', $record->releaseId, $record->recordId,
             resultCount: 1, quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
@@ -143,6 +159,10 @@ final class LookupCivilRegistryAction
             },
             fn ($r) => $r instanceof CivilRecord ? ['FOUND', $r->releaseId, $r->recordId, 1] : ['NOT_FOUND', $r, null, 0]);
         $found = $record instanceof CivilRecord;
+        // FB-CIVIL-02F: the link lookup was charged; reopening this record today is then free.
+        if ($found && CivilLookupFieldPolicy::chargesDisclosure($this->level($user, $context))) {
+            CivilLookupDisclosure::mark($user, $record);
+        }
 
         return ['outcome' => $found ? 'FOUND' : 'NOT_FOUND', 'release_id' => $found ? $record->releaseId : $record,
             'relation' => (string) ($ref['data']['rel'] ?? ''), 'record' => $found ? $this->detail($user, $context, $record) : null,
@@ -282,9 +302,11 @@ final class LookupCivilRegistryAction
     }
 
     /** @return array<string, mixed> */
-    private function listEntry(User $user, string $context, CivilRecord $record): array
+    /** @param  bool  $exactId  FB-CIVIL-02F: an exact National ID result; the exemption is bound to this record inside the encrypted reference */
+    private function listEntry(User $user, string $context, CivilRecord $record, bool $exactId = false): array
     {
-        return ['ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $context, $record->releaseId, ['i' => $record->recordId])]
+        return ['ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $context, $record->releaseId,
+            ['i' => $record->recordId] + ($exactId ? ['e' => 1] : []))]
             + CivilLookupFieldPolicy::summary($record);
     }
 

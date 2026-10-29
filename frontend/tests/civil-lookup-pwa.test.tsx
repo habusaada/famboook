@@ -261,7 +261,8 @@ describe("person details", () => {
     expect(document.querySelectorAll('[data-field="mainid"]')).toHaveLength(1);
     unmount();
 
-    const masked = record({ level: "STANDARD", national_id: "*****0001" });
+    // A masked level (EXTENDED_CONTROLLED): the screen never rebuilds the ID.
+    const masked = record({ level: "EXTENDED_CONTROLLED", national_id: "*****0001" });
     masked.sections[0].fields[0] = { key: "mainid", value: "*****0001" };
     mockPosts({ "/search/national-id": list([entry(1)]), "/records/open": opened(masked) });
     renderPage();
@@ -324,9 +325,8 @@ describe("person details", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-29T10:00:00Z"));
     const user = userEvent.setup();
-    const standard = record({ level: "STANDARD", national_id: "*****0001" });
+    const standard = record({ level: "STANDARD", national_id: "900000001" });
     standard.sections[0].fields = standard.sections[0].fields.filter((f) => f.key !== "deathdate");
-    standard.sections[0].fields[0] = { key: "mainid", value: "*****0001" };
     mockPosts({ "/search/national-id": list([entry(1)]), "/records/open": opened(standard) });
     renderPage();
     await user.type(await screen.findByRole("textbox", { name: "رقم الهوية" }), "900000001");
@@ -334,6 +334,21 @@ describe("person details", () => {
     const detail = await findEl(() => document.querySelector("[data-citizen-detail]"));
     expect(detail.querySelector('[data-field="age"]')?.textContent).toBe(`${(35).toLocaleString("ar")} سنة`);
     expect(detail.querySelector("[data-age-note]")?.textContent).toContain("تاريخ الوفاة لا يُعرض في هذا المستوى");
+  });
+
+  it("explains the STANDARD disclosure and refreshes the quota after opening a record (FB-CIVIL-02F)", async () => {
+    const user = userEvent.setup();
+    const get = vi.spyOn(apiClient, "get").mockResolvedValue(status as never);
+    mockPosts({ "/search/name": list(), "/records/open": opened(record({ level: "STANDARD" })) });
+    renderPage();
+    await searchByName(user);
+    const card = await findEl(() => document.querySelector("[data-result]"));
+    const before = get.mock.calls.filter(([p]) => p === `${BASE}/status`).length;
+    await user.click(within(card).getByRole("button", { name: "عرض السجل" }));
+    const header = await findEl(() => document.querySelector("[data-record-header]"));
+    expect(header.querySelector('[data-field="mainid"]')?.textContent).toBe("900000001");
+    expect(header.querySelector("[data-source-note]")?.textContent).toContain("أول عرض لسجل في اليوم يُحتسب من رصيدك");
+    await waitFor(() => expect(get.mock.calls.filter(([p]) => p === `${BASE}/status`).length).toBeGreaterThan(before));
   });
 
   it("shows «غير متوفر» for a missing, invalid or future date of birth", async () => {

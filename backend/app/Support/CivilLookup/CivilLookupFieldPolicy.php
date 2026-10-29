@@ -15,7 +15,8 @@ use App\Support\NationalIdMask;
  * never returned, so a new source column can never appear by itself.
  *
  *   FULL                 Staff with civil-lookup.view-full (all 35 fields, identifiers unmasked)
- *   STANDARD             other Staff
+ *   STANDARD             other Staff (FB-CIVIL-02F: the opened record's own National ID unmasked —
+ *                        each first disclosure a day is charged, CivilLookupDisclosure; linked IDs masked)
  *   EXTENDED_CONTROLLED  FB-CIVIL-02B, the Family Portal and Coordinator Space (ADR 02B §B-5):
  *                        identity, family-status and place fields only; identifiers always masked.
  *                        Each family-side context maps to it separately (CONTEXT_LEVELS), so the
@@ -65,6 +66,13 @@ final class CivilLookupFieldPolicy
     /** Fields shown masked unless FULL. */
     private const IDENTIFIERS = ['mainid', 'fatherid', 'motherid', 'partnerid'];
 
+    /**
+     * FB-CIVIL-02F (ADR §L-4b): the levels that show the opened record's own `mainid` in clear. The
+     * family-side level is NOT listed — it waits for B-OD-1 (ADR 02B §B-5a). A result list never
+     * uses identifier() (summary() always masks), and linked IDs stay masked outside FULL.
+     */
+    public const RECORD_ID_LEVELS = [self::FULL, self::STANDARD];
+
     /** @return array<string, ?string> the result-list fields */
     public static function summary(CivilRecord $record): array
     {
@@ -103,10 +111,20 @@ final class CivilLookupFieldPolicy
         return $sections;
     }
 
-    /** A National ID as this level may show it. */
+    /** A National ID as this level may show it (`mainid` is the opened record's own; the others are links). */
     public static function identifier(string $key, ?string $value, string $level): ?string
     {
-        return $value !== null && $level !== self::FULL && in_array($key, self::IDENTIFIERS, true) ? NationalIdMask::mask($value) : $value;
+        if ($value === null || ! in_array($key, self::IDENTIFIERS, true) || $level === self::FULL) {
+            return $value;
+        }
+
+        return $key === 'mainid' && in_array($level, self::RECORD_ID_LEVELS, true) ? $value : NationalIdMask::mask($value);
+    }
+
+    /** Whether opening a record at this level shows a full National ID that FB-CIVIL-02F charges for. */
+    public static function chargesDisclosure(string $level): bool
+    {
+        return $level === self::STANDARD;
     }
 
     private static function value(mixed $value): ?string

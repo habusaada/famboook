@@ -192,14 +192,16 @@ privacy controls**.
 | G1 / OD-08: lawful basis and purpose for the family-side lookup | **OPEN** (B-9) |
 | OD-09: the `docs/03` §47e exception covering these contexts | PROPOSED, not approved (B-9) |
 
-**Implemented behavior (unchanged, enforced in the API by
-`CivilLookupFieldPolicy`):**
+**Implemented behavior (enforced in the API by `CivilLookupFieldPolicy`;
+updated by FB-CIVIL-02F, 02A §L-4b and §L-6c):**
 
 - **`FULL`** (Staff with `civil-lookup.view-full`): the record's National ID
-  and the linked IDs in clear.
-- **`STANDARD`** (other Staff): masked. No documented policy authorizes full
-  disclosure for any `STANDARD` role, and lookup permission alone never does.
-- **`EXTENDED_CONTROLLED`** (FAMILY, COORDINATOR): masked (`*****NNNN`).
+  and the linked IDs in clear (unchanged).
+- **`STANDARD`** (other Staff): the opened record's own National ID in clear,
+  by owner decision (2026-10-29). Its first disclosure each Gaza day is
+  charged. Linked IDs and lists stay masked.
+- **`EXTENDED_CONTROLLED`** (FAMILY, COORDINATOR): **masked** (`*****NNNN`),
+  unchanged.
 - **Every result list, at every level:** masked. Searching never discloses a
   full ID.
 - **Refusals** (revoked, not allowed, gate closed): no record data at all.

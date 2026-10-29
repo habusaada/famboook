@@ -5,11 +5,15 @@ namespace Tests\Feature\CivilLookup;
 use App\Models\CivilLookupRolePolicy;
 use App\Models\CivilLookupUserAccess;
 use App\Models\User;
+use App\Support\CivilLookup\CivilLookupDisclosure;
 use App\Support\CivilLookup\CivilLookupQuota;
+use App\Support\CivilLookup\CivilRecord;
 use App\Support\CivilLookup\EffectivePolicy;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use PDO;
 use PDOException;
@@ -69,7 +73,7 @@ class CivilLookupPostgresTest extends TestCase
             return;
         }
         DB::purge('identity_ref_lookup');
-        DB::statement('TRUNCATE civil_lookup_audit_events, civil_lookup_policy_changes, civil_lookup_daily_usage, civil_lookup_user_access');
+        DB::statement('TRUNCATE civil_lookup_audit_events, civil_lookup_policy_changes, civil_lookup_daily_usage, civil_lookup_user_access, civil_lookup_record_disclosures');
         $this->tearDownIdentityRefStaging();
         $this->tearDownIdentityRef();
         // DatabaseTruncation leaves the last test's rows committed (family-side users, persons, families):
@@ -247,6 +251,88 @@ class CivilLookupPostgresTest extends TestCase
         pg_close($other);
         $this->assertSame(1, $this->used($user));
         $this->lookup('/search/national-id', ['national_id' => '900000001'], $user)->assertStatus(429)->assertJsonPath('code', 'QUOTA_EXHAUSTED');
+    }
+
+    /**
+     * FB-CIVIL-02F (ADR §L-6c): the first disclosure of a record is charged once under true
+     * concurrency — a second session inserting the same (user, day, release, record) waits for
+     * the first transaction and then finds the row; when the first rolls back it proceeds; and
+     * disclosures of different records never exceed the limit.
+     */
+    public function test_concurrent_disclosures_charge_one_record_once_and_never_exceed_the_limit(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('DATA_ENTRY');
+        $c = DB::connection()->getConfig();
+        $other = pg_connect(sprintf("host=%s port=%s dbname=%s user=%s password='%s'", $c['host'], $c['port'], $c['database'], $c['username'],
+            addslashes((string) ($c['password'] ?? ''))), PGSQL_CONNECT_FORCE_NEW);
+        $insert = 'INSERT INTO civil_lookup_record_disclosures (user_id, disclosure_date, release_id, record_id, created_at)
+            VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING';
+        $mark = fn (int $recordId) => pg_send_query_params($other, $insert, [$user->id, CivilLookupQuota::today(), 1, $recordId, now()->toDateTimeString()]);
+        $record = fn (int $id) => new CivilRecord(1, $id, '900000001', []);
+        $rows = fn (int $id) => DB::table('civil_lookup_record_disclosures')->where('user_id', $user->id)->where('record_id', $id)->count();
+
+        // The same record, opened twice in parallel: the second waits, then finds the row — it would be free.
+        DB::beginTransaction();
+        $this->assertSame(1, CivilLookupDisclosure::charge($user, new EffectivePolicy('DATA_ENTRY', 5), $record(77)));
+        $mark(77);
+        usleep(400_000);
+        $this->assertTrue(pg_connection_busy($other), 'the competing insert waits for the first transaction');
+        DB::commit();
+        $this->assertSame(0, pg_affected_rows(pg_get_result($other)), 'the record is already disclosed: no second charge');
+        $this->assertSame([1, 1], [$this->used($user), $rows(77)]);
+
+        // When the first transaction rolls back (e.g. its consume was refused), the waiting one proceeds.
+        DB::beginTransaction();
+        CivilLookupDisclosure::charge($user, new EffectivePolicy('DATA_ENTRY', 5), $record(78));
+        $mark(78);
+        usleep(400_000);
+        $this->assertTrue(pg_connection_busy($other));
+        DB::rollBack();
+        $this->assertSame(1, pg_affected_rows(pg_get_result($other)), 'nothing was disclosed by the rolled-back request');
+        $this->assertSame(1, $this->used($user));
+
+        // Different records in parallel at the limit: the second session's consume waits, the guard refuses it,
+        // and its transaction (insert + consume, as CivilLookupDisclosure::charge) rolls back its row.
+        $limit = $this->used($user) + 1;
+        $consume = preg_replace_callback('/\?/', function () {
+            static $n = 0;
+
+            return '$'.(++$n);
+        }, CivilLookupQuota::consumeStatement(true));
+        DB::beginTransaction();
+        $this->assertSame($limit, CivilLookupDisclosure::charge($user, new EffectivePolicy('DATA_ENTRY', $limit), $record(80)));
+        pg_query($other, 'BEGIN');
+        pg_query_params($other, $insert, [$user->id, CivilLookupQuota::today(), 1, 81, now()->toDateTimeString()]);
+        pg_send_query_params($other, $consume, [$user->id, CivilLookupQuota::today(), now()->toDateTimeString(), $limit]);
+        usleep(400_000);
+        $this->assertTrue(pg_connection_busy($other), 'the competing consume waits on the day counter');
+        DB::commit();
+        $this->assertSame(0, pg_num_rows(pg_get_result($other)), 'the guard re-checks the committed count: refused');
+        pg_query($other, 'ROLLBACK');
+        pg_close($other);
+        $this->assertSame([$limit, 1, 0], [$this->used($user), $rows(80), $rows(81)]);
+    }
+
+    /** FB-CIVIL-02F: the disclosure table's UNIQUE key on PostgreSQL, and its migration rolls back cleanly. */
+    public function test_the_disclosure_migration_has_its_unique_key_and_rolls_back(): void
+    {
+        $user = User::factory()->create();
+        $row = ['user_id' => $user->id, 'disclosure_date' => CivilLookupQuota::today(), 'release_id' => 1, 'record_id' => 5, 'created_at' => now()];
+        DB::table('civil_lookup_record_disclosures')->insert($row);
+        $this->assertThrows(fn () => DB::table('civil_lookup_record_disclosures')->insert($row), UniqueConstraintViolationException::class);
+        DB::table('civil_lookup_record_disclosures')->insert(['disclosure_date' => CivilLookupQuota::now()->addDay()->toDateString()] + $row);
+        $index = DB::selectOne("SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_civil_lookup_record_disclosure'");
+        $this->assertStringContainsString('CREATE UNIQUE INDEX', $index->indexdef);
+        $this->assertStringContainsString('(user_id, disclosure_date, release_id, record_id)', $index->indexdef);
+        $this->assertSame(['created_at', 'disclosure_date', 'id', 'record_id', 'release_id', 'user_id'],
+            collect(Schema::getColumnListing('civil_lookup_record_disclosures'))->sort()->values()->all(), 'no National ID column');
+
+        $migration = require database_path('migrations/2026_10_31_090000_create_civil_lookup_record_disclosures.php');
+        $migration->down();
+        $this->assertFalse(Schema::hasTable('civil_lookup_record_disclosures'));
+        $migration->up();
+        $this->assertTrue(Schema::hasTable('civil_lookup_record_disclosures'));
     }
 
     public function test_history_is_append_only_even_for_the_database_owner_and_a_missing_release_is_not_charged(): void

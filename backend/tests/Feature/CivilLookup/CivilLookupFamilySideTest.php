@@ -158,6 +158,8 @@ class CivilLookupFamilySideTest extends TestCase
         $this->assertSame('EMPTY', $links['SPOUSE']['status']);
         $this->assertSame(['DISABLED', 'DISABLED'], [$links['HOUSEHOLD']['status'], $links['CHILDREN']['status']]);
         $this->assertSame(1, $this->used($head), 'the search counted; opening the listed record did not');
+        // FB-CIVIL-02F: EXTENDED_CONTROLLED stays masked pending B-OD-1, so nothing is disclosed or charged for it.
+        $this->assertSame(0, DB::table('civil_lookup_record_disclosures')->count());
 
         $event = CivilLookupAuditEvent::query()->where('event_type', 'SEARCH_BY_ID')->sole();
         $this->assertSame(['FAMILY', 'FAMILY'], [$event->actor_side, $event->lookup_context]);

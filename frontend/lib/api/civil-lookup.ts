@@ -119,12 +119,17 @@ export function useCivilLookupPage(space: CivilLookupSpace = "staff") {
   });
 }
 
-/** A record listed in a result: not counted. */
+/**
+ * A record listed in a result: not counted — except FB-CIVIL-02F: at STANDARD the
+ * first full-ID disclosure of a record each day is, so the quota is refreshed.
+ */
 export function useCivilLookupOpenRecord(space: CivilLookupSpace = "staff") {
+  const refresh = useRefreshStatus();
   return useMutation({
     gcTime: 0,
     mutationFn: async (ref: string) =>
       (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${SPACE_BASES[space]}/records/open`, { ref })).data,
+    onSettled: refresh,
   });
 }
 

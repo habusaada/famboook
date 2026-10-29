@@ -232,14 +232,15 @@ class CivilLookupApiTest extends TestCase
         $standard = $this->staff('DATA_ENTRY');
         $ref = $this->lookup($standard, '/search/national-id', ['national_id' => '900000001'])->json('data.results.0.ref');
         $response = $this->lookup($standard, '/records/open', ['ref' => $ref])->assertOk()
-            ->assertJsonPath('data.record.level', 'STANDARD')->assertJsonPath('data.record.national_id', '*****0001');
+            // FB-CIVIL-02F: STANDARD shows the opened record's own National ID (a charged disclosure); links stay masked.
+            ->assertJsonPath('data.record.level', 'STANDARD')->assertJsonPath('data.record.national_id', '900000001');
         $sections = collect($response->json('data.record.sections'))->mapWithKeys(fn ($s) => [$s['key'] => array_column($s['fields'], 'key')]);
         $this->assertSame(['personal', 'family', 'geographic'], $sections->keys()->all());
         $this->assertNotContains('phonenum', $sections->flatten()->all());
         $this->assertNotContains('fatherid', $sections->flatten()->all());
         $links = collect($response->json('data.record.links'))->keyBy('relation');
         $this->assertSame('*****0002', $links['FATHER']['national_id'], 'linked IDs are masked without view-full');
-        foreach (['900000001', '900000002', '0599000000', 'relgion'] as $hidden) {
+        foreach (['900000002', '0599000000', 'relgion'] as $hidden) {
             $this->assertStringNotContainsString($hidden, $response->getContent());
         }
 

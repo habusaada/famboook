@@ -156,6 +156,25 @@ would be a field-visibility change (§L-4, 02B B-OD-1).
 
 The National ID disclosure by level is unchanged: see 02B §B-5a.
 
+### L-4b. National ID in an opened record (FB-CIVIL-02F, owner decision 2026-10-29)
+
+The owner approved showing the full National ID in the opened record of
+authorized Staff, including `STANDARD`. This supersedes the `STANDARD` row of
+§L-4 for the record's own `mainid` only.
+
+| Level | Opened record's own `mainid` | Linked IDs (father, mother, spouse) | Result lists |
+|---|---|---|---|
+| `FULL` | in clear (unchanged) | in clear (unchanged) | masked |
+| `STANDARD` | **in clear**, a charged disclosure (§L-6c) | masked | masked |
+| `EXTENDED_CONTROLLED` | masked, pending B-OD-1 (02B §B-5a) | masked | masked |
+
+- **"Authorized record":** a record listed in this requester's own
+  authorized search, or reached through its own link, and opened through its
+  user-, context- and release-bound reference (§L-7). There is no
+  per-record ACL (02C, no record-level scope; OD-15).
+- **Enforced in the API:** `CivilLookupFieldPolicy::RECORD_ID_LEVELS`.
+  `summary()` always masks.
+
 ## L-5. Search rules
 
 - **By National ID:** the existing validator (`isValidNationalId` /
@@ -261,6 +280,56 @@ the role-policy history. Nothing changes who may look up:
   other. A grant with no side left is sent as DEFAULT, never REVOKED.
 
 No migration, permission or gate is added.
+
+## L-6c. Disclosure quota (FB-CIVIL-02F, owner decision 2026-10-29)
+
+At `STANDARD`, the **first** disclosure of a record's full National ID to a
+Staff user on a Gaza-local day costs **one** unit of the shared daily quota
+(§L-6).
+
+- **Free:**
+  - reopening that record the same day, by any reference to it;
+  - opening the record of an exact National ID search, since the requester
+    supplied that ID. The exemption flag travels inside that search's
+    encrypted `RECORD` reference and is bound to its record id, so it is
+    marked but not charged.
+- **Linked records:** opening a linked citizen is already a charged lookup.
+  It marks the disclosure without a second charge.
+- **Unchanged:** `FULL` has no disclosure charge and no row, and
+  `EXTENDED_CONTROLLED` discloses nothing. Searches and pages are charged
+  as before.
+- **Mechanism:** table `civil_lookup_record_disclosures`, with UNIQUE
+  (`user_id`, `disclosure_date`, `release_id`, `record_id`), migration
+  `2026_10_31_090000`. `CivilLookupDisclosure::charge` does, in one
+  transaction:
+  1. `INSERT … ON CONFLICT DO NOTHING`;
+  2. only for a new row, the existing guarded quota upsert.
+- **When the consume is refused:**
+  - the transaction rolls the row back;
+  - the record is withheld (429 `QUOTA_EXHAUSTED`);
+  - `RECORD_OPENED` is audited with that outcome.
+- **Concurrency (PostgreSQL):**
+  - a concurrent insert of the same key waits for the first transaction,
+    then finds the row (free), or inserts if the first rolled back;
+  - concurrent disclosures of different records serialize on the day
+    counter and never exceed the limit.
+- **Stored data:** no National ID or fingerprint, only release and record
+  ids, which the audit already keeps.
+
+### Retention of disclosure rows (PROPOSED, not approved, not implemented)
+
+Deduplication needs only today's rows. Older rows are a record of which
+staff user saw which civil record in full, so they are kept for a limited
+time. Until this proposal is formally approved, **nothing deletes these rows
+automatically**: no command, no schedule.
+
+| Item | Proposal |
+|---|---|
+| Retention | 90 days after `disclosure_date`. A row older than that is deleted, unless it is under a hold. |
+| Hold (investigation protection) | A hold protects rows from deletion while an investigation is open. It covers either one staff user's rows, optionally within a date range, or one civil record's rows across users. It records who placed it, why (free text, no personal data), and when it was released. Placing or releasing a hold is restricted to `civil-lookup.manage` and recorded append-only. A held row is kept until its hold is released, then follows the 90-day rule. |
+| Mechanism (on approval) | A table `civil_lookup_disclosure_holds` (migration). A command `famboook:civil-lookup-prune-disclosures` with `--dry-run` that reports counts only, deletes in bounded committed batches as the FB-CIVIL-01A purge does, and never deletes a held row. It is scheduled daily only after approval and a reviewed dry run. |
+| Relation to the audit | `RECORD_OPENED` audit events (with `record_id`) are append-only and follow the audit's own retention. Deleting a disclosure row never deletes audit history. |
+| Open questions for approval | Whether 90 days also suits investigations started after a row has been deleted (the audit still holds the event). Who may place holds. Whether to notify the subject user. |
 
 ## L-7. Opaque references
 

@@ -1473,7 +1473,14 @@ on the test instance and a real browser
     - **Production configuration inspected 2026-10-29:** `enabled` ON, `family_side_enabled` ON, `coordinator_side_enabled` ON, `reverse_links_enabled` OFF. The project owner confirmed that the lookup service had already been tested successfully and needs no configuration change.
     - **Governance (independent of deployment, still open unless separately evidenced):** OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. Their completion is not recorded in this roadmap. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
-- **FB-CIVIL-02E (2026-10-29), local implementation verified, uncommitted, NOT deployed:** mobile-first Civil Registry Lookup (PWA):
+- **FB-CIVIL-02F (2026-10-29), local implementation verified, uncommitted, NOT deployed:** authorized Staff National ID disclosure (ADR 02A §L-4b, §L-6c):
+    - `STANDARD` shows the opened record's own National ID; `FULL` unchanged; `EXTENDED_CONTROLLED` masked pending B-OD-1 (02B §B-5a);
+    - result lists and linked IDs outside `FULL` stay masked;
+    - the first disclosure of a record each Gaza day costs one quota unit, reopening it is free, and an exact National ID search opens its record without a second charge;
+    - atomic and concurrency-safe through migration `2026_10_31_090000` (UNIQUE disclosure rows, inserted with the existing guarded consume in one transaction);
+    - B-OD-1, G1, OD-08, OD-09 and OD-15 unchanged.
+    - Disclosure-row retention: 90 days with investigation holds, **proposed only** (ADR 02A §L-6c); no automatic deletion until approved.
+- **FB-CIVIL-02E (2026-10-29), Production Deployed & Operationally Accepted:** deployed to Production on 2026-10-29 at `b4ca9784e8211fc67c9ea131ce9128b8fb977850`; HTTP smoke tests successful; accepted by the project owner: mobile-first Civil Registry Lookup (PWA):
     - accessible radio-based search modes, one responsive result card for every list, a compact quota indicator;
     - an indeterminate progress bar with an accessible announcement, «جارٍ البحث...», no duplicate request and no automatic retry of a counted request (static under reduced motion);
     - mobile person details and related-person navigation;
