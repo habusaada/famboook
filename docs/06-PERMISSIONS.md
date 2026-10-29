@@ -3028,6 +3028,9 @@ FB-CIVIL-02C (corrected, ADR 02A §L-6a): SUPER_ADMIN and ADMINISTRATOR have
 automatic access with an unlimited quota (their policy cannot be limited or
 disabled). No record-level scope applies. Legal authorization is still
 pending (G1 / OD-08 / OD-09).
+FB-CIVIL-02D (ADR 02A §L-6b): the individual-access page and its endpoints
+(account resolve, Staff search, history filters) use the existing
+`civil-lookup.manage`. No permission is added.
 
 ### 61d-1. Family Portal and Coordinator Space (FB-CIVIL-02B — PROPOSED, local only)
 

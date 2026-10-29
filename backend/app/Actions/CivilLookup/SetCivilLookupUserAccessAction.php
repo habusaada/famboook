@@ -2,6 +2,7 @@
 
 namespace App\Actions\CivilLookup;
 
+use App\Exceptions\CivilLookupException;
 use App\Models\CivilLookupPolicyChange;
 use App\Models\CivilLookupUserAccess;
 use App\Models\User;
@@ -25,13 +26,21 @@ use Illuminate\Validation\ValidationException;
  * A grant never overrides a gate, a permission, a role policy or the field
  * profile, and nothing else about the user — roles, permissions, a
  * Coordinator assignment — is touched. Recorded append-only.
+ *
+ * FB-CIVIL-02D: $expected is the state the editor loaded (access, sides).
+ * When given, it is compared under the row lock and a different current
+ * state refuses with ACCESS_CHANGED (409) — another administrator's change is
+ * never silently overwritten. Without it the behaviour is unchanged.
  */
 final class SetCivilLookupUserAccessAction
 {
     public const DEFAULT = 'DEFAULT';
 
-    /** @param  list<string>  $sides  GRANTED only */
-    public function handle(User $actor, User $target, string $access, array $sides = []): ?CivilLookupUserAccess
+    /**
+     * @param  list<string>  $sides  GRANTED only
+     * @param  array{access: string, sides: list<string>}|null  $expected
+     */
+    public function handle(User $actor, User $target, string $access, array $sides = [], ?array $expected = null): ?CivilLookupUserAccess
     {
         if (! $actor->can(UpdateCivilLookupRolePolicyAction::MANAGE)) {
             throw new AuthorizationException;
@@ -44,10 +53,14 @@ final class SetCivilLookupUserAccessAction
             throw ValidationException::withMessages(['sides' => 'تُحدَّد الجهات مع المنح فقط.']);
         }
 
-        return DB::transaction(function () use ($actor, $target, $access, $sideValue) {
+        return DB::transaction(function () use ($actor, $target, $access, $sideValue, $expected) {
             $current = CivilLookupUserAccess::query()->whereKey($target->id)->lockForUpdate()->first();
             $old = $current?->access;
             $oldSides = $current?->sides;
+            if ($expected !== null && (($old ?? self::DEFAULT) !== $expected['access']
+                || $oldSides !== CivilLookupUserAccess::sideValue($expected['sides']))) {
+                throw new CivilLookupException(CivilLookupException::ACCESS_CHANGED);
+            }
             $new = $access === self::DEFAULT ? null : $access;
             if ($old === $new && $oldSides === $sideValue) {
                 return $current;

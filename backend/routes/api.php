@@ -911,6 +911,9 @@ Route::middleware(['auth:sanctum', 'staff.side'])->group(function () use ($civil
             Route::get('/admin/changes', [CivilLookupAdminController::class, 'changes']);
             Route::get('/admin/user-access', [CivilLookupAdminController::class, 'userAccess']);
             Route::put('/admin/user-access', [CivilLookupAdminController::class, 'setUserAccess'])->middleware('throttle:30,1');
+            // FB-CIVIL-02D: one account's current access (identifier in the body) and the Staff account search.
+            Route::post('/admin/user-access/resolve', [CivilLookupAdminController::class, 'resolveUserAccess'])->middleware('throttle:60,1');
+            Route::get('/admin/accounts/staff', [CivilLookupAdminController::class, 'staffAccounts'])->middleware('throttle:60,1');
         });
     });
 });

@@ -3,6 +3,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiClient } from "@/lib/api/client";
 import type {
+  CivilLookupAccessValue,
+  CivilLookupAccountState,
   CivilLookupList,
   CivilLookupMode,
   CivilLookupPolicyChange,
@@ -10,9 +12,10 @@ import type {
   CivilLookupReverseRelation,
   CivilLookupSide,
   CivilLookupSpace,
+  CivilLookupStaffAccount,
   CivilLookupStatus,
   CivilLookupUsage,
-  CivilLookupUserAccessRow,
+  CivilLookupUserAccessList,
 } from "@/lib/types/api/civil-lookup";
 
 // FB-CIVIL-02A — Civil Registry Lookup (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md).
@@ -37,8 +40,10 @@ export const civilLookupKeys = {
   all: ["civil-lookup"] as const,
   status: (space: CivilLookupSpace = "staff") => [...civilLookupKeys.all, "status", space] as const,
   usage: () => [...civilLookupKeys.all, "usage"] as const,
-  changes: (page: number) => [...civilLookupKeys.all, "changes", page] as const,
+  changes: (page: number, filter: CivilLookupChangesFilter = {}) => [...civilLookupKeys.all, "changes", page, filter] as const,
   userAccess: () => [...civilLookupKeys.all, "user-access"] as const,
+  account: (target: CivilLookupAccessTarget | null) => [...civilLookupKeys.all, "account", target] as const,
+  staffAccounts: (q: string, page: number) => [...civilLookupKeys.all, "staff-accounts", q, page] as const,
 };
 
 export function civilLookupErrorCode(error: unknown): string | null {
@@ -167,12 +172,21 @@ export function useUpdateCivilLookupPolicy() {
   });
 }
 
-export function useCivilLookupChanges(page: number, enabled: boolean) {
+/** FB-CIVIL-02D: role-policy (ROLE) or per-user (USER) changes, optionally one user's. */
+export interface CivilLookupChangesFilter {
+  subject?: "ROLE" | "USER";
+  userId?: number;
+}
+
+export function useCivilLookupChanges(page: number, enabled: boolean, filter: CivilLookupChangesFilter = {}) {
+  const params = new URLSearchParams({ page: String(page) });
+  if (filter.subject) params.set("subject", filter.subject);
+  if (filter.userId) params.set("user_id", String(filter.userId));
   return useQuery({
-    queryKey: civilLookupKeys.changes(page),
+    queryKey: civilLookupKeys.changes(page, filter),
     queryFn: () =>
       apiClient.get<{ data: CivilLookupPolicyChange[]; meta: { current_page: number; last_page: number; per_page: number; total: number } }>(
-        `${BASE}/admin/changes?page=${page}`,
+        `${BASE}/admin/changes?${params.toString()}`,
       ),
     placeholderData: keepPreviousData,
     enabled,
@@ -180,10 +194,11 @@ export function useCivilLookupChanges(page: number, enabled: boolean) {
   });
 }
 
+/** The latest individual overrides (a recent list with its limit and total — never proof that an account has none). */
 export function useCivilLookupUserAccess(enabled: boolean) {
   return useQuery({
     queryKey: civilLookupKeys.userAccess(),
-    queryFn: async () => (await apiClient.get<{ data: CivilLookupUserAccessRow[] }>(`${BASE}/admin/user-access`)).data,
+    queryFn: () => apiClient.get<CivilLookupUserAccessList>(`${BASE}/admin/user-access`),
     enabled,
     retry: false,
   });
@@ -192,6 +207,36 @@ export function useCivilLookupUserAccess(enabled: boolean) {
 /** The target is a Staff email or, for a family-side account (no email), its person code. */
 export type CivilLookupAccessTarget = { email: string } | { person_code: string };
 
+/** FB-CIVIL-02D: one account's current access, resolved by the server (POST: the identifier never goes in a URL). */
+export function useCivilLookupAccount(target: CivilLookupAccessTarget | null) {
+  return useQuery({
+    queryKey: civilLookupKeys.account(target),
+    queryFn: async () => (await apiClient.post<{ data: CivilLookupAccountState }>(`${BASE}/admin/user-access/resolve`, target)).data,
+    enabled: target !== null,
+    retry: false,
+    staleTime: 0,
+  });
+}
+
+/** FB-CIVIL-02D: Staff accounts by name or email (two characters at least). */
+export function useCivilLookupStaffAccounts(q: string, page: number) {
+  return useQuery({
+    queryKey: civilLookupKeys.staffAccounts(q, page),
+    queryFn: () =>
+      apiClient.get<{ data: CivilLookupStaffAccount[]; meta: { current_page: number; last_page: number; per_page: number; total: number } }>(
+        `${BASE}/admin/accounts/staff?${new URLSearchParams({ q, page: String(page) }).toString()}`,
+      ),
+    enabled: q.length >= 2,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
+}
+
+/**
+ * GRANTED replaces the whole set of sides, so the caller sends the full set
+ * it shows. `expected` is the state the editor loaded: the server refuses
+ * with 409 ACCESS_CHANGED if another administrator changed it meanwhile.
+ */
 export function useSetCivilLookupUserAccess() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -199,18 +244,35 @@ export function useSetCivilLookupUserAccess() {
       target,
       access,
       sides,
+      expected,
     }: {
       target: CivilLookupAccessTarget;
-      access: "REVOKED" | "DEFAULT" | "GRANTED";
+      access: CivilLookupAccessValue;
       sides?: CivilLookupSide[];
+      expected?: { access: CivilLookupAccessValue; sides: CivilLookupSide[] };
     }) =>
       (
-        await apiClient.put<{ data: { user_id: number; access: string; sides: CivilLookupSide[] } }>(`${BASE}/admin/user-access`, {
+        await apiClient.put<{ data: { user_id: number; access: CivilLookupAccessValue; sides: CivilLookupSide[] } }>(`${BASE}/admin/user-access`, {
           ...target,
           access,
           ...(access === "GRANTED" ? { sides } : {}),
+          ...(expected ? { expected_access: expected.access, expected_sides: expected.sides } : {}),
         })
       ).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: civilLookupKeys.all }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: civilLookupKeys.all }),
   });
+}
+
+/** Fixed Arabic text for an administration refusal; the server's validation text is Arabic already. */
+export function civilLookupAdminErrorMessage(error: unknown): string {
+  if (civilLookupErrorCode(error) === "ACCESS_CHANGED") {
+    return "تغيّرت إعدادات هذا الحساب بواسطة مسؤول آخر منذ تحميلها. أُعيد تحميل الحالة الحالية؛ راجعها ثم أعد المحاولة.";
+  }
+  if (error instanceof ApiError) {
+    if (error.status === 401) return "انتهت الجلسة. سجّل الدخول مجددًا.";
+    if (error.status === 403) return "لا تملك صلاحية إدارة تصاريح الاستعلام المدني.";
+    if (error.status === 422) return Object.values(error.validationErrors ?? {})[0]?.[0] ?? "تحقق من البيانات المدخلة.";
+    if (error.status === 429) return "طلبات كثيرة خلال وقت قصير. حاول مرة أخرى بعد قليل.";
+  }
+  return "تعذّر إتمام العملية. حاول مرة أخرى.";
 }

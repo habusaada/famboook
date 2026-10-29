@@ -1,26 +1,23 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
-import { AuthContext, authValue } from "@/components/auth/auth-context";
 import { FamilyUserContext } from "@/components/family/family-context";
 import { CivilLookupEntry, FamilyCivilLookup } from "@/components/family/civil-lookup";
 import FamilyCivilRegistryPage from "@/app/family/(portal)/civil-registry/page";
 import CoordinatorCivilRegistryPage from "@/app/family/(portal)/coordinator/(space)/civil-registry/page";
-import CivilLookupQuotasPage from "@/app/(staff)/administration/civil-registry/lookup-quotas/page";
 import { ApiError, apiClient } from "@/lib/api/client";
-import type { CurrentUser } from "@/lib/api/auth";
 import type { FamilyUser } from "@/lib/api/family-auth";
 import type {
   CivilLookupList,
   CivilLookupQuota,
   CivilLookupRecord,
   CivilLookupStatus,
-  CivilLookupUsage,
 } from "@/lib/types/api/civil-lookup";
 import { browserStorageDump, familyUser, renderWithClient } from "./helpers";
 
 // FB-CIVIL-02B — the Civil Registry Lookup on the Family Portal and in
-// Coordinator Space, and the per-side grant in the quota administration.
+// Coordinator Space (the per-side grant administration is covered by
+// civil-lookup-access.test.tsx, FB-CIVIL-02D).
 // SYNTHETIC data only (900000xxx identifiers, placeholder names). The API
 // authorizes, profiles and counts; these tests cover what each side shows,
 // where it sends its requests, and that nothing is kept in the browser.
@@ -218,56 +215,5 @@ describe("Coordinator Space lookup", () => {
     renderFamily({ ...COORD, civil_lookup: { family: false, coordinator: false } }, <FamilyCivilLookup side="coordinator" />);
     expect(document.querySelector('[data-civil-lookup-unavailable="coordinator"]')).not.toBeNull();
     expect(get).not.toHaveBeenCalled();
-  });
-});
-
-describe("per-side grants in the quota administration", () => {
-  const admin: CurrentUser = {
-    name: "مدير تجريبي", email: "admin@example.test", role: "SUPER_ADMIN", role_label: "مدير النظام",
-    permissions: ["civil-lookup.usage.view", "civil-lookup.manage"],
-  } as CurrentUser;
-
-  const usage = (grantable: CivilLookupUsage["grantable_sides"]): { data: CivilLookupUsage } => ({
-    data: {
-      date: "2026-10-27", resets_at: "2026-10-27T22:00:00+00:00", total_lookups: 0, active_users: 0, lookup_enabled: true, reverse_links_enabled: false,
-      grantable_sides: grantable, side_lookup_enabled: { FAMILY: grantable.includes("FAMILY"), COORDINATOR: false }, exhausted_users: [], policies: [],
-    },
-  });
-
-  function mockAdmin(grantable: CivilLookupUsage["grantable_sides"]) {
-    vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
-      if (path === `${STAFF}/admin/usage`) return usage(grantable) as never;
-      if (path.startsWith(`${STAFF}/admin/changes`)) return { data: [], meta: { current_page: 1, last_page: 1, per_page: 25, total: 0 } } as never;
-      if (path === `${STAFF}/admin/user-access`) {
-        return { data: [{ user: { id: 9, name: "رب أسرة تجريبي", email: null }, access: "GRANTED", sides: ["FAMILY"], changed_by: "مدير تجريبي", changed_at: "2026-10-27T08:00:00+00:00" }] } as never;
-      }
-      throw new Error(`Unexpected GET: ${path}`);
-    });
-  }
-
-  it("offers GRANTED only for the sides the server says may be granted, and sends the person code and sides", async () => {
-    const user = userEvent.setup();
-    mockAdmin(["FAMILY"]);
-    const put = vi.spyOn(apiClient, "put").mockResolvedValue({ data: { user_id: 9, access: "GRANTED", sides: ["FAMILY"] } } as never);
-    renderWithClient(<AuthContext.Provider value={authValue(admin)}><CivilLookupQuotasPage /></AuthContext.Provider>);
-
-    expect((await findEl(() => document.querySelector("[data-access-row]"))).textContent).toContain("ممنوح (بوابة الأسرة)");
-    expect(document.querySelector('[data-side-state="FAMILY"]')?.textContent).toBe("مفعّل");
-    await user.selectOptions(screen.getByLabelText("المستخدم حسب"), "person_code");
-    await user.type(screen.getByLabelText("رمز الشخص المرتبط بالحساب"), "PER-000123");
-    await user.selectOptions(screen.getByLabelText("الوصول"), "GRANTED");
-    expect(screen.queryByLabelText("مساحة التنسيق")).toBeNull();
-    const apply = screen.getByRole("button", { name: "تطبيق" });
-    expect(apply).toBeDisabled();
-    await user.click(screen.getByLabelText("بوابة الأسرة"));
-    await user.click(apply);
-    expect(put).toHaveBeenCalledWith(`${STAFF}/admin/user-access`, { person_code: "PER-000123", access: "GRANTED", sides: ["FAMILY"] });
-  });
-
-  it("does not offer GRANTED while no side may be granted", async () => {
-    mockAdmin([]);
-    renderWithClient(<AuthContext.Provider value={authValue(admin)}><CivilLookupQuotasPage /></AuthContext.Provider>);
-    const select = await screen.findByLabelText("الوصول");
-    expect(Array.from((select as HTMLSelectElement).options).map((o) => o.value)).toEqual(["REVOKED", "DEFAULT"]);
   });
 });

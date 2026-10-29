@@ -267,8 +267,10 @@ describe("quota administration", () => {
     },
   });
 
+  let get: MockInstance<typeof apiClient.get>;
+
   beforeEach(() => {
-    vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
+    get = vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
       if (path === `${BASE}/admin/usage`) return usage() as never;
       if (path.startsWith(`${BASE}/admin/changes`)) {
         return {
@@ -301,7 +303,11 @@ describe("quota administration", () => {
     await user.type(input, "40");
     await user.click(within(row).getByRole("button", { name: "حفظ" }));
     expect(put).toHaveBeenCalledWith(`${BASE}/admin/policies/DATA_ENTRY`, { enabled: true, daily_limit: 40 });
-    expect(await screen.findByText("سجل تغييرات الإعدادات")).toBeInTheDocument();
+    expect(await screen.findByText("سجل تغييرات سياسات الأدوار")).toBeInTheDocument();
+    // FB-CIVIL-02D: role changes only; per-user access has its own page.
+    expect(get).toHaveBeenCalledWith(`${BASE}/admin/changes?page=1&subject=ROLE`);
+    expect(document.querySelector("[data-access-form]")).toBeNull();
+    expect(document.querySelector('[data-access-link] a')).toHaveAttribute("href", "/administration/civil-registry/lookup-access");
     expect(document.querySelector('[data-change="ROLE"]')?.textContent).toContain("مدخل بيانات");
   });
 

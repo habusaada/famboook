@@ -56,6 +56,12 @@ const SECTIONS = [
     label: "كوتة الاستعلامات",
     permission: "civil-lookup.usage.view",
   },
+  // FB-CIVIL-02D: individual lookup access (overrides and per-side grants).
+  {
+    href: "/administration/civil-registry/lookup-access",
+    label: "تصاريح الاستعلام المدني",
+    permission: "civil-lookup.manage",
+  },
 ];
 
 /** Section navigation; each entry appears only with its permission (UX only, the API authorizes). */

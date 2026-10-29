@@ -31,10 +31,13 @@ class CivilLookupException extends RuntimeException
 
     public const RATE_LIMITED = 'RATE_LIMITED';
 
+    /** FB-CIVIL-02D: the per-user access changed since the editor loaded it. */
+    public const ACCESS_CHANGED = 'ACCESS_CHANGED';
+
     private const STATUS = [
         self::DISABLED => 503, self::NOT_CONFIGURED => 503, self::UNAVAILABLE => 503, self::NO_PUBLISHED_RELEASE => 503,
         self::NOT_ALLOWED => 403, self::LINKS_DISABLED => 403, self::QUOTA_EXHAUSTED => 429, self::RATE_LIMITED => 429,
-        self::REFERENCE_INVALID => 422, self::RELEASE_CHANGED => 409,
+        self::REFERENCE_INVALID => 422, self::RELEASE_CHANGED => 409, self::ACCESS_CHANGED => 409,
     ];
 
     private const MESSAGES = [
@@ -48,6 +51,7 @@ class CivilLookupException extends RuntimeException
         self::RELEASE_CHANGED => 'The published civil registry release changed; search again.',
         self::LINKS_DISABLED => 'This relationship lookup is not enabled.',
         self::RATE_LIMITED => 'Too many lookup requests; try again later.',
+        self::ACCESS_CHANGED => 'The access of this user changed since it was loaded; reload it and try again.',
     ];
 
     /** @param  array<string, mixed>  $extra  safe values only (e.g. the quota status) */

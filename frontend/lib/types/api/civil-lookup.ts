@@ -139,8 +139,50 @@ export interface CivilLookupPolicyChange {
 
 export interface CivilLookupUserAccessRow {
   user: { id: number | null; name: string | null; email: string | null };
+  /** FB-CIVIL-02D: the account side and, for a family-side account, its linked Person's code (its edit identifier). */
+  account_side: CivilLookupAccountSide | null;
+  person_code: string | null;
   access: "REVOKED" | "GRANTED";
   sides: CivilLookupSide[];
   changed_by: string | null;
   changed_at: string | null;
+}
+
+/** FB-CIVIL-02D: the latest overrides only — a recent list, never a directory. */
+export interface CivilLookupUserAccessList {
+  data: CivilLookupUserAccessRow[];
+  meta: { limit: number; total: number };
+}
+
+// ---------------------------------------------------------------- access page (FB-CIVIL-02D)
+
+/** An individual override; DEFAULT = no override (the role policies decide). */
+export type CivilLookupAccessValue = "GRANTED" | "REVOKED" | "DEFAULT";
+
+export type CivilLookupAccountSide = "STAFF" | "FAMILY" | "INVALID" | "NONE";
+
+/** One account's current access, as the server resolves it. */
+export interface CivilLookupAccountState {
+  user: { id: number; name: string; email: string | null; is_active: boolean; account_side: CivilLookupAccountSide; roles: string[] };
+  person: { person_code: string; full_name: string; link_status: string } | null;
+  access: CivilLookupAccessValue;
+  sides: CivilLookupSide[];
+  changed_by: string | null;
+  changed_at: string | null;
+  /** The latest per-user change in the history (also after a return to DEFAULT). */
+  last_change: { changed_by: string | null; changed_at: string | null } | null;
+  /** The sides that may be GRANTED to this account right now (family-side only). */
+  grantable_sides: CivilLookupSide[];
+  role_policy: { role: string; daily_limit: number | null } | null;
+  /** Effective eligibility per context right now — gates, permissions and policies included. */
+  effective: Partial<Record<CivilLookupContext, { allowed: boolean; reason: string | null }>>;
+}
+
+export interface CivilLookupStaffAccount {
+  id: number;
+  name: string;
+  email: string | null;
+  is_active: boolean;
+  account_side: CivilLookupAccountSide;
+  roles: string[];
 }

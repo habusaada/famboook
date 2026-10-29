@@ -202,6 +202,38 @@ default above:
   the civil registry still needs G1 / OD-08 and OD-09 (§L-0), and the lookup
   stays off by default.
 
+## L-6b. Access page (FB-CIVIL-02D — 2026-10-29)
+
+Individual access moves from the quota page to its own page,
+Administration → Civil Registry → **تصاريح الاستعلام المدني**
+(`/administration/civil-registry/lookup-access`, `civil-lookup.manage`).
+The quota page keeps the service state, the role policies, today's usage and
+the role-policy history. Nothing changes who may look up:
+
+- **One account's current state:** `POST admin/user-access/resolve` takes a
+  Staff email or the person code of a family-side account (in the body,
+  never a URL). It returns the override, or `DEFAULT` when there is none, and
+  the sides. It also returns who set it, the latest per-user change, the
+  sides that may be granted now (open switch; COORDINATOR only for a holder
+  of the role), the role policy, and the effective eligibility per context.
+  The override is shown apart from the effective eligibility.
+- **Staff search:** `GET admin/accounts/staff?q=` returns Staff-side accounts
+  by name or email, 20 per page, with the identity and roles only.
+- **History filters:** `admin/changes?subject=ROLE|USER&user_id=`. The
+  history stays read-only and append-only.
+- **Override list:** the latest 200, with their total, the account side and
+  the person code. It is never treated as a directory.
+- **Stale state:** `PUT admin/user-access` accepts the state the editor
+  loaded (`expected_access`, `expected_sides`). It is compared under the
+  action's existing row lock, and a different current state answers
+  **409 `ACCESS_CHANGED`** and changes nothing. Without these fields the
+  behaviour is unchanged.
+- **Full set of sides:** the editor always sends the whole set of sides,
+  because GRANTED replaces it, so adding or removing one side keeps the
+  other. A grant with no side left is sent as DEFAULT, never REVOKED.
+
+No migration, permission or gate is added.
+
 ## L-7. Opaque references
 
 Search, record and link references are Laravel-encrypted (authenticated,

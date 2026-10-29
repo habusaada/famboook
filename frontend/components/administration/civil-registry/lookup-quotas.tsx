@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Infinity as InfinityIcon, Save, UserX } from "lucide-react";
+import Link from "next/link";
+import { Infinity as InfinityIcon, KeyRound, Save } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DetailItem, DetailList, PageHeader, Panel, SectionHeader } from "@/components/shared/page-layout";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -14,20 +14,16 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { CivilRegistryNav, LoadingBlock, MonitorError, Num } from "@/components/administration/civil-registry/parts";
 import { gazaTime, roleLabel } from "@/components/civil-lookup/labels";
 import { ApiError } from "@/lib/api/client";
-import {
-  useCivilLookupChanges,
-  useCivilLookupUsage,
-  useCivilLookupUserAccess,
-  useSetCivilLookupUserAccess,
-  useUpdateCivilLookupPolicy,
-} from "@/lib/api/civil-lookup";
-import type { CivilLookupPolicy, CivilLookupPolicyChange, CivilLookupSide } from "@/lib/types/api/civil-lookup";
+import { useCivilLookupChanges, useCivilLookupUsage, useUpdateCivilLookupPolicy } from "@/lib/api/civil-lookup";
+import type { CivilLookupPolicy, CivilLookupPolicyChange } from "@/lib/types/api/civil-lookup";
 
 // FB-CIVIL-02A — Administration → Civil Registry → Lookup quotas
 // (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md §L-3, §L-6). Usage needs
 // civil-lookup.usage.view; changing a policy or a user's access needs
 // civil-lookup.manage. Buttons follow the permissions as UX only — the API
-// authorizes and records every change.
+// authorizes and records every change. FB-CIVIL-02D: individual user access
+// (overrides, per-side grants and their history) has its own page,
+// /administration/civil-registry/lookup-access; this page keeps the roles.
 
 function saveError(error: unknown): string | null {
   if (!error) return null;
@@ -119,16 +115,7 @@ function PolicyRow({ policy, manage }: { policy: CivilLookupPolicy; manage: bool
   );
 }
 
-const SIDE_LABELS: Record<CivilLookupSide, string> = { FAMILY: "بوابة الأسرة", COORDINATOR: "مساحة التنسيق" };
-
-const sidesText = (sides: CivilLookupSide[]) => sides.map((side) => SIDE_LABELS[side]).join(" و");
-
 function changeText(c: CivilLookupPolicyChange): string {
-  if (c.subject_type === "USER") {
-    const label = (a: string | null, sides: CivilLookupSide[]) =>
-      a === "REVOKED" ? "موقوف" : a === "GRANTED" ? `ممنوح (${sidesText(sides)})` : "حسب الدور";
-    return `${c.user?.name ?? "—"}: ${label(c.old_access, c.old_sides ?? [])} ← ${label(c.new_access, c.new_sides ?? [])}`;
-  }
   const state = (enabled: boolean | null, limit: number | null) =>
     `${enabled ? "مفعّلة" : "معطّلة"}، ${limit === null ? "غير محدود" : `${limit.toLocaleString("ar")} يوميًا`}`;
   return `${roleLabel(c.role ?? "")}: ${state(c.old_enabled, c.old_daily_limit)} ← ${state(c.new_enabled, c.new_daily_limit)}`;
@@ -139,16 +126,8 @@ export function CivilLookupQuotas() {
   const manage = can("civil-lookup.manage");
   const usage = useCivilLookupUsage();
   const [changesPage, setChangesPage] = useState(1);
-  const changes = useCivilLookupChanges(changesPage, manage);
-  const access = useCivilLookupUserAccess(manage);
-  const setAccess = useSetCivilLookupUserAccess();
-  const [targetKind, setTargetKind] = useState<"email" | "person_code">("email");
-  const [target, setTarget] = useState("");
-  const [accessValue, setAccessValue] = useState<"REVOKED" | "DEFAULT" | "GRANTED">("REVOKED");
-  const [sides, setSides] = useState<CivilLookupSide[]>([]);
-  // FB-CIVIL-02B: GRANTED is offered only for the sides the server says may be granted now.
-  const grantable = usage.data?.grantable_sides ?? [];
-  const granting = accessValue === "GRANTED";
+  // Role-policy changes only; per-user changes are on the access page.
+  const changes = useCivilLookupChanges(changesPage, manage, { subject: "ROLE" });
 
   return (
     <div className="flex flex-col gap-5" data-lookup-quotas>
@@ -241,113 +220,24 @@ export function CivilLookupQuotas() {
       )}
 
       {manage && (
-        <Panel data-user-access>
+        <Panel data-access-link>
           <SectionHeader
-            title="وصول مستخدم محدد"
-            description="الإيقاف يمنع المستخدم من الاستعلام أيًا كان دوره، دون تغيير أدواره أو صلاحياته الأخرى. «حسب الدور» يلغي الإيقاف. المنح الفردي لحسابات الأسر فقط، ولكل جهة على حدة، ولا يتجاوز تفعيل الجهة أو سياسة الدور أو الرصيد."
-            icon={UserX}
-            className="mb-3"
+            title="تصاريح المستخدمين الأفراد"
+            description="الإيقاف الفردي والمنح الصريح لكل جهة وسجلهما في صفحة مستقلة."
+            icon={KeyRound}
+            action={
+              <Button asChild size="sm" variant="outline">
+                <Link href="/administration/civil-registry/lookup-access">تصاريح الاستعلام المدني</Link>
+              </Button>
+            }
           />
-          <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const value = target.trim();
-              setAccess.mutate(
-                {
-                  target: targetKind === "email" ? { email: value } : { person_code: value },
-                  access: accessValue,
-                  sides: granting ? sides : undefined,
-                },
-                { onSuccess: () => setTarget("") },
-              );
-            }}
-            data-access-form
-          >
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="lookup-access-target-kind">المستخدم حسب</Label>
-              <select
-                id="lookup-access-target-kind"
-                className="h-8 rounded-control border border-input bg-background px-2 text-sm"
-                value={targetKind}
-                onChange={(e) => setTargetKind(e.target.value as "email" | "person_code")}
-              >
-                <option value="email">البريد الإلكتروني (موظف)</option>
-                <option value="person_code">رمز الشخص (حساب أسرة)</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="lookup-access-target">{targetKind === "email" ? "البريد الإلكتروني للمستخدم" : "رمز الشخص المرتبط بالحساب"}</Label>
-              <Input
-                id="lookup-access-target"
-                type={targetKind === "email" ? "email" : "text"}
-                dir="ltr"
-                className="w-72"
-                autoComplete="off"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="lookup-access-value">الوصول</Label>
-              <select
-                id="lookup-access-value"
-                className="h-8 rounded-control border border-input bg-background px-2 text-sm"
-                value={accessValue}
-                onChange={(e) => setAccessValue(e.target.value as "REVOKED" | "DEFAULT" | "GRANTED")}
-              >
-                <option value="REVOKED">إيقاف</option>
-                <option value="DEFAULT">حسب الدور</option>
-                {grantable.length > 0 && <option value="GRANTED">منح (حساب أسرة)</option>}
-              </select>
-            </div>
-            {granting && (
-              <fieldset className="flex flex-col gap-1.5" data-grant-sides>
-                <legend className="text-sm font-medium">جهة المنح</legend>
-                <div className="flex gap-3">
-                  {grantable.map((side) => (
-                    <label key={side} className="flex items-center gap-1.5 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={sides.includes(side)}
-                        onChange={(e) => setSides((current) => (e.target.checked ? [...current, side] : current.filter((s) => s !== side)))}
-                      />
-                      {SIDE_LABELS[side]}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-            <Button type="submit" variant="outline" disabled={target.trim() === "" || (granting && sides.length === 0) || setAccess.isPending}>
-              تطبيق
-            </Button>
-            {saveError(setAccess.error) && (
-              <span className="text-sm text-danger" role="alert">
-                {saveError(setAccess.error)}
-              </span>
-            )}
-          </form>
-          {access.data && access.data.length > 0 && (
-            <ul className="mt-4 flex flex-col divide-y divide-border/70 text-sm">
-              {access.data.map((row) => (
-                <li key={row.user.id ?? row.user.email} className="flex flex-wrap justify-between gap-2 py-2" data-access-row>
-                  <span>
-                    {row.user.name} <bdi dir="ltr" className="text-muted-foreground">{row.user.email}</bdi>
-                  </span>
-                  <span className="text-muted-foreground">
-                    {row.access === "REVOKED" ? "موقوف" : `ممنوح (${sidesText(row.sides ?? [])})`} — {row.changed_by} — {gazaTime(row.changed_at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
         </Panel>
       )}
 
       {manage && (
         <Panel flush data-policy-changes>
           <div className="px-4 pt-4 sm:px-5">
-            <SectionHeader title="سجل تغييرات الإعدادات" description="القيمة السابقة والجديدة، ومن غيّرها ومتى. السجل غير قابل للتعديل أو الحذف." />
+            <SectionHeader title="سجل تغييرات سياسات الأدوار" description="القيمة السابقة والجديدة، ومن غيّرها ومتى. السجل غير قابل للتعديل أو الحذف." />
           </div>
           {changes.isPending && (
             <div className="p-4">
