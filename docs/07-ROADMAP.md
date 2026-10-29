@@ -1471,10 +1471,17 @@ on the test instance and a real browser
     - per-role daily quotas in the database (Asia/Gaza day, atomic), per-user revocation, append-only audit and policy history, quota administration screen.
     - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
-- **FB-CIVIL-02D (2026-10-29), local, uncommitted:** standalone access page «تصاريح الاستعلام المدني» (ADR 02A §L-6b):
+- **FB-CIVIL-02D (2026-10-29), Production Deployed & Operationally Accepted:** Civil Registry Lookup Access Administration — standalone access page «تصاريح الاستعلام المدني» (ADR 02A §L-6b):
     - account search (family via Person, Staff by name or email), server-resolved current state with DEFAULT, a safe editor that sends the full set of sides, confirmation, a stale-state 409 check, the override list and the per-user history;
     - the quota page keeps roles, usage and role-policy history;
     - no migration, no new permission, no change to who may look up.
+    - Production deployment 2026-10-29 at `55eb6a816966b6607d7680732de03570f15e619c`:
+        - production database backup completed before the deployment;
+        - no new migrations were required for 02D;
+        - backend health endpoint HTTP 200, frontend login HTTP 200, `/administration/civil-registry/lookup-access` HTTP 200;
+        - authenticated browser testing confirmed successful by the project owner;
+        - existing `CIVIL_LOOKUP_*` feature flags were not intentionally changed.
+    - **The Civil Registry Lookup service is NOT activated:** activation remains a separate operational decision (G1 / OD-08 / OD-09, ADR 02A §L-0).
 - **FB-CIVIL-02C (2026-10-28, corrected):**
     - SUPER_ADMIN and ADMINISTRATOR have automatic, unlimited lookup access (ADR 02A §L-6a); every other role keeps its 02A / 02B policy;
     - the proposed person-level scope / institutional-task / reviewed-grant design was **rejected and is not implemented**;
