@@ -1465,11 +1465,13 @@ on the test instance and a real browser
     - `civil-import.publish.confirm` replaces `.approve` (still gated, closed by default); reject is removed;
     - pending two-person requests expire (`POLICY_CHANGED`); the worker still publishes and re-checks everything.
 - **FB-CIVIL-01B** (lookup by staff): not started; needs a separately approved baseline change (OD-09).
-- **FB-CIVIL-02A (2026-10-28), local technical implementation COMPLETE (technically accepted, committed locally); Production activation BLOCKED:** Staff Portal Civil Registry Lookup (supersedes the 01B placeholder), `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`:
+- **FB-CIVIL-02A (2026-10-28), technically accepted; Production deployed; service ACTIVE on Production (verified 2026-10-29):** Staff Portal Civil Registry Lookup (supersedes the 01B placeholder), `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`:
     - read boundary `08-lookup.dba.sql` (reader login, EXECUTE-only `identity_ref_lookup` functions on the active release; local only) and optional indexes `09-lookup-indexes.dba.sql` (not approved);
     - lookup by National ID, full name and name parts; record details by field level (`relgion` never shown); father / mother / spouse links; household and children reverse links implemented but disabled;
     - per-role daily quotas in the database (Asia/Gaza day, atomic), per-user revocation, append-only audit and policy history, quota administration screen.
-    - **Off by default.** Production needs OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
+    - **Off by default in the code.** Production presence: Production HEAD was `b262aba` before the FB-CIVIL-02D deployment, with no pending migrations reported; updated to `55eb6a8` on 2026-10-29; the individual deployment date of 02A is not recorded.
+    - **Production configuration inspected 2026-10-29:** `enabled` ON, `family_side_enabled` ON, `coordinator_side_enabled` ON, `reverse_links_enabled` OFF. The project owner confirmed that the lookup service had already been tested successfully and needs no configuration change.
+    - **Governance (independent of deployment, still open unless separately evidenced):** OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. Their completion is not recorded in this roadmap. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
 - **FB-CIVIL-02D (2026-10-29), Production Deployed & Operationally Accepted:** Civil Registry Lookup Access Administration — standalone access page «تصاريح الاستعلام المدني» (ADR 02A §L-6b):
     - account search (family via Person, Staff by name or email), server-resolved current state with DEFAULT, a safe editor that sends the full set of sides, confirmation, a stale-state 409 check, the override list and the per-user history;
@@ -1481,23 +1483,25 @@ on the test instance and a real browser
         - backend health endpoint HTTP 200, frontend login HTTP 200, `/administration/civil-registry/lookup-access` HTTP 200;
         - authenticated browser testing confirmed successful by the project owner;
         - existing `CIVIL_LOOKUP_*` feature flags were not intentionally changed.
-    - **The Civil Registry Lookup service is NOT activated:** activation remains a separate operational decision (G1 / OD-08 / OD-09, ADR 02A §L-0).
-- **FB-CIVIL-02C (2026-10-28, corrected):**
+    - *Corrected 2026-10-29:* the Civil Registry Lookup service **is active on Production** (configuration inspected: `enabled`, `family_side_enabled` and `coordinator_side_enabled` ON, `reverse_links_enabled` OFF; see FB-CIVIL-02A). G1 / OD-08 / OD-09 remain open unless separately evidenced (ADR 02A §L-0).
+- **FB-CIVIL-02C (2026-10-28, corrected), technically accepted; Production deployed:**
     - SUPER_ADMIN and ADMINISTRATOR have automatic, unlimited lookup access (ADR 02A §L-6a); every other role keeps its 02A / 02B policy;
     - the proposed person-level scope / institutional-task / reviewed-grant design was **rejected and is not implemented**;
-    - no record-level restriction; legal authorization still pending (G1 / OD-08 / OD-09); lookup stays off by default.
+    - no record-level restriction; legal authorization still pending unless separately evidenced (G1 / OD-08 / OD-09); off by default in the code, active on Production (see FB-CIVIL-02A).
+    - Production presence: Production HEAD was `b262aba` before the FB-CIVIL-02D deployment, with no pending migrations reported; updated to `55eb6a8` on 2026-10-29; the individual deployment date of 02C is not recorded.
     - Technical acceptance 2026-10-28:
         - full SQLite 3400 OK;
         - full PostgreSQL 9 errors + 1 failure, all pre-existing baseline issues unrelated to Civil Lookup (hard-coded id = 1, `sqlite_sequence`, jsonb key order, CHECK-shape factory data);
         - CivilLookup PostgreSQL 33/33;
         - Vitest 1100/1100; `tsc` and ESLint clean; `next build` OK.
-- **FB-CIVIL-02B (2026-10-28), local technical implementation COMPLETE (technically accepted, committed locally); real-data access and Production activation BLOCKED:** Civil Registry Lookup on the Family Portal (household head) and in Coordinator Space, `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`:
+- **FB-CIVIL-02B (2026-10-28), technically accepted; Production deployed; Family Portal and Coordinator Space sides ACTIVE on Production (verified 2026-10-29):** Civil Registry Lookup on the Family Portal (household head) and in Coordinator Space, `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`:
     - one service, quota and audit, mounted per side (`/family/civil-registry/lookup`, `/family/coordinator/civil-registry/lookup`), with references bound to their context;
     - separate side switches (default off) and, in production, separate side approvals plus the `EXTENDED_CONTROLLED` field-profile approval;
     - gated family-side role permissions, explicit per-side GRANTED rows (administered by person code), FAMILY_USER / COORDINATOR policies;
     - one shared daily counter;
     - entry cards and pages reusing `components/civil-lookup/`.
-    - Needs G1 / OD-08 (family-side purpose), OD-09 (covering these contexts), B-OD-1 (field approval), B-OD-2 (eligibility policy), B-OD-3 (docs/06 baseline) and B-OD-4 (docs/11 entries). Reverse links stay disabled.
+    - Production presence: Production HEAD was `b262aba` before the FB-CIVIL-02D deployment, with no pending migrations reported; updated to `55eb6a8` on 2026-10-29; the individual deployment date of 02B is not recorded. Configuration inspected 2026-10-29: `family_side_enabled` and `coordinator_side_enabled` ON, `reverse_links_enabled` OFF (reverse links stay disabled).
+    - **Governance (still open unless separately evidenced):** G1 / OD-08 (family-side purpose), OD-09 (covering these contexts), B-OD-1 (field approval), B-OD-2 (eligibility policy), B-OD-3 (docs/06 baseline) and B-OD-4 (docs/11 entries).
 
 ---
 
