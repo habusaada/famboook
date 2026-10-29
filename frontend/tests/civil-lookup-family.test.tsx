@@ -153,7 +153,7 @@ describe("Family Portal lookup", () => {
     expect(document.querySelector("[data-quota-remaining]")?.textContent).toBe((3).toLocaleString("ar"));
     expect(get).toHaveBeenCalledWith(`${FAMILY}/status`);
 
-    await user.type(screen.getByLabelText("رقم الهوية"), "900000001");
+    await user.type(screen.getByRole("textbox", { name: "رقم الهوية" }), "900000001");
     await user.click(screen.getByRole("button", { name: "بحث" }));
     const detail = await findEl(() => document.querySelector('[data-citizen-detail][data-level="EXTENDED_CONTROLLED"]'));
     expect(post).toHaveBeenCalledWith(`${FAMILY}/search/national-id`, { national_id: "900000001" });
@@ -202,7 +202,7 @@ describe("Coordinator Space lookup", () => {
     expect(header.textContent).toContain("لا يتعلق بأسر نطاق التنسيق");
     expect(document.querySelector("[data-quota-remaining]")?.textContent).toBe((1).toLocaleString("ar"));
 
-    await user.click(screen.getByRole("tab", { name: "الاسم الكامل" }));
+    await user.click(screen.getByRole("radio", { name: "الاسم الكامل" }));
     await user.type(screen.getByLabelText("الاسم الكامل أو جزء منه"), "سامي خالد");
     await user.click(screen.getByRole("button", { name: "بحث" }));
     expect(await findEl(() => document.querySelector("[data-result]"))).toBeInTheDocument();

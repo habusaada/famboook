@@ -143,16 +143,16 @@ describe("lookup screen", () => {
     const user = userEvent.setup();
     mockPosts({ "/search/national-id": list(), "/records/open": opened(record()) });
     renderAs(["civil-lookup.search", "civil-lookup.view"], <CivilRegistryLookupPage />);
-    await screen.findByText("الرصيد اليومي:", { exact: false });
+    await screen.findByText("المتبقي اليوم:", { exact: false });
     expect(document.querySelector("[data-quota-remaining]")?.textContent).toBe((47).toLocaleString("ar"));
 
-    await user.type(screen.getByLabelText("رقم الهوية"), "12345");
+    await user.type(screen.getByRole("textbox", { name: "رقم الهوية" }), "12345");
     await user.click(screen.getByRole("button", { name: "بحث" }));
     expect(screen.getByText("رقم الهوية يجب أن يتكون من 9 أرقام.")).toBeInTheDocument();
     expect(post).not.toHaveBeenCalled();
 
-    await user.clear(screen.getByLabelText("رقم الهوية"));
-    await user.type(screen.getByLabelText("رقم الهوية"), "900000001");
+    await user.clear(screen.getByRole("textbox", { name: "رقم الهوية" }));
+    await user.type(screen.getByRole("textbox", { name: "رقم الهوية" }), "900000001");
     await user.click(screen.getByRole("button", { name: "بحث" }));
     await waitFor(() => expect(document.querySelector("[data-citizen-detail]")).not.toBeNull());
     expect(post).toHaveBeenNthCalledWith(1, `${BASE}/search/national-id`, { national_id: "900000001" });
@@ -183,7 +183,7 @@ describe("lookup screen", () => {
       "/links/open": opened(record({ ref: "rec-2", fullname: "اسم الأب التجريبي", national_id: "*****0002", links: [] })),
     });
     renderAs(["civil-lookup.search", "civil-lookup.view"], <CivilRegistryLookupPage />);
-    await user.click(await screen.findByRole("tab", { name: "الاسم الكامل" }));
+    await user.click(await screen.findByRole("radio", { name: "الاسم الكامل" }));
 
     await user.type(screen.getByLabelText("الاسم الكامل أو جزء منه"), "مح");
     await user.click(screen.getByRole("button", { name: "بحث" }));
@@ -200,7 +200,7 @@ describe("lookup screen", () => {
     await waitFor(() => expect(document.querySelectorAll("[data-result]")).toHaveLength(1));
     expect(post).toHaveBeenLastCalledWith(`${BASE}/search/page`, { ref: "search-1", page: 2 });
 
-    await user.click(screen.getByRole("button", { name: "عرض" }));
+    await user.click(screen.getByRole("button", { name: "عرض السجل" }));
     await waitFor(() => expect(document.querySelector("[data-citizen-detail]")).not.toBeNull());
     await user.click(within(document.querySelector('[data-link="FATHER"]') as HTMLElement).getByRole("button", { name: "فتح السجل" }));
     await waitFor(() => expect(screen.getByText("الأب: اسم الأب التجريبي")).toBeInTheDocument());
@@ -219,7 +219,7 @@ describe("lookup screen", () => {
     const user = userEvent.setup();
     mockPosts({ "/search/national-id": new ApiError(429, { code: "QUOTA_EXHAUSTED", message: "server text 900000001" }) });
     renderAs(["civil-lookup.search", "civil-lookup.view"], <CivilRegistryLookupPage />);
-    await user.type(await screen.findByLabelText("رقم الهوية"), "900000001");
+    await user.type(await screen.findByRole("textbox", { name: "رقم الهوية" }), "900000001");
     await user.click(screen.getByRole("button", { name: "بحث" }));
     const alert = await findEl(() => document.querySelector('[data-lookup-error="QUOTA_EXHAUSTED"]'));
     expect(alert.textContent).toContain("استنفدت رصيدك اليومي");
@@ -238,7 +238,7 @@ describe("lookup screen", () => {
     const user = userEvent.setup();
     mockPosts({ "/search/parts": list({ outcome: "TOO_BROAD", results: [], meta: { page: 1, per_page: 25, total: null, last_page: 1 } }) });
     renderAs(["civil-lookup.search"], <CivilRegistryLookupPage />);
-    await user.click(await screen.findByRole("tab", { name: "البحث التفصيلي" }));
+    await user.click(await screen.findByRole("radio", { name: "البحث التفصيلي" }));
     await user.type(screen.getByLabelText("اسم الأب"), "خالد");
     await user.type(screen.getByLabelText("اسم العائلة"), "تجريبية");
     await user.click(screen.getByRole("button", { name: "بحث" }));

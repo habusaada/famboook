@@ -176,6 +176,55 @@ returned, including any new source column.
   family-side contexts share the profile today but are mapped separately, so
   each can be narrowed if their legal entitlements differ.
 
+## B-5a. Proposed amendment: full National ID at `EXTENDED_CONTROLLED` (2026-10-29, NOT implemented)
+
+**Owner-approved functional direction.** The project owner approves showing
+the full National ID (`mainid`) in the authorized person-detail view of the
+FAMILY and COORDINATOR contexts, **subject to B-OD-1 and the applicable
+privacy controls**.
+
+**Status of the prerequisites:**
+
+| Prerequisite | Status |
+|---|---|
+| Owner functional direction | Recorded (this section) |
+| B-OD-1: field-level privacy approval of `EXTENDED_CONTROLLED`, including the masking format | **OPEN**: no approval is documented |
+| G1 / OD-08: lawful basis and purpose for the family-side lookup | **OPEN** (B-9) |
+| OD-09: the `docs/03` §47e exception covering these contexts | PROPOSED, not approved (B-9) |
+
+**Implemented behavior (unchanged, enforced in the API by
+`CivilLookupFieldPolicy`):**
+
+- **`FULL`** (Staff with `civil-lookup.view-full`): the record's National ID
+  and the linked IDs in clear.
+- **`STANDARD`** (other Staff): masked. No documented policy authorizes full
+  disclosure for any `STANDARD` role, and lookup permission alone never does.
+- **`EXTENDED_CONTROLLED`** (FAMILY, COORDINATOR): masked (`*****NNNN`).
+- **Every result list, at every level:** masked. Searching never discloses a
+  full ID.
+- **Refusals** (revoked, not allowed, gate closed): no record data at all.
+- **The frontend** shows the value exactly as the API returns it and never
+  rebuilds an ID from a masked one.
+
+**Intentionally blocked pending approval.** Full `mainid` at
+`EXTENDED_CONTROLLED` stays blocked until B-OD-1 is recorded as approved,
+together with the legal basis (G1 / OD-08) and OD-09. When approved, the
+change is limited to `CivilLookupFieldPolicy`:
+
+- `mainid` of the opened record unmasked for the two family-side levels.
+- The linked IDs (father, mother, spouse) stay masked unless the approval
+  names them.
+- Result lists stay masked.
+- Each context can still be mapped separately (`CONTEXT_LEVELS`) if their
+  entitlements differ.
+- No new permission, gate or migration is needed. Audit and quota are
+  unchanged: the audit never stores a National ID, and opening a listed
+  record is not counted.
+
+The approval must state whether it also covers a coordinator viewing people
+outside their own household. Today no record-level distinction exists (no
+link between `identity_ref` and `persons`, OD-15).
+
 ## B-6. Shared daily quota
 
 The 02A quota engine is used unchanged:
@@ -238,7 +287,7 @@ exists.
 |---|---|---|---|
 | G1 / OD-08 / D-15 | Lawful basis, purpose limitation, retention and Privacy Policy coverage for a lookup **by household heads and coordinators** (a new purpose beyond the Staff one) | OPEN | Any family-side approval reference |
 | OD-09 | The `docs/03` §47e exception, explicitly covering the family-side contexts | PROPOSED (02A), not approved | Every lookup |
-| B-OD-1 | Field-level privacy approval of `EXTENDED_CONTROLLED` (each field; masking format) | OPEN | `CIVIL_LOOKUP_EXTENDED_PROFILE_APPROVAL` |
+| B-OD-1 | Field-level privacy approval of `EXTENDED_CONTROLLED` (each field; masking format). The owner direction for a full `mainid` is recorded in B-5a; it is not a privacy approval | OPEN | `CIVIL_LOOKUP_EXTENDED_PROFILE_APPROVAL`; full `mainid` at `EXTENDED_CONTROLLED` (B-5a) |
 | B-OD-2 | Eligibility policy: which household heads and coordinators may be granted, by whom, for how long (grants do not expire today; they are revoked explicitly) | OPEN | Granting in production |
 | B-OD-3 | `docs/06` §53 / §22b baseline change (gated lookup permissions on FAMILY_USER / COORDINATOR) | PROPOSED | Opening a side switch |
 | B-OD-4 | `docs/11` amendment (entry cards on the Family home and in Coordinator Space) | PROPOSED | Showing the entries |

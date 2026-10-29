@@ -128,6 +128,34 @@ raw: undocumented codes (`gender`, `maritalst`, `householdrel`, `govern`,
 `relgion` is special-category data (P0): **excluded at every level** until a
 separate privacy decision (OD-08). It is never read into a response.
 
+### L-4a. Display of dates and age (FB-CIVIL-02E, 2026-10-29)
+
+The API still returns the source values raw. The screen applies three
+display rules:
+
+- **Dates** (`datebirth`, `deathdate`) are shown date-only. A value that is
+  not an ISO date is shown as given.
+- **The stored `age` is never shown.** The age is computed from the dates
+  (`frontend/lib/utils/civil-date.ts`) as completed years:
+  - **Living:** up to today's date in Asia/Gaza.
+  - **Deceased:** up to the date of death, labelled «العمر عند الوفاة».
+- **Death** is known only from a non-empty `deathdate`. `presonstate` is
+  never interpreted.
+
+Cases where the age is shown as «غير متوفر», and today is never substituted:
+
+- a birth date that is missing, invalid or in the future;
+- a death date that is invalid, in the future or before the birth date.
+
+A 29 February birthday completes on 1 March in non-leap years.
+
+`deathdate` is returned only at `FULL`. At `STANDARD` and
+`EXTENDED_CONTROLLED` the age runs to today, and the screen says that the
+death date is not shown at this level. Returning `deathdate` at those levels
+would be a field-visibility change (§L-4, 02B B-OD-1).
+
+The National ID disclosure by level is unchanged: see 02B §B-5a.
+
 ## L-5. Search rules
 
 - **By National ID:** the existing validator (`isValidNationalId` /

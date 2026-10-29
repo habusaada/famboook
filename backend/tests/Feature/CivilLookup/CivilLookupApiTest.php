@@ -254,6 +254,32 @@ class CivilLookupApiTest extends TestCase
         $this->assertSame(['0599000000', '1', null], [$values['phonenum'], $values['worker'], $values['deathdate']], 'raw values; empty is null');
     }
 
+    /**
+     * FB-CIVIL-02E: the full National ID reaches only a FULL requester, only for
+     * an opened record, never in a result list, never in the audit, and never
+     * once the requester is revoked — even with a reference issued before.
+     */
+    public function test_a_full_national_id_reaches_only_an_authorized_full_requester_for_an_opened_record(): void
+    {
+        $super = $this->staff('SUPER_ADMIN');
+        $full = $this->staff('ADMINISTRATOR');
+        $search = $this->lookup($full, '/search/national-id', ['national_id' => '900000001'])->assertOk()
+            ->assertJsonPath('data.results.0.national_id', '*****0001');
+        $this->assertStringNotContainsString('900000001', $search->getContent(), 'a result list is masked even for FULL');
+        $ref = $search->json('data.results.0.ref');
+
+        $this->lookup($full, '/records/open', ['ref' => $ref])->assertOk()->assertJsonPath('data.record.national_id', '900000001');
+        $this->assertSame(1, $this->used($full), 'opening a listed record is not counted');
+        foreach (CivilLookupAuditEvent::all() as $event) {
+            $this->assertStringNotContainsString('900000001', json_encode($event->getAttributes()), 'the audit never keeps the National ID');
+        }
+
+        $this->actingAs($super)->putJson(self::BASE.'/admin/user-access', ['email' => $full->email, 'access' => 'REVOKED'])->assertOk();
+        $refused = $this->lookup($full, '/records/open', ['ref' => $ref])->assertStatus(403)->assertJsonPath('code', 'LOOKUP_NOT_ALLOWED');
+        $this->assertStringNotContainsString('900000001', $refused->getContent());
+        $this->assertSame(1, $this->used($full));
+    }
+
     public function test_the_daily_quota_is_atomic_per_user_withholds_results_when_exhausted_and_the_super_admin_is_unlimited(): void
     {
         CivilLookupRolePolicy::where('role_name', 'DATA_ENTRY')->update(['daily_limit' => 2]);

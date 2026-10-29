@@ -241,6 +241,13 @@
   }
 }
 
+/* FB-CIVIL-02E: indeterminate progress (a sliding segment, never a fake
+   percentage). Under reduced motion the component shows a static bar. */
+@keyframes lookup-indeterminate {
+  from { transform: translateX(100%); }
+  to { transform: translateX(-250%); }
+}
+
 /* Family Portal (docs/11 §24), scoped to the /family layout wrapper. Its
    colors are the shared :root palette (ADR FB-UI-01); this scope holds only
    what is genuinely Family-specific: geometry, lighter elevation and the

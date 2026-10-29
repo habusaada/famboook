@@ -1473,6 +1473,15 @@ on the test instance and a real browser
     - **Production configuration inspected 2026-10-29:** `enabled` ON, `family_side_enabled` ON, `coordinator_side_enabled` ON, `reverse_links_enabled` OFF. The project owner confirmed that the lookup service had already been tested successfully and needs no configuration change.
     - **Governance (independent of deployment, still open unless separately evidenced):** OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. Their completion is not recorded in this roadmap. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
+- **FB-CIVIL-02E (2026-10-29), local implementation verified, uncommitted, NOT deployed:** mobile-first Civil Registry Lookup (PWA):
+    - accessible radio-based search modes, one responsive result card for every list, a compact quota indicator;
+    - an indeterminate progress bar with an accessible announcement, «جارٍ البحث...», no duplicate request and no automatic retry of a counted request (static under reduced motion);
+    - mobile person details and related-person navigation;
+    - date-only display and the age computed from the dates, living or at death (ADR 02A §L-4a); the stored age is never shown.
+    - No backend behavior change, no migration.
+    - **National ID:**
+        - unchanged by level: full at `FULL`, masked at `STANDARD` and `EXTENDED_CONTROLLED`, masked in every result list;
+        - the owner direction for a full ID on the family side is recorded in ADR 02B §B-5a and **blocked pending B-OD-1** (with G1 / OD-08 / OD-09).
 - **FB-CIVIL-02D (2026-10-29), Production Deployed & Operationally Accepted:** Civil Registry Lookup Access Administration — standalone access page «تصاريح الاستعلام المدني» (ADR 02A §L-6b):
     - account search (family via Person, Staff by name or email), server-resolved current state with DEFAULT, a safe editor that sends the full set of sides, confirmation, a stale-state 409 check, the override list and the per-user history;
     - the quota page keeps roles, usage and role-policy history;

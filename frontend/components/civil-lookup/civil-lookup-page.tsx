@@ -6,10 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader, Panel } from "@/components/shared/page-layout";
-import { RegistryPagination } from "@/components/shared/registry-pagination";
 import { LoadingBlock } from "@/components/administration/civil-registry/parts";
 import {
   civilLookupErrorCode,
@@ -30,12 +28,13 @@ import type {
   CivilLookupReverseRelation,
   CivilLookupSpace,
 } from "@/lib/types/api/civil-lookup";
-import type { PaginationMeta } from "@/lib/types/api/family";
 import { isValidNationalId } from "@/lib/utils/national-id";
 import { cn } from "@/lib/utils";
 import { CitizenDetail } from "./citizen-detail";
 import { MISSING, RELATION_LABELS } from "./labels";
+import { LookupProgress } from "./lookup-progress";
 import { QuotaIndicator } from "./quota-indicator";
+import { ResultCards } from "./result-cards";
 
 // FB-CIVIL-02A — the Staff Portal Civil Registry Lookup
 // (docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md). Results, records and the
@@ -46,6 +45,11 @@ import { QuotaIndicator } from "./quota-indicator";
 // FB-CIVIL-02B: the same page on the Family Portal and in Coordinator Space
 // (`space`): only the API mount and the header change. Who may use it, and
 // which fields come back, is decided by the server for that mount.
+//
+// FB-CIVIL-02E: mobile-first layout — a segmented control for the three
+// modes, one result card for every list, a visible pending state for every
+// request (indeterminate bar, «جارٍ البحث...», no duplicate submission) and
+// no automatic retry of a counted request.
 
 type View =
   | { kind: "list"; title: string; data: CivilLookupList }
@@ -87,20 +91,6 @@ function validate(mode: CivilLookupMode, nationalId: string, fullname: string, p
   return nameTokensAcceptable(given, 2) ? null : "أدخل حقلين على الأقل من حقول الاسم (حرفان على الأقل لكل حقل، وثلاثة أحرف لأحدها).";
 }
 
-function listMeta(data: CivilLookupList): PaginationMeta {
-  const total = data.meta.total ?? 0;
-  const from = total === 0 ? null : (data.meta.page - 1) * data.meta.per_page + 1;
-  return {
-    current_page: data.meta.page,
-    last_page: data.meta.last_page,
-    per_page: data.meta.per_page,
-    total,
-    from,
-    to: from === null ? null : from + data.results.length - 1,
-    path: "",
-  };
-}
-
 const DESCRIPTION = "استعلام من الإصدار المنشور فقط. كل بحث صحيح يُحتسب من رصيدك اليومي حتى لو لم تُعثر على نتيجة.";
 
 /** The page title: the Staff page header, or the Family Portal heading style (docs/10). */
@@ -136,7 +126,21 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
   const [trail, setTrail] = useState<View[]>([]);
 
   const busy = search.isPending || page.isPending || openRecord.isPending || openLink.isPending || links.isPending;
+  // What is pending, for the visible status (FB-CIVIL-02E). Never a percentage.
+  const pendingLabel = search.isPending
+    ? "جارٍ البحث..."
+    : openRecord.isPending || openLink.isPending
+      ? "جارٍ فتح السجل..."
+      : links.isPending
+        ? "جارٍ تحميل القائمة..."
+        : page.isPending
+          ? "جارٍ تحميل الصفحة..."
+          : null;
   const current = trail.at(-1);
+  const openingLink =
+    current?.kind === "record" && (openLink.isPending || links.isPending)
+      ? (current.record.links.find((l) => l.ref !== undefined && (l.ref === openLink.variables || l.ref === links.variables?.ref))?.relation ?? null)
+      : null;
   const quota = status.data?.quota;
   const canView = status.data?.capabilities.view === true;
 
@@ -151,6 +155,8 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    // One request at a time: a counted search is never sent twice.
+    if (busy) return;
     setError(null);
     const problem = validate(mode, nationalId, fullname, parts);
     setFormError(problem);
@@ -228,12 +234,12 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
     <div className="flex flex-col gap-5" data-civil-lookup={space}>
       <LookupHeader space={space} />
 
-      <Panel data-quota-panel>
+      <Panel data-quota-panel className="py-3">
         {quota && quota.enabled ? (
           <QuotaIndicator quota={quota} />
         ) : (
           <div className="flex items-center gap-2 text-sm text-muted-foreground" data-lookup-disabled={quota?.reason ?? "UNKNOWN"}>
-            <Lock className="size-4" aria-hidden />
+            <Lock className="size-4 shrink-0" aria-hidden />
             {quota?.reason === "LOOKUP_DISABLED"
               ? "خدمة الاستعلام عن السجل المدني غير مفعّلة حاليًا."
               : "خدمة الاستعلام غير مفعّلة لدورك أو لحسابك."}
@@ -243,30 +249,40 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
 
       {quota?.enabled && (
         <Panel>
-          <form onSubmit={submit} className="flex flex-col gap-4" noValidate data-lookup-form={mode}>
-            <div role="tablist" aria-label="طريقة البحث" className="flex flex-wrap gap-2">
-              {MODES.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === m.key}
-                  onClick={() => {
-                    setMode(m.key);
-                    setFormError(null);
-                  }}
-                  className={cn(
-                    "rounded-control border px-3 py-1.5 text-sm transition-colors",
-                    mode === m.key ? "border-brand-600 bg-brand-50 font-semibold text-brand-700" : "border-stroke-subtle hover:bg-surface-hover",
-                  )}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+          <form onSubmit={submit} className="flex flex-col gap-4" noValidate data-lookup-form={mode} aria-busy={search.isPending || undefined}>
+            <fieldset className="min-w-0">
+              <legend className="sr-only">طريقة البحث</legend>
+              <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-pressed/60 p-1" data-lookup-modes>
+                {MODES.map((m) => (
+                  <label key={m.key} className="min-w-0">
+                    <input
+                      type="radio"
+                      name="lookup-mode"
+                      value={m.key}
+                      className="peer sr-only"
+                      checked={mode === m.key}
+                      disabled={busy}
+                      onChange={() => {
+                        setMode(m.key);
+                        setFormError(null);
+                      }}
+                    />
+                    <span
+                      className={cn(
+                        "flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-1.5 text-center text-[13px] leading-tight transition-colors sm:text-sm",
+                        "peer-focus-visible:outline-2 peer-focus-visible:outline-ring peer-disabled:cursor-not-allowed",
+                        mode === m.key ? "bg-surface-1 font-semibold text-brand-700 shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {m.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
 
             {mode === "national-id" && (
-              <div className="flex max-w-sm flex-col gap-1.5">
+              <div className="flex w-full max-w-sm flex-col gap-1.5">
                 <Label htmlFor="lookup-national-id">رقم الهوية</Label>
                 <Input
                   id="lookup-national-id"
@@ -274,6 +290,7 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
                   autoComplete="off"
                   dir="ltr"
                   maxLength={32}
+                  className="h-11 text-base sm:text-sm"
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
                 />
@@ -281,9 +298,16 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
               </div>
             )}
             {mode === "name" && (
-              <div className="flex max-w-xl flex-col gap-1.5">
+              <div className="flex w-full max-w-xl flex-col gap-1.5">
                 <Label htmlFor="lookup-fullname">الاسم الكامل أو جزء منه</Label>
-                <Input id="lookup-fullname" autoComplete="off" maxLength={100} value={fullname} onChange={(e) => setFullname(e.target.value)} />
+                <Input
+                  id="lookup-fullname"
+                  autoComplete="off"
+                  maxLength={100}
+                  className="h-11 text-base sm:text-sm"
+                  value={fullname}
+                  onChange={(e) => setFullname(e.target.value)}
+                />
                 <p className="text-[13px] text-muted-foreground">
                   كلمتان على الأقل وبأي ترتيب. يُتجاهل التشكيل والتطويل واختلاف أشكال الألف؛ لا تُدمج «ة» مع «ه» ولا «ى» مع «ي».
                 </p>
@@ -292,12 +316,13 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
             {mode === "parts" && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {PART_FIELDS.map((f) => (
-                  <div key={f.key} className="flex flex-col gap-1.5">
+                  <div key={f.key} className="flex min-w-0 flex-col gap-1.5">
                     <Label htmlFor={`lookup-${f.key}`}>{f.label}</Label>
                     <Input
                       id={`lookup-${f.key}`}
                       autoComplete="off"
                       maxLength={50}
+                      className="h-11 text-base sm:text-sm"
                       value={parts[f.key]}
                       onChange={(e) => setParts((p) => ({ ...p, [f.key]: e.target.value }))}
                     />
@@ -312,15 +337,20 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
                 {formError}
               </p>
             )}
-            <div>
-              <Button type="submit" disabled={busy || (quota.remaining !== null && quota.remaining <= 0)}>
-                <Search className="size-4" aria-hidden />
-                بحث
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              className="h-11 w-full sm:w-auto sm:self-start sm:px-6"
+              disabled={busy || (quota.remaining !== null && quota.remaining <= 0)}
+              data-lookup-submit
+            >
+              <Search className="size-4" aria-hidden />
+              {search.isPending ? "جارٍ البحث..." : "بحث"}
+            </Button>
           </form>
         </Panel>
       )}
+
+      {pendingLabel && <LookupProgress label={pendingLabel} />}
 
       {error !== null && (
         <Alert variant="destructive" data-lookup-error={civilLookupErrorCode(error) ?? "UNKNOWN"}>
@@ -330,23 +360,28 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
       )}
 
       {trail.length > 0 && (
-        <nav aria-label="مسار التنقل" className="flex flex-wrap items-center gap-2 text-sm" data-breadcrumb>
+        <nav aria-label="مسار التنقل" className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:items-center" data-breadcrumb>
           {trail.length > 1 && (
-            <Button variant="ghost" size="sm" onClick={() => setTrail((t) => t.slice(0, -1))} data-back>
-              <ArrowRight className="size-3.5" aria-hidden />
+            <Button variant="outline" className="h-10 self-start" disabled={busy} onClick={() => setTrail((t) => t.slice(0, -1))} data-back>
+              <ArrowRight className="size-4" aria-hidden />
               رجوع
             </Button>
           )}
-          <ol className="flex flex-wrap items-center gap-1.5">
+          <ol className="flex min-w-0 flex-wrap items-center gap-1.5">
             {trail.map((view, index) => (
-              <li key={index} className="flex items-center gap-1.5">
+              <li key={index} className="flex min-w-0 items-center gap-1.5">
                 {index > 0 && <span aria-hidden className="text-subtle-foreground">/</span>}
                 {index === trail.length - 1 ? (
-                  <span aria-current="page" className="font-semibold">
+                  <span aria-current="page" className="font-semibold break-words">
                     {view.title}
                   </span>
                 ) : (
-                  <button type="button" className="text-brand-700 hover:underline" onClick={() => setTrail((t) => t.slice(0, index + 1))}>
+                  <button
+                    type="button"
+                    className="min-h-8 text-brand-700 hover:underline disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => setTrail((t) => t.slice(0, index + 1))}
+                  >
                     {view.title}
                   </button>
                 )}
@@ -356,92 +391,24 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
         </nav>
       )}
 
-      {busy && trail.length === 0 && <LoadingBlock rows={3} />}
-
       {current?.kind === "list" && (
-        <ResultsList list={current.data} canView={canView} busy={busy} onOpen={showResult} onPage={(p) => goToPage(current.data, p)} />
+        <ResultCards
+          list={current.data}
+          canView={canView}
+          busy={busy}
+          openingRef={openRecord.isPending ? (openRecord.variables ?? null) : null}
+          onOpen={showResult}
+          onPage={(p) => goToPage(current.data, p)}
+        />
       )}
-      {current?.kind === "record" && <CitizenDetail record={current.record} busy={busy} onOpenLink={showLink} onOpenLinks={showLinks} />}
+      {current?.kind === "record" && (
+        <CitizenDetail record={current.record} busy={busy} openingLink={openingLink} onOpenLink={showLink} onOpenLinks={showLinks} />
+      )}
       {current?.kind === "not-found" && (
         <Panel>
           <EmptyState icon={SearchX} title="الشخص المرتبط غير موجود في الإصدار المنشور." />
         </Panel>
       )}
     </div>
-  );
-}
-
-function ResultsList({
-  list,
-  canView,
-  busy,
-  onOpen,
-  onPage,
-}: {
-  list: CivilLookupList;
-  canView: boolean;
-  busy: boolean;
-  onOpen: (entry: CivilLookupResultEntry) => void;
-  onPage: (page: number) => void;
-}) {
-  if (list.outcome === "TOO_BROAD") {
-    return (
-      <Panel data-outcome="TOO_BROAD">
-        <EmptyState icon={Search} title="نتائج كثيرة جدًا" description="يطابق البحث أكثر من 500 سجل. أضف كلمات أخرى من الاسم لتضييق البحث." />
-      </Panel>
-    );
-  }
-  if (list.results.length === 0) {
-    return (
-      <Panel data-outcome="NOT_FOUND">
-        <EmptyState icon={SearchX} title="لا توجد نتائج مطابقة في الإصدار المنشور." />
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel flush data-outcome={list.outcome}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>الاسم الكامل</TableHead>
-            <TableHead>رقم الهوية</TableHead>
-            <TableHead>الجنس (رمز المصدر)</TableHead>
-            <TableHead>تاريخ الميلاد</TableHead>
-            <TableHead>المحافظة / المدينة (رمز المصدر)</TableHead>
-            <TableHead>
-              <span className="sr-only">إجراء</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.results.map((entry) => (
-            <TableRow key={entry.ref} data-result>
-              <TableCell className="font-medium">{entry.fullname ?? MISSING}</TableCell>
-              <TableCell>
-                <bdi dir="ltr" className="tabular-nums">
-                  {entry.national_id ?? MISSING}
-                </bdi>
-              </TableCell>
-              <TableCell>{entry.gender ?? MISSING}</TableCell>
-              <TableCell>
-                <bdi dir="ltr">{entry.datebirth ?? MISSING}</bdi>
-              </TableCell>
-              <TableCell>{[entry.govern, entry.city].filter(Boolean).join(" / ") || MISSING}</TableCell>
-              <TableCell className="text-end">
-                {canView && (
-                  <Button variant="outline" size="sm" disabled={busy} onClick={() => onOpen(entry)}>
-                    عرض
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {list.meta.total !== null && list.meta.total > list.meta.per_page && list.search_ref && (
-        <RegistryPagination meta={listMeta(list)} onPage={onPage} unit="سجل" />
-      )}
-    </Panel>
   );
 }
