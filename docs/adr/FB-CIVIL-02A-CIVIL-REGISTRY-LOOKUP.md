@@ -166,7 +166,7 @@ authorized Staff, including `STANDARD`. This supersedes the `STANDARD` row of
 |---|---|---|---|
 | `FULL` | in clear (unchanged) | in clear (unchanged) | masked |
 | `STANDARD` | **in clear**, a charged disclosure (§L-6c) | masked | masked |
-| `EXTENDED_CONTROLLED` | masked, pending B-OD-1 (02B §B-5a) | masked | masked |
+| `EXTENDED_CONTROLLED` | masked; one value on explicit eye-icon reveal (02B §B-5b, off by default) | masked; revealable one by one | masked; revealable one by one |
 
 - **"Authorized record":** a record listed in this requester's own
   authorized search, or reached through its own link, and opened through its

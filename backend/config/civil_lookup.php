@@ -27,6 +27,14 @@ return [
     'family_side_enabled' => (bool) env('CIVIL_LOOKUP_FAMILY_ENABLED', false),
     'coordinator_side_enabled' => (bool) env('CIVIL_LOOKUP_COORDINATOR_ENABLED', false),
 
+    // FB-CIVIL-02G (ADR 02B §B-5b): the explicit eye-icon reveal of ONE complete
+    // National ID at a time on each family-side side (Staff may always reveal).
+    // Each OFF by default and independent; in production each also needs its
+    // own approval reference in the PROCESS environment
+    // (CIVIL_LOOKUP_FAMILY_ID_REVEAL_APPROVAL / CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_APPROVAL).
+    'family_id_reveal_enabled' => (bool) env('CIVIL_LOOKUP_FAMILY_ID_REVEAL_ENABLED', false),
+    'coordinator_id_reveal_enabled' => (bool) env('CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_ENABLED', false),
+
     // The read-only lookup login (08-lookup.dba.sql): a PHP file returning
     // ['username' => ..., 'password' => ...], root:www-data 0640 on a server.
     'credentials_file' => env('CIVIL_LOOKUP_CREDENTIALS_FILE', '/etc/famboook/identity-lookup.php'),

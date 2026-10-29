@@ -476,6 +476,7 @@ changes nothing visible. Every item below is needed **in addition to** the
 | Item | Value |
 |---|---|
 | Side switches | `CIVIL_LOOKUP_FAMILY_ENABLED`, `CIVIL_LOOKUP_COORDINATOR_ENABLED` (both default `false`, independent). Run `RolePermissionSeeder` after changing one (the family-side role permissions follow the switch), then `famboook:verify-permissions`. |
+| National ID reveal (02G) | Staff: always (one value per explicit request, audited `ID_REVEALED`). Family Portal / Coordinator Space: `CIVIL_LOOKUP_FAMILY_ID_REVEAL_ENABLED` / `CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_ENABLED` (default `false`, independent) and, in production, `CIVIL_LOOKUP_FAMILY_ID_REVEAL_APPROVAL` / `CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_APPROVAL` in the PHP process environment (ADR 02B §B-5b). Migration `2026_10_31_100000_add_civil_lookup_id_revealed_audit_event` (audit CHECK only). |
 | Production approvals | In the PHP process environment, never `.env`: `CIVIL_LOOKUP_FAMILY_APPROVAL` or `CIVIL_LOOKUP_COORDINATOR_APPROVAL`, **and** `CIVIL_LOOKUP_EXTENDED_PROFILE_APPROVAL`. Issued only after G1 / OD-08, OD-09 and B-OD-1. |
 | Role policies | FAMILY_USER and COORDINATOR (default disabled, 5 per day). |
 | Individual grants | Per account and per side: Administration → Civil Registry → Lookup Quotas, by person code. Nothing can be granted while a side switch is closed. |

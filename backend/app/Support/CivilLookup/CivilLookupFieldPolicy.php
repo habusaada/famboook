@@ -73,7 +73,7 @@ final class CivilLookupFieldPolicy
      */
     public const RECORD_ID_LEVELS = [self::FULL, self::STANDARD];
 
-    /** @return array<string, ?string> the result-list fields */
+    /** @return array<string, ?string> the result-list fields — the National ID always masked (FB-CIVIL-02G: revealed one at a time only) */
     public static function summary(CivilRecord $record): array
     {
         $fields = ['national_id' => NationalIdMask::mask($record->mainid)];

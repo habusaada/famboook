@@ -30,7 +30,14 @@ export interface CivilLookupQuota {
 export interface CivilLookupStatus {
   context: CivilLookupContext;
   quota: CivilLookupQuota;
-  capabilities: { search: boolean; view: boolean; view_full: boolean; reverse_links: boolean };
+  capabilities: {
+    search: boolean;
+    view: boolean;
+    view_full: boolean;
+    reverse_links: boolean;
+    /** FB-CIVIL-02G: the eye-icon reveal of one National ID is offered (the server authorizes each reveal again). */
+    reveal_ids?: boolean;
+  };
 }
 
 export interface CivilLookupResultEntry {

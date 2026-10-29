@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Panel } from "@/components/shared/page-layout";
 import { RegistryPagination } from "@/components/shared/registry-pagination";
-import type { CivilLookupList, CivilLookupResultEntry } from "@/lib/types/api/civil-lookup";
+import type { CivilLookupList, CivilLookupResultEntry, CivilLookupSpace } from "@/lib/types/api/civil-lookup";
 import type { PaginationMeta } from "@/lib/types/api/family";
 import { formatCivilDate } from "@/lib/utils/civil-date";
 import { MISSING } from "./labels";
+import { CivilLookupId } from "./revealable-id";
 
 // FB-CIVIL-02E — one result card for every list (full name, detailed search,
 // household / children). A card shows only the result-list fields the API
@@ -38,9 +39,11 @@ function Field({ label, children, ltr }: { label: string; children: React.ReactN
   );
 }
 
-function ResultCard({ entry, canView, busy, opening, onOpen }: {
+function ResultCard({ entry, canView, canReveal, space, busy, opening, onOpen }: {
   entry: CivilLookupResultEntry;
   canView: boolean;
+  canReveal: boolean;
+  space: CivilLookupSpace;
   busy: boolean;
   opening: boolean;
   onOpen: (entry: CivilLookupResultEntry) => void;
@@ -52,8 +55,12 @@ function ResultCard({ entry, canView, busy, opening, onOpen }: {
         {entry.fullname ?? MISSING}
       </h3>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <Field label="رقم الهوية" ltr={entry.national_id !== null}>
-          {entry.national_id ?? MISSING}
+        <Field label="رقم الهوية">
+          {entry.national_id === null ? (
+            MISSING
+          ) : (
+            <CivilLookupId value={entry.national_id} revealRef={entry.ref} space={space} canReveal={canReveal} subject={entry.fullname ?? undefined} />
+          )}
         </Field>
         <Field label="تاريخ الميلاد">{formatCivilDate(entry.datebirth) ?? MISSING}</Field>
         <Field label="الجنس (رمز المصدر)">{entry.gender ?? MISSING}</Field>
@@ -72,6 +79,8 @@ function ResultCard({ entry, canView, busy, opening, onOpen }: {
 export function ResultCards({
   list,
   canView,
+  canReveal = false,
+  space = "staff",
   busy,
   openingRef,
   onOpen,
@@ -79,6 +88,9 @@ export function ResultCards({
 }: {
   list: CivilLookupList;
   canView: boolean;
+  /** FB-CIVIL-02G: the eye-icon reveal of each card's National ID (masked by default). */
+  canReveal?: boolean;
+  space?: CivilLookupSpace;
   busy: boolean;
   openingRef: string | null;
   onOpen: (entry: CivilLookupResultEntry) => void;
@@ -108,7 +120,16 @@ export function ResultCards({
       )}
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {list.results.map((entry) => (
-          <ResultCard key={entry.ref} entry={entry} canView={canView} busy={busy} opening={openingRef === entry.ref} onOpen={onOpen} />
+          <ResultCard
+            key={entry.ref}
+            entry={entry}
+            canView={canView}
+            canReveal={canReveal}
+            space={space}
+            busy={busy}
+            opening={openingRef === entry.ref}
+            onOpen={onOpen}
+          />
         ))}
       </ul>
       {list.meta.total !== null && list.meta.total > list.meta.per_page && list.search_ref && (

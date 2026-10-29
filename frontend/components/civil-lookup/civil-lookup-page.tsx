@@ -143,6 +143,8 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
       : null;
   const quota = status.data?.quota;
   const canView = status.data?.capabilities.view === true;
+  // FB-CIVIL-02G: the eye-icon reveal (the server authorizes each reveal again).
+  const canReveal = canView && status.data?.capabilities.reveal_ids === true;
 
   const push = (view: View) => setTrail((t) => [...t, view]);
   const replaceTop = (view: View) => setTrail((t) => [...t.slice(0, -1), view]);
@@ -395,6 +397,8 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
         <ResultCards
           list={current.data}
           canView={canView}
+          canReveal={canReveal}
+          space={space}
           busy={busy}
           openingRef={openRecord.isPending ? (openRecord.variables ?? null) : null}
           onOpen={showResult}
@@ -402,7 +406,15 @@ export function CivilLookupPage({ space = "staff" }: { space?: CivilLookupSpace 
         />
       )}
       {current?.kind === "record" && (
-        <CitizenDetail record={current.record} busy={busy} openingLink={openingLink} onOpenLink={showLink} onOpenLinks={showLinks} />
+        <CitizenDetail
+          record={current.record}
+          busy={busy}
+          space={space}
+          canReveal={canReveal}
+          openingLink={openingLink}
+          onOpenLink={showLink}
+          onOpenLinks={showLinks}
+        />
       )}
       {current?.kind === "not-found" && (
         <Panel>

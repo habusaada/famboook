@@ -10,6 +10,7 @@ use App\Support\CivilLookup\CivilLookupContext;
 use App\Support\CivilLookup\CivilLookupDisclosure;
 use App\Support\CivilLookup\CivilLookupFieldPolicy;
 use App\Support\CivilLookup\CivilLookupGate;
+use App\Support\CivilLookup\CivilLookupIdentifierDisclosure;
 use App\Support\CivilLookup\CivilLookupQuota;
 use App\Support\CivilLookup\CivilLookupRefs;
 use App\Support\CivilLookup\CivilRecord;
@@ -169,6 +170,50 @@ final class LookupCivilRegistryAction
             'quota' => CivilLookupQuota::status($user, $context) + ['used_after' => $used]];
     }
 
+    /**
+     * FB-CIVIL-02G (ADR 02B §B-5b): ONE complete National ID, revealed on an explicit request — the record
+     * of a RECORD reference (a result card, a reverse-list entry, an opened record) or the linked person of
+     * a LINK reference. Lists and records stay masked; nothing is disclosed in bulk.
+     *
+     * Authorized like opening a record (gate, side, civil-lookup.view, REVOKED / GRANTED, role policy), plus
+     * the context's reveal switch (CivilLookupIdentifierDisclosure). A first reveal of a record each Gaza day
+     * costs one quota unit, deduplicated with the 02F disclosures (reopening or revealing it again is free);
+     * FULL is free, as is the record of an exact National ID search. Audited as ID_REVEALED, never the value.
+     *
+     * @return array{national_id: string, quota: array<string, mixed>}
+     */
+    public function revealIdentifier(User $user, string $context, mixed $token, ?string $ip): array
+    {
+        $policy = $this->authorize($user, $context, CivilLookupAccess::VIEW, 'ID_REVEALED', $ip);
+        if (! CivilLookupIdentifierDisclosure::revealOpen($context)) {
+            CivilLookupAudit::record('ID_REVEALED', $user, $context, 'NOT_ALLOWED', ip: $ip);
+
+            throw new CivilLookupException(CivilLookupException::NOT_ALLOWED);
+        }
+        $ref = CivilLookupRefs::readAny($token, [CivilLookupRefs::RECORD, CivilLookupRefs::LINK], $user, $context);
+        $record = $ref['type'] === CivilLookupRefs::RECORD
+            ? $this->registry->byRecord((int) ($ref['data']['i'] ?? 0))
+            : $this->registry->byMainid((string) ($ref['data']['m'] ?? ''));
+        if ($record === null || $record->releaseId !== $ref['release_id']) {
+            throw new CivilLookupException(CivilLookupException::RELEASE_CHANGED);
+        }
+        if ($this->level($user, $context) !== CivilLookupFieldPolicy::FULL) {
+            try {
+                CivilLookupDisclosure::charge($user, $policy, $record,
+                    exempt: $ref['type'] === CivilLookupRefs::RECORD && ($ref['data']['e'] ?? null) === 1);
+            } catch (CivilLookupException $e) {
+                CivilLookupAudit::record('ID_REVEALED', $user, $context, $e->reason, $record->releaseId, $record->recordId,
+                    quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
+
+                throw $e;
+            }
+        }
+        CivilLookupAudit::record('ID_REVEALED', $user, $context, 'FOUND', $record->releaseId, $record->recordId,
+            resultCount: 1, quotaUsedAfter: CivilLookupQuota::used($user), ip: $ip);
+
+        return ['national_id' => $record->mainid, 'quota' => CivilLookupQuota::status($user, $context)];
+    }
+
     /** A reverse-link list (household members, children): charged; disabled unless enabled (§L-8). @return array<string, mixed> */
     public function links(User $user, string $context, mixed $linksRef, string $relation, ?string $ip): array
     {
@@ -301,8 +346,10 @@ final class LookupCivilRegistryAction
         ];
     }
 
-    /** @return array<string, mixed> */
-    /** @param  bool  $exactId  FB-CIVIL-02F: an exact National ID result; the exemption is bound to this record inside the encrypted reference */
+    /**
+     * @param  bool  $exactId  FB-CIVIL-02F: an exact National ID result; the exemption is bound to this record inside the encrypted reference
+     * @return array<string, mixed>
+     */
     private function listEntry(User $user, string $context, CivilRecord $record, bool $exactId = false): array
     {
         return ['ref' => CivilLookupRefs::issue(CivilLookupRefs::RECORD, $user, $context, $record->releaseId,

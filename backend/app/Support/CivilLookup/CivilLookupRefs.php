@@ -49,17 +49,32 @@ final class CivilLookupRefs
      */
     public static function read(mixed $token, string $type, User $user, string $context): array
     {
+        $ref = self::readAny($token, [$type], $user, $context);
+
+        return ['release_id' => $ref['release_id'], 'data' => $ref['data']];
+    }
+
+    /**
+     * FB-CIVIL-02G: a reference of one of $types (a reveal accepts RECORD and LINK), with its type.
+     *
+     * @param  list<string>  $types
+     * @return array{type: string, release_id: int, data: array<string, mixed>}
+     *
+     * @throws CivilLookupException REFERENCE_INVALID
+     */
+    public static function readAny(mixed $token, array $types, User $user, string $context): array
+    {
         try {
             $payload = is_string($token) && $token !== '' && strlen($token) <= 4096 ? json_decode(Crypt::decryptString($token), true) : null;
         } catch (DecryptException) {
             $payload = null;
         }
-        if (! is_array($payload) || ($payload['v'] ?? null) !== 2 || ($payload['t'] ?? null) !== $type || ($payload['u'] ?? null) !== $user->id
+        if (! is_array($payload) || ($payload['v'] ?? null) !== 2 || ! in_array($payload['t'] ?? null, $types, true) || ($payload['u'] ?? null) !== $user->id
             || ($payload['c'] ?? null) !== $context
             || ! is_int($payload['r'] ?? null) || ! is_int($payload['x'] ?? null) || $payload['x'] < now()->getTimestamp() || ! is_array($payload['d'] ?? null)) {
             throw new CivilLookupException(CivilLookupException::REFERENCE_INVALID);
         }
 
-        return ['release_id' => $payload['r'], 'data' => $payload['d']];
+        return ['type' => $payload['t'], 'release_id' => $payload['r'], 'data' => $payload['d']];
     }
 }

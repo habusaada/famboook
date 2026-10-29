@@ -10,6 +10,7 @@ use App\Support\CivilLookup\CivilLookupQuota;
 use App\Support\CivilLookup\CivilRecord;
 use App\Support\CivilLookup\EffectivePolicy;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Support\Facades\DB;
@@ -312,6 +313,23 @@ class CivilLookupPostgresTest extends TestCase
         pg_query($other, 'ROLLBACK');
         pg_close($other);
         $this->assertSame([$limit, 1, 0], [$this->used($user), $rows(80), $rows(81)]);
+    }
+
+    /** FB-CIVIL-02G: a reveal against the real lookup functions, audited as ID_REVEALED under the PostgreSQL CHECK. */
+    public function test_a_reveal_returns_one_id_and_its_audit_event_passes_the_database_check(): void
+    {
+        $this->publishedRelease(['900000001' => ['fullname' => 'سامي خالد اختبار']]);
+        $user = User::factory()->create();
+        $user->assignRole('DATA_ENTRY');
+        $list = $this->lookup('/search/national-id', ['national_id' => '900000001'], $user)->assertOk()
+            ->assertJsonPath('data.results.0.national_id', '*****0001');
+        $this->lookup('/identifiers/reveal', ['ref' => $list->json('data.results.0.ref')], $user)->assertOk()
+            ->assertJsonPath('data.national_id', '900000001');
+        $this->assertSame(1, $this->used($user), 'the exact-ID search only: its record is revealed free');
+        $this->assertSame(['event_type' => 'ID_REVEALED', 'outcome_code' => 'FOUND'], (array) DB::selectOne(
+            "SELECT event_type, outcome_code FROM civil_lookup_audit_events WHERE event_type = 'ID_REVEALED'"));
+        $this->assertThrows(fn () => DB::table('civil_lookup_audit_events')->insert(['event_type' => 'NOT_AN_EVENT', 'actor_user_id' => $user->id,
+            'actor_side' => 'STAFF', 'outcome_code' => 'FOUND', 'lookup_context' => 'STAFF']), QueryException::class);
     }
 
     /** FB-CIVIL-02F: the disclosure table's UNIQUE key on PostgreSQL, and its migration rolls back cleanly. */

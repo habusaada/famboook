@@ -20,7 +20,7 @@ use InvalidArgumentException;
 final class CivilLookupAudit
 {
     public const EVENT_TYPES = ['SEARCH_BY_ID', 'SEARCH_BY_NAME', 'SEARCH_BY_PARTS', 'SEARCH_PAGE', 'RECORD_OPENED', 'LINK_OPENED',
-        'LINKS_LISTED', 'LOOKUP_REFUSED'];
+        'LINKS_LISTED', 'LOOKUP_REFUSED', 'ID_REVEALED'];
 
     public static function record(string $eventType, User $actor, string $context, string $outcome, ?int $releaseId = null, ?int $recordId = null,
         #[\SensitiveParameter] ?string $criteria = null, ?int $resultCount = null, ?int $quotaUsedAfter = null, ?string $ip = null): CivilLookupAuditEvent

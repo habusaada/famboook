@@ -4,8 +4,15 @@ import { IdCard, Link2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel, SectionHeader } from "@/components/shared/page-layout";
 import { StatusBadge } from "@/components/shared/status-badge";
-import type { CivilLookupLink, CivilLookupRecord, CivilLookupRelation, CivilLookupReverseRelation } from "@/lib/types/api/civil-lookup";
+import type {
+  CivilLookupLink,
+  CivilLookupRecord,
+  CivilLookupRelation,
+  CivilLookupReverseRelation,
+  CivilLookupSpace,
+} from "@/lib/types/api/civil-lookup";
 import { formatCivilDate, recordAge } from "@/lib/utils/civil-date";
+import { CivilLookupId } from "./revealable-id";
 import { FIELD_LABELS, LINK_STATUS_LABELS, MISSING, RELATION_LABELS, SECTION_LABELS } from "./labels";
 
 const IDENTIFIER_FIELDS = new Set(["mainid", "fatherid", "motherid", "partnerid", "householdid", "phonenum"]);
@@ -30,12 +37,17 @@ const DATE_FIELDS = new Set(["datebirth", "deathdate"]);
 export function CitizenDetail({
   record,
   busy,
+  space = "staff",
+  canReveal = false,
   openingLink,
   onOpenLink,
   onOpenLinks,
 }: {
   record: CivilLookupRecord;
   busy: boolean;
+  /** FB-CIVIL-02G: the mount the reveal goes through, and whether the eye-icon reveal is offered. */
+  space?: CivilLookupSpace;
+  canReveal?: boolean;
   openingLink?: CivilLookupRelation | null;
   onOpenLink: (link: CivilLookupLink) => void;
   onOpenLinks: (link: CivilLookupLink, relation: CivilLookupReverseRelation) => void;
@@ -43,6 +55,8 @@ export function CitizenDetail({
   const fields = record.sections.flatMap((s) => s.fields);
   const value = (key: string) => fields.find((f) => f.key === key)?.value ?? null;
   const nationalId = value("mainid") ?? record.national_id;
+  // The note says identifiers are masked only when some are (FB-CIVIL-02G: each can then be revealed).
+  const someMasked = [nationalId, ...record.links.map((l) => l.national_id ?? null)].some((v) => v?.includes("*"));
   // undefined = this level does not return the death date at all.
   const deathField = fields.find((f) => f.key === "deathdate");
   const age = recordAge(value("datebirth"), deathField ? deathField.value : undefined);
@@ -69,9 +83,14 @@ export function CitizenDetail({
             <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
               <span className="text-muted-foreground">رقم الهوية</span>
               {nationalId ? (
-                <bdi dir="ltr" className="font-semibold tabular-nums" data-field="mainid">
-                  {nationalId}
-                </bdi>
+                <CivilLookupId
+                  value={nationalId}
+                  revealRef={record.ref}
+                  space={space}
+                  canReveal={canReveal}
+                  className="font-semibold tabular-nums"
+                  field="mainid"
+                />
               ) : (
                 <span className="text-subtle-foreground" data-field="mainid">
                   {MISSING}
@@ -84,7 +103,11 @@ export function CitizenDetail({
           تُعرض القيم كما وردت في الإصدار المنشور من السجل المدني، دون تفسير للرموز. العمر محسوب من تاريخ الميلاد.
           {record.level === "STANDARD" &&
             " يعرض هذا المستوى حقولًا محددة. رقم هوية هذا السجل كامل، وأرقام الأشخاص المرتبطين مخفية جزئيًا. أول عرض لسجل في اليوم يُحتسب من رصيدك، وإعادة فتحه في اليوم نفسه مجانية."}
-          {record.level === "EXTENDED_CONTROLLED" && " تُعرض بيانات الهوية والحالة الاجتماعية والمكان فقط، وتظهر أرقام الهوية مخفية جزئيًا."}
+          {record.level === "EXTENDED_CONTROLLED" &&
+            ` تُعرض بيانات الهوية والحالة الاجتماعية والمكان فقط${someMasked ? "، وتظهر أرقام الهوية مخفية جزئيًا" : ""}.`}
+          {someMasked &&
+            canReveal &&
+            " لإظهار رقم كامل اضغط رمز العين بجانبه؛ أول إظهار لسجل في اليوم يُحتسب من رصيدك، وإعادة إظهاره مجانية."}
         </p>
       </Panel>
 
@@ -145,9 +168,15 @@ export function CitizenDetail({
                 <span className="flex min-w-0 flex-col">
                   <span className="text-sm font-medium">{RELATION_LABELS[link.relation]}</span>
                   {link.national_id && (
-                    <bdi dir="ltr" className="text-[13px] text-muted-foreground tabular-nums">
-                      {link.national_id}
-                    </bdi>
+                    <span className="text-[13px] text-muted-foreground">
+                      <CivilLookupId
+                        value={link.national_id}
+                        revealRef={link.status === "AVAILABLE" ? link.ref : undefined}
+                        space={space}
+                        canReveal={canReveal}
+                        subject={RELATION_LABELS[link.relation]}
+                      />
+                    </span>
                   )}
                 </span>
                 {link.status === "AVAILABLE" && link.ref ? (

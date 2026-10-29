@@ -227,6 +227,77 @@ The approval must state whether it also covers a coordinator viewing people
 outside their own household. Today no record-level distinction exists (no
 link between `identity_ref` and `persons`, OD-15).
 
+## B-5b. Eye-icon reveal of a National ID (FB-CIVIL-02G, owner decision 2026-10-29)
+
+**Owner decision.** Every user holding the Civil Registry Lookup permission
+of a side (Staff, Family Portal, Coordinator Space) may reveal a complete
+National ID. The reveal reuses the existing interaction of «بياناتي
+الشخصية» (Family Portal → my personal information → National ID): the
+value is masked, an eye icon reveals it, and pressing again hides it. It
+applies to:
+
+- result cards of every search mode, page and reverse (family / children)
+  list;
+- the opened person's own `mainid`;
+- each related person's `fatherid`, `motherid` and `partnerid`, each
+  independently.
+
+No family-relationship requirement applies: the side's lookup permission is
+the authority.
+
+**Implemented behavior (local):**
+
+- **Never automatic.** Lists and records keep their masking:
+  - `summary()` always masks;
+  - `EXTENDED_CONTROLLED` and the `STANDARD` links stay masked;
+  - 02F is unchanged.
+
+  Nothing is disclosed in bulk. The automatic per-value authorizer first
+  drafted for 02G was replaced by this explicit reveal.
+- **`POST …/identifiers/reveal {ref}`** on each mount reveals **one** value.
+  - It is authorized like opening a record: gates, side, `civil-lookup.view`,
+    REVOKED / GRANTED and the role policy, re-checked on every call.
+  - The reference names it: a `RECORD` reference (result card, list entry or
+    opened record) or a `LINK` reference (a related person present in the
+    release). References are bound to the user, context, release and expiry.
+    A person not in the release has no reference, so there is no reveal.
+- **Quota.** The first disclosure of a record each Gaza day costs one unit.
+  It is deduplicated with the 02F disclosures (`civil_lookup_record_disclosures`),
+  so revealing again, or opening the same record, is free.
+  - Free: `FULL`, and the record of an exact National ID search.
+  - Refused at the limit with 429 `QUOTA_EXHAUSTED`, revealing nothing.
+  - Rate limits unchanged.
+- **Audit.** `ID_REVEALED` (migration `2026_10_31_100000` adds it to the
+  PostgreSQL CHECK) records the actor, context, outcome, release and record
+  ids, **never the value**.
+- **Switches.**
+  - Staff may always reveal.
+  - Each family side has its own switch, **off by default** and
+    independent: `CIVIL_LOOKUP_FAMILY_ID_REVEAL_ENABLED` and
+    `CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_ENABLED`.
+  - In production each side also needs its own approval reference in the
+    process environment: `CIVIL_LOOKUP_FAMILY_ID_REVEAL_APPROVAL` and
+    `CIVIL_LOOKUP_COORDINATOR_ID_REVEAL_APPROVAL`.
+  - The status API exposes `capabilities.reveal_ids`.
+- **Frontend.** `RevealableId` follows `SensitiveValue` exactly: the same
+  states, Eye / EyeOff control and accessible names. The value is kept in
+  component state only, never cached or stored. The reveal state resets with
+  the record, the page or the view.
+
+**Approval status (unchanged).** B-OD-1 (field-level privacy approval,
+including the masking format) is OPEN. G1 / OD-08 are OPEN. OD-09 is
+PROPOSED. OD-15 is approved as no linkage, and none is introduced.
+
+**Production-enabled behavior.** Staff reveal ships with the code. The
+family-side reveal is **off** until its switch, and in production its
+approval reference, are set.
+
+**Before enabling the family-side reveal:**
+
+- the owner's record that B-OD-1 / G1 / OD-08 cover a complete National ID
+  revealed on explicit request, or their approval;
+- the switch and the approval reference, set by the system administrator.
+
 ## B-6. Shared daily quota
 
 The 02A quota engine is used unchanged:

@@ -1473,7 +1473,14 @@ on the test instance and a real browser
     - **Production configuration inspected 2026-10-29:** `enabled` ON, `family_side_enabled` ON, `coordinator_side_enabled` ON, `reverse_links_enabled` OFF. The project owner confirmed that the lookup service had already been tested successfully and needs no configuration change.
     - **Governance (independent of deployment, still open unless separately evidenced):** OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. Their completion is not recorded in this roadmap. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
-- **FB-CIVIL-02F (2026-10-29), local implementation verified, uncommitted, NOT deployed:** authorized Staff National ID disclosure (ADR 02A §L-4b, §L-6c):
+- **FB-CIVIL-02G (2026-10-29), local implementation verified, uncommitted, NOT deployed:** eye-icon reveal of a National ID, reusing the «بياناتي الشخصية» interaction (ADR 02B §B-5b):
+    - result cards of every mode, page and reverse list; the opened record; each related person;
+    - one value per explicit, authorized request; never automatic, nothing disclosed in bulk;
+    - the first reveal of a record each day costs one quota unit, deduplicated with 02F;
+    - audited as `ID_REVEALED` without the value (migration `2026_10_31_100000`, audit CHECK);
+    - Staff always; the Family Portal and Coordinator Space each behind their own switch, off by default, with a production approval reference;
+    - B-OD-1, G1, OD-08, OD-09 and OD-15 unchanged.
+- **FB-CIVIL-02F (2026-10-29), committed `adc23d3`; Production baseline as reported by the project owner:** authorized Staff National ID disclosure (ADR 02A §L-4b, §L-6c):
     - `STANDARD` shows the opened record's own National ID; `FULL` unchanged; `EXTENDED_CONTROLLED` masked pending B-OD-1 (02B §B-5a);
     - result lists and linked IDs outside `FULL` stay masked;
     - the first disclosure of a record each Gaza day costs one quota unit, reopening it is free, and an exact National ID search opens its record without a second charge;

@@ -12,6 +12,7 @@ use App\Http\Requests\CivilLookup\ReferenceRequest;
 use App\Support\CivilLookup\CivilLookupAccess;
 use App\Support\CivilLookup\CivilLookupContext;
 use App\Support\CivilLookup\CivilLookupGate;
+use App\Support\CivilLookup\CivilLookupIdentifierDisclosure;
 use App\Support\CivilLookup\CivilLookupQuota;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +46,9 @@ class CivilLookupController extends Controller
             'view' => CivilLookupAccess::evaluate($user, $context, CivilLookupAccess::VIEW)['allowed'],
             'view_full' => $context === CivilLookupContext::STAFF && $user->can(CivilLookupAccess::VIEW_FULL),
             'reverse_links' => CivilLookupGate::reverseLinksEnabled(),
+            // FB-CIVIL-02G: whether the eye-icon reveal is offered (the reveal itself is authorized again).
+            'reveal_ids' => CivilLookupIdentifierDisclosure::revealOpen($context)
+                && CivilLookupAccess::evaluate($user, $context, CivilLookupAccess::VIEW)['allowed'],
         ]]);
     }
 
@@ -76,6 +80,12 @@ class CivilLookupController extends Controller
     public function openLink(ReferenceRequest $request): JsonResponse
     {
         return $this->guarded($request, fn () => $this->lookup->openLink($request->user(), CivilLookupContext::of($request), $request->input('ref'), $request->ip()));
+    }
+
+    /** FB-CIVIL-02G: one complete National ID, on an explicit request (the reference in the body, never a URL). */
+    public function revealIdentifier(ReferenceRequest $request): JsonResponse
+    {
+        return $this->guarded($request, fn () => $this->lookup->revealIdentifier($request->user(), CivilLookupContext::of($request), $request->input('ref'), $request->ip()));
     }
 
     public function links(ReferenceRequest $request): JsonResponse

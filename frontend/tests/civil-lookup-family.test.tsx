@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { FamilyUserContext } from "@/components/family/family-context";
@@ -188,6 +188,125 @@ describe("Family Portal lookup", () => {
     mockApi(FAMILY, new ApiError(403, { message: "server text", code: "LOOKUP_NOT_ALLOWED" }));
     renderFamily(HEAD, <FamilyCivilRegistryPage />);
     expect(await screen.findByText("لا تملك صلاحية استخدام الاستعلام عن السجل المدني، أو أن الخدمة غير مفعّلة لدورك.")).toBeInTheDocument();
+    expect(screen.queryByText("server text")).toBeNull();
+  });
+});
+
+describe("eye-icon reveal on the Family Portal (FB-CIVIL-02G)", () => {
+  // Lists and records arrive masked; each eye asks the server for ONE value by its reference.
+  const revealing = (over: Partial<CivilLookupStatus["capabilities"]> = {}): { data: CivilLookupStatus } => ({
+    data: { ...status("FAMILY").data, capabilities: { ...status("FAMILY").data.capabilities, reveal_ids: true, ...over } },
+  });
+
+  const results = (): { data: CivilLookupList } => ({
+    data: {
+      ...list().data, outcome: "RESULTS", meta: { page: 1, per_page: 25, total: 2, last_page: 1 },
+      results: [list().data.results[0], { ...list().data.results[0], ref: "ref-5", national_id: "*****0005", fullname: "اسم تجريبي 5" }],
+    },
+  });
+
+  const revealed: Record<string, string> = { "ref-1": "900000001", "rec-1": "900000001", "link-father": "900000002" };
+
+  function mockReveal(statusReply: unknown, reveal: (ref: string) => Promise<unknown>) {
+    get = vi.spyOn(apiClient, "get").mockImplementation(async (path: string) => {
+      if (path === `${FAMILY}/status`) return statusReply as never;
+      throw new Error(`Unexpected GET: ${path}`);
+    });
+    post = vi.spyOn(apiClient, "post").mockImplementation(async (path: string, body?: unknown) => {
+      const ref = (body as { ref?: string } | undefined)?.ref ?? "";
+      if (path === `${FAMILY}/search/name`) return results() as never;
+      if (path === `${FAMILY}/records/open`) return { data: { outcome: "FOUND", release_id: 1, record: extended(), quota: quota() } } as never;
+      if (path === `${FAMILY}/identifiers/reveal`) return (await reveal(ref)) as never;
+      throw new Error(`Unexpected POST: ${path}`);
+    });
+  }
+
+  const ok = async (ref: string) => ({ data: { national_id: revealed[ref], quota: quota() } });
+
+  async function searchByName(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("radio", { name: "الاسم الكامل" }));
+    await user.type(screen.getByLabelText("الاسم الكامل أو جزء منه"), "اسم تجريبي");
+    await user.click(screen.getByRole("button", { name: "بحث" }));
+    await waitFor(() => expect(document.querySelectorAll("[data-result]")).toHaveLength(2));
+  }
+
+  it("reveals and hides one result card's National ID at a time, through the server", async () => {
+    const user = userEvent.setup();
+    mockReveal(revealing(), ok);
+    renderFamily(HEAD, <FamilyCivilRegistryPage />);
+    await searchByName(user);
+    const [first, second] = Array.from(document.querySelectorAll("[data-result]")) as HTMLElement[];
+    expect(first.querySelector("[data-masked]")?.textContent).toBe("*****0001");
+
+    await user.click(within(first).getByRole("button", { name: "إظهار رقم الهوية — اسم تجريبي 1" }));
+    await waitFor(() => expect(first.querySelector("[data-revealed]")?.textContent).toBe("900000001"));
+    expect(post).toHaveBeenCalledWith(`${FAMILY}/identifiers/reveal`, { ref: "ref-1" });
+    expect(within(first).getByRole("button", { name: "إخفاء رقم الهوية — اسم تجريبي 1" })).toHaveAttribute("aria-pressed", "true");
+    // The other card is untouched: still masked, no request for it.
+    expect(second.querySelector("[data-masked]")?.textContent).toBe("*****0005");
+    expect(post).not.toHaveBeenCalledWith(`${FAMILY}/identifiers/reveal`, { ref: "ref-5" });
+
+    await user.click(within(first).getByRole("button", { name: "إخفاء رقم الهوية — اسم تجريبي 1" }));
+    expect(first.querySelector("[data-masked]")?.textContent).toBe("*****0001");
+    expect(document.body.textContent).not.toContain("900000001");
+    expect(browserStorageDump()).not.toMatch(/90000000/);
+  });
+
+  it("reveals the record's own ID and each related person independently, and resets when the view changes", async () => {
+    const user = userEvent.setup();
+    mockReveal(revealing(), ok);
+    renderFamily(HEAD, <FamilyCivilRegistryPage />);
+    await searchByName(user);
+    await user.click(within(document.querySelector("[data-result]") as HTMLElement).getByRole("button", { name: "عرض السجل" }));
+    const header = await findEl(() => document.querySelector("[data-record-header]"));
+    expect(header.querySelector('[data-field="mainid"] [data-masked]')?.textContent).toBe("*****0001");
+    expect(header.querySelector("[data-source-note]")?.textContent).toContain("اضغط رمز العين");
+
+    // The related father: his own reveal, by his link reference; the record's ID stays masked.
+    const father = document.querySelector('[data-link="FATHER"]') as HTMLElement;
+    await user.click(within(father).getByRole("button", { name: "إظهار رقم الهوية — الأب" }));
+    await waitFor(() => expect(father.querySelector("[data-revealed]")?.textContent).toBe("900000002"));
+    expect(post).toHaveBeenLastCalledWith(`${FAMILY}/identifiers/reveal`, { ref: "link-father" });
+    expect(header.querySelector('[data-field="mainid"] [data-masked]')?.textContent).toBe("*****0001");
+    // A person not in the release has no reference: no eye.
+    expect(within(document.querySelector('[data-link="MOTHER"]') as HTMLElement).queryByRole("button", { name: /إظهار رقم الهوية/ })).toBeNull();
+
+    await user.click(within(header).getByRole("button", { name: "إظهار رقم الهوية" }));
+    await waitFor(() => expect(header.querySelector("[data-revealed]")?.textContent).toBe("900000001"));
+    expect(post).toHaveBeenLastCalledWith(`${FAMILY}/identifiers/reveal`, { ref: "rec-1" });
+
+    // Back to the results: the cards start masked again; the record's revealed values are gone.
+    await user.click(screen.getByRole("button", { name: "رجوع" }));
+    await waitFor(() => expect(document.querySelectorAll("[data-result] [data-masked]")).toHaveLength(2));
+    expect(document.body.textContent).not.toMatch(/900000001|900000002/);
+  });
+
+  it("offers no eye when the server does not offer the reveal", async () => {
+    const user = userEvent.setup();
+    mockReveal(revealing({ reveal_ids: false }), ok);
+    renderFamily(HEAD, <FamilyCivilRegistryPage />);
+    await searchByName(user);
+    expect(screen.queryByRole("button", { name: /إظهار رقم الهوية/ })).toBeNull();
+    await user.click(within(document.querySelector("[data-result]") as HTMLElement).getByRole("button", { name: "عرض السجل" }));
+    await findEl(() => document.querySelector("[data-record-header]"));
+    expect(screen.queryByRole("button", { name: /إظهار رقم الهوية/ })).toBeNull();
+    expect(document.querySelector("[data-source-note]")?.textContent).not.toContain("رمز العين");
+  });
+
+  it.each([
+    [new ApiError(429, { code: "QUOTA_EXHAUSTED" }), "استنفدت رصيدك اليومي من الاستعلامات"],
+    [new ApiError(403, { code: "LOOKUP_NOT_ALLOWED", message: "server text" }), "لا تملك صلاحية استخدام الاستعلام"],
+  ])("shows a fixed message when a reveal is refused (%#) and keeps the value masked", async (error, message) => {
+    const user = userEvent.setup();
+    mockReveal(revealing(), async () => {
+      throw error;
+    });
+    renderFamily(HEAD, <FamilyCivilRegistryPage />);
+    await searchByName(user);
+    const first = document.querySelector("[data-result]") as HTMLElement;
+    await user.click(within(first).getByRole("button", { name: "إظهار رقم الهوية — اسم تجريبي 1" }));
+    expect((await findEl(() => first.querySelector("[data-reveal-error]"))).textContent).toContain(message);
+    expect(first.querySelector("[data-masked]")?.textContent).toBe("*****0001");
     expect(screen.queryByText("server text")).toBeNull();
   });
 });

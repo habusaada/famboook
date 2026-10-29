@@ -453,8 +453,9 @@ class CivilLookupApiTest extends TestCase
         $this->assertThrows(fn () => $event->delete(), LogicException::class);
 
         $uris = collect(Route::getRoutes()->getRoutes())->map->uri()->filter(fn ($u) => str_starts_with($u, 'api/v1/civil-registry/lookup'))->values();
-        // 13 + FB-CIVIL-02D: POST admin/user-access/resolve (identifier in the body) and GET admin/accounts/staff.
-        $this->assertCount(15, $uris);
+        // 13 + FB-CIVIL-02D: POST admin/user-access/resolve (identifier in the body) and GET admin/accounts/staff;
+        // + FB-CIVIL-02G: POST identifiers/reveal (the reference in the body).
+        $this->assertCount(16, $uris);
         $this->assertSame(['api/v1/civil-registry/lookup/admin/policies/{role}'], $uris->filter(fn ($u) => str_contains($u, '{'))->values()->all());
     }
 }

@@ -95,7 +95,7 @@ const SEARCH_PATHS: Record<CivilLookupMode, string> = {
 };
 
 /** After every counted lookup the quota indicator is refreshed (every space: the counter is shared). */
-function useRefreshStatus() {
+export function useRefreshStatus() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: [...civilLookupKeys.all, "status"] });
 }
@@ -131,6 +131,18 @@ export function useCivilLookupOpenRecord(space: CivilLookupSpace = "staff") {
       (await apiClient.post<{ data: CivilLookupRecordResponse }>(`${SPACE_BASES[space]}/records/open`, { ref })).data,
     onSettled: refresh,
   });
+}
+
+/**
+ * FB-CIVIL-02G — ONE complete National ID, named by its opaque reference (a
+ * result card, a list entry, an opened record or a linked person). A plain
+ * request, never a query or a mutation: the value never enters a cache. The
+ * caller keeps it in transient component state only, as SensitiveValue does
+ * on «بياناتي الشخصية». The first reveal of a record each day is counted.
+ */
+export async function revealCivilLookupId(space: CivilLookupSpace, ref: string): Promise<string> {
+  const response = await apiClient.post<{ data: { national_id: string } }>(`${SPACE_BASES[space]}/identifiers/reveal`, { ref });
+  return response.data.national_id;
 }
 
 /** A linked citizen: a new, counted lookup. */

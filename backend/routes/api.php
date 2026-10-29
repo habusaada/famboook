@@ -75,6 +75,8 @@ $civilLookupEndpoints = function (string $context): void {
     Route::middleware(["civil-lookup.enabled:{$context}", 'can:civil-lookup.view', 'throttle:civil-lookup'])->group(function () {
         Route::post('/records/open', [CivilLookupController::class, 'openRecord']);
         Route::post('/links/open', [CivilLookupController::class, 'openLink']);
+        // FB-CIVIL-02G: the eye-icon reveal of one National ID (ADR 02B §B-5b).
+        Route::post('/identifiers/reveal', [CivilLookupController::class, 'revealIdentifier']);
         Route::post('/links/list', [CivilLookupController::class, 'links']);
     });
 };

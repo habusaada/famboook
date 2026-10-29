@@ -65,6 +65,12 @@ final class CivilLookupGate
         return self::referenceOf(self::VARIABLE);
     }
 
+    /** A well-formed approval reference in the PROCESS environment, or null (FB-CIVIL-02G reuses the format). */
+    public static function approvalReference(string $variable): ?string
+    {
+        return self::referenceOf($variable);
+    }
+
     public static function reverseLinksEnabled(): bool
     {
         return config('civil_lookup.reverse_links_enabled') === true;
