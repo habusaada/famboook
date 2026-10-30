@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Famboook Next.js Staff Portal — build/restart TEMPLATE (docs/08 §20 D).
 # Requires frontend/.env.production.local (see deploy/env/frontend.production.env.example).
-# The process manager (systemd unit / pm2) runs: npx next start -H 127.0.0.1 -p 3000
+# The systemd unit runs: npm start -- -H 127.0.0.1, with PORT=3001 (docs/08 §1).
 set -euo pipefail
 
 cd "$(dirname "$0")/../../frontend"

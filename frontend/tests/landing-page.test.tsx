@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import WelcomePage, { metadata } from "@/app/(public)/welcome/page";
+import HomePage, { metadata } from "@/app/(public)/page";
 import { demoAnnouncements, demoFamilyUser, demoHousehold, demoMembers, demoNotifications, demoRegistryMembers } from "@/components/landing/demo-fixtures";
 import { DEMO_CARD_LABEL, demoFamilyCard } from "@/components/landing/demo-card-fixture";
 import { apiClient } from "@/lib/api/client";
@@ -13,7 +13,7 @@ import { renderWithClient } from "./helpers";
 // use only synthetic fixtures, nothing touches the network, and its module
 // graph reaches no API client, session or authenticated screen.
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/welcome" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/" }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>
@@ -58,24 +58,28 @@ afterEach(() => {
 });
 
 describe("the public route", () => {
-  it("renders at /welcome without a session, in the approved order, and stays out of search engines until approved", () => {
-    renderWithClient(<WelcomePage />);
+  it("renders at the homepage without a session, in the approved order, with its own metadata", () => {
+    renderWithClient(<HomePage />);
     expect(screen.getByRole("heading", { level: 1, name: "فامبوك.. منصة رقمية لتنظيم العائلات والعشائر" })).toBeInTheDocument();
     const ids = Array.from(document.querySelectorAll("main > section[id]")).map((el) => el.id);
     expect(ids).toEqual(["hero", "preview", "digital-family-card", "about", "capabilities", "how-it-works", "governance", "faq"]);
-    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(metadata.title).toBe("فامبوك | منصة رقمية لتنظيم العائلات والعشائر");
+    expect(metadata.alternates?.canonical).toBe("https://famboook.com/");
+    expect(metadata.openGraph?.url).toBe("https://famboook.com/");
+    expect(metadata.robots).toBeUndefined();
   });
 
   it("links to the existing sign-in pages on this site", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/login");
     expect(hrefs).toContain("/family/login");
     expect(hrefs.some((href) => href?.startsWith("https://famboook.com"))).toBe(false);
   });
 
-  it("does not replace / and sits outside the Staff and Family layouts", () => {
-    expect(existsSync(join(ROOT, "app/(staff)/page.tsx"))).toBe(true);
+  it("is the homepage and sits outside the Staff and Family layouts", () => {
+    expect(existsSync(join(ROOT, "app/(public)/page.tsx"))).toBe(true);
+    expect(existsSync(join(ROOT, "app/(staff)/page.tsx"))).toBe(false);
     expect(existsSync(join(ROOT, "app/page.tsx"))).toBe(false);
     expect(existsSync(join(ROOT, "app/(public)/layout.tsx"))).toBe(false);
   });
@@ -83,7 +87,7 @@ describe("the public route", () => {
 
 describe("content accuracy", () => {
   it("positions the platform for councils, with the approved Hero copy and audience order (FB-WEB-02C)", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const hero = document.getElementById("hero") as HTMLElement;
     expect(hero.textContent).toContain("منصة رقمية متخصصة تمكّن مجالس العائلات والعشائر من تنظيم بيانات فروعها وأسرها وأفرادها، وإدارة الهياكل العائلية، وتعزيز التنسيق والتواصل المجتمعي عبر منظومة موحدة.");
     expect(within(hero).getByRole("link", { name: "الدخول إلى المنصة" })).toHaveAttribute("href", "/login");
@@ -96,7 +100,7 @@ describe("content accuracy", () => {
   });
 
   it("uses the approved operator and the active contact address only", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const text = document.body.textContent ?? "";
     expect(text).toContain("المركز الفلسطيني للبيانات والتنمية المجتمعية (PCDCD)");
     expect(text).not.toContain("للتنمية الثقافية");
@@ -106,7 +110,7 @@ describe("content accuracy", () => {
   });
 
   it("does not advertise civil-registry functionality", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(document.body.textContent).not.toMatch(/السجل المدني|الاستعلام المدني/);
   });
 });
@@ -114,7 +118,7 @@ describe("content accuracy", () => {
 describe("the preview", () => {
   it("has accessible tabs, moved by the arrow keys, and an illustrative-data notice in every panel", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const preview = document.querySelector("[data-platform-preview]") as HTMLElement;
     const tablist = within(preview).getByRole("tablist", { name: "أقسام معاينة المنصة" });
     expect(within(tablist).getAllByRole("tab").map((t) => t.textContent)).toEqual(TAB_NAMES);
@@ -136,7 +140,7 @@ describe("the preview", () => {
   it("makes no request on any tab, through fetch or the API client", async () => {
     const user = userEvent.setup();
     const calls = (["get", "post", "put", "patch", "delete"] as const).map((method) => vi.spyOn(apiClient, method));
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     for (const name of TAB_NAMES) await user.click(screen.getByRole("tab", { name }));
     expect(fetchSpy).not.toHaveBeenCalled();
     for (const call of calls) expect(call).not.toHaveBeenCalled();
@@ -144,7 +148,7 @@ describe("the preview", () => {
 
   it("offers no link or action inside any panel", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     for (const name of TAB_NAMES) {
       await user.click(screen.getByRole("tab", { name }));
       const panel = screen.getByRole("tabpanel", { name });
@@ -156,7 +160,7 @@ describe("the preview", () => {
 
   it("shows the real components: KPI cards, the registry table, the Family cards and the notification rows", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(document.querySelectorAll("[data-kpi]").length).toBe(4);
     await user.click(screen.getByRole("tab", { name: TAB_NAMES[1] }));
     expect(screen.getByRole("table")).toBeInTheDocument();
@@ -174,7 +178,7 @@ describe("the preview", () => {
 
 describe("demo isolation", () => {
   it("reaches no API client, session, gate or authenticated screen at run time", () => {
-    const graph = [...runtimeGraph(join(ROOT, "app/(public)/welcome/page.tsx"))];
+    const graph = [...runtimeGraph(join(ROOT, "app/(public)/page.tsx"))];
     expect(graph).toContain("components/landing/demo-panels.tsx");
     const forbidden = graph.filter((file) =>
       /^lib\/api\/|^components\/auth\/|family-gate|family-shell|family-context|family-home|bottom-nav|notification-bell|family-notifications\.tsx|staff-announcement-list|announcement-parts|operational-dashboard|dashboard-sections|families-registry|family-members-table|family-service-worker|query-provider|^lib\/utils\/announcement\.ts|components\/family\/card\/family-card\.tsx/.test(file),
@@ -195,7 +199,7 @@ describe("demo isolation", () => {
 
 describe("content corrections (FB-WEB-02D)", () => {
   it("describes manual in-app announcements as available and does not advertise automated or push delivery", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const capabilities = document.getElementById("capabilities") as HTMLElement;
     const card = within(capabilities).getByRole("heading", { name: "الإعلانات والإشعارات" }).closest("article") as HTMLElement;
     expect(card.textContent).toContain("يدويًا");
@@ -204,7 +208,7 @@ describe("content corrections (FB-WEB-02D)", () => {
   });
 
   it("points «عن فامبوك» at the About section, and every section anchor at a real section", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(screen.getAllByRole("link", { name: "عن فامبوك" })[0]).toHaveAttribute("href", "#about");
     for (const link of document.querySelectorAll('a[href^="#"]')) {
       expect(document.getElementById((link.getAttribute("href") as string).slice(1)), link.getAttribute("href") as string).not.toBeNull();
@@ -212,7 +216,7 @@ describe("content corrections (FB-WEB-02D)", () => {
   });
 
   it("keeps all four preview tabs reachable without scrolling the strip, and offers a skip link", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const tablist = screen.getByRole("tablist", { name: "أقسام معاينة المنصة" });
     expect(tablist.className).toContain("grid-cols-2");
     expect(tablist.className).not.toContain("overflow-x-auto");
@@ -222,7 +226,7 @@ describe("content corrections (FB-WEB-02D)", () => {
 
   it("offers both sign-in pages in the mobile menu and closes it with Escape", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     await user.click(screen.getByRole("button", { name: "فتح القائمة" }));
     const close = screen.getByRole("button", { name: "إغلاق القائمة" });
     const menu = document.getElementById(close.getAttribute("aria-controls") as string) as HTMLElement;
@@ -235,7 +239,7 @@ describe("content corrections (FB-WEB-02D)", () => {
 
 describe("governance wording (FB-WEB-02E)", () => {
   it("separates councils, operational users, the operator and household heads, and promises councils no account", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const how = document.getElementById("how-it-works") as HTMLElement;
     const [council, coordinators, heads] = Array.from(how.querySelectorAll("article")).map((a) => a.textContent);
     expect(council).toContain("المستفيد المؤسسي المستهدف");
@@ -255,14 +259,14 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
   const field = (name: string) => section().querySelector(`[data-field="${name}"] dd`);
 
   it("sits right after the preview, labelled by its Arabic heading, with the approved copy", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(section().previousElementSibling).toHaveAttribute("id", "preview");
     expect(section().nextElementSibling).toHaveAttribute("id", "about");
     expect(screen.getByRole("region", { name: "بطاقة الأسرة الرقمية" })).toBe(section());
   });
 
   it("uses the real card face with the synthetic fixture, under the section's heading level", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const face = section().querySelector("[data-family-card]") as HTMLElement;
     expect(face).not.toBeNull();
     expect(within(face).getByRole("heading", { level: 3, name: demoFamilyCard.head_name })).toBeInTheDocument();
@@ -272,11 +276,11 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
     expect(field("clan")).toHaveTextContent("عشيرة تجريبية");
     expect(field("branch")).toHaveTextContent("فرع تجريبي");
     expect(face.closest("[data-portal='family']")).not.toBeNull();
-    expect(runtimeGraph(join(ROOT, "app/(public)/welcome/page.tsx"))).toContain("components/family/card/family-card-face.tsx");
+    expect(runtimeGraph(join(ROOT, "app/(public)/page.tsx"))).toContain("components/family/card/family-card-face.tsx");
   });
 
   it("cannot be mistaken for a valid credential: a clear label, the disclaimer, and no working QR", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(section().querySelector("[data-demo-card-label]")).toHaveTextContent(DEMO_CARD_LABEL);
     expect(DEMO_CARD_LABEL).toBe("نموذج توضيحي — بيانات غير حقيقية");
     expect(section().querySelector("[data-demo-card-disclaimer]")?.textContent).toContain("وليست وثيقة هوية رسمية");
@@ -300,7 +304,7 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
   });
 
   it("links only to the Family sign-in and the preview, with no public lookup or verification action", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(within(section()).getByRole("link", { name: "الدخول إلى بوابة الأسرة" })).toHaveAttribute("href", "/family/login");
     const hrefs = within(section()).getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual(["/family/login", "#preview"]);
@@ -310,7 +314,7 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
   });
 
   it("uses the official name everywhere, explains who reaches the card, and states its limits with no speculative use", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const limits = section().querySelector("[data-card-uses='limits']")?.textContent;
     expect(limits).toContain("ليست وثيقة هوية رسمية");
     expect(limits).toContain("لا تمنح أهلية أو استحقاقًا");
@@ -324,7 +328,7 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
   });
 
   it("offers every implemented feature, stacks on narrow screens, and makes no request", () => {
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     expect(Array.from(section().querySelectorAll("[data-card-feature]")).map((el) => el.getAttribute("data-card-feature"))).toEqual(["identity", "structure", "qr", "access", "download", "privacy"]);
     const grid = section().firstElementChild as HTMLElement;
     expect(grid.className).toContain("grid-cols-1");
@@ -336,7 +340,7 @@ describe("the Digital Family Card section (FB-WEB-02D-CARD)", () => {
 describe("the FAQ and the mobile menu", () => {
   it("expands one answer at a time with aria-expanded and the keyboard", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const first = screen.getByRole("button", { name: /ما هي منصة فامبوك/ });
     const second = screen.getByRole("button", { name: /لمن صُممت فامبوك/ });
     expect(first).toHaveAttribute("aria-expanded", "false");
@@ -354,7 +358,7 @@ describe("the FAQ and the mobile menu", () => {
 
   it("opens and closes the mobile menu with its state announced", async () => {
     const user = userEvent.setup();
-    renderWithClient(<WelcomePage />);
+    renderWithClient(<HomePage />);
     const toggle = screen.getByRole("button", { name: "فتح القائمة" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     await user.click(toggle);

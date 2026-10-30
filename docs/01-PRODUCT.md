@@ -1998,6 +1998,8 @@ Filament / Laravel
 System Administration
 ```
 
+> **Note (2026-10-30, FB-WEB-04):** `app.famboook.com` is now also an official Production application host, and `famboook.com/` is the public homepage. The topology above is kept as the original record; see `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`.
+
 PostgreSQL and private infrastructure are not directly exposed to browser applications.
 
 Final hostnames may change without changing this architectural separation.
@@ -3102,6 +3104,8 @@ Private Infrastructure
 ├── Private File Storage
 └── Queue Infrastructure
 ```
+
+> **Note (2026-10-30, FB-WEB-04):** `app.famboook.com` is now also an official Production application host, and `famboook.com/` is the public homepage. The topology above is kept as the original record; see `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`.
 
 Final hostnames remain deployment configuration rather than permanent domain-model decisions.
 

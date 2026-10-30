@@ -1,6 +1,6 @@
 import type { FamilyCard } from "@/lib/api/family-card";
 
-// FB-WEB-02D-CARD — the only data behind the card on /welcome. Invented and
+// FB-WEB-02D-CARD — the only data behind the card on the homepage. Invented and
 // fixed. It holds no token, no verification URL and no QR, and its number cannot
 // be a real one: «DEMO-…» does not match CredentialNumbers::FORMAT (FC-XXXX-XXXX-XX).
 

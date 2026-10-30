@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEMO_NOTICE } from "./demo-fixtures";
 import { FamilyPortalPanel, HouseholdRegistryPanel, NotificationsPanel, StaffDashboardPanel } from "./demo-panels";
 
-// FB-WEB-02B — the interactive preview of /welcome. Radix Tabs give the tab
+// FB-WEB-02B — the interactive preview of the homepage. Radix Tabs give the tab
 // roles and arrow-key navigation (dir: arrows follow the RTL reading order);
 // only the active panel is mounted. Rendered in the page, never in an iframe
 // (the site sends X-Frame-Options: DENY).

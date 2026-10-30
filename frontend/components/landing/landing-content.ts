@@ -1,6 +1,6 @@
 import { OPERATOR, OPERATOR_DISPLAY_NAME } from "@/lib/legal/operator";
 
-// FB-WEB-02B / 02C — the copy of /welcome. The product is positioned for family
+// FB-WEB-02B / 02C — the copy of the homepage. The product is positioned for family
 // and clan councils (owner decision, FB-WEB-02C); the Hero copy is verbatim as
 // approved. Kept accurate (docs/adr/FB-WEB-02-LANDING-PAGE.md §4): a council
 // decides and delegates a coordinator but has no account in the system

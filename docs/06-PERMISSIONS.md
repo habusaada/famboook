@@ -3550,6 +3550,10 @@ api.famboook.com
 admin.famboook.com
 ```
 
+> **Note (2026-10-30, FB-WEB-04):** the approved CORS origins are now exactly
+> `https://famboook.com` and `https://app.famboook.com`, an explicit list with no wildcard.
+> See `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`.
+
 CORS is not authorization.
 
 ---

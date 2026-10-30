@@ -10,6 +10,7 @@ import { FamilyServiceWorker } from "@/components/family/pwa/family-service-work
 export const metadata: Metadata = {
   title: "Famboook — بوابة الأسرة",
   description: "بوابة الأسرة في فامبوك",
+  robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

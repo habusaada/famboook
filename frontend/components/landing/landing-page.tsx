@@ -28,7 +28,7 @@ import { DigitalFamilyCardSection } from "./digital-family-card-section";
 import { LandingFaq, LandingHeader } from "./landing-interactive";
 import { PlatformPreview } from "./platform-preview";
 
-// FB-WEB-02B — the public page (/welcome), following the approved Stitch V2.1
+// FB-WEB-02B — the public page (/), following the approved Stitch V2.1
 // section order and layout with the application's own tokens, logo and font.
 // A server component: only the header, the FAQ and the preview run on the client.
 

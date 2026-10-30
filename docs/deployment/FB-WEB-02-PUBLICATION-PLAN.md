@@ -140,6 +140,10 @@ wording problem appears, fixing forward with a new approved commit is also accep
 
 ## 7. Separate future decisions
 
+> **Note (2026-10-30, FB-WEB-04):** the root of `famboook.com` and the role of
+> `app.famboook.com` are now decided in `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`. Removing
+> `noindex` stays a separate approval. The list below is kept as written.
+
 These are out of scope here, and nothing in this plan pre-empts them:
 
 - **`famboook.com` and `app.famboook.com`.** Whether the landing page becomes the

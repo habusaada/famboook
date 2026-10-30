@@ -16,7 +16,8 @@ document, shell history or tickets.
 # 1. Topology
 
 ```text
-https://famboook.com        Next.js Staff Portal   (next start on 127.0.0.1:3000)
+https://famboook.com        Next.js public homepage, Staff and Family Portals (next start on 127.0.0.1:3001)
+https://app.famboook.com    The same Next.js process; / redirects to /family
 https://api.famboook.com    Laravel API            (PHP-FPM, /api/v1, /sanctum/csrf-cookie)
 https://admin.famboook.com  Filament               (same Laravel app, ADMIN_DOMAIN)
 PostgreSQL 16+              localhost / private network only
@@ -92,8 +93,8 @@ is sent in V1), `IMPORT_APPLY_ENABLED=false` (Import Apply stays off; §7a).
 | `SESSION_HTTP_ONLY` | `true` (session cookie unreadable by JavaScript) |
 | `SESSION_SAME_SITE` | `lax` |
 | `SESSION_ENCRYPT` | `true` |
-| `SANCTUM_STATEFUL_DOMAINS` | `famboook.com` |
-| CORS allowed origin | `https://famboook.com` only (`FRONTEND_URL`), credentials allowed |
+| `SANCTUM_STATEFUL_DOMAINS` | `famboook.com,app.famboook.com` (FB-WEB-04) |
+| CORS allowed origins | `CORS_ALLOWED_ORIGINS=https://famboook.com,https://app.famboook.com`, credentials allowed; no wildcard; falls back to `FRONTEND_URL` when unset or empty (FB-WEB-04) |
 
 Reasoning:
 
@@ -106,7 +107,8 @@ Reasoning:
 - All three hosts are the same *site*, so `SameSite=Lax` cookies travel on
   the portal's credentialed `fetch` calls while cross-site requests from
   other sites do not carry them. `None` is not needed and not used.
-- Only `famboook.com` is stateful for Sanctum and allowed by CORS. Filament
+- Only `famboook.com` and `app.famboook.com` are stateful for Sanctum and
+  allowed by CORS (originally `famboook.com` only; FB-WEB-04). Filament
   uses the `web` guard directly and needs neither.
 - CSRF stays enabled everywhere (Sanctum's `ValidateCsrfToken`, Filament's
   `VerifyCsrfToken`). Credentials never touch `localStorage`.
@@ -1518,7 +1520,7 @@ Never do this once real data has been entered.
 
 **D. Next.js**
 - [ ] [R] `frontend/.env.production.local` with the two public URLs
-- [ ] [R] `npm ci && npm run build`; service runs `next start -H 127.0.0.1 -p 3000`
+- [ ] [R] `npm ci && npm run build`; service listens on `127.0.0.1:3001` (`PORT=3001`, `npm start -- -H 127.0.0.1`)
 - [ ] [R] Service restarts on boot (systemd/pm2)
 
 **E. PostgreSQL**
@@ -1593,6 +1595,7 @@ Never do this once real data has been entered.
 | 1.1.28 | 2026-10-18 | Approved | §16 amended (ADR FB-NOTIFY-01): queue worker and scheduler cron recorded as FB-NOTIFY-01 prerequisites; no server change |
 | 1.1.29 | 2026-10-18 | Approved | §16 (ADR FB-NOTIFY-01, 01B.1 alignment): scheduler and worker dependencies per function (manual publication, SYSTEM discovery and publication, follow-up / expiry); no synchronous fallback; Production readiness unverified; documentation only, no server change |
 | 1.1.30 | 2026-10-19 | Approved | §16 as built (FB-NOTIFY-01B.2b.7): notification mode, queue, dedicated worker, scheduler tasks and locks, heartbeat, `famboook:notifications-check`, reconciliation and expiry sweep; rollback constraint; PILOT readiness checklist `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. Documentation only, no server change |
+| 1.1.31 | 2026-10-30 | Ready for deployment review | FB-WEB-04: §1 adds `app.famboook.com` as an official Production host and corrects the Next.js port to 3001 (verified 2026-10-30); §4 `CORS_ALLOWED_ORIGINS` and the stateful domains; §19 service line. Checklist: `docs/deployment/FB-WEB-04-PRODUCTION-READINESS.md` |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

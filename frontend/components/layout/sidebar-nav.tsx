@@ -25,7 +25,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               <p className="px-3 pb-1 text-[11px] font-semibold text-subtle-foreground">{group.label}</p>
             )}
             {groupItems.map((item) => {
-              const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const isActive = pathname.startsWith(item.href);
               const Icon = item.icon;
 
               return (

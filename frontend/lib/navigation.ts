@@ -35,7 +35,7 @@ export const navGroups: { key: NavGroup; label: string | null }[] = [
 ];
 
 export const navItems: NavItem[] = [
-  { href: "/", label: "لوحة العمليات", icon: LayoutDashboard, permissions: ["dashboard.view-operational"], group: "operations" },
+  { href: "/dashboard", label: "لوحة العمليات", icon: LayoutDashboard, permissions: ["dashboard.view-operational"], group: "operations" },
   { href: "/families", label: "الأسر", icon: Users, permissions: ["family.view"], group: "registry" },
   { href: "/people", label: "الأشخاص", icon: User, permissions: ["person.view"], group: "registry" },
   // PWA-5d: the Staff review workspace (change-request.view — SUPER_ADMIN,
@@ -66,7 +66,7 @@ export const navItems: NavItem[] = [
 
 /** The nav section a path belongs to (longest matching prefix). */
 export function navItemFor(pathname: string): NavItem | undefined {
-  return navItems.find((item) => (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)));
+  return navItems.find((item) => pathname.startsWith(item.href));
 }
 
 /** Routes rendered without the Staff shell and without authentication. */
@@ -76,7 +76,27 @@ export function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
-/** A safe in-app redirect target (never an absolute or protocol-relative URL). */
+const DEFAULT_NEXT = "/dashboard";
+const PARSE_BASE = "https://next.invalid";
+
+/**
+ * A safe in-app redirect target (never an absolute or protocol-relative URL).
+ * Browsers treat a backslash as "/" and drop tabs and newlines, so those are refused
+ * outright. The value is judged as a browser resolves it, and that resolved
+ * form is what is returned: "/.//evil.example" resolves to "//evil.example".
+ */
 export function safeNext(next: string | null): string {
-  return next && next.startsWith("/") && !next.startsWith("//") && !isPublicRoute(next) ? next : "/";
+  if (!next || !next.startsWith("/") || /[\\\s\p{Cc}]/u.test(next)) return DEFAULT_NEXT;
+
+  let url: URL;
+  try {
+    url = new URL(next, PARSE_BASE);
+  } catch {
+    return DEFAULT_NEXT;
+  }
+
+  if (url.origin !== PARSE_BASE || url.pathname.startsWith("//") || /%(2f|5c)/i.test(url.pathname) || isPublicRoute(url.pathname)) {
+    return DEFAULT_NEXT;
+  }
+  return url.pathname + url.search + url.hash;
 }

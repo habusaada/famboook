@@ -4,7 +4,7 @@ import type { FamilyHousehold, FamilyMember } from "@/lib/api/family-household";
 import type { FamilyNotificationSummary } from "@/lib/api/family-notifications";
 import type { FamilyMemberDetail } from "@/lib/types/api/family";
 
-// FB-WEB-02B — the ONLY data of the public preview on /welcome: invented and
+// FB-WEB-02B — the ONLY data of the public preview on the homepage: invented and
 // fixed. No real person, family, National ID or mobile number; every identifier
 // field a real type allows is null, and codes carry DEMO. Figures are
 // illustrative, never operational statistics. Type imports only: nothing here

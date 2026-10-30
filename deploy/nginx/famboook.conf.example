@@ -3,7 +3,8 @@
 # TLS is terminated here. Laravel runs on PHP-FPM through FastCGI, so it sees
 # HTTPS=on and the real client address directly: Laravel trusts NO proxy
 # headers (no TrustProxies needed, X-Forwarded-For cannot be spoofed).
-# Next.js listens on 127.0.0.1:3000 only.
+# Next.js listens on 127.0.0.1:3001 only. app.famboook.com (FB-WEB-04) proxies to the
+# same process and is not in this template. Never copy this file over Production.
 
 # ---------------------------------------------------------------- HTTP → HTTPS
 server {
@@ -38,7 +39,7 @@ server {
     # the access log. Uncomment, run `nginx -t`, then reload.
     # location ^~ /verify/ {
     #     access_log off;
-    #     proxy_pass http://127.0.0.1:3000;
+    #     proxy_pass http://127.0.0.1:3001;
     #     proxy_http_version 1.1;
     #     proxy_set_header Host $host;
     #     proxy_set_header X-Forwarded-Proto https;
@@ -46,7 +47,7 @@ server {
     # }
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto https;

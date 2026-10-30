@@ -1483,6 +1483,12 @@ on the test instance and a real browser
     - **Production (owner-confirmed 2026-10-30):** `notifications.mode = ON`, `credentials.family_card_issuance_enabled = true`. These show enablement, not end-to-end operation; PDF download and manual announcement delivery remain to be verified operationally.
     - **Not recorded as tested (no evidence):** QR verification, PDF download and announcement delivery in Production.
 - **FB-WEB-03 «فامبوك بالأرقام»: DEFERRED** by the owner's decision; not in progress.
+- **FB-WEB-04 — Public Homepage & Staff Dashboard Separation: committed locally, NOT deployed (2026-10-30)** (`docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`; checklist: `docs/deployment/FB-WEB-04-PRODUCTION-READINESS.md`):
+    - `famboook.com/` is the landing page, `/welcome` redirects to it permanently, and the Staff dashboard moves to `/dashboard` behind the same AuthGate;
+    - `app.famboook.com` is an official Production host, and its `/` redirects to `/family` (307);
+    - `safeNext` hardened; `CORS_ALLOWED_ORIGINS` added to the repository;
+    - **SEO:** Nginx `noindex` stays; activating the exact homepage path is a separate approval;
+    - **Not verified:** real Staff and Family logins, PWA and QR on a deployed build.
 - **FB-OPS-01: NOT STARTED.** A separate task to improve the Frontend deployment script and document the actual port, 3001.
 - **FB-CIVIL-02G (2026-10-29), local implementation verified, uncommitted, NOT deployed:** eye-icon reveal of a National ID, reusing the «بياناتي الشخصية» interaction (ADR 02B §B-5b):
     - result cards of every mode, page and reverse list; the opened record; each related person;
@@ -3084,6 +3090,8 @@ admin.famboook.com
 PostgreSQL
 → Private / non-public
 ```
+
+> **Note (2026-10-30, FB-WEB-04):** `app.famboook.com` is now also an official Production application host, and `famboook.com/` is the public homepage. The topology above is kept as the original record; see `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`.
 
 ## Infrastructure
 

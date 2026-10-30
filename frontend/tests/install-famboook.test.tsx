@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -189,9 +189,9 @@ describe("when it is shown", () => {
 
 describe("the Staff Portal", () => {
   it("never renders the install suggestion", () => {
-    const staffFiles = execSync("git ls-files app/(staff) components", { cwd: join(__dirname, ".."), encoding: "utf8" })
+    const staffFiles = execSync("git ls-files --cached --others --exclude-standard app/(staff) components", { cwd: join(__dirname, ".."), encoding: "utf8" })
       .split("\n")
-      .filter((file) => /\.(ts|tsx)$/.test(file) && !file.startsWith("components/family/"));
+      .filter((file) => /\.(ts|tsx)$/.test(file) && !file.startsWith("components/family/") && existsSync(join(__dirname, "..", file)));
     const users = staffFiles.filter((file) => readFileSync(join(__dirname, "..", file), "utf8").includes("InstallFamboook"));
 
     expect(staffFiles.length).toBeGreaterThan(20);

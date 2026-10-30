@@ -1,5 +1,14 @@
 # FB-WEB-02 — Public Landing Page V2.1
 
+> **Superseded in part (2026-10-30, FB-WEB-04, approved, not yet deployed):** the page moves
+> to `/`, `/welcome` redirects to it, and the Staff dashboard moves to `/dashboard`. §1's route
+> statements and the `/` question in §6 are kept below as the original record. See
+> `docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`.
+>
+> **Correction (2026-10-30):** §2 says the site sends `X-Frame-Options: DENY`. The value read
+> from `famboook.com` that day was `SAMEORIGIN`. The rule of rendering the preview in the page,
+> never in an iframe, still stands.
+
 **Status:** COMPLETED / DEPLOYED / ACCEPTED. Deployed to Production on 2026-10-30 at
 `https://famboook.com/welcome`, commit `be44d923cccdc9e1d7cc3f3fceaaa7f7937da016`, and accepted manually by the project
 owner (FB-WEB-02H). Indexing and the role of `/` remain owner decisions (§6). See

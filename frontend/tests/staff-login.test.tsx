@@ -126,7 +126,7 @@ describe("Staff login (FB-UI-02)", () => {
     await user.type(password(), "secret-Pass1");
     await user.click(submit());
 
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/dashboard"));
     expect(post).toHaveBeenCalledWith("/api/v1/auth/login", { email: "staff@example.test", password: "secret-Pass1" });
   });
 });

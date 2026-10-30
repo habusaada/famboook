@@ -7,7 +7,7 @@ import { FAMILY_CARD_DISCLAIMER } from "@/lib/utils/family-card";
 import { DEMO_CARD_LABEL, demoFamilyCard } from "./demo-card-fixture";
 import { DIGITAL_CARD, LANDING_SECTION, LANDING_SHELL } from "./landing-content";
 
-// FB-WEB-02D-CARD — the Digital Family Card on /welcome: the real card face
+// FB-WEB-02D-CARD — the Digital Family Card on the homepage: the real card face
 // (FamilyCardFace, also used by /family/card) with a synthetic fixture and a
 // non-functional QR placeholder. It reads no session and calls no API. Every
 // statement is what the code does today; nothing here is a government ID or a

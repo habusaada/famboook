@@ -58,6 +58,17 @@ export default function config(phase: string): NextConfig {
       ];
     },
 
+    // FB-WEB-04: the landing page moved from /welcome to the homepage, which
+    // belongs to famboook.com. app.famboook.com shares this process (nginx
+    // passes Host) and opens on the Family Portal. Temporary, so the entry
+    // point can change without browsers keeping the old answer.
+    async redirects() {
+      return [
+        { source: "/", has: [{ type: "host", value: "app\\.famboook\\.com" }], destination: "/family", permanent: false },
+        { source: "/welcome", destination: "/", permanent: true },
+      ];
+    },
+
     async rewrites() {
       if (phase === PHASE_DEVELOPMENT_SERVER) return [];
 

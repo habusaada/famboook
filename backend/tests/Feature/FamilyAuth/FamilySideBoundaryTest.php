@@ -113,6 +113,20 @@ class FamilySideBoundaryTest extends TestCase
         $this->actingAs($staff)->getJson(self::ME)->assertForbidden();
     }
 
+    public function test_the_identifier_reveal_refuses_guests_and_staff_on_both_mounts(): void
+    {
+        $staff = tap(User::factory()->create(), fn (User $u) => $u->assignRole('SUPER_ADMIN'));
+        $staff->givePermissionTo('family-portal.access');
+        // The switches open: the feature gate runs before the side boundary (bootstrap/app.php).
+        config(['civil_lookup.enabled' => true, 'civil_lookup.family_side_enabled' => true, 'civil_lookup.coordinator_side_enabled' => true]);
+
+        foreach (['/api/v1/family/civil-registry/lookup/identifiers/reveal', '/api/v1/family/coordinator/civil-registry/lookup/identifiers/reveal'] as $uri) {
+            $this->postJson($uri, ['ref' => 'not-a-reference'])->assertUnauthorized();
+            $this->actingAs($staff)->postJson($uri, ['ref' => 'not-a-reference'])->assertForbidden()->assertJsonPath('message', EnsureFamilySideAccount::MESSAGE);
+            $this->app['auth']->forgetGuards();
+        }
+    }
+
     public function test_a_guest_and_an_inactive_account_get_401(): void
     {
         $this->getJson(self::ME)->assertUnauthorized();
@@ -206,7 +220,7 @@ class FamilySideBoundaryTest extends TestCase
             'api/v1/family/auth/password/reset/resend' => 'family.password-reset', 'api/v1/family/auth/password/reset/complete' => 'family.password-reset',
         ];
         $public = array_keys($gates);
-        $checked = 0;
+        $registered = [];
         foreach (Route::getRoutes() as $route) {
             if (! str_starts_with($route->uri(), 'api/v1/family/')) {
                 continue;
@@ -316,30 +330,35 @@ class FamilySideBoundaryTest extends TestCase
                     : [...$space, 'can:coordinator-notification-followup.manage', 'throttle:coordinator-followup-write'];
                 $this->assertSame($expected, $middleware, $route->uri());
             }
-            // FB-CIVIL-02B: the two Civil Registry Lookup mounts, each behind its own side boundary and context.
-            if (str_starts_with($route->uri(), 'api/v1/family/civil-registry/lookup')) {
-                $this->assertContains('family.context', $middleware, $route->uri());
-                $this->assertContains('civil-lookup.context:FAMILY', $middleware, $route->uri());
-                $this->assertNotContains('coordinator.space', $middleware, $route->uri());
+            // FB-CIVIL-02B, FB-CIVIL-02G: the two Civil Registry Lookup mounts, each
+            // behind its own side boundary and context, then the feature switch,
+            // the search or view permission and a throttle (none on /status).
+            foreach ([
+                'FAMILY' => ['api/v1/family/civil-registry/lookup/', ['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context']],
+                'COORDINATOR' => ['api/v1/family/coordinator/civil-registry/lookup/', ['api', 'auth:sanctum', 'family.side', 'coordinator.space']],
+            ] as $context => [$prefix, $boundary]) {
+                if (! str_starts_with($route->uri(), $prefix)) {
+                    continue;
+                }
+                $endpoint = substr($route->uri(), strlen($prefix));
+                $mount = [...$boundary, "civil-lookup.context:{$context}"];
+                $expected = match (true) {
+                    $endpoint === 'status' => [...$mount, 'can:civil-lookup.search'],
+                    str_starts_with($endpoint, 'search/') => [...$mount, "civil-lookup.enabled:{$context}", 'can:civil-lookup.search', 'throttle:civil-lookup'],
+                    default => [...$mount, "civil-lookup.enabled:{$context}", 'can:civil-lookup.view', 'throttle:civil-lookup'],
+                };
+                $this->assertSame($expected, $middleware, $route->uri());
             }
-            if (str_starts_with($route->uri(), 'api/v1/family/coordinator/civil-registry/lookup')) {
-                $this->assertContains('coordinator.space', $middleware, $route->uri());
-                $this->assertContains('civil-lookup.context:COORDINATOR', $middleware, $route->uri());
-            }
-            $checked++;
+            $registered[] = implode('|', array_diff($route->methods(), ['HEAD'])).' '.$route->uri();
         }
-        // 28 + the six Change Request routes (PWA-5e) + the add-member
-        // relationship options (FP-ADR-076) + the password change (FU-16) + the
-        // four contact-update routes (FP-ADR-079) + the Coordinator members
-        // directory and reveal (CO-01C, AUTH-ADR-092) + the six Coordinator
-        // request routes (CO-02.4, AUTH-ADR-093) + the FAMILY_ADD proposal
-        // route (CO-02.5) + the two Coordinator form reference routes (CO-02.6a)
-        // + the three read-only Gaza reference mirrors (FB-GEO-01 API-D2)
-        // + the Coordinator summary (FB-FAMILY-DASHBOARD-01) + the five
-        // notification routes (FB-NOTIFY-01B.2b.6b) + the seven Coordinator
-        // announcement routes (FB-NOTIFY-01B.2b.6c) + the six Coordinator
-        // follow-up routes (FB-NOTIFY-01E.3-F3.2) + the eight Civil Registry
-        // Lookup routes on each of the two family-side mounts (FB-CIVIL-02B).
-        $this->assertSame(89, $checked);
+
+        // Every route passed the boundary above; the inventory names each one, so a
+        // new route needs a deliberate review (family-routes.php).
+        $reviewed = require __DIR__.'/family-routes.php';
+        $this->assertSame([], array_values(array_diff($registered, $reviewed)), 'Family routes missing from the reviewed inventory.');
+        $this->assertSame([], array_values(array_diff($reviewed, $registered)), 'Reviewed family routes that are no longer registered.');
+        $this->assertCount(count($reviewed), $registered);
+        $this->assertSame([], array_values(array_diff(array_map(fn ($uri) => "POST {$uri}", $public), $registered)), 'Gated public routes that are no longer registered.');
+
     }
 }
