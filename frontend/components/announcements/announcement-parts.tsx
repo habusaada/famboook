@@ -6,41 +6,21 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DetailItem, DetailList } from "@/components/shared/page-layout";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { AnnouncementLevelBadge, AnnouncementStatusBadge } from "@/components/announcements/announcement-row";
 import {
   type AnnouncementAction,
   type AnnouncementDetail,
-  type AnnouncementLevel,
   type AnnouncementOutcome,
-  type AnnouncementStatus,
   useAnnouncementAction,
 } from "@/lib/api/announcements";
-import { announcementErrorMessage, announcementStatusLabels, announcementStatusTones, statisticsBasisLabels } from "@/lib/utils/announcement";
+import { announcementErrorMessage, statisticsBasisLabels } from "@/lib/utils/announcement";
 
 // Shared pieces of announcement management (FB-NOTIFY-01C.3c), side-agnostic:
 // the Staff screens now, the Coordinator screens later. Every state is text.
 
 const fmt = (n: number) => n.toLocaleString("ar");
 
-export function AnnouncementStatusBadge({ status }: { status: AnnouncementStatus }) {
-  return (
-    <StatusBadge tone={announcementStatusTones[status] ?? "neutral"}>
-      <span data-announcement-status={status}>{announcementStatusLabels[status] ?? status}</span>
-    </StatusBadge>
-  );
-}
-
-export function AnnouncementLevelBadge({ level }: { level: AnnouncementLevel }) {
-  return level === "IMPORTANT" ? (
-    <StatusBadge tone="warning">
-      <span data-announcement-level="IMPORTANT">مهم</span>
-    </StatusBadge>
-  ) : (
-    <StatusBadge tone="neutral">
-      <span data-announcement-level="NORMAL">عادي</span>
-    </StatusBadge>
-  );
-}
+export { AnnouncementLevelBadge, AnnouncementStatusBadge };
 
 /**
  * The server's aggregate statistics — never a family. "No activated account"

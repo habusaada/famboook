@@ -51,7 +51,14 @@ function Stat({ label, children, testId }: { label: string; children: React.Reac
  * members are registered individually. No difference is calculated and
  * neither is presented as the more correct one.
  */
-export function HouseholdSummaryCard({ household }: { household: FamilyHousehold }) {
+export function HouseholdSummaryCard({
+  household,
+  showMembersLink = true,
+}: {
+  household: FamilyHousehold;
+  /** False only for a non-navigating display (the public preview, FB-WEB-02B). */
+  showMembersLink?: boolean;
+}) {
   const declared = household.declared_household_size;
 
   return (
@@ -70,6 +77,7 @@ export function HouseholdSummaryCard({ household }: { household: FamilyHousehold
       <p className="mt-3 text-xs leading-relaxed text-subtle-foreground" data-summary-caption>
         {SUMMARY_CAPTION}
       </p>
+      {showMembersLink && (
       <Link
         href="/family/members"
         className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
@@ -81,6 +89,7 @@ export function HouseholdSummaryCard({ household }: { household: FamilyHousehold
         </span>
         <ChevronLeft className="size-4" aria-hidden />
       </Link>
+      )}
     </section>
   );
 }

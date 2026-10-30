@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Bell, Megaphone } from "lucide-react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { FamilyNotificationSummary, FamilyNotificationView } from "@/lib/api/family-notifications";
+import { formatTimestampDate } from "@/lib/utils/date";
 
 // Shared pieces of the Family notification screens (FB-NOTIFY-01C.2). Every
 // state is text (a badge with a label), never color alone.
@@ -35,6 +37,47 @@ export function NotificationStateBadges({ notification }: { notification: Family
           <span data-family-notification-state="expired">منتهي</span>
         </StatusBadge>
       )}
+    </>
+  );
+}
+
+/** The surface of one notification row. */
+export const NOTIFICATION_ROW_CLASS = "flex items-start gap-3 rounded-2xl border border-border bg-surface-1 p-4";
+
+/**
+ * One row's icon, title, badges and context — never the body, and no
+ * navigation: the caller decides what surrounds it (FB-WEB-02B). The unread
+ * state is text for assistive technology, a dot visually.
+ */
+export function NotificationRowContent({ notification }: { notification: FamilyNotificationSummary }) {
+  const unread = notification.viewed_at === null;
+  const Icon = notification.kind === "ANNOUNCEMENT" ? Megaphone : Bell;
+
+  return (
+    <>
+      <span className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
+        <Icon className="size-5" />
+        {unread && <span className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full bg-brand-700 ring-2 ring-surface-1" data-family-unread-dot />}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <span className={`break-words ${unread ? "font-semibold text-foreground" : "font-medium text-foreground"}`}>
+          {unread && <span className="sr-only">جديد: </span>}
+          {notification.title}
+        </span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <NotificationLevelBadge level={notification.level} />
+          <NotificationStateBadges notification={notification} />
+        </span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span data-family-notification-source>{notification.source}</span>
+          {notification.published_at && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">{formatTimestampDate(notification.published_at)}</span>
+            </>
+          )}
+        </span>
+      </span>
     </>
   );
 }

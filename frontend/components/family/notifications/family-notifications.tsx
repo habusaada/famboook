@@ -3,10 +3,10 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, Archive, Bell, ChevronLeft, ChevronRight, Inbox, Megaphone, RotateCw } from "lucide-react";
+import { AlertCircle, Archive, ChevronLeft, ChevronRight, Inbox, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { NotificationLevelBadge, NotificationStateBadges, NotificationTabs } from "@/components/family/notifications/notification-parts";
+import { NOTIFICATION_ROW_CLASS, NotificationRowContent, NotificationTabs } from "@/components/family/notifications/notification-parts";
 import { FamilyRequestsHeader } from "@/components/family/requests/family-request-parts";
 import { ApiError } from "@/lib/api/client";
 import { isAccessFailure } from "@/lib/api/family-household";
@@ -16,7 +16,6 @@ import {
   normalizePage,
   useFamilyNotificationsQuery,
 } from "@/lib/api/family-notifications";
-import { formatTimestampDate } from "@/lib/utils/date";
 import { RATE_LIMIT_MESSAGE, isRateLimited } from "@/lib/utils/family-notification";
 
 const COPY: Record<FamilyNotificationView, { title: string; description: string; label: string; empty: string; emptyHint: string }> = {
@@ -43,39 +42,16 @@ const COPY: Record<FamilyNotificationView, { title: string; description: string;
  */
 function NotificationCard({ notification }: { notification: FamilyNotificationSummary }) {
   const unread = notification.viewed_at === null;
-  const Icon = notification.kind === "ANNOUNCEMENT" ? Megaphone : Bell;
 
   return (
     <li>
       <Link
         href={`/family/notifications/${encodeURIComponent(notification.id)}`}
-        className="flex items-start gap-3 rounded-2xl border border-border bg-surface-1 p-4 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring"
+        className={`${NOTIFICATION_ROW_CLASS} transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-ring`}
         data-family-notification={notification.id}
         data-unread={unread ? "true" : undefined}
       >
-        <span className="relative flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700" aria-hidden>
-          <Icon className="size-5" />
-          {unread && <span className="absolute -end-0.5 -top-0.5 size-2.5 rounded-full bg-brand-700 ring-2 ring-surface-1" data-family-unread-dot />}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className={`break-words ${unread ? "font-semibold text-foreground" : "font-medium text-foreground"}`}>
-            {unread && <span className="sr-only">جديد: </span>}
-            {notification.title}
-          </span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            <NotificationLevelBadge level={notification.level} />
-            <NotificationStateBadges notification={notification} />
-          </span>
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span data-family-notification-source>{notification.source}</span>
-            {notification.published_at && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="tabular-nums">{formatTimestampDate(notification.published_at)}</span>
-              </>
-            )}
-          </span>
-        </span>
+        <NotificationRowContent notification={notification} />
         <ChevronLeft className="mt-2.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
     </li>

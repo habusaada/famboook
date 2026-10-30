@@ -1473,6 +1473,12 @@ on the test instance and a real browser
     - **Production configuration inspected 2026-10-29:** `enabled` ON, `family_side_enabled` ON, `coordinator_side_enabled` ON, `reverse_links_enabled` OFF. The project owner confirmed that the lookup service had already been tested successfully and needs no configuration change.
     - **Governance (independent of deployment, still open unless separately evidenced):** OD-09 (baseline exception), G1 / OD-08 (lawful basis for this purpose), the DBA scripts and a recorded approval reference. Their completion is not recorded in this roadmap. FB-CIVIL-02B (Family Portal / Coordinator Space): see below.
     - Production name search additionally needs a UTF-8 libc `LC_CTYPE` (confirmed read-only by the DBA) and the approved `09` indexes; under `C` pg_trgm extracts no Arabic trigrams (ADR §L-2). National ID lookup does not depend on either.
+- **FB-WEB-02B to 02F (2026-10-30), committed locally, NOT pushed or deployed:** public landing page V2.1 at `/welcome` (`docs/adr/FB-WEB-02-LANDING-PAGE.md`; plan: `docs/deployment/FB-WEB-02-PUBLICATION-PLAN.md`):
+    - four preview tabs built from the application's real presentational components, with synthetic fixtures only; no API request, session or operational import (tested);
+    - a «بطاقة الأسرة الرقمية» section showing the real card face (`FamilyCardFace`, extracted without changing `/family/card`), with a synthetic fixture and a non-functional QR placeholder;
+    - checked in a real browser at seven viewports, 360 to 1920 wide;
+    - `/` and every existing route unchanged; `noindex` until publication is approved.
+    - **Production (owner-confirmed 2026-10-30):** `notifications.mode = ON`, `credentials.family_card_issuance_enabled = true`. These show enablement, not end-to-end operation; PDF download and manual announcement delivery remain to be verified operationally.
 - **FB-CIVIL-02G (2026-10-29), local implementation verified, uncommitted, NOT deployed:** eye-icon reveal of a National ID, reusing the «بياناتي الشخصية» interaction (ADR 02B §B-5b):
     - result cards of every mode, page and reverse list; the opened record; each related person;
     - one value per explicit, authorized request; never automatic, nothing disclosed in bulk;

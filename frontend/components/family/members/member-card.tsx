@@ -45,10 +45,13 @@ export function MemberCard({
   member,
   onShowDetails,
   hasHealth = false,
+  showMyDataLink = true,
 }: {
   member: FamilyMember;
   onShowDetails?: () => void;
   hasHealth?: boolean;
+  /** False only for a non-navigating display (the public preview, FB-WEB-02B). */
+  showMyDataLink?: boolean;
 }) {
   const relationship = relationshipLabel(member.relationship, member.gender);
 
@@ -148,7 +151,7 @@ export function MemberCard({
         </button>
       )}
 
-      {member.is_household_head && (
+      {member.is_household_head && showMyDataLink && (
         // The head's card is the signed-in user's own (V1 eligibility):
         // the way to «بياناتي الشخصية». No other card links anywhere.
         <Link

@@ -7,30 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/auth-context";
-import { AnnouncementLevelBadge, AnnouncementStatusBadge } from "@/components/announcements/announcement-parts";
+import { AnnouncementRowContent } from "@/components/announcements/announcement-row";
 import { AppCard } from "@/components/shared/app-card";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Code, PageHeader } from "@/components/shared/page-layout";
+import { PageHeader } from "@/components/shared/page-layout";
 import { RegistryPagination } from "@/components/shared/registry-pagination";
 import { ANNOUNCEMENT_STATUSES, type AnnouncementStatus, type AnnouncementSummary, useAnnouncementsQuery } from "@/lib/api/announcements";
 import { ApiError } from "@/lib/api/client";
 import { useRegistrySearch } from "@/lib/hooks/use-registry-search";
-import { announcementErrorMessage, announcementStatusLabels, audienceTypeLabels } from "@/lib/utils/announcement";
+import { announcementErrorMessage, announcementStatusLabels } from "@/lib/utils/announcement";
 
 const ALL = "ALL";
-const fmt = (n: number) => n.toLocaleString("ar");
-const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("ar", { day: "numeric", month: "short", year: "numeric" }) : null);
-
-/** The most relevant date of a row: published, else queued, else created. */
-function milestone(a: AnnouncementSummary): string | null {
-  if (a.published_at) return `نُشر ${day(a.published_at)}`;
-  if (a.queued_at) return `طُلب النشر ${day(a.queued_at)}`;
-  if (a.created_at) return `أُنشئ ${day(a.created_at)}`;
-  return null;
-}
 
 function Row({ announcement }: { announcement: AnnouncementSummary }) {
-  const when = milestone(announcement);
   return (
     <li>
       <Link
@@ -38,31 +27,7 @@ function Row({ announcement }: { announcement: AnnouncementSummary }) {
         className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring sm:px-5"
         data-announcement-row={announcement.id}
       >
-        <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="flex flex-wrap items-center gap-2">
-            <Code className="text-xs text-brand-800">{announcement.notice_code}</Code>
-            <AnnouncementStatusBadge status={announcement.status} />
-            <AnnouncementLevelBadge level={announcement.level} />
-          </span>
-          <span className="truncate text-sm font-semibold text-foreground">{announcement.title}</span>
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            {announcement.audience_type && <span>{audienceTypeLabels[announcement.audience_type] ?? announcement.audience_type}</span>}
-            {when && (
-              <>
-                <span aria-hidden>·</span>
-                <span>{when}</span>
-              </>
-            )}
-            {announcement.recipient_count_at_publication !== null && (
-              <>
-                <span aria-hidden>·</span>
-                <span data-announcement-recipients>
-                  المستلمون عند النشر: <bdi className="tabular-nums">{fmt(announcement.recipient_count_at_publication)}</bdi>
-                </span>
-              </>
-            )}
-          </span>
-        </span>
+        <AnnouncementRowContent announcement={announcement} />
         <ChevronLeft className="size-5 shrink-0 text-muted-foreground" aria-hidden />
       </Link>
     </li>
