@@ -1,7 +1,8 @@
 # FB-WEB-02 — Public Landing Page V2.1
 
-**Status:** implemented and committed locally (FB-WEB-02B to 02F, 2026-10-30), not
-deployed. Its publication, indexing and the role of `/` are owner decisions (§6). See
+**Status:** COMPLETED / DEPLOYED / ACCEPTED. Deployed to Production on 2026-10-30 at
+`https://famboook.com/welcome`, commit `be44d923cccdc9e1d7cc3f3fceaaa7f7937da016`, and accepted manually by the project
+owner (FB-WEB-02H). Indexing and the role of `/` remain owner decisions (§6). See
 `docs/deployment/FB-WEB-02-PUBLICATION-PLAN.md`.
 
 **Design reference:** a Google Stitch static review artifact,
@@ -16,7 +17,7 @@ carries the superseded operator name and claims listed in §4.
   needed.
 - `/` stays the Staff dashboard. `/login`, `/family` and `/family/login` are
   unchanged.
-- The page is `noindex` until publication is approved.
+- The page is published as `noindex, nofollow`. Removing that is not approved.
 
 ## 2. Preview
 
@@ -100,15 +101,18 @@ All old exports and behaviour are preserved.
 
 ## 6. Open decisions
 
-- Publishing `/welcome` and removing `noindex`.
+- Removing `noindex`. `/welcome` itself is published (2026-10-30).
 - Whether `/` ever becomes the landing page. That needs the Staff dashboard moved
   (`navItems`, `safeNext`, the sidebar logo, `AuthGate`) and is out of scope here.
-- docs/08 §1 still describes `famboook.com` as the Staff Portal. It is updated
-  when the page is deployed.
+- docs/08 §1 still describes `famboook.com` as the Staff Portal. The page is now
+  deployed and this update is still outstanding.
 - Operational checks before relying on the page's wording. The owner confirmed
   `notifications.mode = ON` and `credentials.family_card_issuance_enabled = true`
-  (2026-10-30), which show enablement only. PDF download and manual announcement
-  delivery have not been verified end to end in Production.
+  (2026-10-30), which show enablement only. QR verification, PDF download and
+  manual announcement delivery have no recorded end-to-end test in Production.
+
+Deferred separately: FB-WEB-03 «فامبوك بالأرقام» (owner's decision, not in progress) and
+FB-OPS-01 (the Frontend deployment script and the actual port, 3001; not started).
 
 ## 7. Digital Family Card section (FB-WEB-02D-CARD, FB-WEB-02E)
 

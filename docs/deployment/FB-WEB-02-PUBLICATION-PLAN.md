@@ -1,6 +1,6 @@
 # FB-WEB-02 — Publication Plan for `/welcome`
 
-**Status:** plan only, not executed. Publication needs the owner's explicit approval.
+**Status:** EXECUTED on 2026-10-30 and accepted by the owner. §8 records the outcome and where execution differed from this plan. The sections before it are kept as written.
 
 **Readers:** the release owner and the operator with server access. Follow
 `docs/08-PILOT-DEPLOYMENT.md` for anything this plan does not restate.
@@ -150,3 +150,32 @@ These are out of scope here, and nothing in this plan pre-empts them:
   sidebar logo and `AuthGate`.
 - **Removing `noindex`** and adding the page to search engines.
 - **Updating docs/08 §1**, which still describes `famboook.com` as the Staff Portal only.
+
+## 8. Execution record (FB-WEB-02G, FB-WEB-02H)
+
+| Item | Value |
+|---|---|
+| Production URL | `https://famboook.com/welcome` |
+| Commit before | `f4ddc1f4b2c2b8cd72d515f2de66340591b6305f` |
+| Commit after | `be44d923cccdc9e1d7cc3f3fceaaa7f7937da016` |
+| Deployment window | 2026-10-30, 15:41:29 to 15:45:52 CET |
+| Rollback | Not needed |
+| Acceptance | Manual, by the project owner, after visiting the portals and confirming that they work |
+| SEO | `noindex, nofollow`; removing it is not approved |
+
+Production was confirmed to match `origin/feature/fb-geo-02` after a successful
+`git fetch` as the `deploy` user.
+
+Differences from §3:
+
+- `deploy-frontend.sh` is not executable, so it ran through `bash`.
+- The script's `sudo systemctl restart` needs a password that `deploy` could not
+  supply, so it exited with code 1 after a successful build. The same restart was
+  then run as root.
+- The previous build was copied to `frontend/.next.pre-f4ddc1f` before the build.
+- The service listens on port 3001, not the 3000 named in the script's comment.
+
+These are carried by FB-OPS-01, a separate task that has not started.
+
+Still without recorded evidence (§5, "Outstanding operational verification"): QR
+verification, PDF download and announcement delivery in Production.
