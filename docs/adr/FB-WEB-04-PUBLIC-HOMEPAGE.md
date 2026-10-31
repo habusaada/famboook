@@ -124,6 +124,13 @@ map $uri $famboook_apex_robots {
 This snippet has not been syntax-tested. `app.`, `api.` and `admin.` are not edited, and
 `robots.txt` stays as it is: blocking a URL there would stop crawlers seeing `noindex`.
 
+> **Amendment (2026-10-31, FB-SEO-03, owner decision):** `frontend/app/robots.ts` now blocks
+> the private areas (Staff sections, `/dashboard`, the Family Portal, `/api/`, `/dev-login`)
+> and lists `sitemap.xml`, which contains only the homepage (FB-SEO-04). Pages that public
+> pages link to stay crawlable so that their `noindex` is read: `/login`, `/family/login`,
+> `/family/activate`, `/family/forgot-password`, `/verify/*` and the legal pages. There is no
+> blanket `Disallow: /`, and robots.txt is not access control.
+
 **Order is a safety rule.** The currently deployed `/` is the Staff shell, which has no
 meta `noindex`. Nginx must change only after the new frontend is live and verified. In a
 rollback, Nginx is restored first.
