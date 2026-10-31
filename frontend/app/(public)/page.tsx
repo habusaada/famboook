@@ -8,12 +8,23 @@ import { LandingPage } from "@/components/landing/landing-page";
 const TITLE = "فامبوك | منصة رقمية لتنظيم العائلات والعشائر";
 const DESCRIPTION = "منصة رقمية متخصصة تمكّن مجالس العائلات والعشائر من تنظيم بيانات فروعها وأسرها وأفرادها، وإدارة الهياكل العائلية، وتعزيز التنسيق والتواصل المجتمعي.";
 const HOME_URL = "https://famboook.com/";
+// FB-SEO-02: the approved sharing image (public/brand/famboook-og.png, 1200 × 630).
+const SHARE_IMAGE = "https://famboook.com/brand/famboook-og.png";
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: HOME_URL },
-  openGraph: { type: "website", url: HOME_URL, siteName: "فامبوك", locale: "ar", title: TITLE, description: DESCRIPTION },
+  openGraph: {
+    type: "website",
+    url: HOME_URL,
+    siteName: "فامبوك",
+    locale: "ar",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: SHARE_IMAGE, width: 1200, height: 630, alt: "فامبوك - منصة رقمية لتنظيم العائلات والعشائر" }],
+  },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [SHARE_IMAGE] },
 };
 
 export default function HomePage() {

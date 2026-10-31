@@ -66,6 +66,10 @@ describe("the public route", () => {
     expect(metadata.title).toBe("فامبوك | منصة رقمية لتنظيم العائلات والعشائر");
     expect(metadata.alternates?.canonical).toBe("https://famboook.com/");
     expect(metadata.openGraph?.url).toBe("https://famboook.com/");
+    // FB-SEO-02: the approved sharing image, on Open Graph and X.
+    expect(metadata.openGraph?.images).toEqual([{ url: "https://famboook.com/brand/famboook-og.png", width: 1200, height: 630, alt: "فامبوك - منصة رقمية لتنظيم العائلات والعشائر" }]);
+    expect(metadata.twitter).toEqual({ card: "summary_large_image", title: metadata.title, description: metadata.description, images: ["https://famboook.com/brand/famboook-og.png"] });
+    expect(existsSync(join(ROOT, "public/brand/famboook-og.png"))).toBe(true);
     expect(metadata.robots).toBeUndefined();
   });
 
