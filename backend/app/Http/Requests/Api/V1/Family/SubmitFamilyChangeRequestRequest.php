@@ -45,8 +45,9 @@ class SubmitFamilyChangeRequestRequest extends FormRequest
     {
         return [
             // REGISTER_FAMILY is a Coordinator proposal only (CO-02, docs/04
-            // DB-ADR-062): never a household submission.
-            'type' => ['required', 'string', Rule::enum(ChangeRequestType::class)->except(ChangeRequestType::REGISTER_FAMILY)],
+            // DB-ADR-062): never a household submission. HOUSEHOLD_RECONCILIATION is
+            // Staff only (FB-FAMILY-RECON-01).
+            'type' => ['required', 'string', Rule::enum(ChangeRequestType::class)->except([ChangeRequestType::REGISTER_FAMILY, ChangeRequestType::HOUSEHOLD_RECONCILIATION])],
             'client_reference' => ['required', 'uuid'],
             'reason' => $this->workflowTextRules(required: false),
             'data' => ['required', 'array'],

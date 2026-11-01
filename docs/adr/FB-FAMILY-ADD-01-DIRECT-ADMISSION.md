@@ -40,6 +40,12 @@ schemas have no runtime effect and can change in review.
 - National ID integrity and existing RBAC are preserved;
 - no Production change.
 
+**Cross-reference (2026-11-01, FB-FAMILY-RECON-01, `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`).** D-07 there confirms that
+parentage is independent of household membership: a discovered child stays visible when married or
+head of an independent household, and direct admission never transfers anyone. E-8 and the single
+`NOT_ELIGIBLE` answer are unchanged. Conflicts between households go through that separate central
+workflow. D-01 … D-06 and gates G-01 … G-07 are unchanged here, and all gates remain OPEN.
+
 ## 2. Exact scope of the exception (D-01)
 
 The exception applies only when **all** of these hold:

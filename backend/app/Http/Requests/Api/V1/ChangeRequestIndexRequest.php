@@ -29,10 +29,11 @@ class ChangeRequestIndexRequest extends FormRequest
     {
         return [
             'status' => ['sometimes', Rule::enum(ChangeRequestStatus::class)],
-            'type' => ['sometimes', Rule::enum(ChangeRequestType::class)],
+            // FB-FAMILY-RECON-01: defined but not open; refused as before.
+            'type' => ['sometimes', Rule::enum(ChangeRequestType::class)->except(ChangeRequestType::HOUSEHOLD_RECONCILIATION)],
             'family' => ['sometimes', 'string', 'max:50'],
             // CO-02.7b: who submitted — the household or a Coordinator.
-            'channel' => ['sometimes', Rule::enum(SubmissionChannel::class)],
+            'channel' => ['sometimes', Rule::enum(SubmissionChannel::class)->except(SubmissionChannel::STAFF)],
             // CO-02.7b: part of the submitter's name, as the queue shows it.
             'submitter' => ['sometimes', 'string', 'min:2', 'max:100'],
             'request_code' => ['sometimes', 'string', 'regex:/^CRQ-[0-9]{6,12}$/'],

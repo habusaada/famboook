@@ -3586,6 +3586,9 @@ no migration; the Family Portal is unchanged.
 - **Before PWA-6.1:** the Staff activity timeline needs labels for the three
   CHANGE_REQUEST_* activity types (PWA-5d).
 
+**Proposed extension (2026-11-01, FB-FAMILY-RECON-01; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md` §10).** These review routes would also serve a
+`HOUSEHOLD_RECONCILIATION` request, with added submission routes for Staff. Nothing above changes until then.
+
 ## PWA-5d implementation record — Staff Change Request review workspace
 
 Implemented 2026-10-08 (docs/05 WF-ADR-052, docs/06 AUTH-ADR-090, docs/07
@@ -5399,3 +5402,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.56 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §21 amended — unified notifications, family recipient, levels, follow-up, expiry; FP-ADR-018 and A-07 amended; documentation only |
 | 1.57 | 2026-10-19 | Approved | FB-NOTIFY-01B.2b.7: §21 "As built" — notification endpoints (Staff, Coordinator, Family), response contracts, publication and retry lifecycle, audiences as built and the audience-id gap; §22 as built (current scope, count preview, history after revocation); frontend handoff `docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md`. Documentation only |
 | 1.58 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §14 direct admission, §9 annotated, A-21, FP-ADR-081. Not implemented or activated; gates G-01 … G-07 open |
+| 1.59 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): pointer in the Staff API record. Not implemented |

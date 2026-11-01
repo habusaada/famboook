@@ -37,7 +37,7 @@ class CoordinatorRequestFoundationTest extends TestCase
     {
         $this->assertSame('REGISTER_FAMILY', ChangeRequestType::REGISTER_FAMILY->value);
         $this->assertFalse(ChangeRequestType::REGISTER_FAMILY->isSystemVerified());
-        $this->assertSame(['FAMILY', 'COORDINATOR'], array_map(fn (SubmissionChannel $c) => $c->value, SubmissionChannel::cases()));
+        $this->assertSame(['FAMILY', 'COORDINATOR', 'STAFF'], array_map(fn (SubmissionChannel $c) => $c->value, SubmissionChannel::cases()));
         $this->assertSame('COORDINATOR', WorkflowActorSide::COORDINATOR->value);
         $this->assertSame('COORDINATOR_REQUEST', RegistrationSource::COORDINATOR_REQUEST->value);
         $this->assertSame([RegistrationSource::PAPER_FORM, RegistrationSource::MANUAL_ENTRY, RegistrationSource::IMPORT, RegistrationSource::VERIFIED_SOURCE],

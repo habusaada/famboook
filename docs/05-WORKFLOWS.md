@@ -598,6 +598,12 @@ Audit
 
 The operation is transactional.
 
+**Related workflow (2026-11-01, FB-FAMILY-RECON-01; WF-ADR-056; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`).** Central reconciliation
+of an existing non-head member into head of a NEW household uses the §54 lifecycle: (new) → SUBMITTED →
+UNDER_REVIEW → APPROVED → APPLIED, with RETURNED_FOR_CLARIFICATION (responses only), RESUBMITTED,
+REJECTED and CANCELLED. DRAFT is deferred. The membership changes only at APPLIED. This section still
+describes a general transfer, which is not built.
+
 ---
 
 # 29. Household Head Change Workflow
@@ -3413,6 +3419,9 @@ Coordinator-submitted requests (2026-10-13, CO-02.2, approved architecture; not 
 
 ### WF-ADR-055
 Direct admission of civil-verified sons and daughters (FB-FAMILY-ADD-01, 2026-11-01; approved architecture, NOT implemented, NOT activated; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`): one narrow exception to the Change Request lifecycle (§54). §73 and FP-ADR-076 are unchanged for ordinary requests. Gates G-01 … G-07 remain open; activation needs their resolution and a separate approval.
+
+### WF-ADR-056
+Central membership reconciliation (FB-FAMILY-RECON-01, 2026-11-01; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`): §28 annotated. The §54 engine, its transition table and every existing type are unchanged today.
 ```
 
 ---
@@ -3700,3 +3709,4 @@ Date: 2026-09-24
 | 1.2.31 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): Announcements flow amended to the unified publication, snapshot, viewing / acknowledgement and follow-up workflow; §85 derivation from `workflow_events`; documentation only |
 | 1.2.32 | 2026-10-18 | Approved | FB-NOTIFY-01B.1 design alignment (ADR FB-NOTIFY-01): SYSTEM messages discovered and created asynchronously and published through the queued lifecycle; expiry effective at `expires_at` in read models; documentation only |
 | 1.2.33 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02.1, documentation only): §54 and §73 annotated, WF-ADR-055. Change Request workflow and FP-ADR-076 unchanged; not implemented or activated; gates G-01 … G-07 open |
+| 1.2.34 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §28 annotated, WF-ADR-056. Not implemented or activated |

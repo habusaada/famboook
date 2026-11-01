@@ -32,6 +32,11 @@ class CoordinatorRequestSchemaTest extends TestCase
 
     private const MIGRATION = __DIR__.'/../../../database/migrations/2026_10_21_090000_add_coordinator_change_requests.php';
 
+    /** Migrated after this one (FB-FAMILY-RECON-01 WP-03): rolled back first, re-applied last. */
+    private const LATER_MIGRATION = __DIR__.'/../../../database/migrations/2026_11_01_090000_add_household_reconciliation_foundation.php';
+
+    private const LATER_CHANGE_REQUEST_CHECKS = ['chk_change_request_submitter_person', 'chk_change_request_reconciliation_subject'];
+
     private const OLD_TYPES = ['CONTACT_UPDATE', 'RESIDENCE_UPDATE', 'PERSON_CORRECTION', 'ADD_FAMILY_MEMBER', 'MEMBERSHIP_CHANGE',
         'HOUSEHOLD_HEAD_CHANGE', 'BIRTH_REPORT', 'DEATH_REPORT', 'MARRIAGE_UPDATE', 'DOCUMENT_UPDATE', 'OTHER'];
 
@@ -180,10 +185,12 @@ class CoordinatorRequestSchemaTest extends TestCase
     private function migrateUp(): void
     {
         DB::transaction(fn () => $this->migration()->up());
+        DB::transaction(fn () => (require self::LATER_MIGRATION)->up());
     }
 
     private function migrateDown(): void
     {
+        DB::transaction(fn () => (require self::LATER_MIGRATION)->down());
         DB::transaction(fn () => $this->migration()->down());
     }
 
@@ -221,7 +228,7 @@ class CoordinatorRequestSchemaTest extends TestCase
     public function test_every_existing_constraint_is_preserved_and_only_the_approved_ones_are_added(): void
     {
         $checks = $this->checks('change_requests');
-        $this->assertEqualsCanonicalizing([...self::PRESERVED_CHANGE_REQUEST_CHECKS, ...self::NEW_CHANGE_REQUEST_CHECKS], array_keys($checks));
+        $this->assertEqualsCanonicalizing([...self::PRESERVED_CHANGE_REQUEST_CHECKS, ...self::NEW_CHANGE_REQUEST_CHECKS, ...self::LATER_CHANGE_REQUEST_CHECKS], array_keys($checks));
         $this->assertEqualsCanonicalizing(self::WORKFLOW_CHECKS, array_keys($this->checks('workflow_events')));
 
         // The CONTACT_UPDATE relaxations (2026_10_18_090000) are untouched.
@@ -403,7 +410,7 @@ class CoordinatorRequestSchemaTest extends TestCase
                 }
                 $this->assertTrue(Schema::hasColumn('change_requests', 'submission_channel'), $case);
                 $this->assertSame('YES', $this->column('change_requests', 'family_id')->is_nullable, $case);
-                $this->assertEqualsCanonicalizing([...self::PRESERVED_CHANGE_REQUEST_CHECKS, ...self::NEW_CHANGE_REQUEST_CHECKS],
+                $this->assertEqualsCanonicalizing([...self::PRESERVED_CHANGE_REQUEST_CHECKS, ...self::NEW_CHANGE_REQUEST_CHECKS, ...self::LATER_CHANGE_REQUEST_CHECKS],
                     array_keys($this->checks('change_requests')), $case);
             } finally {
                 DB::rollBack();

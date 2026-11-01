@@ -3752,6 +3752,20 @@ plus authorization to affected Family context(s).
 
 Family User cannot directly transfer canonical membership.
 
+**Related workflow (2026-11-01, FB-FAMILY-RECON-01; AUTH-ADR-100; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md` §5).** Reconciliation does not grant
+`family-membership.transfer`.
+
+**Definitions, not grants (WP-03, local, uncommitted, not deployed).** `household-reconciliation.submit`, `.view`,
+`.approve` and `.apply` are defined in `RolePermissionSeeder::PERMISSIONS`, so seeding creates them. They are **assigned
+to no role, and no route or action checks them**. Nobody holds them, and reconciliation is NOT operational.
+
+**Proposed for later work packages:** `.approve` and `.apply` would apply in addition to `change-request.approve` and
+`.apply`. Neither the original submitter nor an administrator acting as submitter may approve or apply their own
+request. These rules are not enforced yet. Role grants need a separate approved change.
+
+**Permission count.** The catalog is 178 with these four, 174 without. `famboook:verify-permissions` compares each role's
+grants and the catalog with the seeder, not with a fixed number, so it does not depend on this count.
+
 ---
 
 # 99. Document Verification Authorization
@@ -4811,6 +4825,9 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-100
+FB-FAMILY-RECON-01 (2026-11-01; documentation only): §98 annotated with proposed dedicated permissions. No permission, role, seeder or route is added now. `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`. **Amended by WP-03 (2026-11-01):** four permission definitions were added to the seeder locally, with no role grant, no route and no check.
+
 ### AUTH-ADR-099
 FB-FAMILY-ADD-01 (2026-11-01; documentation only): §61d-2 records a proposed household-head permission for direct admission. No permission, role, seeder or route is added now; §53 is unchanged. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
 
@@ -5388,6 +5405,8 @@ Date: 2026-09-24
 | 1.2.78 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U2 (AUTH-ADR-098 amended): `civil-import.stage` and `civil-import.validate` seeded locally to SUPER_ADMIN only; execution-request routes (202, recorded only) and the cancel rule; verifier extended. Catalog 165 → 167; no role added; no other mapping change |
 | 1.2.80 | 2026-10-27 | Approved | FB-CIVIL-01A-UI D-UI-12a (AUTH-ADR-098 amended): single-operator publication. `civil-import.publish.approve` replaced by the gated `civil-import.publish.confirm` (SUPER_ADMIN only, gate open only); `/confirm` (requester only, active SUPER_ADMIN, fresh password) replaces `/approve` and `/reject`; verifier flags the removed permission. Catalog stays 169; no role added |
 | 1.2.81 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §61d-2 proposed permission, AUTH-ADR-099. No runtime change |
+| 1.2.82 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §98 annotated, AUTH-ADR-100. No runtime change |
+| 1.2.83 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-03C, documentation only): §98 and AUTH-ADR-100 corrected: four definitions, no role grant, catalog 178. Reconciliation not operational |
 | 1.2.79 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U3 (AUTH-ADR-098 amended): `civil-import.publish.request` (SUPER_ADMIN) and the gated `civil-import.publish.approve` (SUPER_ADMIN only while the publication gate is open); two-person publication routes; verifier: gate and direct-grant checks. Catalog 167 → 169; no role added |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |

@@ -57,6 +57,7 @@ final readonly class ChangeRequestSubmissionContext
         return match ($this->channel) {
             SubmissionChannel::FAMILY => WorkflowActorSide::FAMILY,
             SubmissionChannel::COORDINATOR => WorkflowActorSide::COORDINATOR,
+            SubmissionChannel::STAFF => WorkflowActorSide::STAFF,
         };
     }
 }

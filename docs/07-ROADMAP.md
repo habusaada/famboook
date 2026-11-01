@@ -1483,6 +1483,10 @@ on the test instance and a real browser
     - **Production (owner-confirmed 2026-10-30):** `notifications.mode = ON`, `credentials.family_card_issuance_enabled = true`. These show enablement, not end-to-end operation; PDF download and manual announcement delivery remain to be verified operationally.
     - **Not recorded as tested (no evidence):** QR verification, PDF download and announcement delivery in Production.
 - **FB-WEB-03 «فامبوك بالأرقام»: DEFERRED** by the owner's decision; not in progress.
+- **FB-FAMILY-RECON-01 — Central membership reconciliation: decisions approved 2026-11-01; WP-03 schema foundation local, uncommitted, not deployed; NOT operational, NOT activated** (`docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`):
+    - **Exists locally:** migration, `HOUSEHOLD_RECONCILIATION`, channel `STAFF`, `household_reconciliation.mode` (default and fail-closed `OFF`, read by nothing yet), four permission definitions with no role grant;
+    - **Does not exist:** handler, endpoint, review or apply rules, membership ending, household creation, R-03, R-06, R-07 and R-08 behavior, UI;
+    - **Next (RM-ADR-072):** WP-04 eligibility and the atomic Domain Action, with deadlock tests. Role grants and activation each need a separate approval.
 - **FB-FAMILY-ADD-01 — Direct admission of civil-verified sons and daughters: decisions approved 2026-11-01; WP-02 documentation only; NOT implemented, NOT activated** (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`):
     - narrow exception to the Change Request rule, behind `family_registry_admission.mode`, default `OFF`;
     - **Open gates:** G-01 legal basis, G-02 adult children's data, G-03 parent-link semantics, G-04 gender codes, G-05 death status, G-06 tests, G-07 activation approval;
@@ -4984,6 +4988,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-072
+FB-FAMILY-RECON-01 (2026-11-01): D-07, D-08 and the approved policies recorded; WP-03 schema foundation done locally, uncommitted. Reconciliation is not operational. `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`.
+
 ### RM-ADR-071
 FB-FAMILY-ADD-01 (2026-11-01): decisions D-01 … D-06 recorded (WP-02, documentation only). Work continues locally behind `OFF`; WP-04's verified mapping depends on G-04 and G-05, and no work package closes a gate by itself. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
 
@@ -5348,6 +5355,7 @@ Date: 2026-09-24
 | 1.2.75 | 2026-10-26 | Approved | FB-CIVIL-01A-UI: U1 committed; U2 controlled execution implemented locally (worker, control plane, sources, requests, wizard); no publication |
 | 1.2.76 | 2026-10-26 | Approved | FB-CIVIL-01A-UI: U2 committed; U3 two-person publication approval implemented locally; gate closed by default |
 | 1.2.77 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 WP-02 (documentation only): progress note, RM-ADR-071. Not implemented or activated |
+| 1.2.78 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 WP-03C (documentation only): progress note, RM-ADR-072. Foundation local and uncommitted; not operational |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

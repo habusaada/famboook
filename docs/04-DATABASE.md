@@ -783,6 +783,19 @@ A later work package would add `family_registry_admissions` and
 
 ---
 
+# 22b. Membership Reconciliation (SCHEMA FOUNDATION ONLY)
+
+**Schema foundation implemented locally, uncommitted and not deployed (WP-03, 2026-11-01; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md` §0). Reconciliation
+is NOT operational: nothing can submit, approve or apply such a request.** Migration
+`2026_11_01_090000_add_household_reconciliation_foundation` extends `change_requests`: type
+`HOUSEHOLD_RECONCILIATION`, channel `STAFF`, `submitted_by_person_id` NULL for STAFF only, CHECKs replaced by
+strict supersets, `chk_change_request_submitter_person`, `chk_change_request_reconciliation_subject`, and the
+partial unique index `uq_change_request_open_reconciliation_person`. `family_id` stays NULL; the source Family is
+the Family of `target_membership_id`. §20 and §21 and `uq_persons_national_id` stay the final guards, and
+memberships keep their history. `down()` refuses while any reconciliation row exists.
+
+---
+
 # 23. Person Relationships Table
 
 ```text
@@ -4526,6 +4539,9 @@ PWA-1H added **no migration**. Coordinator authorization runs on the PWA-1C `coo
 ### DB-ADR-049
 The TweetsMS SMS integration added **no migration**. The OTP plaintext is never persisted: it lives only in process memory until the SMS is handed to TweetsMS after the response, and `auth_otp_challenges` keeps only `code_hash`. Nothing is written to `jobs` or any queue table. A delivery failure is recorded on the `OTP_ISSUED` row of `auth_security_events` through two additional allow-listed `metadata` keys, `delivery_outcome` and `delivery_reason` (safe classification codes, never a provider body, number, text or key). `send_count` and `last_sent_at` keep their meaning: they record the issue or resend, not the provider's acceptance.
 
+### DB-ADR-069
+FB-FAMILY-RECON-01 (2026-11-01; WP-02 documentation only) adds **no migration now**. §22b records the proposed extension; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`. **Amended by WP-03 (2026-11-01):** the schema foundation migration now exists locally, uncommitted and not deployed; no workflow uses it.
+
 ### DB-ADR-068
 FB-FAMILY-ADD-01 (2026-11-01; WP-02 documentation only) adds **no migration now**. §22a records the proposed admission tables for a later work package; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
 
@@ -4891,6 +4907,8 @@ Date: 2026-09-24
 | 1.2.52 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §56 — custom notification model justified; proposed logical tables; no migration; documentation only |
 | 1.2.53 | 2026-10-18 | Approved | FB-NOTIFY-01B.2a (DB-ADR-067): §56 implemented physical schema recorded — four notification migrations `2026_10_24_090000`–`090003` (commit `29a0b12`), keys, indexes, 52 PostgreSQL CHECKs, append-only trigger, `NTF-` sequence, JSON objects, guarded rollback; verified on `famboook_test` only; local `famboook` and Production NOT migrated; not operational |
 | 1.2.54 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §22a proposed admission tables, DB-ADR-068. No migration |
+| 1.2.55 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §22b proposed schema, DB-ADR-069. No migration |
+| 1.2.56 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-03C, documentation only): §22b and DB-ADR-069 corrected to the local schema foundation. Reconciliation not operational |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |

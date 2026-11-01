@@ -308,6 +308,11 @@ Audit operation
 
 The system must not simply update `family_id`.
 
+**Related workflow (2026-11-01, FB-FAMILY-RECON-01, D-07, D-08; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`).** A Person with an
+active non-head membership may become head of a NEW household only through central reconciliation.
+DATA_ENTRY submits; a central reviewer decides; nothing changes until APPLIED. Nothing else moves
+automatically. Civil parentage is independent of household membership. This section still governs.
+
 ---
 
 # 14. Household Head
@@ -5059,6 +5064,9 @@ No review or verification state is an eligibility gate: programmes keep their ow
 ### BD-053
 Direct admission of civil-verified sons and daughters is a narrow, flag-gated exception to §66 (§82a; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`; approved 2026-11-01). Not implemented or activated; gates G-01 … G-07 are open.
 
+### BD-054
+Central membership reconciliation (FB-FAMILY-RECON-01; D-07, D-08, policies P-1 … P-8; approved 2026-11-01; NOT implemented, NOT activated; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`). §12, §13 and §21 are unchanged.
+
 ---
 
 # 126. Pending Business Decisions
@@ -5299,6 +5307,7 @@ Date: 2026-09-24
 | 1.2.62 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (ADR-FB-GEO-01): "Residence decision" amended — PDD-006 architecturally resolved, implementation pending; current residence is the displacement location when DISPLACED; free text kept, no inference or backfill; reporting, workflows and RBAC unchanged. Documentation only |
 | 1.2.63 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): "Notifications and announcements" amended — unified system, family recipient, NORMAL / IMPORTANT, follow-up, expiration and late acknowledgement; §90–§92 unchanged; documentation only |
 | 1.2.64 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §82a direct admission of civil-verified sons and daughters, §66 annotated, BD-053. Not implemented or activated; gates G-01 … G-07 open |
+| 1.2.65 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §13 annotated, BD-054. Not implemented or activated |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

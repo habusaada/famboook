@@ -256,6 +256,13 @@ class RolePermissionSeeder extends Seeder
         'import.review',
         'import.apply',
 
+        // Household membership reconciliation (FB-FAMILY-RECON-01): defined
+        // only. Assigned to no role, and nothing checks them yet.
+        'household-reconciliation.submit',
+        'household-reconciliation.view',
+        'household-reconciliation.approve',
+        'household-reconciliation.apply',
+
         // §61c Civil identity import management (FB-CIVIL-01A-UI U1–U3,
         // AUTH-ADR-098): metadata-only monitoring; no identity value is ever
         // exposed. U2: queue staging (and abort) and validation requests,

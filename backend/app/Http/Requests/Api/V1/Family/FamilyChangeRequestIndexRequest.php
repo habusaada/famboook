@@ -25,7 +25,8 @@ class FamilyChangeRequestIndexRequest extends FormRequest
     {
         return [
             'status' => ['sometimes', Rule::enum(ChangeRequestStatus::class)],
-            'type' => ['sometimes', Rule::enum(ChangeRequestType::class)],
+            // FB-FAMILY-RECON-01: defined but not open; refused as before.
+            'type' => ['sometimes', Rule::enum(ChangeRequestType::class)->except(ChangeRequestType::HOUSEHOLD_RECONCILIATION)],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
         ];
     }

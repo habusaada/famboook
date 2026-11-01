@@ -54,7 +54,9 @@ class ChangeRequestEnumsTest extends TestCase
             ['CONTACT_UPDATE', 'RESIDENCE_UPDATE', 'PERSON_CORRECTION', 'ADD_FAMILY_MEMBER', 'MEMBERSHIP_CHANGE', 'HOUSEHOLD_HEAD_CHANGE',
                 'BIRTH_REPORT', 'DEATH_REPORT', 'MARRIAGE_UPDATE', 'DOCUMENT_UPDATE', 'OTHER',
                 // CO-02 (docs/04 DB-ADR-062): the approved Coordinator FAMILY_ADD proposal.
-                'REGISTER_FAMILY'],
+                'REGISTER_FAMILY',
+                // FB-FAMILY-RECON-01: the approved Staff reconciliation request.
+                'HOUSEHOLD_RECONCILIATION'],
             $this->values(ChangeRequestType::class),
         );
         // PFP-008 proposals are not approved and must not exist as codes.

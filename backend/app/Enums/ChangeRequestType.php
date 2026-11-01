@@ -29,6 +29,10 @@ enum ChangeRequestType: string
     // creates the Family. Not registered in ChangeRequestTypes and never
     // accepted by the family submission route.
     case REGISTER_FAMILY = 'REGISTER_FAMILY';
+    // FB-FAMILY-RECON-01: an existing Person proposed as head of a NEW Family.
+    // Staff channel only; its family_id is NULL until APPLY. Schema foundation:
+    // not registered in ChangeRequestTypes, so nothing can submit or apply it.
+    case HOUSEHOLD_RECONCILIATION = 'HOUSEHOLD_RECONCILIATION';
 
     /**
      * Approved and applied by the SYSTEM after an OTP to the proposed value
