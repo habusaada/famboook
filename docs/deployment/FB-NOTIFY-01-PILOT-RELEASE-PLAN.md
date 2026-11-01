@@ -189,7 +189,7 @@ Preconditions: Release 1 (and any Release 0) done and settled under their own ap
 | S4 | Server `.env`: explicit `NOTIFICATIONS_MODE=OFF`, empty allow-list, `NOTIFICATIONS_FOLLOWUPS_ENABLED=false`, cutoffs unset, `QUEUE_CONNECTION=sync` unchanged | [APPROVAL] |
 | S5 | Backend: `deploy-backend.sh` (down → composer → migrate → RolePermissionSeeder → verify-permissions (162) → optimize → queue:restart → up) | [APPROVAL] |
 | S6 | `migrate:status` shows the five as Ran; `famboook:notifications-check` no warnings (mode OFF) | [VERIFY] → **A2** |
-| S7 | Frontend: `deploy-frontend.sh`; bell, inbox, `/announcements`, `/followups` answer (empty) | [APPROVAL] [VERIFY] |
+| S7 | Frontend: isolated release (build, smoke-test, switch; FB-DEVOPS-01 runbook §3); bell, inbox, `/announcements`, `/followups` answer (empty) | [APPROVAL] [VERIFY] |
 | S8 | Gate checks with OFF: publish → 503; drafts work; follow-up lists empty and 200 | [VERIFY] |
 | S9 | Queue switch (§4) | [APPROVAL] |
 | S10 | Worker install (§5), `systemd-analyze verify`, enable, `is-active` | [APPROVAL] [VERIFY] |

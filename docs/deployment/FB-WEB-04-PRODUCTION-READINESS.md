@@ -13,7 +13,7 @@ Re-verify each one, because Production changed during that same day.
 | 1 | Uncommitted `backend/config/cors.php` | Modified in the Production working tree; adds `CORS_ALLOWED_ORIGINS` | Replace it with the reviewed repository version (§3) | **Deployment** |
 | 2 | Untracked files in the Production repository | Includes names such as `backend/e]);`, `backend/t();`, `backend/Family::query()` and fragments of shell commands; contents not opened | A person with server access reviews them and decides; `git clean` is not a safe shortcut, because the `.next.pre-*` rollback builds are untracked too | **Deployment** |
 | 3 | Duplicate `SESSION_DOMAIN` in the backend `.env` | `null`, then `.famboook.com`; live cookies used `.famboook.com` | Keep one line, `.famboook.com`, in an approved window | Cleanup |
-| 4 | Deployment script | `deploy-frontend.sh` is not executable, and its `sudo systemctl restart` needs a password that `deploy` lacks; FB-OPS-01, not started | Use the known workaround: run it with `bash`, and an administrator restarts the service | Known workaround |
+| 4 | Deployment scripts | The scripts are not executable, and `deploy` has no sudo password; FB-OPS-01, not started | Run them with `bash`; an administrator runs the switch (§ Frontend below) | Known workaround |
 | 5 | Real Staff authentication | Not tested on this change; only browser API stubs were used | §5 | **Acceptance** |
 | 6 | Real Family authentication | Not tested on this change | §5 | **Acceptance** |
 | 7 | PWA behaviour | Unit tests only | §5 | **Acceptance** |
@@ -68,9 +68,11 @@ done
 
 **Frontend.**
 
-- [ ] Copy `frontend/.next` to `frontend/.next.pre-<commit>`
-- [ ] `bash deploy/scripts/deploy-frontend.sh` as `deploy`. It exits 1 at the `sudo` restart after a successful build (item 4)
-- [ ] As an administrator, `systemctl restart famboook-frontend`. Expect a few seconds of downtime
+> **FB-DEVOPS-01:** steps per `docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md`, after its §7 migration. Never run a plain build on the server: it deletes the served `.next/<id>` release.
+
+- [ ] `bash deploy/scripts/build-frontend.sh <release-id>` as `deploy`
+- [ ] `bash deploy/scripts/smoke-frontend-release.sh <release-id>` as `deploy`
+- [ ] As an administrator, `bash deploy/scripts/switch-frontend-release.sh <release-id>`. Expect a few seconds of downtime
 - [ ] Confirm the route matrix:
 
 ```bash
@@ -165,8 +167,8 @@ the Staff shell without any `noindex`.
 
 **Frontend:**
 
-Restore the saved build (`frontend/.next.pre-<commit>`) with the matching frontend source, then
-run `systemctl restart famboook-frontend`. `/` is then the Staff dashboard again, `/dashboard`
+As an administrator, run `bash deploy/scripts/switch-frontend-release.sh --rollback`, and restore
+the matching `public/` and `next.config.ts` if they changed (FB-DEVOPS-01 runbook §3). `/` is then the Staff dashboard again, `/dashboard`
 returns 404, and `app.famboook.com/` no longer redirects.
 
 **Backend CORS: keep it.** Do not restore the old `cors.php`, or `app.famboook.com` loses API

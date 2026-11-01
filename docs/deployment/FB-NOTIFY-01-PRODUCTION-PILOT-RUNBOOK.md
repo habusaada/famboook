@@ -133,9 +133,9 @@ All five run inside `deploy-backend.sh` (`migrate --force`), each in its own Pos
 - **`deploy-backend.sh`:** down → composer → `migrate --force` (automatic) → `RolePermissionSeeder` → `verify-permissions` (162) → `optimize` → `filament:optimize` → `queue:restart` (non-fatal) → up.
   - A failure leaves maintenance mode on.
   - It never checks out code: always `php artisan down` **before** `git checkout`.
-- **`deploy-frontend.sh`:** `npm ci` → `npm run build` (writes `.next` in place while the old server runs) → `systemctl restart famboook-frontend`.
+- **Frontend (FB-DEVOPS-01 runbook §3):** `build-frontend.sh <release-id>` (isolated; the old server keeps running) → `smoke-frontend-release.sh <release-id>` → as an administrator, `switch-frontend-release.sh <release-id>`. Never a plain `npm run build` on the server.
   - Low-traffic window.
-  - Rollback = fix forward, or a full code rollback to one SHA (never a mixed tree).
+  - Rollback = `switch-frontend-release.sh --rollback` (build output only; see that runbook §3), fix forward, or a full code rollback to one SHA (never a mixed tree).
 - **Not in any script:** service installation, enabling or starting; `.env` changes; activation.
 
 ---
@@ -276,7 +276,7 @@ systemctl is-enabled famboook-notifications-worker famboook-scheduler.timer
   - S6 GO for at least one full day;
   - **C1–C3 deployed in the candidate SHA (S1–S3 repeated for that SHA), OR the owner's written acceptance of the §3.1 exposure**;
   - low-traffic window; family support briefed.
-- **Commands:** `./deploy/scripts/deploy-frontend.sh`.
+- **Commands:** the three FB-DEVOPS-01 steps above; the switch needs an administrator.
 - **GO:**
   - the build succeeds; `famboook-frontend` active;
   - Staff and Family logins and main screens load;

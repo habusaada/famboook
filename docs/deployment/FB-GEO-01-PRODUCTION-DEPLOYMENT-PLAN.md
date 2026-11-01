@@ -223,13 +223,13 @@ These were confirmed by real imports into the disposable test databases
 |---|---|---|
 | P1 | Decisions D1–D6 (§12) answered in writing | Owner |
 | P2 | FB-GEO-01 committed, reviewed and pushed to `origin/main`; `<sha>` recorded | Developer, after authorization |
-| P3 | On `<sha>`, locally: clean tree; backend SQLite suite, frontend suite, `tsc`, ESLint and `npm run build` pass | Developer |
+| P3 | On `<sha>`, locally (not on the server): clean tree; backend SQLite suite, frontend suite, `tsc`, ESLint and `npm run build` pass | Developer |
 | P4 | On `<sha>`: PostgreSQL suite (docs/08 §16a, isolated cluster on port 5433) for `tests/Feature/Geography`, `tests/Feature/ChangeRequests`, `tests/Feature/FamilyPortal`, `tests/Feature/FamilyAuth`; known legacy fixture failures only (docs/11 FU-12) | Developer |
 | P5 | **Rehearsal on a restored copy of Production** (§7) passed | Developer + system administrator |
 | P6 | Production PostgreSQL major version recorded (`SELECT version()`); if 16, the P4/P5 runs used PostgreSQL 16 (Decision D4) | System administrator |
 | P7 | Latest nightly backup exists off-server and a §13 restore test has passed on a recent backup | System administrator |
 | P8 | Workbook transferred to the server path and its `sha256sum` matches the pinned value (§4.1) | System administrator |
-| P9 | Disk and memory sufficient for `npm run build` (≈ 2 GB free) | System administrator |
+| P9 | Disk and memory sufficient for a frontend release build (≈ 2 GB free) | System administrator |
 | P10 | Staff briefed: optional geographic fields beside the text; reviewers see locations as names and paths | Owner |
 
 ---
@@ -331,7 +331,10 @@ Run V4–V6 (counts). **Checkpoint A3.**
 
 ```text
 # ---------- 6. frontend ----------
-sudo -u deploy <app-root>/deploy/scripts/deploy-frontend.sh      # npm ci → build → restart
+# Isolated release: docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md (needs its §7 migration)
+sudo -u deploy bash <app-root>/deploy/scripts/build-frontend.sh <release-id>
+sudo -u deploy bash <app-root>/deploy/scripts/smoke-frontend-release.sh <release-id>
+sudo bash <app-root>/deploy/scripts/switch-frontend-release.sh <release-id>
 sudo nginx -t && sudo systemctl reload nginx
 
 # ---------- 7. verification ----------

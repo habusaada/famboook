@@ -291,7 +291,7 @@ backend/.env        640 (deploy:www-data)
 backend/storage/    770 dirs / 660 files, group www-data (logs, framework cache, sessions not used)
 backend/bootstrap/cache/  770, group www-data
 backend/public/     readable by www-data (Nginx static, Filament assets)
-frontend/           owned by the service user; only frontend/.next/cache must be writable at runtime
+frontend/           owned by the service user; only the active release's cache (frontend/.builds/<id>/cache) must be writable at runtime
 ```
 
 Never `777`. PHP-FPM runs as `www-data`; the deploy user owns code.
@@ -625,7 +625,7 @@ Family Portal activation may be enabled in Production.
   reviewer's `GET /api/v1/change-requests` answers 200 with no data, a
   family-side account 403, a guest 401. Rollback: code only.
 - **Staff review workspace (PWA-5d, docs/07 RM-ADR-058).** Frontend only
-  (`deploy-frontend.sh`); no backend change. After the deploy a reviewer
+  (isolated release, FB-DEVOPS-01 runbook); no backend change. After the deploy a reviewer
   sees «طلبات تحديث البيانات» in the Staff navigation and an empty queue
   («لا توجد طلبات تحديث بيانات») — no request type is enabled; DATA_ENTRY,
   SOCIAL_WORKER and REPORTS_VIEWER do not see the entry. Rollback: the
@@ -1019,7 +1019,7 @@ explicit authorization (docs/09 «طلبات تحديث السكن — التج�
 5. The server `.env` contains `CHANGE_REQUESTS_FAMILY_SUBMISSION_MODE=OFF`
    and an empty `CHANGE_REQUESTS_PILOT_FAMILY_IDS=` (explicit, not
    implicit), and does NOT contain `CHANGE_REQUESTS_FAMILY_SUBMISSION_ENABLED`.
-6. Free disk space and memory are sufficient for `npm run build` (it
+6. Free disk space and memory are sufficient for a frontend release build (it
    fails with out-of-memory errors on a 4 GB machine under load).
 
 ## Deployment (runbook — do not improvise)
@@ -1051,8 +1051,12 @@ sudo -u deploy <app-root>/deploy/scripts/deploy-backend.sh
 # 4. PHP-FPM picks up the new code and cached config
 sudo systemctl reload php<version>-fpm
 
-# 5. frontend: npm ci → build → restart the service
-sudo -u deploy <app-root>/deploy/scripts/deploy-frontend.sh
+# 5. frontend: isolated release, then an administrator switches to it
+#    (docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md; needs its §7 migration;
+#    never a plain `npm run build` on the server; install dependencies per its §4)
+sudo -u deploy bash <app-root>/deploy/scripts/build-frontend.sh <release-id>
+sudo -u deploy bash <app-root>/deploy/scripts/smoke-frontend-release.sh <release-id>
+sudo bash <app-root>/deploy/scripts/switch-frontend-release.sh <release-id>
 
 # 6. web server
 sudo nginx -t && sudo systemctl reload nginx
@@ -1196,7 +1200,7 @@ Three different operations — never mix them up:
 | Operation | What it does | When |
 |---|---|---|
 | Feature shutdown | Mode `OFF` (above) | First response to any problem with submissions |
-| Code rollback | Check out the previous commit (`e36ebd7`, PWA-5a) as `deploy`, re-run `deploy-backend.sh` and `deploy-frontend.sh` | A defect in the release code, and only per the cases below |
+| Code rollback | Check out the previous commit (`e36ebd7`, PWA-5a) as `deploy`, re-run `deploy-backend.sh`, and return the frontend with `switch-frontend-release.sh --rollback` (FB-DEVOPS-01 runbook §3) | A defect in the release code, and only per the cases below |
 | Data restoration | Restore a backup | Only for data loss or corruption, by decision of the owner — never as a "rollback" of this release |
 
 **A. Before any real request exists** (`change_requests` and
@@ -1315,7 +1319,7 @@ current commit or migration status: step 0 reads them.
    `CHANGE_REQUESTS_COORDINATOR_SUBMISSION_MODE=OFF` and an empty
    `CHANGE_REQUESTS_COORDINATOR_PILOT_USER_IDS=`. The family keys and
    `FAMILY_CONTACT_UPDATE_ENABLED` stay as they are.
-6. Disk and memory are sufficient for `npm run build` (≈ 2 GB free).
+6. Disk and memory are sufficient for a frontend release build (≈ 2 GB free).
 7. Staff reviewers are briefed (docs/09): coordinator requests in the queue,
    the «عبر منسّق» badge, proposed Families, the attestation wording for a
    new household head, and the new «رفض» on returned requests.
@@ -1350,8 +1354,11 @@ CHANGE_REQUESTS_COORDINATOR_PILOT_USER_IDS=
 sudo -u deploy <app-root>/deploy/scripts/deploy-backend.sh
 sudo systemctl reload php<version>-fpm
 
-# 5. frontend: npm ci → build → restart, then the web server
-sudo -u deploy <app-root>/deploy/scripts/deploy-frontend.sh
+# 5. frontend: isolated release (FB-DEVOPS-01 runbook; never a plain `npm run build`
+#    on the server), then the web server
+sudo -u deploy bash <app-root>/deploy/scripts/build-frontend.sh <release-id>
+sudo -u deploy bash <app-root>/deploy/scripts/smoke-frontend-release.sh <release-id>
+sudo bash <app-root>/deploy/scripts/switch-frontend-release.sh <release-id>
 sudo nginx -t && sudo systemctl reload nginx
 
 # 6. readiness (must exit 0)
@@ -1420,7 +1427,7 @@ not affected.
 | Situation | Action |
 |---|---|
 | Any problem with coordinator submissions | Feature shutdown (above) first |
-| A defect, and **no coordinator-channel request exists** (`SELECT count(*) FROM change_requests WHERE submission_channel = 'COORDINATOR'` = 0) | Code rollback to the previous SHA as `deploy` (`deploy-backend.sh`, `deploy-frontend.sh`); **leave the migration in place** — it is additive, the previous code ignores the new columns, and no NULL `family_id` exists |
+| A defect, and **no coordinator-channel request exists** (`SELECT count(*) FROM change_requests WHERE submission_channel = 'COORDINATOR'` = 0) | Code rollback to the previous SHA as `deploy` (`deploy-backend.sh`, then `switch-frontend-release.sh --rollback`, FB-DEVOPS-01 runbook §3); **leave the migration in place** — it is additive, the previous code ignores the new columns, and no NULL `family_id` exists |
 | A defect after a coordinator request exists | Feature shutdown, then **fix forward**. Previous code cannot display a REGISTER_FAMILY request (no Family) and would break the Staff queue |
 | Never | `migrate:rollback` of `2026_10_21_090000` after the pilot started (it refuses anyway); editing or deleting `change_requests` or `workflow_events` rows; restoring a backup to "undo" requests |
 
@@ -1520,7 +1527,7 @@ Never do this once real data has been entered.
 
 **D. Next.js**
 - [ ] [R] `frontend/.env.production.local` with the two public URLs
-- [ ] [R] `npm ci && npm run build`; service listens on `127.0.0.1:3001` (`PORT=3001`, `npm start -- -H 127.0.0.1`)
+- [ ] [R] Isolated release build (`deploy/scripts/build-frontend.sh <release-id>`, FB-DEVOPS-01 runbook; never a plain `npm run build` beside served releases); service listens on `127.0.0.1:3001` (`PORT=3001`, `npm start -- -H 127.0.0.1`)
 - [ ] [R] Service restarts on boot (systemd/pm2)
 
 **E. PostgreSQL**
@@ -1596,6 +1603,7 @@ Never do this once real data has been entered.
 | 1.1.29 | 2026-10-18 | Approved | §16 (ADR FB-NOTIFY-01, 01B.1 alignment): scheduler and worker dependencies per function (manual publication, SYSTEM discovery and publication, follow-up / expiry); no synchronous fallback; Production readiness unverified; documentation only, no server change |
 | 1.1.30 | 2026-10-19 | Approved | §16 as built (FB-NOTIFY-01B.2b.7): notification mode, queue, dedicated worker, scheduler tasks and locks, heartbeat, `famboook:notifications-check`, reconciliation and expiry sweep; rollback constraint; PILOT readiness checklist `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. Documentation only, no server change |
 | 1.1.31 | 2026-10-30 | Ready for deployment review | FB-WEB-04: §1 adds `app.famboook.com` as an official Production host and corrects the Next.js port to 3001 (verified 2026-10-30); §4 `CORS_ALLOWED_ORIGINS` and the stateful domains; §19 service line. Checklist: `docs/deployment/FB-WEB-04-PRODUCTION-READINESS.md` |
+| 1.1.32 | 2026-10-31 | Ready for review (not applied to Production) | FB-DEVOPS-01: isolated releases in `frontend/.builds/<id>` with a generated per-release tsconfig; `build-frontend.sh`, `smoke-frontend-release.sh`, `switch-frontend-release.sh`; `deploy-frontend.sh` now only builds a release (no `npm ci`, plain build or restart); §19 D, the §16b-style deployment and rollback steps and the runtime-writable path updated. Runbook: `docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md` |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |
 | 1.1.1 | 2026-10-01 | Approved | §3 `IMPORT_APPLY_ENABLED=false`; §7 verifier enforces the Import Apply gate; §7a Import Apply activation procedure (after the Apply UI phase and final review) and the persistent-connection invariant |

@@ -2,6 +2,8 @@
 
 **Status:** EXECUTED on 2026-10-30 and accepted by the owner. §8 records the outcome and where execution differed from this plan. The sections before it are kept as written.
 
+> **Historical: do not reuse its commands (FB-DEVOPS-01, 2026-11-01).** `deploy-frontend.sh` no longer behaves as described here, and a plain `npm run build` on the server deletes `.next/<id>` releases. Use `docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md`.
+
 **Readers:** the release owner and the operator with server access. Follow
 `docs/08-PILOT-DEPLOYMENT.md` for anything this plan does not restate.
 

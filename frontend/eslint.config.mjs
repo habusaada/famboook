@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Isolated release builds (FB-DEVOPS-01).
+    ".builds/**",
   ]),
 ]);
 

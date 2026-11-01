@@ -1,0 +1,24 @@
+# Famboook Next.js frontend — systemd unit TEMPLATE (FB-DEVOPS-01).
+# Mirrors the Production unit as read on 2026-10-30 (not re-verified since):
+# /etc/systemd/system/famboook-frontend.service plus its 10-bind-localhost.conf drop-in
+# (`-H 127.0.0.1`): Description, User, Group, WorkingDirectory, Environment, ExecStart,
+# Restart and RestartSec. After=, Type= and [Install] are standard values, not read from
+# Production. The active release comes from 20-release.conf in
+# famboook-frontend.service.d/. Do not copy over the Production unit; see the runbook.
+[Unit]
+Description=Famboook Next.js Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/famboook/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3001
+ExecStart=/usr/bin/npm start -- -H 127.0.0.1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

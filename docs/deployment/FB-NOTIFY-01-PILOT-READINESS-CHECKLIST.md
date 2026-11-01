@@ -51,7 +51,7 @@
 | R2 | **Backend first**: `deploy-backend.sh` (maintenance mode → composer → `migrate --force` → `RolePermissionSeeder` → `verify-permissions` → `optimize` → `queue:restart` → up). `NOTIFICATIONS_MODE=OFF`, `QUEUE_CONNECTION=sync` unchanged | **[APPROVAL]** |
 | R3 | **Migration verification**: `php artisan migrate:status` lists `2026_10_24_090000`–`090003` as Ran; `famboook:notifications-check` reports `Notification tables: present` and **no warnings** (mode OFF) | **[VERIFY]** |
 | R4 | **Permission verification**: `famboook:verify-permissions` exit 0 (§4) | **[VERIFY]** |
-| R5 | **Frontend second**: `deploy-frontend.sh`; the bell / inbox / announcement routes answer (empty, mode OFF) | **[APPROVAL] [VERIFY]** |
+| R5 | **Frontend second**: isolated release (build, smoke-test, switch; FB-DEVOPS-01 runbook §3); the bell / inbox / announcement routes answer (empty, mode OFF) | **[APPROVAL] [VERIFY]** |
 | R6 | **Queue**: server `.env` `QUEUE_CONNECTION=database`, `DB_QUEUE_RETRY_AFTER=90`; `config:clear` + `optimize` + reload PHP-FPM (§5) | **[APPROVAL]** |
 | R7 | **Worker**: install, `systemd-analyze verify`, enable and start `famboook-notifications-worker` (§6) | **[APPROVAL] [VERIFY]** |
 | R8 | **Scheduler**: after D4 and after R7, install and enable `famboook-scheduler.timer` (§7) | **[APPROVAL] [VERIFY]** |

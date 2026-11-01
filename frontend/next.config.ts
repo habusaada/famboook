@@ -1,5 +1,7 @@
+import { existsSync } from "node:fs";
 import type { NextConfig } from "next";
-import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD } from "next/constants";
+import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from "next/constants";
+import { legacyReleasesIn, parseDistDir, releaseTsconfigPath } from "./lib/release-dir";
 import { assertPublishableEffectiveDate } from "./lib/legal/effective-date";
 
 export default function config(phase: string): NextConfig {
@@ -26,17 +28,36 @@ export default function config(phase: string): NextConfig {
     );
   }
 
-  // Optional isolated build output (FB-CIVIL-01A-UI U4 local acceptance): `next dev`
-  // takes a lock in <distDir>/ (one dev server per distDir), so a second dev server
-  // from this directory needs its own distDir. Restricted to a sub-folder of .next/
-  // (git-ignored); unset, the default .next is used.
-  const distDir = process.env.FAMBOOOK_NEXT_DIST_DIR?.trim();
-  if (distDir && !/^\.next\/[a-z0-9-]{1,40}$/.test(distDir)) {
-    throw new Error("FAMBOOOK_NEXT_DIST_DIR must be a sub-folder of .next/ (e.g. .next/u4-acceptance).");
+  // Optional isolated build output (lib/release-dir.ts; FB-DEVOPS-01). Unset,
+  // the default .next is used. A release in .builds/<id> is type-checked with its
+  // generated .builds/<id>.tsconfig.json: only that release's generated types, and
+  // Next.js never edits the tracked tsconfig.json. A release is built only through
+  // deploy/scripts/build-frontend.sh, which writes that file first.
+  const buildDir = parseDistDir(process.env.FAMBOOOK_NEXT_DIST_DIR);
+  let tsconfigPath: string | undefined;
+  if (buildDir?.kind === "release") {
+    const releaseTsconfig = releaseTsconfigPath(buildDir.distDir);
+    if (existsSync(releaseTsconfig)) {
+      tsconfigPath = releaseTsconfig;
+    } else if (phase !== PHASE_PRODUCTION_SERVER) {
+      throw new Error(`${releaseTsconfig} is missing: build releases with deploy/scripts/build-frontend.sh.`);
+    }
+  }
+  if (buildDir?.kind === "legacy" && phase === PHASE_PRODUCTION_BUILD) {
+    console.warn(`Building into the legacy ${buildDir.distDir}: a default \`next build\` deletes it. Use deploy/scripts/build-frontend.sh.`);
+  }
+
+  // A default build empties .next/, including any release still served from it.
+  if (!buildDir && phase === PHASE_PRODUCTION_BUILD) {
+    const releases = legacyReleasesIn(".next");
+    if (releases.length > 0) {
+      throw new Error(`A default \`next build\` would delete ${releases.join(", ")}. Use deploy/scripts/build-frontend.sh.`);
+    }
   }
 
   return {
-    ...(distDir ? { distDir } : {}),
+    ...(buildDir ? { distDir: buildDir.distDir } : {}),
+    ...(tsconfigPath ? { typescript: { tsconfigPath } } : {}),
 
     // Always inlined as a literal (the validated date or ""), so an unset date
     // lets the bundler drop the unpublished policy text from the client code.

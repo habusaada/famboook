@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Famboook Next.js Staff Portal — build/restart TEMPLATE (docs/08 §20 D).
-# Requires frontend/.env.production.local (see deploy/env/frontend.production.env.example).
-# The systemd unit runs: npm start -- -H 127.0.0.1, with PORT=3001 (docs/08 §1).
+# Famboook Next.js — frontend build step, kept for the runbooks that call it (docs/08 §20 D).
+#
+#   deploy/scripts/deploy-frontend.sh <release-id>
+#
+# FB-DEVOPS-01 compatibility change: this script used to run `npm ci`, a plain
+# `npm run build` and `sudo systemctl restart famboook-frontend`. A plain build
+# empties frontend/.next/, which deletes the isolated releases served from
+# .next/<id>. It now only builds an isolated release through build-frontend.sh.
+# Install dependencies, smoke-test and switch as separate steps:
+# docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md
 set -euo pipefail
 
-cd "$(dirname "$0")/../../frontend"
-
-npm ci
-npm run build                 # refuses to build without NEXT_PUBLIC_API_URL
-
-# Restart the service (placeholder name):
-sudo systemctl restart famboook-frontend
+exec bash "$(dirname "${BASH_SOURCE[0]}")/build-frontend.sh" "$@"

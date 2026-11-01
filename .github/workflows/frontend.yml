@@ -1,0 +1,98 @@
+# Famboook frontend validation (FB-DEVOPS-01). Read-only: no secrets, no deployment,
+# no published artifacts, no branch changes.
+name: Frontend
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "deploy/scripts/*frontend*"
+      - "deploy/systemd/famboook-frontend*/**"
+      - "deploy/tests/**"
+      - ".github/workflows/frontend.yml"
+  push:
+    branches: [main, "feature/**", "release/**"]
+    paths:
+      - "frontend/**"
+      - "deploy/scripts/*frontend*"
+      - "deploy/systemd/famboook-frontend*/**"
+      - "deploy/tests/**"
+      - ".github/workflows/frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Public build-time value only; nothing is deployed.
+      NEXT_PUBLIC_API_URL: https://api.example.invalid
+      NEXT_TELEMETRY_DISABLED: "1"
+      # A test that cannot run here is a failure, not a skip (real flock, real builds).
+      FAMBOOOK_TESTS_NO_SKIP: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install (isolated CI environment)
+        run: npm ci
+
+      - name: Generate route types
+        run: npx next typegen
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Default production build
+        run: npm run build
+
+      - name: Shell scripts (shellcheck)
+        working-directory: .
+        run: >-
+          shellcheck --severity=warning deploy/scripts/build-frontend.sh deploy/scripts/smoke-frontend-release.sh
+          deploy/scripts/switch-frontend-release.sh deploy/scripts/deploy-frontend.sh
+          deploy/tests/build-frontend.test.sh deploy/tests/build-frontend-integration.sh
+
+      - name: systemd precedence (a throwaway transient unit on the runner)
+        working-directory: .
+        run: |
+          f=$(mktemp)
+          echo 'FAMBOOOK_NEXT_DIST_DIR=.builds/from-file' >"$f"
+          chmod 0644 "$f"
+          out=$(sudo systemd-run --wait --pipe --quiet -p Environment=FAMBOOOK_NEXT_DIST_DIR=.next/from-environment -p EnvironmentFile="$f" /usr/bin/printenv FAMBOOOK_NEXT_DIST_DIR)
+          rm -f "$f"
+          echo "EnvironmentFile over Environment: $out"
+          test "$out" = ".builds/from-file"
+
+      - name: Build-script and switch tests (real flock)
+        working-directory: .
+        run: |
+          flock --version
+          bash deploy/tests/build-frontend.test.sh
+
+      - name: Isolated build integration (stale types, type errors, default build)
+        working-directory: .
+        env:
+          FAMBOOOK_BUILD_INTEGRATION: "1"
+        run: bash deploy/tests/build-frontend-integration.sh
