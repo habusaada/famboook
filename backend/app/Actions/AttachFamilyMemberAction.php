@@ -3,11 +3,11 @@
 namespace App\Actions;
 
 use App\Enums\FamilyActivityType;
-use App\Enums\LifeStatus;
 use App\Models\Family;
 use App\Models\FamilyMembership;
 use App\Models\Person;
 use App\Support\FamilyActivityLog;
+use App\Support\FamilyMemberIdentity;
 use App\Support\RelationshipTypes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -52,7 +52,7 @@ class AttachFamilyMemberAction
                 throw ValidationException::withMessages(['person' => 'الشخص عضو نشط في أسرة.']);
             }
             $locked = Person::query()->whereKey($person->id)->lockForUpdate()->first();
-            if ($locked === null || $locked->life_status !== LifeStatus::ALIVE || ! $locked->is_active) {
+            if ($locked === null || ! FamilyMemberIdentity::attachable($locked)) {
                 throw ValidationException::withMessages(['person' => 'لا يمكن ربط شخص متوفى أو غير مؤكد الحياة أو غير نشط بالأسرة.']);
             }
 

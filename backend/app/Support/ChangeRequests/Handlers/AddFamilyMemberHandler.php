@@ -29,6 +29,7 @@ use App\Support\ChangeRequests\RequiresApprovalAttestation;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\FamilyAuth\FamilyMobile;
 use App\Support\FamilyAuth\FamilyNationalId;
+use App\Support\FamilyMemberIdentity;
 use App\Support\MobileMask;
 use App\Support\NationalId;
 use App\Support\NationalIdGuard;
@@ -53,7 +54,7 @@ use Illuminate\Validation\ValidationException;
  *   submission. Staff see a safe match summary; approval and APPLY refuse
  *   every unsafe case.
  * - At approval and APPLY, under the National ID advisory lock, the
- *   equivalent registry matches (NationalIdGuard::equivalentMatches) decide:
+ *   equivalent registry matches decide (FamilyMemberIdentity::resolve):
  *     none                                  → new Person + membership
  *                                             (AddFamilyMemberAction)
  *     exactly one: ALIVE, active, with no   → attach that Person
@@ -266,44 +267,17 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, CoordinatorS
 
     /**
      * The registry Person to attach, NULL for a new Person, or a refusal for
-     * every unsafe case: an active membership anywhere (a transfer is not
-     * this type), a Person who is not ALIVE or not active (FP-ADR-076), or
-     * several equivalent holders (ambiguous legacy data).
-     *
-     * Lock order: called with the Family locked (engine) and takes the
-     * National ID lock, then — only for a Person with no active membership —
-     * the Person row, and re-checks under it. A Person who is active in a
-     * Family is refused WITHOUT locking their row: that Family's own writers
-     * lock Person → Family (e.g. a death record's activity), so locking it
-     * here could close a cycle.
+     * every unsafe case (FamilyMemberIdentity::resolve, called with the Family
+     * locked by the engine).
      */
     private static function resolve(string $nationalId): ?Person
     {
-        NationalIdGuard::lock($nationalId);
-        $matches = self::matches($nationalId);
-        if ($matches->count() > 1) {
-            throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
-        }
-        $match = $matches->first();
-        if ($match === null) {
-            return null;
-        }
-        if ($match->activeMembership !== null) {
+        $resolution = FamilyMemberIdentity::resolve($nationalId);
+        if ($resolution->outcome->refused()) {
             throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
         }
 
-        $person = Person::query()->whereKey($match->getKey())->lockForUpdate()->first();
-        if ($person === null || ! self::attachable($person) || $person->activeMembership()->exists()) {
-            throw new ChangeRequestException(ChangeRequestException::PRECONDITION_FAILED);
-        }
-
-        return $person;
-    }
-
-    /** FP-ADR-076: only a living, active registry Person may be attached. */
-    private static function attachable(Person $person): bool
-    {
-        return $person->life_status === LifeStatus::ALIVE && (bool) $person->is_active;
+        return $resolution->person;
     }
 
     /** @return Collection<int, Person> */
@@ -328,7 +302,7 @@ final class AddFamilyMemberHandler implements ChangeRequestHandler, CoordinatorS
         // Staff only: the facts that decide whether this Person may be attached.
         $status = 'الحالة: '.self::lifeLabel($person->life_status).'، السجل '.($person->is_active ? 'نشط' : 'غير نشط');
         $membership = $person->activeMembership;
-        if ($membership === null && ! self::attachable($person)) {
+        if ($membership === null && ! FamilyMemberIdentity::attachable($person)) {
             return "شخص مسجّل دون عضوية نشطة ({$who}؛ {$status}) — لا يُربط إلا شخص على قيد الحياة وسجله نشط؛ لا يمكن اعتماد الطلب.";
         }
         if ($membership === null) {
