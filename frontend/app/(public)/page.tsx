@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing/landing-page";
+import { WhatsAppWidget } from "@/components/shared/whatsapp-widget";
 
 // FB-WEB-04 — the public homepage (docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md). A route
 // group outside (staff) and family/: no AuthGate, no FamilyGate, no manifest and
@@ -27,6 +28,12 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: [SHARE_IMAGE] },
 };
 
+// FB-WEB-05: the contact widget is on this page only (the legal pages stay FB-LEGAL-01D).
 export default function HomePage() {
-  return <LandingPage />;
+  return (
+    <>
+      <LandingPage />
+      <WhatsAppWidget />
+    </>
+  );
 }

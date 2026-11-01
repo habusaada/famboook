@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER } from "next/constants";
 import { legacyReleasesIn, parseDistDir, releaseTsconfigPath } from "./lib/release-dir";
 import { assertPublishableEffectiveDate } from "./lib/legal/effective-date";
+import { whatsAppNumber } from "./lib/whatsapp";
 
 export default function config(phase: string): NextConfig {
   // NEXT_PUBLIC_* values are inlined at build time. A production build
@@ -26,6 +27,11 @@ export default function config(phase: string): NextConfig {
         ? `Legal policies: PUBLISHED (privacy, terms, data-protection) with effective date ${effectiveDate} (version 1.0).`
         : "Legal policies: NOT PUBLISHED (NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE is not set).",
     );
+  }
+
+  // The public contact widget (FB-WEB-05) hides itself on an invalid number: fail here instead.
+  if (phase === PHASE_PRODUCTION_BUILD && !whatsAppNumber()) {
+    throw new Error("NEXT_PUBLIC_WHATSAPP_NUMBER must be an international number (e.g. 970595990929), or unset.");
   }
 
   // Optional isolated build output (lib/release-dir.ts; FB-DEVOPS-01). Unset,
