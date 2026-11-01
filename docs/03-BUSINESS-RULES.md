@@ -1985,6 +1985,10 @@ Family Users do not receive unrestricted CRUD access to canonical registry data.
 
 Substantive changes use controlled Change Requests.
 
+**Narrow exception (2026-11-01, FB-FAMILY-ADD-01, approved architecture; NOT implemented, NOT
+activated):** §82a. It is the only exception to this section. All other substantive changes
+keep using Change Requests.
+
 ---
 
 # 67. Change Request Principle
@@ -2235,6 +2239,33 @@ Run duplicate checks
 ```
 
 If an existing Person is identified, the system should reuse the existing Person where appropriate rather than create a duplicate.
+
+---
+
+# 82a. Direct Admission of Civil-Verified Sons and Daughters
+
+**Approved 2026-11-01 as architecture (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`, decisions D-01 … D-06). NOT
+implemented, NOT activated. Every activation gate G-01 … G-07 is OPEN.**
+
+An eligible household head may admit their own son or daughter directly, without an Add
+Family Member request, only when all of these hold:
+
+- the person is discovered in the published civil registry release, which is read only and
+  never modified;
+- parenthood comes from `fatherid` / `motherid` matching the head's National ID, used only
+  after those semantics and their relationship to `mainid` are verified (G-03);
+- age and marital status do not limit who is in scope;
+- the head explicitly declares that this person actually belongs to the household. This is
+  an assertion by the head, never verification;
+- no duplicate or conflicting membership exists. A Person active in any household is
+  refused, and nobody is transferred, merged or chosen automatically;
+- National ID rules (§18–§21) hold;
+- a deceased child never receives an active living membership, and uncertain death status
+  fails closed (G-05).
+
+No source `record_id` is stored against a Person. Spouses, other relatives, newborns not yet
+in the release, Coordinator and Staff flows are outside this rule. §13, §21 and §82 are
+unchanged, and a person who is not eligible may still be proposed under §82.
 
 ---
 
@@ -5025,6 +5056,9 @@ Family Profile Review is the household head's review of the family data; it is s
 ### BD-052
 No review or verification state is an eligibility gate: programmes keep their own required data and criteria (docs/11 FP-ADR-058). Registered Members are ACTIVE memberships whatever the life status; Living Members name the targeting / health population (docs/11 FP-ADR-056).
 
+### BD-053
+Direct admission of civil-verified sons and daughters is a narrow, flag-gated exception to §66 (§82a; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`; approved 2026-11-01). Not implemented or activated; gates G-01 … G-07 are open.
+
 ---
 
 # 126. Pending Business Decisions
@@ -5264,6 +5298,7 @@ Date: 2026-09-24
 | 1.2.61 | 2026-10-14 | Approved | CO-02.7d: meaning of the FAMILY_ADD (REGISTER_FAMILY) approval attestations — identity against an official document; the person is genuinely the household head and the Family belongs to the selected Clan / Branch (Clan membership without a Branch); no social, health or assistance information certified (docs/adr/CO-02 §21) |
 | 1.2.62 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (ADR-FB-GEO-01): "Residence decision" amended — PDD-006 architecturally resolved, implementation pending; current residence is the displacement location when DISPLACED; free text kept, no inference or backfill; reporting, workflows and RBAC unchanged. Documentation only |
 | 1.2.63 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): "Notifications and announcements" amended — unified system, family recipient, NORMAL / IMPORTANT, follow-up, expiration and late acknowledgement; §90–§92 unchanged; documentation only |
+| 1.2.64 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §82a direct admission of civil-verified sons and daughters, §66 annotated, BD-053. Not implemented or activated; gates G-01 … G-07 open |
 | 1.2.38 | 2026-10-02 | Approved | PWA-1D hardening: §89b — the Staff API requires a Staff-side account; role-less and custom-role accounts are refused too |
 | 1.2.37 | 2026-10-02 | Approved | PWA-1D: §89b status (resolver, link lifecycle, correction and death effects, account sides implemented); separation of account, link and authentication-identity state; ended link terminal and never deactivates the account; Staff API boundary |
 | 1.2.36 | 2026-10-02 | Approved | PWA-1C: §89b status note — foundation implemented (schema, strict normalizers, keyed fingerprints, role and permission names); no §89b rule is enforced by behaviour yet |

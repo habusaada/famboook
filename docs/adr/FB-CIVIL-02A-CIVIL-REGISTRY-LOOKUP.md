@@ -1,5 +1,10 @@
 # FB-CIVIL-02A — Civil Registry Smart Lookup (Staff Portal)
 
+> **Cross-reference (2026-11-01, FB-FAMILY-ADD-01):** `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` plans a separate,
+> flag-gated use of the same read boundary for a household head's own children. It changes
+> nothing in this ADR: its text, status and open decisions stay as recorded, and the reverse-link gate in §L-8 stays closed for the lookup. OD-03 and OD-10 stay open; OD-15 is respected.
+> See that ADR §4.
+
 **Status:** PROPOSED. Implemented locally only. **Not approved for Production.**
 The lookup is OFF by default; Production additionally needs a recorded approval
 reference (§L-1). The baseline exception (§L-0) is proposed, not approved.

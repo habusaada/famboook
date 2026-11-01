@@ -1483,6 +1483,10 @@ on the test instance and a real browser
     - **Production (owner-confirmed 2026-10-30):** `notifications.mode = ON`, `credentials.family_card_issuance_enabled = true`. These show enablement, not end-to-end operation; PDF download and manual announcement delivery remain to be verified operationally.
     - **Not recorded as tested (no evidence):** QR verification, PDF download and announcement delivery in Production.
 - **FB-WEB-03 «فامبوك بالأرقام»: DEFERRED** by the owner's decision; not in progress.
+- **FB-FAMILY-ADD-01 — Direct admission of civil-verified sons and daughters: decisions approved 2026-11-01; WP-02 documentation only; NOT implemented, NOT activated** (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`):
+    - narrow exception to the Change Request rule, behind `family_registry_admission.mode`, default `OFF`;
+    - **Open gates:** G-01 legal basis, G-02 adult children's data, G-03 parent-link semantics, G-04 gender codes, G-05 death status, G-06 tests, G-07 activation approval;
+    - **Order (RM-ADR-071):** WP-03 shared eligibility extraction; WP-04 verified code mapping; WP-05 migration, flag and permission; WP-06 discovery; WP-07 admission; WP-08 Arabic UI; WP-09 PostgreSQL, concurrency and integrity tests; WP-10 security review and activation plan.
 - **FB-WEB-04 — Public Homepage & Staff Dashboard Separation: committed locally, NOT deployed (2026-10-30)** (`docs/adr/FB-WEB-04-PUBLIC-HOMEPAGE.md`; checklist: `docs/deployment/FB-WEB-04-PRODUCTION-READINESS.md`):
     - `famboook.com/` is the landing page, `/welcome` redirects to it permanently, and the Staff dashboard moves to `/dashboard` behind the same AuthGate;
     - `app.famboook.com` is an official Production host, and its `/` redirects to `/family` (307);
@@ -4980,6 +4984,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-071
+FB-FAMILY-ADD-01 (2026-11-01): decisions D-01 … D-06 recorded (WP-02, documentation only). Work continues locally behind `OFF`; WP-04's verified mapping depends on G-04 and G-05, and no work package closes a gate by itself. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
+
 ### RM-ADR-070
 FB-GEO-01 RESIDENCE_UPDATE v2 done locally (2026-10-16, owner-approved; ADR §8.6): versioned handler (v1 + v2), optional location references with active-only new selections, both in the base, name/path presentation, family profile summaries, Family PWA selectors, PX-1 fix. Production needs the FB-GEO-01 migration and import approvals.
 
@@ -5340,6 +5347,7 @@ Date: 2026-09-24
 | 1.2.74 | 2026-10-26 | Approved | FB-CIVIL program entry (X-4): FB-CIVIL-01A, FB-CIVIL-01A-UI U0 and U1 (read-only monitoring, local only), U2 / U3 and 01B not started |
 | 1.2.75 | 2026-10-26 | Approved | FB-CIVIL-01A-UI: U1 committed; U2 controlled execution implemented locally (worker, control plane, sources, requests, wizard); no publication |
 | 1.2.76 | 2026-10-26 | Approved | FB-CIVIL-01A-UI: U2 committed; U3 two-person publication approval implemented locally; gate closed by default |
+| 1.2.77 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 WP-02 (documentation only): progress note, RM-ADR-071. Not implemented or activated |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

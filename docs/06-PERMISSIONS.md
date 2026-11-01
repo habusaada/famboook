@@ -3060,6 +3060,26 @@ Production or real registry data.** This proposes a baseline change to §53
   holding search or view against its switch, and any direct (model) grant of
   a `civil-lookup.*` permission.
 
+### 61d-2. Direct admission from the civil registry (FB-FAMILY-ADD-01 — PROPOSED, not implemented)
+
+Design: `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (decisions approved 2026-11-01). **No runtime permission, role, seeder
+or route changes with this entry.**
+
+Proposed for a later work package, with no effect today:
+
+```text
+family-member.admit-from-registry   FAMILY_USER only
+```
+
+- The holder must also pass `family.context`: an eligible household head, Family from the
+  server, never from the client. A permission alone authorizes nothing here.
+- Separate from `change-request.*` and from `civil-lookup.*`. It grants no lookup, and the
+  lookup grants do not grant it. No Coordinator or Staff role receives it.
+- Independent rate limits and audit, and no civil lookup quota (D-05).
+- Flag `family_registry_admission.mode`, default `OFF` (D-04). Activation needs gates
+  G-01 … G-07.
+- The count enforced by `famboook:verify-permissions` changes only when this is implemented.
+
 ---
 
 # 62. System Administration Permissions
@@ -4791,6 +4811,9 @@ and `canViewSensitiveIdentity`, which is FALSE for every viewer because no
 permission grants full identity viewing — Staff status alone never does.
 The context is never taken from client input.
 
+### AUTH-ADR-099
+FB-FAMILY-ADD-01 (2026-11-01; documentation only): §61d-2 records a proposed household-head permission for direct admission. No permission, role, seeder or route is added now; §53 is unchanged. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
+
 ### AUTH-ADR-098
 Civil identity import management — read-only monitoring permissions (2026-10-26, FB-CIVIL-01A-UI U1; decisions D-UI-7, D-UI-8; `docs/decisions/FB-CIVIL-01A-UI-DECISIONS.md` X-3). *Status: IMPLEMENTED LOCALLY, not committed or deployed.*
 - **Seeded:** `civil-import.view`, `civil-import.locations.view` and `civil-import.audit.view`, to SUPER_ADMIN only. Catalog 162 → 165; still eight roles; no other mapping changes.
@@ -5364,6 +5387,7 @@ Date: 2026-09-24
 | 1.2.77 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U1 (AUTH-ADR-098): §61c — `civil-import.view`, `civil-import.locations.view` and `civil-import.audit.view` seeded locally to SUPER_ADMIN only; nine read-only `/civil-registry` routes; verifier extended. Catalog 162 → 165; no role added; no other mapping change |
 | 1.2.78 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U2 (AUTH-ADR-098 amended): `civil-import.stage` and `civil-import.validate` seeded locally to SUPER_ADMIN only; execution-request routes (202, recorded only) and the cancel rule; verifier extended. Catalog 165 → 167; no role added; no other mapping change |
 | 1.2.80 | 2026-10-27 | Approved | FB-CIVIL-01A-UI D-UI-12a (AUTH-ADR-098 amended): single-operator publication. `civil-import.publish.approve` replaced by the gated `civil-import.publish.confirm` (SUPER_ADMIN only, gate open only); `/confirm` (requester only, active SUPER_ADMIN, fresh password) replaces `/approve` and `/reject`; verifier flags the removed permission. Catalog stays 169; no role added |
+| 1.2.81 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §61d-2 proposed permission, AUTH-ADR-099. No runtime change |
 | 1.2.79 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U3 (AUTH-ADR-098 amended): `civil-import.publish.request` (SUPER_ADMIN) and the gated `civil-import.publish.approve` (SUPER_ADMIN only while the publication gate is open); two-person publication routes; verifier: gate and direct-grant checks. Catalog 167 → 169; no role added |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |

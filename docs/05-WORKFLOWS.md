@@ -1807,6 +1807,15 @@ submit             lock the Family → client_reference replay check →
 - FamilyActivity only for submitted, rejected and applied (request type
   metadata only); everything else is a workflow event only.
 
+**Narrow exception (2026-11-01, FB-FAMILY-ADD-01; WF-ADR-055; approved architecture, NOT
+implemented, NOT activated).** This lifecycle stays the rule for every family change to
+canonical registry information. The one exception is direct admission of the household head's
+own civil-verified son or daughter from the published civil registry (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`). That flow
+creates no Change Request and therefore has no states, workflow events or transitions in this
+lifecycle. This engine and its transition table are unchanged. Activation gates G-01 … G-07
+remain open, and activation is prohibited until they are resolved and activation is separately
+approved.
+
 ---
 
 # 55. Change Request DRAFT
@@ -2177,6 +2186,14 @@ Reuse Person             Create Person
                ↓
              APPLIED
 ```
+
+**Relation to direct admission (2026-11-01, FB-FAMILY-ADD-01; WF-ADR-055; approved architecture,
+NOT implemented, NOT activated).** This workflow is unchanged: FP-ADR-076 is not superseded, and
+its review, attestations, no-enumeration rule and APPLY all still apply to every
+`ADD_FAMILY_MEMBER` request. A separate, flag-gated flow (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`) is planned for the head's own
+civil-verified son or daughter only. A person not eligible there may still be proposed here.
+Activation gates G-01 … G-07 remain open, and that flow must not be activated until they are
+resolved and activation is separately approved.
 
 ---
 
@@ -3393,6 +3410,9 @@ Family Change Request API as implemented by PWA-5e (2026-10-08): submit, resubmi
 
 ### WF-ADR-054
 Coordinator-submitted requests (2026-10-13, CO-02.2, approved architecture; not implemented; full design docs/adr/CO-02-COORDINATOR-REQUESTS.md): one Change Request engine and one Staff queue. New submission channel COORDINATOR and workflow actor side COORDINATOR. The Coordinator submits ADD_FAMILY_MEMBER for a Family in the effective scope or REGISTER_FAMILY (new type, no Family until APPLY) for a placement the scope covers, and may resubmit or cancel only their own request while it is in their current scope; the household head views but cannot cancel or answer it. Review, return, approve, reject and APPLY are unchanged Staff transitions; APPLY of REGISTER_FAMILY runs RegisterFamilyAction in the APPLY transaction (registration_source COORDINATOR_REQUEST) and records created_family_id. Scope revocation stops only the coordinator's access; nothing is deleted. Handlers receive a submission context (channel, actor, Family or placement) instead of the family-only context.
+
+### WF-ADR-055
+Direct admission of civil-verified sons and daughters (FB-FAMILY-ADD-01, 2026-11-01; approved architecture, NOT implemented, NOT activated; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`): one narrow exception to the Change Request lifecycle (§54). §73 and FP-ADR-076 are unchanged for ordinary requests. Gates G-01 … G-07 remain open; activation needs their resolution and a separate approval.
 ```
 
 ---
@@ -3679,3 +3699,4 @@ Date: 2026-09-24
 | 1.2.30 | 2026-10-14 | Approved | CO-02.7b (approved): Staff RETURNED_FOR_CLARIFICATION → REJECTED with change-request.reject and a required reason, both channels; no other transition changed |
 | 1.2.31 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): Announcements flow amended to the unified publication, snapshot, viewing / acknowledgement and follow-up workflow; §85 derivation from `workflow_events`; documentation only |
 | 1.2.32 | 2026-10-18 | Approved | FB-NOTIFY-01B.1 design alignment (ADR FB-NOTIFY-01): SYSTEM messages discovered and created asynchronously and published through the queued lifecycle; expiry effective at `expires_at` in read models; documentation only |
+| 1.2.33 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02.1, documentation only): §54 and §73 annotated, WF-ADR-055. Change Request workflow and FP-ADR-076 unchanged; not implemented or activated; gates G-01 … G-07 open |

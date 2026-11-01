@@ -3207,6 +3207,30 @@ events or actors are fabricated for them.
 
 ---
 
+# 61b. Family Registry Admission (PROPOSED)
+
+**Approved constraints, proposed schema (2026-11-01, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9). NOT implemented;
+no table exists.**
+
+Evidence that a household head admitted a son or daughter directly (docs/03 §82a).
+
+| Field | Meaning |
+|---|---|
+| Family, Person, Family Membership | What the admission produced |
+| Admitted by, admitted by Person | The account and the head it acted as (User ≠ Person) |
+| Client reference | Idempotency key, unique per account |
+| Outcome type | `PERSON_CREATED` or `PERSON_ATTACHED` |
+| Parent link | `FATHER` or `MOTHER` |
+| Reference fingerprint and key version | Keyed HMAC of the canonical National ID |
+| Release id | The published release read; not a record id |
+| Declaration version, declared at | The wording the head accepted, and when |
+
+**Never stored:** the source `record_id` or version id, a National ID, a registry payload or a
+name. A separate append-only event record covers discovery and refused attempts. This data
+holds no canonical value of its own: the Person and the Family Membership stay canonical.
+
+---
+
 # 62. Data Classification
 
 Famboook uses data classification to support security decisions.
@@ -4284,6 +4308,10 @@ Family Portal identity entities (§45b): `user_person_links` (SELF only, VERIFIE
 
 Registered Members (`registered_member_count`) are ACTIVE memberships whatever the Person's life status, activity or soft-deleted state; Living Members (not DECEASED, not soft-deleted) is the targeting and health-summary population; "Registered Household Size" is superseded (§20a, §75). Family Profile Review (derived completeness and states, stored confirmations with a keyed fingerprint, no registry copy) is distinct from Staff Family Verification (§45a; docs/11 FP-ADR-056, FP-ADR-057).
 
+### DD-ADR-037
+
+Family Registry Admission evidence (FB-FAMILY-ADD-01, 2026-11-01; approved constraints, proposed schema, NOT implemented; §61b, docs/04 §22a, DB-ADR-068, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`). No source record id is stored (OD-15 respected).
+
 ### DD-ADR-036
 
 Unified Gaza geographic reference (FB-GEO-01 Phase 0, 2026-10-15; approved architecture, NOT implemented; full design docs/adr/FB-GEO-01-GAZA-GEOGRAPHIC-REFERENCE.md; docs/04 DB-ADR-063). Resolves PDD-006 architecturally. One reference, Governorate → City → Area → Neighborhood → optional Landmark, limited to the five Gaza governorates and sourced only from the supplied classification spreadsheet, serves both residences through proposed nullable `family_residences.original_location_id` and `current_location_id` (deepest known node; ancestors derived, never stored on the residence). The current residence is the displacement location when DISPLACED and the ordinary accommodation when NOT_DISPLACED; no structured displacement address. Free-text fields kept; no inference, overwrite or backfill. RESIDENCE_UPDATE v1 unchanged; v2 future. Residence history stays separate.
@@ -4541,6 +4569,7 @@ Date: 2026-09-24
 | 1.2.40 | 2026-10-15 | Approved | FB-GEO-01 Phase 0 (DD-ADR-036, ADR-FB-GEO-01): PDD-006 architecturally resolved, implementation pending — unified Gaza geographic reference for original and current residence (§19 current vs future), RESIDENCE_UPDATE v2 noted as future (§47). Documentation only; no schema change |
 | 1.2.41 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §59 custom notification model (logical entities), §60 derivation from `workflow_events`, "Announcement and recipient" unified with system notifications; documentation only |
 | 1.2.42 | 2026-10-18 | Approved | FB-NOTIFY-01B.2a: §59 implemented data dictionary for `notification_messages`, `notification_recipients`, `notification_followups`, `notification_recipient_events` (commit `29a0b12`; DB vs application rules); verified on `famboook_test` only; local `famboook` and Production NOT migrated; not operational |
+| 1.2.43 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §61b proposed Family Registry Admission data, DD-ADR-037. No table exists |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

@@ -1,5 +1,10 @@
 # FB-CIVIL-02B — Civil Registry Lookup for the Family Portal and Coordinator Space
 
+> **Cross-reference (2026-11-01, FB-FAMILY-ADD-01):** `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` plans a separate,
+> flag-gated use of the same read boundary for a household head's own children. It changes
+> nothing in this ADR: its text, status and open decisions stay as recorded, and the children and household links in §B-5 stay disabled for the lookup. B-OD-1 … B-OD-4 stay open.
+> See that ADR §4.
+
 **Status:** PROPOSED. Implemented locally only, 2026-10-28. **Not approved for
 Production and not approved for real registry data.** Both family-side contexts
 are closed by default and independent of each other. Approving this

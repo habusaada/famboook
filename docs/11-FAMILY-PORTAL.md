@@ -480,6 +480,10 @@ remain the only mechanism that changes canonical data. A head's
 confirmation is an assertion, recorded as such; it can never grant
 VERIFIED.
 
+**Narrowed 2026-11-01 (FB-FAMILY-ADD-01, FP-ADR-081, A-21; approved architecture, not
+implemented):** the one exception is §14 "Direct admission". Profile Review itself is
+unchanged: it never changes canonical data.
+
 ## V1 sections
 
 | Section | Arabic | Content |
@@ -807,6 +811,22 @@ no such action exists today (§33a FU-02).
 
 A family never changes UNKNOWN → ALIVE directly. DECEASED is handled by the
 death-report workflow and `RecordPersonDeathAction`.
+
+## Direct admission of civil-verified children (approved architecture, NOT implemented)
+
+**FP-ADR-081, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (2026-11-01). Not activated: gates G-01 … G-07 are open and
+`family_registry_admission.mode` would default to `OFF`.**
+
+The one exception to "Family Users do not edit canonical records". An eligible household head
+discovers their sons and daughters in the published release, declares for each one that they
+actually belong to the household, and admits an eligible one directly, with no
+`ADD_FAMILY_MEMBER` request.
+
+- Applies only to the head's own son or daughter, found through this flow, never a typed ID.
+- Refused with one generic answer: an active membership anywhere, an unsafe or ambiguous
+  holder, an unverified code, or a deceased or uncertain status. No transfer, no merge.
+- `ADD_FAMILY_MEMBER` stays available and unchanged for anyone not eligible here.
+- Proposed routes, the failure table, evidence and privacy rules: the ADR, §5–§10.
 
 ## Proposed new types — NOT approved
 
@@ -4044,6 +4064,7 @@ also annotated at its original location.
 | A-18 | docs/06 §38 (Family self National ID "MASKED by default"; other members' mobile / National ID HIDDEN; Person Code FULL), §121 (adult member sensitive fields HIDDEN), §123 (health hidden), §124–§125 (needs / assistance pending); docs/11 FP-ADR-056 allow-list, §9 HEAD, §15, §23 | Full Data Visibility (§23a, 2026-10-05) | **Amended (FP-ADR-062).** For the Family Portal: own and members' National ID / mobiles masked with reveal through dedicated endpoints; structured health facts, recorded needs and received assistance visible; person_code INTERNAL_ONLY; internal Staff, audit, security and targeting data stay hidden |
 | A-19 | docs/11 §18, FP-ADR-017, docs/02 §45a, docs/03 «Card and QR», docs/05 §53a: the **Digital Household Head Card** belongs to the eligible household-head identity; loss of head eligibility invalidates it; ISSUED / REISSUED states; "FH-…" holder ID | (2026-10-07, FP-ADR-070) The **Digital Family Card**: subject = the Family; the current head is shown live; a head change changes nothing; ACTIVE → REVOKED with REISSUED as a reason; card number FC-XXXX-XXXX-XX | **Superseded in part.** Minimal content, opaque non-derived public number, live-status QR, possession ≠ identity, enumeration protection and audited lifecycle are unchanged |
 | A-20 | docs/06 §22b, docs/03 §89b, docs/11 §8 (PWA-1H, AUTH-ADR-070): a Coordinator reads family SUMMARIES only — never a National ID, a mobile or member data | Option B approved 2026-10-12 (CO-01C) | **Amended (AUTH-ADR-092).** With two new COORDINATOR-only permissions a Coordinator reads the members directory of a family in scope (basic fields, identifiers masked) and reveals one National ID or mobile of one member at a time, audited. The summary rule stays as history; health, needs, assistance, notes and account data stay closed |
+| A-21 | docs/11 §9 and §14, docs/03 §66: canonical changes by a family go through the Change Request workflow | FB-FAMILY-ADD-01 (2026-11-01, FP-ADR-081): direct admission of a civil-verified son or daughter by the household head | **Narrow exception; not implemented or activated.** Every other workflow unchanged; FP-ADR-076 unchanged for `ADD_FAMILY_MEMBER` |
 
 ---
 
@@ -5111,6 +5132,23 @@ docs/adr/CO-02-COORDINATOR-REQUESTS.md).
   request (`coordinator: {name}`), nothing else about them and no action;
   Staff may reject a returned request; Coordinator Space reads throttled;
   ADR §20.
+
+FP-ADR-081
+Direct admission of civil-verified sons and daughters (FB-FAMILY-ADD-01,
+approved 2026-11-01 as architecture; NOT implemented, NOT activated).
+- narrow exception to §9 and §14 (D-01); every other workflow is unchanged,
+  and FP-ADR-076 stays in force for ADD_FAMILY_MEMBER;
+- no civil record_id-to-Person linkage is stored: a keyed reference
+  fingerprint and evidence only (D-02, OD-15 respected);
+- parenthood from fatherid / motherid matching the head's National ID, only
+  after verification (D-03);
+- independent flag family_registry_admission.mode, default OFF (D-04);
+- discovery uses no civil lookup quota, with its own limits and audit (D-05);
+- no active living membership for a deceased child; uncertain status fails
+  closed (D-06);
+- gates G-01 ... G-07 are OPEN. FB-CIVIL-02A and 02B keep their text and
+  status, and their reverse-link gate stays closed for the lookup.
+  Design: docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md.
 ```
 
 ---
@@ -5360,3 +5398,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.55 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01: §23 amended — the unified Family home (welcome header with current time and previous sign-in, shortcuts, server-driven services, Coordinator section for open Coordinator Space); docs/06 AUTH-ADR-096 |
 | 1.56 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §21 amended — unified notifications, family recipient, levels, follow-up, expiry; FP-ADR-018 and A-07 amended; documentation only |
 | 1.57 | 2026-10-19 | Approved | FB-NOTIFY-01B.2b.7: §21 "As built" — notification endpoints (Staff, Coordinator, Family), response contracts, publication and retry lifecycle, audiences as built and the audience-id gap; §22 as built (current scope, count preview, history after revocation); frontend handoff `docs/audits/FB-NOTIFY-01B-FRONTEND-HANDOFF.md`. Documentation only |
+| 1.58 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §14 direct admission, §9 annotated, A-21, FP-ADR-081. Not implemented or activated; gates G-01 … G-07 open |

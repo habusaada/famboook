@@ -119,6 +119,11 @@ Filament must NOT become the operational Staff Application.
 - User and Person are separate concepts.
 - Family Portal users may only access authorized family information.
 - Family Portal changes to canonical registry information must use the Change Request workflow.
+  - Sole exception: FB-FAMILY-ADD-01 direct admission of a household head's own civil-verified
+    son or daughter from the published civil registry (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`). Approved as architecture
+    only; not implemented. FP-ADR-076 still governs ordinary `ADD_FAMILY_MEMBER` requests.
+    Activation gates G-01 through G-07 remain open. The feature must not be activated, in
+    PILOT or Production, until they are resolved and activation is separately approved.
 - APPROVED and APPLIED are distinct Change Request states.
 
 ## Development Principles
