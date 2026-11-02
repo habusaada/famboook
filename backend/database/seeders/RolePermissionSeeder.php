@@ -256,6 +256,10 @@ class RolePermissionSeeder extends Seeder
         'import.review',
         'import.apply',
 
+        // Direct admission from the civil registry (FB-FAMILY-ADD-01): defined
+        // only. Assigned to no role, and nothing checks it yet.
+        'family-member.admit-from-registry',
+
         // Household membership reconciliation (FB-FAMILY-RECON-01): defined
         // only. Assigned to no role, and nothing checks them yet.
         'household-reconciliation.submit',

@@ -4,6 +4,18 @@
 architecture. **NOT implemented, NOT activated, NOT approved for real registry data or
 Production.** Every activation gate in §12 is OPEN.
 
+**Implementation status (ADD-WP-04, 2026-11-01; local, uncommitted, not deployed).**
+
+- **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
+  `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
+  `family-member.admit-from-registry`, assigned to no role and checked nowhere; the evidence and event tables of §9
+  (migration `2026_11_01_100000_create_family_registry_admission_tables`), which nothing reads or writes.
+- **Implemented in ADD-WP-05 (local, uncommitted):** an internal strict value adapter, a fail-closed proof-of-life evaluator
+  and a read-only eligibility evaluation, in `App\Support\FamilyPortal\RegistryAdmission` (§5a). Nothing calls them yet.
+- **Not implemented:** discovery, the admission action, the operational API, the Family Portal UI, the PILOT allowlist, the
+  reference fingerprint context, pilot activation.
+- **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
+
 **Scope of this document:** the household head of an authenticated Family may discover
 their sons and daughters in the published civil registry and, after declaring that each
 one actually belongs to the household, admit an eligible one directly, without an
@@ -143,6 +155,30 @@ admission, inside the locks of §10. Any failure refuses the admission.
 - an unknown marital code becomes `UNKNOWN`;
 - an existing Person's recorded data is never updated from the registry.
 
+## 5a. Strict adapter and fail-closed evaluation (ADD-WP-05)
+
+**Implemented locally, internal only, uncommitted; no route, response or action uses it.** Gates G-03, G-04 and G-05 stay OPEN.
+
+- **Provisional mappings (G-04).** `CivilRegistryValues` matches raw values exactly as stored: never trimmed, normalized or
+  compared by similarity. The listed values are the ones observed in the 2026-10-25 export (aggregate audit WP-04B), not a
+  confirmed code table: gender `ذكر` → MALE and `أنثى` → FEMALE; marital `اعزب`, `متزوج`, `أرمل`, `مطلق` → SINGLE, MARRIED,
+  WIDOWED, DIVORCED. `MAPPINGS_APPROVED` is false, so a mapped gender still refuses (GENDER_MAPPING_PROVISIONAL).
+- **Listed without a mapping (INDETERMINATE):** gender `غير معروف`; marital `متعدد الزوجات` and `غير مسجل`. No MaritalStatus case is
+  guessed for them.
+- **Unsupported:** every other value, including coded or near-identical spellings. Missing values are MISSING. All refuse.
+- **Parentage (G-03).** Only `fatherid` / `motherid`, compared exactly with the head's server-side National ID. Both naming the
+  head is PARENT_LINK_INDETERMINATE. Names are never used.
+- **Proof of life (G-05, D-06).** `ProofOfLife` returns only DECEASED (a valid `deathdate`), INDETERMINATE (an invalid one) or
+  UNVERIFIED (empty). There is no ALIVE outcome and no override. `presonstate`, age, birth date and marital status are not read.
+  E-6 therefore refuses every child (LIFE_UNVERIFIED or DECEASED).
+- **Evaluation.** `RegistryChildEligibility::evaluate()` takes the family.context result and one record, collects every internal
+  reason (E-3 … E-9, plus the source checks), reads the application registry without locks, and never reads or writes
+  `identity_ref`. The admission action must evaluate again under its locks (§10).
+- **Public status.** `RegistryChildAssessment::publicStatus()` gives only ELIGIBLE, ALREADY_MEMBER, REQUEST_OPEN or NOT_ELIGIBLE.
+  REQUEST_OPEN is shown only when no undisclosable reason applies. Another household, a death, a deleted or unattachable record and
+  every internal reason stay internal. While G-04 and G-05 are open, ELIGIBLE cannot occur.
+- **No schema change.** Nothing here needed a table.
+
 ## 6. The declaration
 
 **Approved rule; proposed form.** One declaration per child, made by the head, never
@@ -253,10 +289,12 @@ details. Errors, logs and queues carry no National ID, name or payload.
   worker does not cache them.
 - **PWA and browser:** no National ID in a URL, a query key or client storage.
 
-## 9. Proposed admission audit schema
+## 9. Admission audit schema
 
-**Proposal; D-02 and D-05 are approved constraints.** One forward-only migration in a later
-work package. No change to `identity_ref`, `persons` or `family_memberships`.
+**Implemented as schema only (ADD-WP-04, migration `2026_11_01_100000_create_family_registry_admission_tables`); D-02 and D-05 are approved constraints.** No change to
+`identity_ref`, `persons` or `family_memberships`. Nothing writes these tables yet. Both are append-only on PostgreSQL.
+`outcome_code` follows the existing format check of `civil_lookup_audit_events`; its code list comes with the work package that
+writes it. A CHECK cannot prove that the membership, Person and Family of a row agree; the admission action must.
 
 ### `family_registry_admissions` (evidence, one row per successful admission)
 
@@ -325,7 +363,8 @@ metadata. Retention is part of G-02.
 
 ## 11. Feature flag (D-04)
 
-**Approved name and values. Not implemented or enabled by this ADR.**
+**Approved name and values. Implemented in ADD-WP-04 as configuration only: nothing reads it to open anything, and it is not
+enabled. The PILOT allowlist below is still a proposal.**
 
 | Mode | Effect |
 |---|---|

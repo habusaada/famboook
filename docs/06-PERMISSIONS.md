@@ -3060,12 +3060,15 @@ Production or real registry data.** This proposes a baseline change to §53
   holding search or view against its switch, and any direct (model) grant of
   a `civil-lookup.*` permission.
 
-### 61d-2. Direct admission from the civil registry (FB-FAMILY-ADD-01 — PROPOSED, not implemented)
+### 61d-2. Direct admission from the civil registry (FB-FAMILY-ADD-01 — definition only, not operational)
 
-Design: `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (decisions approved 2026-11-01). **No runtime permission, role, seeder
-or route changes with this entry.**
+Design: `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (decisions approved 2026-11-01). **No role, route or behavior changes with this entry.**
 
-Proposed for a later work package, with no effect today:
+**Definition, not a grant (ADD-WP-04, local, uncommitted, not deployed).** `family-member.admit-from-registry` is in
+`RolePermissionSeeder::PERMISSIONS`, so seeding creates it. It is **assigned to no role, and no route or action checks it**. Nobody
+holds it.
+
+Proposed role grant, for a later approved change, with no effect today:
 
 ```text
 family-member.admit-from-registry   FAMILY_USER only
@@ -3076,9 +3079,9 @@ family-member.admit-from-registry   FAMILY_USER only
 - Separate from `change-request.*` and from `civil-lookup.*`. It grants no lookup, and the
   lookup grants do not grant it. No Coordinator or Staff role receives it.
 - Independent rate limits and audit, and no civil lookup quota (D-05).
-- Flag `family_registry_admission.mode`, default `OFF` (D-04). Activation needs gates
+- Flag `family_registry_admission.mode`, default `OFF` (D-04), read by nothing yet. Activation needs gates
   G-01 … G-07.
-- The count enforced by `famboook:verify-permissions` changes only when this is implemented.
+- `famboook:verify-permissions` compares with the seeder, not with a fixed number. The catalog is now 179 (§98).
 
 ---
 
@@ -3763,7 +3766,7 @@ to no role, and no route or action checks them**. Nobody holds them, and reconci
 `.apply`. Neither the original submitter nor an administrator acting as submitter may approve or apply their own
 request. These rules are not enforced yet. Role grants need a separate approved change.
 
-**Permission count.** The catalog is 178 with these four, 174 without. `famboook:verify-permissions` compares each role's
+**Permission count.** The catalog is 179 with these four and `family-member.admit-from-registry` (§61d-2), 174 without them. `famboook:verify-permissions` compares each role's
 grants and the catalog with the seeder, not with a fixed number, so it does not depend on this count.
 
 ---
@@ -4829,7 +4832,7 @@ The context is never taken from client input.
 FB-FAMILY-RECON-01 (2026-11-01; documentation only): §98 annotated with proposed dedicated permissions. No permission, role, seeder or route is added now. `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`. **Amended by WP-03 (2026-11-01):** four permission definitions were added to the seeder locally, with no role grant, no route and no check.
 
 ### AUTH-ADR-099
-FB-FAMILY-ADD-01 (2026-11-01; documentation only): §61d-2 records a proposed household-head permission for direct admission. No permission, role, seeder or route is added now; §53 is unchanged. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
+FB-FAMILY-ADD-01 (2026-11-01; documentation only): §61d-2 records a proposed household-head permission for direct admission. No permission, role, seeder or route is added now; §53 is unchanged. **Amended by ADD-WP-04 (2026-11-01):** the permission is defined in the seeder locally, with no role grant, no route and no check. `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
 
 ### AUTH-ADR-098
 Civil identity import management — read-only monitoring permissions (2026-10-26, FB-CIVIL-01A-UI U1; decisions D-UI-7, D-UI-8; `docs/decisions/FB-CIVIL-01A-UI-DECISIONS.md` X-3). *Status: IMPLEMENTED LOCALLY, not committed or deployed.*
@@ -5407,6 +5410,7 @@ Date: 2026-09-24
 | 1.2.81 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §61d-2 proposed permission, AUTH-ADR-099. No runtime change |
 | 1.2.82 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §98 annotated, AUTH-ADR-100. No runtime change |
 | 1.2.83 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-03C, documentation only): §98 and AUTH-ADR-100 corrected: four definitions, no role grant, catalog 178. Reconciliation not operational |
+| 1.2.84 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (ADD-WP-04): §61d-2 and AUTH-ADR-099: one definition, no role grant, catalog 179. Not operational |
 | 1.2.79 | 2026-10-26 | Approved | FB-CIVIL-01A-UI U3 (AUTH-ADR-098 amended): `civil-import.publish.request` (SUPER_ADMIN) and the gated `civil-import.publish.approve` (SUPER_ADMIN only while the publication gate is open); two-person publication routes; verifier: gate and direct-grant checks. Catalog 167 → 169; no role added |
 | 1.2.72 | 2026-10-18 | Approved | FB-FAMILY-DASHBOARD-01 (AUTH-ADR-096): Coordinator summary endpoint and `/family/me` previous sign-in fields; no permission, role or mapping change |
 | 1.2.71 | 2026-10-15 | Approved | FB-GEO-01 Stage 3.2: §46 note — residence location references under the existing `family.create` / `residence.update`; no permission, role or mapping change |

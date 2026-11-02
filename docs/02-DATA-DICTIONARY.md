@@ -3207,10 +3207,10 @@ events or actors are fabricated for them.
 
 ---
 
-# 61b. Family Registry Admission (PROPOSED)
+# 61b. Family Registry Admission (SCHEMA FOUNDATION ONLY)
 
-**Approved constraints, proposed schema (2026-11-01, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9). NOT implemented;
-no table exists.**
+**Schema foundation implemented locally, uncommitted and not deployed (ADD-WP-04, 2026-11-01; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9).
+Direct admission is NOT operational: nothing reads or writes these tables.**
 
 Evidence that a household head admitted a son or daughter directly (docs/03 §82a).
 
@@ -4310,7 +4310,7 @@ Registered Members (`registered_member_count`) are ACTIVE memberships whatever t
 
 ### DD-ADR-037
 
-Family Registry Admission evidence (FB-FAMILY-ADD-01, 2026-11-01; approved constraints, proposed schema, NOT implemented; §61b, docs/04 §22a, DB-ADR-068, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`). No source record id is stored (OD-15 respected).
+Family Registry Admission evidence (FB-FAMILY-ADD-01, 2026-11-01; approved constraints; schema foundation local since ADD-WP-04, workflow NOT implemented; §61b, docs/04 §22a, DB-ADR-068, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`). No source record id is stored (OD-15 respected).
 
 ### DD-ADR-036
 
@@ -4570,6 +4570,7 @@ Date: 2026-09-24
 | 1.2.41 | 2026-10-18 | Approved | FB-NOTIFY-01A (ADR FB-NOTIFY-01): §59 custom notification model (logical entities), §60 derivation from `workflow_events`, "Announcement and recipient" unified with system notifications; documentation only |
 | 1.2.42 | 2026-10-18 | Approved | FB-NOTIFY-01B.2a: §59 implemented data dictionary for `notification_messages`, `notification_recipients`, `notification_followups`, `notification_recipient_events` (commit `29a0b12`; DB vs application rules); verified on `famboook_test` only; local `famboook` and Production NOT migrated; not operational |
 | 1.2.43 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §61b proposed Family Registry Admission data, DD-ADR-037. No table exists |
+| 1.2.44 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (ADD-WP-04): §61b and DD-ADR-037 reflect the local schema foundation. Not operational |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1D: §45b `family_auth_identities.supersede_reason` gains `LINK_ENDED` (an ended link supersedes its identity); SUSPENDED reserved for a non-canonical stored National ID |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1C: §45b entities implemented as tables, models, enums and factories (no behaviour); §40 `users.email` nullable implemented; security events reference a challenge by `otp_challenge_uuid` without a foreign key |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1B: §45b Family Portal identity entities; §40 `users.email` nullable (approved, not migrated); §45a login identifier resolved (DD-ADR-032). Documentation only |

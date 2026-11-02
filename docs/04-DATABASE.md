@@ -767,11 +767,11 @@ Application logic additionally ensures active/inactive state consistency.
 
 ---
 
-# 22a. Family Registry Admission Tables (PROPOSED)
+# 22a. Family Registry Admission Tables (SCHEMA FOUNDATION ONLY)
 
-**Proposed schema, NOT implemented; no migration exists (2026-11-01, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9).**
-A later work package would add `family_registry_admissions` and
-`family_registry_admission_events` in one additive, forward-only migration.
+**Schema foundation implemented locally, uncommitted and not deployed (ADD-WP-04, 2026-11-01; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9). Direct admission is
+NOT operational: nothing reads or writes these tables.** Migration `2026_11_01_100000_create_family_registry_admission_tables` adds `family_registry_admissions` and
+`family_registry_admission_events`, both append-only on PostgreSQL. `down()` refuses once history exists.
 
 - No change to `identity_ref`, `persons`, `family_memberships` or `change_requests`: §20 and
   §21 and `uq_persons_national_id` stay the final guards.
@@ -4543,7 +4543,7 @@ The TweetsMS SMS integration added **no migration**. The OTP plaintext is never 
 FB-FAMILY-RECON-01 (2026-11-01; WP-02 documentation only) adds **no migration now**. §22b records the proposed extension; `docs/adr/FB-FAMILY-RECON-01-MEMBERSHIP-RECONCILIATION.md`. **Amended by WP-03 (2026-11-01):** the schema foundation migration now exists locally, uncommitted and not deployed; no workflow uses it.
 
 ### DB-ADR-068
-FB-FAMILY-ADD-01 (2026-11-01; WP-02 documentation only) adds **no migration now**. §22a records the proposed admission tables for a later work package; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
+FB-FAMILY-ADD-01 (2026-11-01; WP-02 documentation only) adds **no migration now**. §22a records the proposed admission tables for a later work package; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`. **Amended by ADD-WP-04 (2026-11-01):** the migration now exists locally, uncommitted and not deployed; no workflow uses it.
 
 ### DB-ADR-067
 Unified notifications database foundation, implemented in the repository (2026-10-18, FB-NOTIFY-01B.2a; local commit `29a0b12`; ADR FB-NOTIFY-01 and its §2a design alignment). Schema: §56 "Implemented physical schema".
@@ -4909,6 +4909,7 @@ Date: 2026-09-24
 | 1.2.54 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §22a proposed admission tables, DB-ADR-068. No migration |
 | 1.2.55 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): §22b proposed schema, DB-ADR-069. No migration |
 | 1.2.56 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-03C, documentation only): §22b and DB-ADR-069 corrected to the local schema foundation. Reconciliation not operational |
+| 1.2.57 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (ADD-WP-04): §22a and DB-ADR-068 reflect the local schema foundation. Not operational |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1D: migration `2026_10_14_090000` — `family_auth_identities.supersede_reason` CHECK allows `LINK_ENDED` (DB-ADR-044). No other schema change |
 | 1.2.25 | 2026-10-02 | Approved | PWA-1C: §55b implemented as schema, models and factories (seven migrations `2026_10_13_090000`–`090006`); coordinator uniqueness as three partial unique indexes, `otp_challenge_uuid` without a foreign key, open-challenge and CHECK-constraint notes, RESTRICT foreign keys, no backfill (DB-ADR-043) |
 | 1.2.24 | 2026-10-02 | Approved | PWA-1B: §55b Family Portal identity schema (approved design, no migration); §55a login identifier decided; PDB-020 resolved (DB-ADR-042). Documentation only |
