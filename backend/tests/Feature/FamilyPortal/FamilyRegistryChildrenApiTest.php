@@ -316,7 +316,7 @@ class FamilyRegistryChildrenApiTest extends TestCase
                 throw new CivilLookupException(CivilLookupException::UNAVAILABLE);
             }
 
-            public function recordOf(string $nationalId): ?CivilRecord
+            public function recordOf(string $nationalId, int $releaseId): ?CivilRecord
             {
                 throw new CivilLookupException(CivilLookupException::UNAVAILABLE);
             }
@@ -377,9 +377,10 @@ class FamilyRegistryChildrenApiTest extends TestCase
                 return $this->page ? ($this->page)($found) : $found;
             }
 
-            public function recordOf(string $nationalId): ?CivilRecord
+            public function recordOf(string $nationalId, int $releaseId): ?CivilRecord
             {
-                $found = $this->inner->recordOf($nationalId);
+                // The inner source has one release (1); the rewrite below stands for the faulty source.
+                $found = $this->inner->recordOf($nationalId, 1);
 
                 return $this->record ? ($this->record)($found) : $found;
             }

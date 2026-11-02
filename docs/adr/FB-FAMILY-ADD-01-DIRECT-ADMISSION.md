@@ -5,7 +5,8 @@ architecture. **NOT implemented, NOT activated, NOT approved for real registry d
 Production.** Every activation gate in §12 is OPEN.
 
 **Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, ADD-WP-06B-1 in
-`3bb64f4`, ADD-WP-06B-2 in `ec8f647`, not pushed; ADD-WP-06B-3 local, uncommitted; nothing deployed).**
+`3bb64f4`, ADD-WP-06B-2 in `ec8f647`, ADD-WP-06B-3 in `2b2ce02`, not pushed; ADD-WP-06B-4 local, uncommitted; nothing
+deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
@@ -17,12 +18,14 @@ Production.** Every activation gate in §12 is OPEN.
   classification and bounded, deterministic pagination (§5b). Nothing calls it.
 - **Implemented in ADD-WP-06B-1:** the page's registry facts read in one batch (§5b, "Batch facts").
 - **Implemented in ADD-WP-06B-2:** the opaque admission reference service (§7a). Nothing issues or reads references yet.
-- **Implemented in ADD-WP-06B-3 (local, uncommitted):** the guarded discovery route (§7b). It is unavailable in operation: the
+- **Implemented in ADD-WP-06B-3:** the guarded discovery route (§7b). It is unavailable in operation: the
   flag is `OFF`, no role holds the permission, and **no registry source is bound**, so even an open gate answers 503 without
   reading anything.
-- **Not implemented:** discovery against the real civil registry (no `RegistryChildSource` adapter exists, so the route is not
-  operational), issuing `ref` in a response, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
-  reference fingerprint context, pilot activation.
+- **Implemented in ADD-WP-06B-4 (local, uncommitted):** the precise source contract and a synthetic-only adapter under
+  `tests/` (§7c). The head's record is now read in the page's release.
+- **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
+  not operational), issuing `ref` in a response, the Family Portal UI, the admission action, the reference fingerprint context,
+  pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
 **Scope of this document:** the household head of an authenticated Family may discover
@@ -380,9 +383,9 @@ Gates G-01 … G-07 stay OPEN.
   (`page` only). Discovery refuses, before evaluating anything, a page with no release or a release below 1, a row or the head's
   record from another release, rows on a too-broad answer, a total that does not equal the rows, or another cap. The answer is
   the same `503 REGISTRY_UNAVAILABLE`, with no children and no audit row.
-- **Source contract (current; revisit in ADD-WP-06B-4).** A too-broad page must report exactly `total = LINKS_CAP + 1` (101)
-  and no rows, as `identity_ref_lookup.children()` caps it. A source reporting `total > 101` therefore fails closed with 503,
-  not 409. The adapter design (ADD-WP-06B-4) must revisit this before any source is bound.
+- **Source contract (settled in ADD-WP-06B-4, §7c).** A too-broad page must report exactly `total = LINKS_CAP + 1` (101)
+  and no rows: the bounded probe never learns a larger count. A source reporting `total > 101` breaks the contract and fails
+  closed with 503, not 409.
 - **Response (provisional until G-02).** `data.children[]` with exactly `display_name` (the first word of the name),
   `birth_year`, `status` (`ELIGIBLE`, `ALREADY_MEMBER`, `REQUEST_OPEN`, `NOT_ELIGIBLE`) and `ref`, always NULL; `data.meta` with
   `page`, `per_page` and `total`. No National ID (even masked), full birth date, relationship, reason, other household
@@ -395,6 +398,36 @@ Gates G-01 … G-07 stay OPEN.
   written, the answer is 503 and nothing is shown. Append-only on PostgreSQL; no retention rule (G-02).
 - **Open decisions kept open:** O-1 (GET with an audit row), O-3 (the over-cap answer, provisionally 409), O-5 (a missing permission answers 404,
   like a closed flag), and the response fields (G-02).
+
+## 7c. Source contract and synthetic adapter (ADD-WP-06B-4)
+
+**Implemented locally, uncommitted; not operational.** Gates G-01 … G-07 stay OPEN; D-06 is unchanged. Nothing is bound.
+
+- **Contract (`RegistryChildSource`).**
+  - `childrenOf(head, 0, 100)`: exact, non-empty `fatherid` / `motherid` matches in **one** published release, named by the page's
+    `releaseId` (NULL only when none is published), in a deterministic order, `cap` = `LINKS_CAP` (100).
+  - A **bounded probe**: the source reads at most 101 matches. `total` = min(matches, 101), so a larger count is never learnt,
+    reported or recorded. More than 100: no rows. Otherwise every match, and `count(rows) = total`. Every row carries the page's
+    release.
+  - `recordOf(id, releaseId)`: the head's record **in the page's release**, or NULL. If that release is no longer published:
+    `CivilLookupException RELEASE_CHANGED`, never a record of another release. Before ADD-WP-06B-4 the head was read in
+    "the active release", so a release published between the two reads could pass unnoticed when the head was missing in it.
+  - Read failures are `CivilLookupException`.
+- **Overflow versus integrity.** Both are decided before any child is evaluated:
+  - **Overflow:** a contract-conforming answer with more than 100 matches (`total = 101`, no rows) → `409 RESULT_SET_TOO_BROAD`,
+    recorded (`RESULT_SET_TOO_BROAD`, count 0).
+  - **Integrity failure:** a breach of the contract (no release, a row or the head from another release, rows on a too-broad
+    page, `total ≠ count(rows)`, `total > 101`, another cap) or a read failure, including `RELEASE_CHANGED` → `503
+    REGISTRY_UNAVAILABLE`, nothing shown, no audit row.
+- **Synthetic adapter.** `Tests\Support\FamilyPortal\SyntheticRegistryChildAdapter`: under `tests/` (autoload-dev, absent from a
+  `--no-dev` build), bound by no provider, and it refuses to be built outside the test runner. It reads no table: its records
+  come from a deterministic generator (synthetic IDs, two releases per child, interleaved other parents). It scans lazily and
+  stops at the 101st match, so it holds at most 100 rows.
+- **Limitations.** The adapter is a contract and test aid, not a model of the real registry's cost: its scan is linear in the
+  synthetic dataset where a real adapter uses an index. It knows one published release at a time, and duplicate or anomalous
+  records exist only when a test makes them. The synthetic measurements (constant queries per page, bounded rows and memory)
+  are not Production performance.
+- **Not changed:** the API response contract, `RegistryAdmissionRefs`, the permission (no role), the flag (`OFF`).
 
 ## 8. Privacy protections
 

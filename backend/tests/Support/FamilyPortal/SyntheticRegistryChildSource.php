@@ -2,6 +2,7 @@
 
 namespace Tests\Support\FamilyPortal;
 
+use App\Exceptions\CivilLookupException;
 use App\Support\CivilLookup\CivilRecord;
 use App\Support\CivilLookup\CivilRecordPage;
 use App\Support\CivilLookup\CivilRegistrySource;
@@ -53,11 +54,14 @@ final class SyntheticRegistryChildSource implements RegistryChildSource
         return new CivilRecordPage(1, $total, $total > $cap ? [] : array_slice($hits, $offset, $limit), $cap);
     }
 
-    public function recordOf(string $nationalId): ?CivilRecord
+    public function recordOf(string $nationalId, int $releaseId): ?CivilRecord
     {
         $this->calls[] = ['recordOf', $nationalId, 0, 1];
+        if ($releaseId !== 1) {
+            throw new CivilLookupException(CivilLookupException::RELEASE_CHANGED);
+        }
         foreach ($this->records as $record) {
-            if ($record->mainid === $nationalId) {
+            if ($record->mainid === $nationalId && $record->releaseId === $releaseId) {
                 return $record;
             }
         }

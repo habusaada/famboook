@@ -16,9 +16,11 @@ use LogicException;
 
 /**
  * Internal, read-only discovery of the signed-in household head's suggested children
- * (FB-FAMILY-ADD-01 ADD-WP-06A; ADR §5, §7 Discovery, §8). Not wired to any route,
- * job, command or listener, and it does not read the flag: that is the entry point's
- * job (E-1), in a later work package.
+ * (FB-FAMILY-ADD-01 ADD-WP-06A; ADR §5, §7 Discovery, §8). Its only caller is the
+ * guarded GET /api/v1/family/household/registry-children (ADD-WP-06B-3, ADR §7b),
+ * which checks the flag (OFF by default), the permission and the limits; discovery
+ * itself reads none of them. No operational source is bound, so that route is not
+ * operational, and there is no admission endpoint. No job, command or listener.
  *
  * - The parent is the head of the family.context result, never a supplied value.
  * - Parentage is fatherid / motherid only, exact (G-03 open: provisional). A record
@@ -35,6 +37,8 @@ use LogicException;
  *   reports, never a supplied value. No release, a row or the head's record from
  *   another release, rows on a too-broad answer, or a total that does not match the
  *   rows throw RegistryChildSourceIntegrityException before anything is evaluated.
+ *   The head's record is then read in that same release (ADD-WP-06B-4): a release
+ *   published in between is RELEASE_CHANGED from the source.
  */
 final class SuggestedChildrenDiscovery
 {
@@ -70,7 +74,8 @@ final class SuggestedChildrenDiscovery
         }
         ksort($groups, SORT_STRING);
 
-        $headRecord = $this->source->recordOf($headId);
+        // The head is read in the page's release (ADD-WP-06B-4): a release published in between is RELEASE_CHANGED.
+        $headRecord = $this->source->recordOf($headId, $found->releaseId);
         if ($headRecord !== null && $headRecord->releaseId !== $found->releaseId) {
             throw new RegistryChildSourceIntegrityException;
         }
