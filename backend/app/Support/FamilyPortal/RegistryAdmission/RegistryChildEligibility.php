@@ -26,13 +26,19 @@ use LogicException;
  * - It never reads or writes identity_ref: the record is passed in.
  * - Every applicable reason is collected, so a later gate change cannot hide another.
  *   While gates G-04 and G-05 are open, no record can be ELIGIBLE.
+ * - Discovery passes the page's RegistryChildFacts (ADD-WP-06B-1) so the registry is
+ *   read once per page; without them each record is read on its own. The rules below
+ *   are the same either way: only where the facts come from differs.
  */
 final class RegistryChildEligibility
 {
-    public static function evaluate(FamilyAccessResult $context, CivilRecord $record): RegistryChildAssessment
+    public static function evaluate(FamilyAccessResult $context, CivilRecord $record, ?RegistryChildFacts $facts = null): RegistryChildAssessment
     {
         if (! $context->hasFamilyContext()) {
             throw new LogicException('A suggested child is evaluated only for an eligible household head.');
+        }
+        if ($facts !== null && $facts->familyId !== (int) $context->family->getKey()) {
+            throw new LogicException('The facts were read for another household.');
         }
         $headId = FamilyNationalId::normalize($context->person->national_id)
             ?? throw new LogicException('An eligible household head has a nine-digit National ID.');
@@ -50,7 +56,7 @@ final class RegistryChildEligibility
         } elseif ($record->mainid === $headId) {
             $reasons[] = Reason::IS_HEAD;
         } else {
-            array_push($reasons, ...self::registryReasons($context, $record->mainid));
+            array_push($reasons, ...self::registryReasons($context, $record->mainid, $facts));
         }
 
         if (CivilRegistryValues::fullName($record) === null) {
@@ -76,11 +82,21 @@ final class RegistryChildEligibility
         );
     }
 
+    /**
+     * Whether evaluate() reads the application registry for this record, i.e. which
+     * National IDs a page's RegistryChildFacts must cover.
+     */
+    public static function readsRegistry(FamilyAccessResult $context, CivilRecord $record): bool
+    {
+        return CivilRegistryValues::validNationalId($record->mainid)
+            && $record->mainid !== FamilyNationalId::normalize($context->person->national_id);
+    }
+
     /** @return list<Reason> E-7 … E-9 from the application registry, read without locks. */
-    private static function registryReasons(FamilyAccessResult $context, string $nationalId): array
+    private static function registryReasons(FamilyAccessResult $context, string $nationalId, ?RegistryChildFacts $facts): array
     {
         $reasons = [];
-        $matches = NationalIdGuard::equivalentMatches($nationalId);
+        $matches = $facts?->holders($nationalId) ?? NationalIdGuard::equivalentMatches($nationalId);
         if ($matches->count() > 1) {
             $reasons[] = Reason::AMBIGUOUS_HOLDERS;
         } elseif (($holder = $matches->first()) !== null) {
@@ -92,11 +108,11 @@ final class RegistryChildEligibility
             } elseif (! FamilyMemberIdentity::attachable($holder)) {
                 $reasons[] = Reason::PERSON_NOT_ATTACHABLE;
             }
-        } elseif (NationalIdGuard::heldByDeleted($nationalId)) {
+        } elseif ($facts?->heldByDeleted($nationalId) ?? NationalIdGuard::heldByDeleted($nationalId)) {
             $reasons[] = Reason::SOFT_DELETED_HOLDER;
         }
 
-        $open = ChangeRequest::query()
+        $open = $facts?->requestOpen($nationalId) ?? ChangeRequest::query()
             ->where('family_id', $context->family->getKey())
             ->where('type', ChangeRequestType::ADD_FAMILY_MEMBER)
             ->whereIn('status', ChangeRequestStatus::open())

@@ -27,7 +27,8 @@ use LogicException;
  *   only the cross-record reasons it alone can see (duplicate rows, contradictory
  *   parent links). Nothing can be admitted from here.
  * - It reads at most CivilRegistrySource::LINKS_CAP source records in one call,
- *   orders them by National ID and evaluates only the requested page.
+ *   orders them by National ID and evaluates only the requested page, reading the
+ *   page's registry facts in one batch (RegistryChildFacts, ADD-WP-06B-1).
  * - It writes nothing and stores or caches nothing.
  */
 final class SuggestedChildrenDiscovery
@@ -65,10 +66,19 @@ final class SuggestedChildrenDiscovery
 
         $headParents = $this->parentsOf($this->source->recordOf($headId));
         $siblings = array_map('strval', array_keys($groups));
-        $children = [];
+        $pageGroups = [];
         foreach (array_slice($groups, ($page - 1) * $perPage, $perPage, true) as $records) {
             usort($records, fn (CivilRecord $a, CivilRecord $b) => $a->recordId <=> $b->recordId);
-            $children[] = $this->present($context, $records[0], count($records) > 1, $headParents, $siblings, $headId);
+            $pageGroups[] = $records;
+        }
+        $facts = RegistryChildFacts::load($context->family, array_values(array_map(
+            fn (array $records) => $records[0]->mainid,
+            array_filter($pageGroups, fn (array $records) => RegistryChildEligibility::readsRegistry($context, $records[0])),
+        )));
+
+        $children = [];
+        foreach ($pageGroups as $records) {
+            $children[] = $this->present($context, $records[0], count($records) > 1, $headParents, $siblings, $headId, $facts);
         }
 
         return new SuggestedChildrenPage($children, $page, $perPage, count($groups));
@@ -78,9 +88,9 @@ final class SuggestedChildrenDiscovery
      * @param  list<string>  $headParents
      * @param  list<string>  $siblings
      */
-    private function present(FamilyAccessResult $context, CivilRecord $record, bool $duplicated, array $headParents, array $siblings, string $headId): SuggestedChild
+    private function present(FamilyAccessResult $context, CivilRecord $record, bool $duplicated, array $headParents, array $siblings, string $headId, RegistryChildFacts $facts): SuggestedChild
     {
-        $assessment = RegistryChildEligibility::evaluate($context, $record);
+        $assessment = RegistryChildEligibility::evaluate($context, $record, $facts);
         $extra = [];
         if ($duplicated) {
             $extra[] = Reason::DUPLICATE_SOURCE_ROWS;

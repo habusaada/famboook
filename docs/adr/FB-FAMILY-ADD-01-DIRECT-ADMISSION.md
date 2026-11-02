@@ -4,8 +4,8 @@
 architecture. **NOT implemented, NOT activated, NOT approved for real registry data or
 Production.** Every activation gate in §12 is OPEN.
 
-**Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, not pushed; ADD-WP-06A local, uncommitted;
-nothing deployed).**
+**Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, not pushed;
+ADD-WP-06B-1 local, uncommitted; nothing deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
@@ -13,8 +13,9 @@ nothing deployed).**
   (migration `2026_11_01_100000_create_family_registry_admission_tables`), which nothing reads or writes.
 - **Implemented in ADD-WP-05:** an internal strict value adapter, a fail-closed proof-of-life evaluator
   and a read-only eligibility evaluation, in `App\Support\FamilyPortal\RegistryAdmission` (§5a). Nothing calls them yet.
-- **Implemented in ADD-WP-06A (local, uncommitted):** an internal, read-only discovery service over synthetic sources only,
-  with privacy-safe classification and bounded, deterministic pagination (§5b). Nothing calls it.
+- **Implemented in ADD-WP-06A:** an internal, read-only discovery service over synthetic sources only, with privacy-safe
+  classification and bounded, deterministic pagination (§5b). Nothing calls it.
+- **Implemented in ADD-WP-06B-1 (local, uncommitted):** the page's registry facts read in one batch (§5b, "Batch facts").
 - **Not implemented:** the operational API, discovery against the real civil registry (no `RegistryChildSource` adapter exists),
   the opaque `ref`, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
   reference fingerprint context, pilot activation.
@@ -185,8 +186,8 @@ admission, inside the locks of §10. Any failure refuses the admission.
 
 ## 5b. Internal discovery service (ADD-WP-06A)
 
-**Implemented locally, internal only, uncommitted. No route, controller, job, command or listener uses it; the flag is not read
-here (E-1 belongs to the entry point).** Gates G-01 … G-07 stay OPEN; D-06 is unchanged.
+**Implemented locally, internal only (ADD-WP-06A committed; ADD-WP-06B-1 uncommitted). No route, controller, job, command or
+listener uses it; the flag is not read here (E-1 belongs to the entry point).** Gates G-01 … G-07 stay OPEN; D-06 is unchanged.
 
 - **Source.** `SuggestedChildrenDiscovery` reads only through `RegistryChildSource`, a two-method read-only interface
   (`childrenOf`, `recordOf`) with the `identity_ref_lookup.children()` contract. It is **not bound in the container**, so only
@@ -206,10 +207,31 @@ here (E-1 belongs to the entry point).** Gates G-01 … G-07 stay OPEN; D-06 is 
 - **Paging.** One source call reads at most `CivilRegistrySource::LINKS_CAP` (100) matches; more than that lists nothing
   (`tooBroad`). Children are ordered by National ID, deduplicated, and only the requested page is evaluated; page size 25 by
   default, at most 100.
+- **Batch facts (ADD-WP-06B-1).** `RegistryChildFacts::load()` reads, once per page and for at most 100 valid National IDs, what
+  `evaluate()` used to read per child: equivalent holders, a soft-deleted exact holder and an open `ADD_FAMILY_MEMBER` request of
+  this Family. `evaluate()` takes the facts as an optional argument; the rules are the same code either way, and without facts it
+  reads per record as before (the admission action's path under locks). Two holder strategies, chosen on every build:
+  - `INDEXED_EXACT` on PostgreSQL **only when the catalog shows** the validated CHECK `chk_person_national_id_format` and the
+    valid unique index `uq_persons_national_id`. Then every stored value is nine ASCII digits, `NationalId::normalize()` is the
+    identity on them, and an exact `IN` match equals the equivalent match. The migration file alone is not trusted; a `NOT VALID`
+    CHECK or a dropped constraint selects the fallback.
+  - `NORMALIZED_SCAN` otherwise (SQLite, legacy data): **one** chunked pass over `persons` per page instead of one per child, with
+    the same normalization, the same `MAX_MATCHES + 1` cap and the same early stop. It still grows with the number of Persons.
+- **Measured (synthetic, 2,500 bulk Persons plus fixtures; test cluster and SQLite).** Application queries to read the facts:
+
+  | Path | 1 child | 25 children |
+  |---|---|---|
+  | PostgreSQL, `INDEXED_EXACT` | 7 | 7 |
+  | SQLite, `NORMALIZED_SCAN` (3 chunk queries) | 8 | 8 |
+  | Per record, before (both drivers) | — | 133 |
+
+  On PostgreSQL `EXPLAIN` of the holder query shows `Index Scan using uq_persons_national_id`, with no sequential scan of
+  `persons`. Compatibility: for canonical and legacy formats (Arabic and Persian digits, separators, ambiguity above the cap,
+  soft-deleted and historical holders, open, cancelled and other-family requests, malformed IDs and the head), the batched
+  reasons equal the per-record reasons on both drivers.
 - **Known limits.** The real `children()` orders by normalized name; discovery re-sorts the capped set itself, so paging does not
-  depend on the source order. Each evaluated child still costs a few registry queries, and `NationalIdGuard::equivalentMatches()`
-  scans every Person with a National ID in chunks: bounded by the page, not by the source, but a cost to address before any
-  real use. A synthetic source cannot show real-data performance.
+  depend on the source order. The fallback still reads every Person with a National ID once per page. Whether Production has the
+  validated constraints is not verified here. A synthetic source cannot show real-data performance.
 
 ## 6. The declaration
 
