@@ -1487,7 +1487,7 @@ on the test instance and a real browser
     - **Exists locally:** migration, `HOUSEHOLD_RECONCILIATION`, channel `STAFF`, `household_reconciliation.mode` (default and fail-closed `OFF`, read by nothing yet), four permission definitions with no role grant;
     - **Does not exist:** handler, endpoint, review or apply rules, membership ending, household creation, R-03, R-06, R-07 and R-08 behavior, UI;
     - **Next (RM-ADR-072):** WP-04 eligibility and the atomic Domain Action, with deadlock tests. Role grants and activation each need a separate approval.
-- **FB-FAMILY-ADD-01 — Direct admission of civil-verified sons and daughters: decisions approved 2026-11-01; WP-03 refactor committed; ADD-WP-04 foundation local and uncommitted (flag, permission definition, evidence and event tables); discovery, admission, API and UI NOT implemented; NOT activated** (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`):
+- **FB-FAMILY-ADD-01 — Direct admission of civil-verified sons and daughters: decisions approved 2026-11-01; WP-03 refactor committed; ADD-WP-04 foundation and ADD-WP-05 strict eligibility committed locally (`a2bfbdb`); ADD-WP-06A internal synthetic discovery local and uncommitted; operational API, real-registry discovery, admission and UI NOT implemented; NOT activated** (`docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`):
     - narrow exception to the Change Request rule, behind `family_registry_admission.mode`, default `OFF`;
     - **Open gates:** G-01 legal basis, G-02 adult children's data, G-03 parent-link semantics, G-04 gender codes, G-05 death status, G-06 tests, G-07 activation approval;
     - **Order (RM-ADR-071):** WP-03 shared eligibility extraction; WP-04 verified code mapping; WP-05 migration, flag and permission; WP-06 discovery; WP-07 admission; WP-08 Arabic UI; WP-09 PostgreSQL, concurrency and integrity tests; WP-10 security review and activation plan.
@@ -4988,6 +4988,9 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-075
+FB-FAMILY-ADD-01 ADD-WP-06A (2026-11-02): internal read-only discovery of suggested children over an unbound `RegistryChildSource`, synthetic sources only, local and uncommitted; nothing calls it. Classification reuses the ADD-WP-05 evaluation, plus duplicate-row and parentage-anomaly refusals; bounded (100) and deterministic paging. Not implemented: operational API, real-registry adapter, `ref`, UI, admission, pilot activation. Gates G-01 … G-07 OPEN. ADR §5b; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
+
 ### RM-ADR-074
 FB-FAMILY-ADD-01 ADD-WP-05 (2026-11-02): internal strict value adapter with provisional mappings, fail-closed proof of life (no ALIVE outcome) and read-only eligibility evaluation with a unified NOT_ELIGIBLE, local and uncommitted; nothing calls them. No record can be eligible while G-04 and G-05 are open. ADR §5a; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md`.
 
@@ -5364,6 +5367,7 @@ Date: 2026-09-24
 | 1.2.78 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 WP-03C (documentation only): progress note, RM-ADR-072. Foundation local and uncommitted; not operational |
 | 1.2.79 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 ADD-WP-04: progress note, RM-ADR-073. Foundation local and uncommitted; not operational |
 | 1.2.80 | 2026-11-02 | Approved | FB-FAMILY-ADD-01 ADD-WP-05: RM-ADR-074. Internal adapter and fail-closed evaluation, local and uncommitted; not operational |
+| 1.2.81 | 2026-11-02 | Approved | FB-FAMILY-ADD-01 ADD-WP-06A: RM-ADR-075. Internal synthetic discovery, local and uncommitted; not operational |
 | 1.2.28 | 2026-10-02 | Approved | PWA-1D done (resolver, identity service, link lifecycle actions, correction and death integration, account sides and Staff API boundary); PWA-1E next |
 | 1.2.27 | 2026-10-02 | Approved | PWA-1C done (schema, models, normalizers, keyed fingerprints, role and permission seeding; foundation only); PWA-1D next; coordinator assist grant moved to PWA-1H |
 | 1.2.26 | 2026-10-02 | Approved | PWA-1B: §31a program status (PWA-0, PWA-1A, PWA-1B done; PWA-1C next), PWA-1 slices C … I absorbing the former PWA-2 scope, Production activation gate and FU-01 rollout gate (RM-ADR-042). Documentation only |

@@ -4,15 +4,19 @@
 architecture. **NOT implemented, NOT activated, NOT approved for real registry data or
 Production.** Every activation gate in §12 is OPEN.
 
-**Implementation status (ADD-WP-04, 2026-11-01; local, uncommitted, not deployed).**
+**Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, not pushed; ADD-WP-06A local, uncommitted;
+nothing deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
   `family-member.admit-from-registry`, assigned to no role and checked nowhere; the evidence and event tables of §9
   (migration `2026_11_01_100000_create_family_registry_admission_tables`), which nothing reads or writes.
-- **Implemented in ADD-WP-05 (local, uncommitted):** an internal strict value adapter, a fail-closed proof-of-life evaluator
+- **Implemented in ADD-WP-05:** an internal strict value adapter, a fail-closed proof-of-life evaluator
   and a read-only eligibility evaluation, in `App\Support\FamilyPortal\RegistryAdmission` (§5a). Nothing calls them yet.
-- **Not implemented:** discovery, the admission action, the operational API, the Family Portal UI, the PILOT allowlist, the
+- **Implemented in ADD-WP-06A (local, uncommitted):** an internal, read-only discovery service over synthetic sources only,
+  with privacy-safe classification and bounded, deterministic pagination (§5b). Nothing calls it.
+- **Not implemented:** the operational API, discovery against the real civil registry (no `RegistryChildSource` adapter exists),
+  the opaque `ref`, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
   reference fingerprint context, pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
@@ -178,6 +182,34 @@ admission, inside the locks of §10. Any failure refuses the admission.
   REQUEST_OPEN is shown only when no undisclosable reason applies. Another household, a death, a deleted or unattachable record and
   every internal reason stay internal. While G-04 and G-05 are open, ELIGIBLE cannot occur.
 - **No schema change.** Nothing here needed a table.
+
+## 5b. Internal discovery service (ADD-WP-06A)
+
+**Implemented locally, internal only, uncommitted. No route, controller, job, command or listener uses it; the flag is not read
+here (E-1 belongs to the entry point).** Gates G-01 … G-07 stay OPEN; D-06 is unchanged.
+
+- **Source.** `SuggestedChildrenDiscovery` reads only through `RegistryChildSource`, a two-method read-only interface
+  (`childrenOf`, `recordOf`) with the `identity_ref_lookup.children()` contract. It is **not bound in the container**, so only
+  code that passes a source explicitly can run discovery; today that is the tests, with synthetic records. An adapter over
+  `CivilRegistrySource` needs its own approved work package (and `09-lookup-indexes.dba.sql`, G-06 / G-07).
+- **Parent.** The head's National ID comes from the family.context result, never from a caller. Parentage is exact
+  `fatherid` / `motherid` (G-03, provisional). A returned record naming the head as neither parent is dropped. Marriage,
+  polygamy or heading another household never hides a child (D-07).
+- **Classification.** Each listed child is classified by `RegistryChildEligibility::evaluate()` (§5a), unchanged. Discovery adds
+  two internal reasons only it can see: `DUPLICATE_SOURCE_ROWS` (one National ID in several rows: listed once, the lowest record
+  id standing for the group) and `PARENTAGE_ANOMALY` (the head's own record names the child as a parent, or the child's other
+  parent is the child or another suggested child). Both refuse.
+- **Result.** An internal DTO per child: full name, masked National ID (`NationalIdMask`), birth date in the observed shape or
+  NULL, relationship and status. The relationship is NULL unless the gender mapping is approved (G-04) and the status is not
+  `NOT_ELIGIBLE`, so it is always NULL today. No reason, other household, membership, record id or payload field is carried.
+  No `ref` is issued yet. Nothing is stored or cached.
+- **Paging.** One source call reads at most `CivilRegistrySource::LINKS_CAP` (100) matches; more than that lists nothing
+  (`tooBroad`). Children are ordered by National ID, deduplicated, and only the requested page is evaluated; page size 25 by
+  default, at most 100.
+- **Known limits.** The real `children()` orders by normalized name; discovery re-sorts the capped set itself, so paging does not
+  depend on the source order. Each evaluated child still costs a few registry queries, and `NationalIdGuard::equivalentMatches()`
+  scans every Person with a National ID in chunks: bounded by the page, not by the source, but a cost to address before any
+  real use. A synthetic source cannot show real-data performance.
 
 ## 6. The declaration
 

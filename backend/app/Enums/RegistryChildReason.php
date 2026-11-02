@@ -36,4 +36,9 @@ enum RegistryChildReason: string
     case DECEASED = 'DECEASED';
     // E-6, D-06: no approved proof of life (gate G-05), or an invalid death date.
     case LIFE_UNVERIFIED = 'LIFE_UNVERIFIED';
+    // Discovery (ADD-WP-06A): the source returned the same National ID more than once.
+    case DUPLICATE_SOURCE_ROWS = 'DUPLICATE_SOURCE_ROWS';
+    // Discovery (ADD-WP-06A): the parent links contradict each other, e.g. the head's own
+    // record names this child as the head's parent, or a sibling as the child's parent.
+    case PARENTAGE_ANOMALY = 'PARENTAGE_ANOMALY';
 }
