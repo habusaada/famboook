@@ -32,4 +32,7 @@ enum FingerprintContext: string
     case CIVIL_LOOKUP_QUERY = 'famboook.civil-lookup.query.v1:';
     // The client IP of a Civil Registry Lookup event (same audit).
     case CIVIL_LOOKUP_IP = 'famboook.civil-lookup.ip.v1:';
+    // The client IP of a direct-admission event (FB-FAMILY-ADD-01 ADD-WP-06B-3,
+    // family_registry_admission_events.ip_hash). Never returned.
+    case FAMILY_REGISTRY_ADMISSION_IP = 'famboook.family-registry-admission.ip.v1:';
 }

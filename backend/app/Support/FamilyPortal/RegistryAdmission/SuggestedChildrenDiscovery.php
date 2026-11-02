@@ -6,6 +6,7 @@ use App\Enums\Gender;
 use App\Enums\RegistryChildReason as Reason;
 use App\Enums\RegistryChildStatus;
 use App\Support\CivilLookup\CivilRecord;
+use App\Support\CivilLookup\CivilRecordPage;
 use App\Support\CivilLookup\CivilRegistrySource;
 use App\Support\FamilyAuth\FamilyAccessResult;
 use App\Support\FamilyAuth\FamilyNationalId;
@@ -30,6 +31,10 @@ use LogicException;
  *   orders them by National ID and evaluates only the requested page, reading the
  *   page's registry facts in one batch (RegistryChildFacts, ADD-WP-06B-1).
  * - It writes nothing and stores or caches nothing.
+ * - Release integrity (ADD-WP-06B-3R): the release is the one the source's own page
+ *   reports, never a supplied value. No release, a row or the head's record from
+ *   another release, rows on a too-broad answer, or a total that does not match the
+ *   rows throw RegistryChildSourceIntegrityException before anything is evaluated.
  */
 final class SuggestedChildrenDiscovery
 {
@@ -51,8 +56,9 @@ final class SuggestedChildrenDiscovery
             ?? throw new LogicException('An eligible household head has a nine-digit National ID.');
 
         $found = $this->source->childrenOf($headId, 0, CivilRegistrySource::LINKS_CAP);
+        $this->assertConsistent($found);
         if ($found->tooBroad()) {
-            return new SuggestedChildrenPage([], $page, $perPage, 0, tooBroad: true);
+            return new SuggestedChildrenPage([], $page, $perPage, 0, tooBroad: true, releaseId: $found->releaseId);
         }
 
         // One entry per National ID; the lowest record id stands for its duplicates.
@@ -64,7 +70,11 @@ final class SuggestedChildrenDiscovery
         }
         ksort($groups, SORT_STRING);
 
-        $headParents = $this->parentsOf($this->source->recordOf($headId));
+        $headRecord = $this->source->recordOf($headId);
+        if ($headRecord !== null && $headRecord->releaseId !== $found->releaseId) {
+            throw new RegistryChildSourceIntegrityException;
+        }
+        $headParents = $this->parentsOf($headRecord);
         $siblings = array_map('strval', array_keys($groups));
         $pageGroups = [];
         foreach (array_slice($groups, ($page - 1) * $perPage, $perPage, true) as $records) {
@@ -81,7 +91,23 @@ final class SuggestedChildrenDiscovery
             $children[] = $this->present($context, $records[0], count($records) > 1, $headParents, $siblings, $headId, $facts);
         }
 
-        return new SuggestedChildrenPage($children, $page, $perPage, count($groups));
+        return new SuggestedChildrenPage($children, $page, $perPage, count($groups), releaseId: $found->releaseId);
+    }
+
+    /** The page names one valid release, and its rows and total agree with it. */
+    private function assertConsistent(CivilRecordPage $found): void
+    {
+        $cap = CivilRegistrySource::LINKS_CAP;
+        $consistent = $found->releaseId !== null && $found->releaseId >= 1 && $found->cap === $cap
+            && ($found->tooBroad()
+                ? $found->rows === [] && $found->total === $cap + 1
+                : $found->total >= 0 && count($found->rows) === $found->total);
+        foreach ($found->rows as $record) {
+            $consistent = $consistent && $record->releaseId === $found->releaseId;
+        }
+        if (! $consistent) {
+            throw new RegistryChildSourceIntegrityException;
+        }
     }
 
     /**

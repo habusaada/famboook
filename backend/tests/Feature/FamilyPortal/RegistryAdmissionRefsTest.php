@@ -294,7 +294,8 @@ class RegistryAdmissionRefsTest extends TestCase
     {
         foreach (Route::getRoutes() as $route) {
             $this->assertStringNotContainsString('RegistryAdmission', (string) $route->getActionName());
-            $this->assertStringNotContainsString('registry-children', $route->uri());
+            // ADD-WP-06B-3 added the read-only discovery GET (ref = null); no admission route exists.
+            $this->assertStringNotContainsString('admissions', $route->uri());
         }
         // Only the RegistryAdmission support namespace may name the class.
         $users = [];

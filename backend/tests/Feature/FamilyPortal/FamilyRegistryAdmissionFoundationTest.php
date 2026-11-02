@@ -82,12 +82,15 @@ class FamilyRegistryAdmissionFoundationTest extends TestCase
         $this->assertSame(HouseholdReconciliationMode::ON, HouseholdReconciliationPolicy::mode());
     }
 
-    public function test_setting_the_flag_on_opens_no_route(): void
+    // ADD-WP-06B-3: the one route is the guarded, read-only discovery; there is still no admission route.
+    public function test_the_only_route_is_the_guarded_discovery_read(): void
     {
-        foreach (['PILOT', 'ON'] as $mode) {
+        foreach (['OFF', 'PILOT', 'ON'] as $mode) {
             config(['family_registry_admission.mode' => $mode]);
-            $uris = collect(Route::getRoutes()->getRoutes())->map(fn ($route) => $route->uri());
-            $this->assertSame([], $uris->filter(fn (string $uri) => preg_match('/registry-children|admissions|suggested/', $uri) === 1)->values()->all(), $mode);
+            $routes = collect(Route::getRoutes()->getRoutes())->filter(fn ($route) => preg_match('/registry-children|admissions|suggested/', $route->uri()) === 1);
+            $this->assertSame(['api/v1/family/household/registry-children'], $routes->map(fn ($route) => $route->uri())->values()->all(), $mode);
+            $this->assertSame(['GET', 'HEAD'], $routes->first()->methods(), $mode);
+            $this->assertContains('family.registry-discovery', $routes->first()->gatherMiddleware(), $mode);
         }
     }
 

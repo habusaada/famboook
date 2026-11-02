@@ -248,6 +248,12 @@ class FamilySideBoundaryTest extends TestCase
                 'api/v1/family/household/needs', 'api/v1/family/household/assistance'], true)) {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context'], $middleware);
             }
+            // Suggested children (FB-FAMILY-ADD-01 ADD-WP-06B-3): the same boundary, then its own gate
+            // (flag, permission and limits); GET only.
+            if ($route->uri() === 'api/v1/family/household/registry-children') {
+                $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.registry-discovery'], $middleware);
+                $this->assertSame(['GET', 'HEAD'], $route->methods());
+            }
             // Self sensitive-value reveal (PWA-3B.2): the same boundary plus its own throttle.
             if ($route->uri() === 'api/v1/family/self/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-self-reveal'], $middleware);

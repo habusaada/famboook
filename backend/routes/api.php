@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyNotificationController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
+use App\Http\Controllers\Api\V1\Family\FamilyRegistryChildrenController;
 use App\Http\Controllers\Api\V1\Family\FamilySelfController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
 use App\Http\Controllers\Api\V1\FamilyActivityController;
@@ -163,6 +164,14 @@ Route::prefix('family')->group(function () use ($civilLookupEndpoints) {
             // chooses a Family, member or Person.
             Route::get('/household/needs', [FamilyHouseholdController::class, 'needs']);
             Route::get('/household/assistance', [FamilyHouseholdController::class, 'assistance']);
+
+            // Suggested children from the civil registry (FB-FAMILY-ADD-01 ADD-WP-06B-3):
+            // read-only, `page` only, the head from family.context. Closed: the flag
+            // (OFF by default), a permission no role holds and the per-user limits, all
+            // in family.registry-discovery; and no registry source is bound, so even an
+            // open gate answers 503 without reading anything.
+            Route::get('/household/registry-children', [FamilyRegistryChildrenController::class, 'index'])
+                ->middleware('family.registry-discovery');
 
             // Household-member sensitive-value reveal (PWA-3B.4): one field of
             // ANOTHER member, named by the opaque member_ref (FU-13) and

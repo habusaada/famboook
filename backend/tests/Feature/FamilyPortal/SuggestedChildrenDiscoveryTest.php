@@ -369,12 +369,15 @@ class SuggestedChildrenDiscoveryTest extends TestCase
     }
 
     // 20
-    public function test_no_route_reaches_discovery(): void
+    // ADD-WP-06B-3: one guarded GET route reaches discovery, and no source is bound for it.
+    public function test_only_the_guarded_route_reaches_discovery(): void
     {
-        foreach (Route::getRoutes() as $route) {
-            $this->assertStringNotContainsString('registry-children', $route->uri());
-            $this->assertStringNotContainsString('RegistryAdmission', (string) $route->getActionName());
-        }
-        $this->assertSame([], glob(app_path('Http/Controllers/**/*RegistryChild*')) ?: []);
+        $routes = collect(Route::getRoutes()->getRoutes())->filter(fn ($route) => str_contains($route->uri(), 'registry-children')
+            || str_contains((string) $route->getActionName(), 'RegistryChildren') || str_contains((string) $route->getActionName(), 'RegistryAdmission'));
+        $this->assertSame(['api/v1/family/household/registry-children'], $routes->map(fn ($route) => $route->uri())->values()->all());
+        $this->assertSame(['GET', 'HEAD'], $routes->first()->methods());
+        $this->assertContains('family.context', $routes->first()->gatherMiddleware());
+        $this->assertContains('family.registry-discovery', $routes->first()->gatherMiddleware());
+        $this->assertFalse($this->app->bound(RegistryChildSource::class));
     }
 }

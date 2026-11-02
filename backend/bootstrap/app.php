@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsureNotificationPublicationReady;
 use App\Http\Middleware\EnsurePasswordChangeEnabled;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
+use App\Http\Middleware\EnsureRegistryDiscoveryAvailable;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SendSmsAfterResponse;
@@ -53,6 +54,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'coordinator.space' => EnsureCoordinatorSpace::class,
             // Family data (PWA-3A): the server-resolved Family context.
             'family.context' => EnsureFamilyContext::class,
+            // FB-FAMILY-ADD-01: suggested children discovery (flag, permission, limits); after family.context.
+            'family.registry-discovery' => EnsureRegistryDiscoveryAvailable::class,
             // OTP SMS after the response, same process, no queue (A′).
             'sms.after-response' => SendSmsAfterResponse::class,
             // Notification publication readiness (FB-NOTIFY-01B.2b): after

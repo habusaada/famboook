@@ -41,6 +41,7 @@ return [
     'GET api/v1/family/household/members',
     'GET api/v1/family/household/needs',
     'GET api/v1/family/household/profile',
+    'GET api/v1/family/household/registry-children',
     'GET api/v1/family/me',
     'GET api/v1/family/notifications',
     'GET api/v1/family/notifications/archive',

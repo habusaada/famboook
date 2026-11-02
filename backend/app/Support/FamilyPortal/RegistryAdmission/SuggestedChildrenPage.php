@@ -13,5 +13,7 @@ final class SuggestedChildrenPage
         public readonly int $total,
         /** More matches than the source cap: nothing is listed, and nothing is guessed. */
         public readonly bool $tooBroad = false,
+        /** The release the source's own page reported (for audit). Discovery refuses a page without one. */
+        public readonly ?int $releaseId = null,
     ) {}
 }

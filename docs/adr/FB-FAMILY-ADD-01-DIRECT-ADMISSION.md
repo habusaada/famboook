@@ -5,7 +5,7 @@ architecture. **NOT implemented, NOT activated, NOT approved for real registry d
 Production.** Every activation gate in §12 is OPEN.
 
 **Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, ADD-WP-06B-1 in
-`3bb64f4`, not pushed; ADD-WP-06B-2 local, uncommitted; nothing deployed).**
+`3bb64f4`, ADD-WP-06B-2 in `ec8f647`, not pushed; ADD-WP-06B-3 local, uncommitted; nothing deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
@@ -16,10 +16,12 @@ Production.** Every activation gate in §12 is OPEN.
 - **Implemented in ADD-WP-06A:** an internal, read-only discovery service over synthetic sources only, with privacy-safe
   classification and bounded, deterministic pagination (§5b). Nothing calls it.
 - **Implemented in ADD-WP-06B-1:** the page's registry facts read in one batch (§5b, "Batch facts").
-- **Implemented in ADD-WP-06B-2 (local, uncommitted):** the opaque admission reference service (§7a). Nothing issues or reads
-  references yet.
-- **Not implemented:** the operational API, discovery against the real civil registry (no `RegistryChildSource` adapter exists),
-  issuing `ref` in a response, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
+- **Implemented in ADD-WP-06B-2:** the opaque admission reference service (§7a). Nothing issues or reads references yet.
+- **Implemented in ADD-WP-06B-3 (local, uncommitted):** the guarded discovery route (§7b). It is unavailable in operation: the
+  flag is `OFF`, no role holds the permission, and **no registry source is bound**, so even an open gate answers 503 without
+  reading anything.
+- **Not implemented:** discovery against the real civil registry (no `RegistryChildSource` adapter exists, so the route is not
+  operational), issuing `ref` in a response, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
   reference fingerprint context, pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
@@ -353,6 +355,46 @@ Gates G-01 … G-07 stay OPEN.
 - **Key rotation.** A reference sealed under a key listed in `APP_PREVIOUS_KEYS` still opens after `APP_KEY` changes; one sealed
   under any other key is `REFERENCE_INVALID`. With the 15-minute lifetime, removing a previous key soon after rotation is safe.
 - **Unchanged:** `CivilLookupRefs` and every Civil Lookup behavior. A lookup reference is refused here.
+
+## 7b. Guarded discovery route (ADD-WP-06B-3)
+
+**Implemented locally, uncommitted; not operational.** Gates G-01 … G-07 stay OPEN; D-06 is unchanged.
+
+- **Route.** `GET /api/v1/family/household/registry-children`, inside `auth:sanctum` → `family.side` →
+  `can:family-portal.access` → `family.context`, then `family.registry-discovery`. GET only; the route inventory and the family
+  boundary test name it exactly.
+- **Gate (`family.registry-discovery`).** `FamilyRegistryAdmissionPolicy::allowsFamily()`: `OFF`, a missing or invalid mode
+  refuse; `PILOT` allows only the Family ids in `family_registry_admission.pilot_family_ids`
+  (`FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS`; empty or unreadable allows nobody); `ON` allows every eligible head. The
+  account must also hold `family-member.admit-from-registry`, which no role has. Every refusal is the same
+  `404 ADMISSION_UNAVAILABLE`, and nothing is read, counted or recorded.
+- **Limits.** Per user, 10 per minute and 60 per hour by default (`family_registry_admission.limits.*`), counted in the gate after
+  it passes: a route `throttle:` would be moved before `family.context` by the middleware priority list. `429 RATE_LIMITED` with
+  `Retry-After`. Independent of the civil lookup limiter and quota (D-05).
+- **Request.** `page` only, 1 … 4 (`LINKS_CAP` / 25); the page size is fixed at 25. Any other parameter, in the query or the body,
+  is `422`. The head and the household come from `family.context`.
+- **Source.** The controller uses the `RegistryChildSource` in the container, and the application binds **none**: every allowed
+  request is `503 REGISTRY_UNAVAILABLE` until an approved adapter exists. A `CivilLookupException` from a source is the same 503.
+  Tests bind synthetic sources only.
+- **Release integrity (ADD-WP-06B-3R).** The release is the one the source's own page reports; the client cannot supply one
+  (`page` only). Discovery refuses, before evaluating anything, a page with no release or a release below 1, a row or the head's
+  record from another release, rows on a too-broad answer, a total that does not equal the rows, or another cap. The answer is
+  the same `503 REGISTRY_UNAVAILABLE`, with no children and no audit row.
+- **Source contract (current; revisit in ADD-WP-06B-4).** A too-broad page must report exactly `total = LINKS_CAP + 1` (101)
+  and no rows, as `identity_ref_lookup.children()` caps it. A source reporting `total > 101` therefore fails closed with 503,
+  not 409. The adapter design (ADD-WP-06B-4) must revisit this before any source is bound.
+- **Response (provisional until G-02).** `data.children[]` with exactly `display_name` (the first word of the name),
+  `birth_year`, `status` (`ELIGIBLE`, `ALREADY_MEMBER`, `REQUEST_OPEN`, `NOT_ELIGIBLE`) and `ref`, always NULL; `data.meta` with
+  `page`, `per_page` and `total`. No National ID (even masked), full birth date, relationship, reason, other household
+  or registry field. `Cache-Control: no-store, private` on every answer.
+- **More than the cap (ADD-WP-06B-3R).** `409 RESULT_SET_TOO_BROAD`, `{message, code}` only: no children, no count, no reason
+  and no source data. Recorded first (outcome `RESULT_SET_TOO_BROAD`, result count 0); if the row cannot be written, 503.
+- **Audit.** One `DISCOVERY_LISTED` row per successful page or too-broad refusal, through `FamilyRegistryAdmissionAudit`, before the answer: actor,
+  Family, release, number of children shown, outcome `LISTED` or `RESULT_SET_TOO_BROAD`, and a keyed IP hash under the new
+  `FingerprintContext::FAMILY_REGISTRY_ADMISSION_IP`. No National ID, name, per-child status or payload. If the row cannot be
+  written, the answer is 503 and nothing is shown. Append-only on PostgreSQL; no retention rule (G-02).
+- **Open decisions kept open:** O-1 (GET with an audit row), O-3 (the over-cap answer, provisionally 409), O-5 (a missing permission answers 404,
+  like a closed flag), and the response fields (G-02).
 
 ## 8. Privacy protections
 
