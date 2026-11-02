@@ -4,8 +4,8 @@
 architecture. **NOT implemented, NOT activated, NOT approved for real registry data or
 Production.** Every activation gate in §12 is OPEN.
 
-**Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, not pushed;
-ADD-WP-06B-1 local, uncommitted; nothing deployed).**
+**Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, ADD-WP-06B-1 in
+`3bb64f4`, not pushed; ADD-WP-06B-2 local, uncommitted; nothing deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
@@ -15,9 +15,11 @@ ADD-WP-06B-1 local, uncommitted; nothing deployed).**
   and a read-only eligibility evaluation, in `App\Support\FamilyPortal\RegistryAdmission` (§5a). Nothing calls them yet.
 - **Implemented in ADD-WP-06A:** an internal, read-only discovery service over synthetic sources only, with privacy-safe
   classification and bounded, deterministic pagination (§5b). Nothing calls it.
-- **Implemented in ADD-WP-06B-1 (local, uncommitted):** the page's registry facts read in one batch (§5b, "Batch facts").
+- **Implemented in ADD-WP-06B-1:** the page's registry facts read in one batch (§5b, "Batch facts").
+- **Implemented in ADD-WP-06B-2 (local, uncommitted):** the opaque admission reference service (§7a). Nothing issues or reads
+  references yet.
 - **Not implemented:** the operational API, discovery against the real civil registry (no `RegistryChildSource` adapter exists),
-  the opaque `ref`, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
+  issuing `ref` in a response, the Family Portal UI, the admission action, discovery audit and rate limits, the PILOT allowlist, the
   reference fingerprint context, pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
@@ -322,6 +324,35 @@ One child per request, so that each has its own declaration, locks and outcome.
 partial admission cannot exist, because membership, evidence and activity commit in one
 transaction. A lost uniqueness race is answered `NOT_ELIGIBLE`, never with the holder's
 details. Errors, logs and queues carry no National ID, name or payload.
+
+## 7a. Admission references (ADD-WP-06B-2)
+
+**Implemented locally as an internal service, uncommitted. No route, response, action or job issues or reads a reference.**
+Gates G-01 … G-07 stay OPEN.
+
+- **Encryption.** `RegistryAdmissionRefs` uses Laravel `Crypt`, as `CivilLookupRefs` and `CredentialTokens` do: AES-256-CBC
+  with a random IV and an HMAC-SHA256 (encrypt-then-MAC) under `APP_KEY`. The same input never gives the same token. The whole
+  payload is encrypted; nothing travels in clear.
+- **Payload (version 1), exactly these fields:** version, purpose `ADMIT_REGISTRY_CHILD`, user id, Family id, household head's
+  Person id, published release id, the child's nine-digit National ID, `FATHER` or `MOTHER`, issued-at, expiry and a 128-bit
+  random nonce.
+- **Lifetime.** Fixed at 15 minutes (`TTL_SECONDS`); expiry minus issued-at must be exactly that. An issued-at more than 30
+  seconds ahead of the server clock (`CLOCK_SKEW_SECONDS`) is refused.
+- **Validation, before anything is returned:** at most 4,096 characters and canonical base64, both checked before decryption;
+  the MAC; a flat JSON object with exactly the expected keys and types; version and purpose; a positive id for user, Family, head
+  and release; a strictly valid National ID; `FATHER` or `MOTHER`; the nonce shape; the lifetime; and the user, Family and head
+  Person of the **current** family.context. A change of household head therefore invalidates every reference.
+- **Answers.** Every failure is `REFERENCE_INVALID` (proposed HTTP 422), without saying which check failed. Only a reference
+  valid in every other respect but issued for another release is `RELEASE_CHANGED` (proposed 409): the head discovers again.
+- **Result.** `RegistryAdmissionReference`, internal and typed: release, parent link, times, and the child's National ID through
+  `childNationalId()` only. It is redacted in `var_dump` / `print_r`, cannot be JSON-encoded or serialized, and the issuing
+  parameter is `#[\SensitiveParameter]`. Exceptions carry only the code.
+- **Stateless replay.** Nothing is stored. A reference can be presented again until it expires, so it identifies a child; it does
+  not authorize anything. The admission action (ADD-WP-07) must re-read the registry, evaluate again under its locks (§10), and
+  rely on its own idempotency and uniqueness guards. Single use would need persistence and is not approved.
+- **Key rotation.** A reference sealed under a key listed in `APP_PREVIOUS_KEYS` still opens after `APP_KEY` changes; one sealed
+  under any other key is `REFERENCE_INVALID`. With the 15-minute lifetime, removing a previous key soon after rotation is safe.
+- **Unchanged:** `CivilLookupRefs` and every Civil Lookup behavior. A lookup reference is refused here.
 
 ## 8. Privacy protections
 
