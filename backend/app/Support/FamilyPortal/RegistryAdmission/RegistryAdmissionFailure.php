@@ -4,6 +4,7 @@ namespace App\Support\FamilyPortal\RegistryAdmission;
 
 use App\Exceptions\RegistryAdmissionReferenceException;
 use App\Exceptions\RegistryAdmissionUnavailableException;
+use App\Exceptions\RegistryReleasePinUnavailableException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,6 +28,9 @@ use Throwable;
  *   which roll the whole transaction back; the answer carries Retry-After.
  * - It writes no audit row: recording REGISTRY_UNAVAILABLE is the action's choice, outside
  *   the failed transaction, and that write may fail too.
+ * - A release pin failure (ADD-WP-07B-2b) is logged with its controlled detail code as the
+ *   failure (PIN_BUSY, PIN_NOT_PROVEN, …) and is retryable when the pin says so. A pin's
+ *   RELEASE_CHANGED is a reference refusal and passes through (409).
  */
 final class RegistryAdmissionFailure
 {
@@ -67,9 +71,19 @@ final class RegistryAdmissionFailure
 
     private static function failClosed(Throwable $e): RegistryAdmissionUnavailableException
     {
+        if ($e instanceof RegistryReleasePinUnavailableException) {
+            // A controlled detail code (ADD-WP-07B-2b): logged as the failure, retryable as the pin says.
+            return self::logged($e, $e->detail, null, $e->retryable);
+        }
         $sqlstate = self::sqlstate($e);
         $code = $sqlstate === null ? ($e instanceof QueryException || $e instanceof PDOException ? self::DATABASE_ERROR : self::INTERNAL_ERROR)
             : (self::RETRYABLE[$sqlstate] ?? self::DATABASE_ERROR);
+
+        return self::logged($e, $code, $sqlstate, isset(self::RETRYABLE[$sqlstate ?? '']));
+    }
+
+    private static function logged(Throwable $e, string $code, ?string $sqlstate, bool $retryable): RegistryAdmissionUnavailableException
+    {
         $correlationId = (string) Str::uuid();
 
         Log::error('Registry admission failed closed.', [
@@ -79,7 +93,7 @@ final class RegistryAdmissionFailure
             'sqlstate' => $sqlstate,
         ]);
 
-        return new RegistryAdmissionUnavailableException($correlationId, isset(self::RETRYABLE[$sqlstate ?? '']));
+        return new RegistryAdmissionUnavailableException($correlationId, $retryable);
     }
 
     /** The five-character SQLSTATE of a database failure, or NULL: never a message. */

@@ -3,6 +3,8 @@
 namespace App\Support\CivilLookup;
 
 use App\Exceptions\CivilLookupException;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
+use App\Support\FamilyPortal\RegistryAdmission\ReleasePinVerification;
 use App\Support\IdentityRef\IdentityRefErrorRedactor;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
@@ -23,8 +25,13 @@ use Throwable;
  *
  * Database errors are logged redacted (SQLSTATE / constraint) and answered as
  * LOOKUP_UNAVAILABLE; no payload, National ID or term ever reaches the log.
+ *
+ * FB-FAMILY-ADD-01 ADD-WP-07B-2b: also the lookup side of the admission release pin
+ * (releasePinHeld()), over identity_ref_lookup.release_pin_held(). That function belongs
+ * to the DBA-3 package and does not exist yet, so the call fails and every pin fails
+ * closed. Nothing calls releasePinHeld() yet.
  */
-final class CivilRegistryReader implements CivilRegistrySource
+final class CivilRegistryReader implements CivilRegistrySource, RegistryReleasePinVerifier
 {
     public const CONNECTION = 'identity_ref_lookup';
 
@@ -37,6 +44,13 @@ final class CivilRegistryReader implements CivilRegistrySource
         $id = $this->call(fn (Connection $db) => $db->selectOne('SELECT identity_ref_lookup.active_release_id() AS id')?->id);
 
         return $id === null ? null : (int) $id;
+    }
+
+    /** @throws CivilLookupException|\UnexpectedValueException */
+    public function releasePinHeld(int $holderPid, int $nonce): ReleasePinVerification
+    {
+        return ReleasePinVerification::fromRow($this->call(fn (Connection $db) => $db->selectOne(
+            'SELECT held, active_release_id FROM identity_ref_lookup.release_pin_held(?, ?)', [$holderPid, $nonce])));
     }
 
     public function byMainid(string $mainid): ?CivilRecord

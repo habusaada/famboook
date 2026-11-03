@@ -25,8 +25,10 @@ uncommitted; nothing deployed).**
   `tests/` (§7c). The head's record is now read in the page's release.
 - **Implemented in ADD-WP-07B-1 (committed `5fe7174`):** the admission audit and integrity foundation (§9a): event CHECKs, a
   TRUNCATE guard, the reference fingerprint context and the admission audit helpers. Nothing calls them.
-- **Implemented in ADD-WP-07B-2a (local, uncommitted):** replay claims and the replay, conflict and unavailable-registry audit
+- **Implemented in ADD-WP-07B-2a (committed `e3012aa`):** replay claims and the replay, conflict and unavailable-registry audit
   helpers (§7a, "Replay claims"). Nothing calls them; no action or route exists.
+- **Implemented in ADD-WP-07B-2b (local, uncommitted):** the application side of the registry release pin (§10a). Nothing calls
+  it and nothing binds it; without the DBA package every pin fails closed.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
@@ -631,6 +633,145 @@ OPEN; D-06 is unchanged.
     replay would change `RegistryAdmissionRefs`; nothing here does.
   - **O-K and G-02 stay unresolved:** the declaration wording and version, and retention.
 
+## 10a. Registry release pin (ADD-WP-07B-2b)
+
+**Implemented locally, application side only; uncommitted. Nothing calls or binds it.** It follows the ADD-WP-07B-2R decisions
+D-F1, D-F3 and D-F5. `identity_ref`, the publication lifecycle and Production configuration are unchanged. DBA-1 … DBA-3 are not
+applied, so in operation every pin fails closed and no admission could pass it. Gates G-01 … G-07 stay OPEN.
+
+- **Contract.** `RegistryReleasePin::pin(int $releaseId)` runs inside the admission transaction, before its row locks. It
+  returns only if publication cannot replace the release until that transaction ends. Its outcomes:
+  - `RELEASE_CHANGED` (409) when the release is no longer active;
+  - otherwise `RegistryReleasePinUnavailableException`, which carries one controlled code and no pid, nonce, SQL or message.
+- **`PostgresRegistryReleasePin`, on the admission connection:**
+  1. A transaction is required (`PIN_NOT_IN_TRANSACTION`), and so is READ COMMITTED (`PIN_ISOLATION_UNSUPPORTED`).
+  2. In ONE statement (ADD-WP-07B-2b-F), so that all three come from the same backend whatever a
+     pool does between statements:
+     - `pg_try_advisory_xact_lock_shared` on `'FBCIV01P'` (`0x4642434956303150`). It never waits: `PIN_BUSY`, retryable,
+       while a publication holds the key or waits for it;
+     - an exclusive transaction-level nonce lock (`'FBPN'`, random 1 … 2^31 − 1). `PIN_NONCE_BUSY`, retryable, on a
+       collision; the rollback then releases the shared pin taken in the same statement;
+     - `pg_backend_pid()`.
+  3. The verifier, on the registry's own session, answers in one READ COMMITTED statement: is session `pid` in a LIVE
+     transaction that holds the shared pin AND this nonce, in the verifier's database, without being the caller; and which
+     release is active. `PIN_VERIFIER_UNAVAILABLE` if it cannot be called. `PIN_NOT_PROVEN` if it does not see the pin.
+- **Why not a pid alone.** Every running admission holds the shared pin, so another admission's pid would pass a pid-only check.
+  A pid is also reused after a backend ends. The nonce lock exists only while this one transaction is open, and must share its
+  `virtualtransaction` with the pin. The mutation test shows the difference: with a pid-only verifier, the pid test fails.
+- **Same database.** Advisory locks of different databases never conflict. The verifier therefore compares `pg_locks.database`
+  with its own database. A registry in another database of the same cluster cannot see the pin and answers `PIN_NOT_PROVEN`;
+  this is tested with a second database on the test cluster.
+  - **Another cluster is NOT excluded by the proof.** Nothing in the protocol is cryptographic: a pid, a 31-bit nonce and a
+    database oid only mean something inside one cluster. A lookup connection that reached another cluster would answer
+    `held = true` if a backend there had the same pid and held the pin and the same nonce at that moment. That is improbable,
+    not impossible, and it cannot be ruled out from inside the database. Excluding it is an operational guarantee, DBA-4.
+- **A caller cannot forge a proof.** `pin()` takes no pid: it reads its own, in the statement that takes the locks. A
+  verifier called with another session's pid answers `held` only if that session really holds both locks in a live
+  transaction, and even then it confirms that session's pin, never the caller's. A nonce collision only refuses
+  (`PIN_NONCE_BUSY`): a false positive needs the caller's own pid. The admission action must build the pin on the very
+  connection of its transaction; a pin on another connection protects nothing.
+- **Live transaction, fresh snapshot (ADD-WP-07B-2b-F).**
+  - The verifier also requires the `virtualxid` lock of the holder's virtual transaction, so the session-level locks of an
+    idle session are not a pin.
+  - It proves nothing unless its own statement runs under READ COMMITTED. In an older REPEATABLE READ or SERIALIZABLE
+    snapshot, the active release it reads could be stale and would confirm a replaced release.
+  - Mutation tests: removing either condition makes its test fail.
+- **Pooling.** The pid and both locks are transaction-scoped and read in one statement, so transaction-mode pooling, which
+  keeps one backend per transaction, is compatible. Statement-mode pooling breaks transactions and is unsupported. The lookup
+  session already depends on session state (`SET ROLE`, FB-CIVIL-02A) and must not be transaction-pooled either.
+- **Mandatory lock order of the admission action (ADD-WP-07B-2b-F).**
+  - The order: the pin, then Family `FOR UPDATE`, then the head's active membership `FOR SHARE`, then the child's National
+    ID advisory lock, then Person `FOR UPDATE`. A Person with an active membership anywhere is refused before that Person is
+    locked.
+  - No cycle with the existing writers, checked against each:
+    - `EndFamilyMembershipAction` and `CorrectMembershipRelationshipAction` lock a membership first. For the head's
+      membership they refuse, or change nothing, without waiting for the Family.
+    - Recording the head's death locks the head's Person and link, then waits for the Family (its activity row). The
+      admission does not lock the head's Person or link: the Family lock alone orders the two.
+    - The Change Request APPLY, `AddFamilyMemberAction`, `AttachFamilyMemberAction`, `CorrectNationalIdAction` and
+      `RecordPersonDeathAction` (for the child) keep the same Family → National ID → Person order, as in ADD-WP-07B-2R §3.
+    - An import row locks an existing Person before a Family it creates itself, which the admission cannot hold.
+  - Any residual deadlock is detected by PostgreSQL (40P01). It rolls back, and the failure contract answers it as a
+    retryable 503.
+- **Privileges.**
+  - The application role needs nothing new: advisory locks and `pg_locks` are available to every role.
+  - The lookup login needs EXECUTE on the new function only (DBA-3). `pg_locks` is not filtered by role, so the function needs
+    no monitoring privilege.
+- **Lock order.** The pin is taken first in the transaction, before the Family lock (ADD-WP-07B-2R §4). It never waits, so it
+  cannot join a deadlock cycle, and the order is not safety-critical. Database errors on the admission connection propagate
+  unchanged, and `RegistryAdmissionFailure::run()` sanitizes them; a pin failure is logged under its own code.
+- **Operational verifier.** `CivilRegistryReader::releasePinHeld()`, the only user of the lookup connection, calls
+  `identity_ref_lookup.release_pin_held(pid, nonce)`. That function does not exist (DBA-3), so the call fails and the pin
+  fails closed.
+- **DBA-3 contract (revised; proposal only, not applied).** It replaces the `(int, bigint)` of ADD-WP-07B-2R: a nonce is added
+  and the release argument is dropped. To be applied by the DBA as `famboook_identity_owner`, in the database that holds both
+  the application tables and `identity_ref`:
+
+  ```sql
+  CREATE OR REPLACE FUNCTION identity_ref_lookup.release_pin_held(p_holder_pid integer, p_nonce integer)
+      RETURNS TABLE (held boolean, active_release_id bigint)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+      SELECT EXISTS (
+                 SELECT 1 FROM pg_catalog.pg_locks pin
+                   JOIN pg_catalog.pg_locks nonce ON nonce.pid = pin.pid AND nonce.virtualtransaction = pin.virtualtransaction
+                  WHERE pin.locktype = 'advisory' AND nonce.locktype = 'advisory'
+                    AND pin.database = (SELECT d.oid FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database())
+                    AND nonce.database = pin.database
+                    AND pin.classid = 1178747721::oid AND pin.objid = 1445998928::oid AND pin.objsubid = 1      -- 'FBCIV01P'
+                    AND pin.mode = 'ShareLock' AND pin.granted
+                    AND nonce.classid = 1178751054::oid AND nonce.objid = p_nonce::oid AND nonce.objsubid = 2  -- 'FBPN', nonce
+                    AND nonce.mode = 'ExclusiveLock' AND nonce.granted
+                    AND pin.pid = p_holder_pid AND pin.pid <> pg_catalog.pg_backend_pid() AND p_nonce > 0
+                    AND EXISTS (SELECT 1 FROM pg_catalog.pg_locks live
+                                 WHERE live.locktype = 'virtualxid' AND live.pid = pin.pid
+                                   AND live.virtualxid = pin.virtualtransaction AND live.mode = 'ExclusiveLock' AND live.granted))
+             AND pg_catalog.current_setting('transaction_isolation') = 'read committed',
+             (SELECT a.release_id FROM identity_ref.active_release a WHERE a.id = 1)
+  $$;
+  REVOKE ALL ON FUNCTION identity_ref_lookup.release_pin_held(integer, integer) FROM PUBLIC;
+  GRANT EXECUTE ON FUNCTION identity_ref_lookup.release_pin_held(integer, integer) TO famboook_identity_reader;
+  ```
+
+  - The fixture's function is this body. It differs only in its schema, in being SECURITY INVOKER and in writing its operators
+    as `OPERATOR(pg_catalog.…)`; the DBA file should qualify them the same way.
+  - Comparing `pg_locks.database` with the database of `current_database()` is what makes a registry in another database
+    answer `held = false`.
+  - The function grants nothing new to the application role.
+- **Synthetic fixture (tests only).** `SyntheticReleasePinFixture` is one committed schema in the test database, dropped after
+  each test. It models DBA-1 (publication: fail fast on `'FBCIV01A'`, then wait, bounded, for `'FBCIV01P'`), DBA-2 (the pointer
+  only moves forward, and only under the exclusive pin) and DBA-3. `SyntheticReleasePinVerifier` sends the operational query
+  to it. Both refuse to run outside the test runner, and neither is bound.
+- **Limits that need the DBA package.**
+  - Without DBA-1, a real publication still fails fast whenever an admission holds the pin, which fails an approved
+    publication.
+  - Without DBA-2, the owner can still rewind the pointer by hand.
+  - Without DBA-3, nothing can be verified.
+  - A superuser or the identity owner can bypass all of these.
+  - `pg_locks` cannot tell transaction-level from session-level advisory locks. The live-transaction condition refuses an idle
+    session. A session that holds session-level locks AND is in a transaction would still be accepted; this is tested and
+    documented. Only this code takes the nonce, and only at transaction level.
+  - A session-level lock on `'FBCIV01P'` outlives transactions and blocks publication (tested). Any database role can cause
+    this, as on `'FBCIV01A'` today; it needs monitoring.
+  - A lookup connection on another cluster could answer a false positive only if a backend with the same pid held the pin
+    and the same 31-bit nonce there at that moment. The protocol does not exclude this; only DBA-4 does.
+- **Mandatory prerequisites before any admission activation (ADD-WP-07B-2b-C).** None is implemented. Each needs its own approved
+  DBA or operations work package, and evidence for G-06 and G-07.
+  - **DBA-1.** `publish_release()` takes `'FBCIV01P'` exclusively, with a bounded wait, after `'FBCIV01A'`.
+  - **DBA-2.** A trigger on `identity_ref.active_release`: the release only moves forward, and only while the writer holds the
+    pin exclusively.
+  - **DBA-3.** `identity_ref_lookup.release_pin_held(integer, integer)` as specified above, with EXECUTE for
+    `famboook_identity_reader` only.
+  - **DBA-4: one cluster and one database, under all routing and failover.** An operational guarantee: no code can prove it.
+    - The admission connection (`DB_*`) and the lookup connection (`IDENTITY_REF_LOOKUP_DB_*`) reach the same PostgreSQL cluster
+      and the same database. Host, port and database name resolve to the same server.
+    - **Routing.** No proxy, load balancer, DNS name or pooler may send the lookup connection to another node, another cluster or
+      a read replica. A standby does not see the primary's advisory locks, so a replica fails closed (`PIN_NOT_PROVEN`), but it
+      is still a misconfiguration.
+    - **Failover.** Both connections move together, to the same new primary. While they do not, every pin fails closed. A
+      split-brain, with two writable primaries, breaks the guarantee and must be excluded by the cluster manager.
+    - **Evidence.** It is recorded in the Production audit before G-07: the configured endpoints, the routing and failover
+      design, and a check run from both connections that they report the same server and database.
+
 ## 10. Idempotency, concurrency and rate limits
 
 **Proposal, following established patterns.**
@@ -676,7 +817,7 @@ are roles; the project owner assigns the named person when each gate starts.
 | G-04 | Verified gender codes for `SON` / `DAUGHTER` | Authoritative code table; profiling shows no unknown code unhandled | Civil registry data owner | **OPEN** |
 | G-05 | Verified death-status semantics | Written definition of what proves living and deceased, including `deathdate` and `presonstate` | Civil registry data owner, with the project owner | **OPEN** |
 | G-06 | Security, PostgreSQL, concurrency and integrity tests | Passing runs and an independent security review; test list in §13 | Engineering lead, with a security reviewer | **OPEN** |
-| G-07 | Separate explicit approval before PILOT or Production activation | Recorded approval naming the commit, mode and allowlist, with `09` index approval where needed | Project owner | **OPEN** |
+| G-07 | Separate explicit approval before PILOT or Production activation | Recorded approval naming the commit, mode and allowlist, with `09` index approval where needed; DBA-1 … DBA-4 applied and verified (§10a) | Project owner | **OPEN** |
 
 **Open questions inside these gates (not decided):**
 
