@@ -374,10 +374,15 @@ class SuggestedChildrenDiscoveryTest extends TestCase
     {
         $routes = collect(Route::getRoutes()->getRoutes())->filter(fn ($route) => str_contains($route->uri(), 'registry-children')
             || str_contains((string) $route->getActionName(), 'RegistryChildren') || str_contains((string) $route->getActionName(), 'RegistryAdmission'));
-        $this->assertSame(['api/v1/family/household/registry-children'], $routes->map(fn ($route) => $route->uri())->values()->all());
-        $this->assertSame(['GET', 'HEAD'], $routes->first()->methods());
-        $this->assertContains('family.context', $routes->first()->gatherMiddleware());
-        $this->assertContains('family.registry-discovery', $routes->first()->gatherMiddleware());
+        // The guarded discovery GET and, since ADD-WP-07C, the guarded admission POST; nothing else.
+        $routes = $routes->sortBy(fn ($route) => $route->uri())->values();
+        $this->assertSame(['api/v1/family/household/registry-children', 'api/v1/family/household/registry-children/admissions'],
+            $routes->map(fn ($route) => $route->uri())->all());
+        $this->assertSame([['GET', 'HEAD'], ['POST']], $routes->map(fn ($route) => $route->methods())->all());
+        $this->assertContains('family.context', $routes[0]->gatherMiddleware());
+        $this->assertContains('family.registry-discovery', $routes[0]->gatherMiddleware());
+        $this->assertContains('family.context', $routes[1]->gatherMiddleware());
+        $this->assertContains('family.registry-admission', $routes[1]->gatherMiddleware());
         $this->assertFalse($this->app->bound(RegistryChildSource::class));
     }
 }

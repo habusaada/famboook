@@ -40,11 +40,7 @@ class EnsureRegistryDiscoveryAvailable
             return self::refuse(self::CODE, self::MESSAGE, 404);
         }
 
-        $id = $user->getAuthIdentifier();
-        $windows = [
-            "family-registry-discovery|user|{$id}|minute" => [(int) config('family_registry_admission.limits.discovery_user_minute'), 60],
-            "family-registry-discovery|user|{$id}|hour" => [(int) config('family_registry_admission.limits.discovery_user_hour'), 3600],
-        ];
+        $windows = $this->windows($user->getAuthIdentifier());
         foreach ($windows as $key => [$max]) {
             if (RateLimiter::tooManyAttempts($key, max(1, $max))) {
                 return self::refuse(self::RATE_LIMITED, 'طلبات كثيرة، حاول لاحقًا.', 429)
@@ -56,6 +52,20 @@ class EnsureRegistryDiscoveryAvailable
         }
 
         return $next($request);
+    }
+
+    /**
+     * The per-user windows: key => [max, decay seconds]. Keys name the account id only, never
+     * a National ID, a reference or a request value.
+     *
+     * @return array<string, array{int, int}>
+     */
+    protected function windows(int|string $id): array
+    {
+        return [
+            "family-registry-discovery|user|{$id}|minute" => [(int) config('family_registry_admission.limits.discovery_user_minute'), 60],
+            "family-registry-discovery|user|{$id}|hour" => [(int) config('family_registry_admission.limits.discovery_user_hour'), 3600],
+        ];
     }
 
     public static function refuse(string $code, string $message, int $status): Response

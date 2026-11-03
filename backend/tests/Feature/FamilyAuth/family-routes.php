@@ -95,6 +95,8 @@ return [
     'POST api/v1/family/coordinator/requests/{changeRequest}/cancel',
     'POST api/v1/family/coordinator/requests/{changeRequest}/resubmit',
     'POST api/v1/family/household/members/{memberRef}/reveal',
+    // FB-FAMILY-ADD-01 ADD-WP-07C: direct admission; flag, permission and limits in family.registry-admission.
+    'POST api/v1/family/household/registry-children/admissions',
     'POST api/v1/family/notifications/{notification}/acknowledge',
     'POST api/v1/family/notifications/{notification}/view',
     'POST api/v1/family/self/reveal',

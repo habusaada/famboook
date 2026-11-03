@@ -31,10 +31,12 @@ uncommitted; nothing deployed).**
   it and nothing binds it; without the DBA package every pin fails closed.
 - **Implemented in ADD-WP-07B-2c-0 (committed `6e3935c`):** `RegistryAdmissionReference` hardened against ordinary exposure of
   the child's National ID (§7a, "Reference exposure").
-- **Implemented in ADD-WP-07B-2c (local, uncommitted):** the internal atomic admission action `AdmitRegistryChildAction` (§10b).
-  No route, controller, job or command calls it; nothing binds its source or verifier. In operation it admits no one: the flag
-  is `OFF`, no role holds the permission, no source is bound, the release pin fails closed until DBA-1 … DBA-4, and the
-  operational eligibility refuses every child until G-04 and G-05 close (D-06).
+- **Implemented in ADD-WP-07B-2c (committed `87b2928`):** the atomic admission action `AdmitRegistryChildAction` (§10b). In
+  operation it admits no one: the flag is `OFF`, no role holds the permission, no source is bound, the release pin fails closed
+  until DBA-1 … DBA-4, and the operational eligibility refuses every child until G-04 and G-05 close (D-06).
+- **Implemented in ADD-WP-07C (local, uncommitted):** the admission route `POST
+  /api/v1/family/household/registry-children/admissions` (§7, "Admission (implemented, ADD-WP-07C)"). It is closed in
+  operation: no source and no verifier are bound, so even an open gate answers 503 without reading anything.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
@@ -341,6 +343,48 @@ One child per request, so that each has its own declaration, locks and outcome.
 partial admission cannot exist, because membership, evidence and activity commit in one
 transaction. A lost uniqueness race is answered `NOT_ELIGIBLE`, never with the holder's
 details. Errors, logs and queues carry no National ID, name or payload.
+
+### Admission (implemented, ADD-WP-07C; local, uncommitted)
+
+The contract above, as built. It is not operational: the flag is `OFF`, the permission is held by no role, and neither a registry
+source nor a release pin verifier is bound.
+
+- **Route.** `POST /api/v1/family/household/registry-children/admissions`, in its own stack:
+  `family.registry-admission.no-store`, then `auth:sanctum`, `family.side`, `can:family-portal.access`, `family.context` and
+  `family.registry-admission`. POST only. The route inventory and the family boundary test name it exactly.
+- **Gate (`EnsureRegistryAdmissionAvailable`).**
+  - It runs the discovery gate's checks: the flag must allow this Family and the account must hold
+    `family-member.admit-from-registry`. Either refusal is the same `404 ADMISSION_UNAVAILABLE`, and nothing is counted.
+  - Then come its own per-user limits: 5 per minute and 20 per hour by default
+    (`family_registry_admission.limits.admission_user_*`), independent of discovery and of the civil lookup. They are counted
+    before validation and before the action, so invalid and refused attempts count too. Over the limit the answer is
+    `429 RATE_LIMITED` with `Retry-After`. The keys name the account id only.
+- **Request (`FamilyRegistryAdmissionRequest`).** Exactly four body fields, and nothing in the query:
+  - `ref`: a string of at most 4,096 characters;
+  - `client_reference`: a lowercase canonical UUID;
+  - `declaration_version`: at most 40 characters;
+  - `declaration_accepted`: the JSON `true` only.
+
+  Anything else is a 422 that names fields, never values, and is `no-store`. The default handler would have allowed caching;
+  this was found by the API test.
+- **Controller (`FamilyRegistryAdmissionController`).** Thin.
+  - The source and the verifier come from the container. The application binds neither, so every allowed request is
+    `503 REGISTRY_UNAVAILABLE` and nothing is read.
+  - Eligibility is `GatedRegistryChildAdmissibility` unless the container holds another, which the action refuses outside the
+    test runner.
+  - It then runs `AdmitRegistryChildAction`, which checks the flag, the permission and the declaration again.
+- **Answers.**
+  - `201 {data: {member_ref, replayed: false}}`, or `200` with `replayed: true` for a replay.
+  - Every refusal of the table above as exactly `{message, code}`.
+  - `503 {message, code: REGISTRY_UNAVAILABLE, correlation_id}`, with `Retry-After` when retryable.
+  - Every answer of the route is `Cache-Control: no-store, private`, the shared boundary's `401` and `403` included
+    (ADD-WP-07C-C).
+    - `EnsureRegistryAdmissionNoStore` is the first middleware of this one route, and is placed before authentication in the
+      priority list; without that, Laravel's priority sort would have run it after `auth:sanctum`.
+    - No shared middleware, and no other route's order, changes.
+  - No National ID, reference, name or internal reason is ever answered or logged; the controller logs nothing.
+- **Operational binding (not done; its own approved package):** a real `RegistryChildSource` adapter, `CivilRegistryReader` as
+  the `RegistryReleasePinVerifier`, DBA-1 … DBA-4, then G-01 … G-07.
 
 ## 7a. Admission references (ADD-WP-06B-2)
 

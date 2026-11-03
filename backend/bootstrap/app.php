@@ -10,11 +10,14 @@ use App\Http\Middleware\EnsureFamilySideAccount;
 use App\Http\Middleware\EnsureNotificationPublicationReady;
 use App\Http\Middleware\EnsurePasswordChangeEnabled;
 use App\Http\Middleware\EnsurePasswordResetEnabled;
+use App\Http\Middleware\EnsureRegistryAdmissionAvailable;
+use App\Http\Middleware\EnsureRegistryAdmissionNoStore;
 use App\Http\Middleware\EnsureRegistryDiscoveryAvailable;
 use App\Http\Middleware\EnsureStaffSideAccount;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\SendSmsAfterResponse;
 use App\Http\Middleware\SetCivilLookupContext;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -56,6 +59,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'family.context' => EnsureFamilyContext::class,
             // FB-FAMILY-ADD-01: suggested children discovery (flag, permission, limits); after family.context.
             'family.registry-discovery' => EnsureRegistryDiscoveryAvailable::class,
+            // FB-FAMILY-ADD-01 ADD-WP-07C: the admission gate (flag, permission, its own limits); after family.context.
+            'family.registry-admission' => EnsureRegistryAdmissionAvailable::class,
+            // ADD-WP-07C-C: no-store on every answer of the admission route; first in that route's own stack.
+            'family.registry-admission.no-store' => EnsureRegistryAdmissionNoStore::class,
             // OTP SMS after the response, same process, no queue (A′).
             'sms.after-response' => SendSmsAfterResponse::class,
             // Notification publication readiness (FB-NOTIFY-01B.2b): after
@@ -74,6 +81,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(ThrottleRequests::class, EnsureContactUpdateEnabled::class);
         // FB-CIVIL-02A: a closed lookup gate counts nothing either.
         $middleware->prependToPriorityList(ThrottleRequests::class, EnsureCivilLookupEnabled::class);
+        // FB-FAMILY-ADD-01 ADD-WP-07C-C: the admission route's no-store wrapper runs BEFORE
+        // authentication, so the shared boundary's 401 / 403 on that route are no-store too.
+        // It is used by that one route only; no other middleware moves.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, EnsureRegistryAdmissionNoStore::class);
         // One enforcement point for deactivated accounts (AUTH-ADR-057):
         // every Staff API and Filament request.
         $middleware->appendToGroup('web', EnsureUserIsActive::class);

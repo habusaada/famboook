@@ -254,6 +254,11 @@ class FamilySideBoundaryTest extends TestCase
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.registry-discovery'], $middleware);
                 $this->assertSame(['GET', 'HEAD'], $route->methods());
             }
+            // Direct admission (FB-FAMILY-ADD-01 ADD-WP-07C): no-store around the same boundary, then its own gate; POST only.
+            if ($route->uri() === 'api/v1/family/household/registry-children/admissions') {
+                $this->assertSame(['api', 'family.registry-admission.no-store', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.registry-admission'], $middleware);
+                $this->assertSame(['POST'], $route->methods());
+            }
             // Self sensitive-value reveal (PWA-3B.2): the same boundary plus its own throttle.
             if ($route->uri() === 'api/v1/family/self/reveal') {
                 $this->assertSame(['api', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'throttle:family-self-reveal'], $middleware);

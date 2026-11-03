@@ -25,10 +25,13 @@ return [
     // every admission is refused DECLARATION_REQUIRED (fail closed).
     'declaration_version' => env('FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION'),
 
-    // Per-user discovery limits (ADR §10), independent of the civil lookup.
+    // Per-user discovery and admission limits (ADR §10), independent of each other and of
+    // the civil lookup. Admission attempts are counted before validation (ADD-WP-07C).
     'limits' => [
         'discovery_user_minute' => (int) env('FAMILY_REGISTRY_DISCOVERY_LIMIT_USER_MINUTE', 10),
         'discovery_user_hour' => (int) env('FAMILY_REGISTRY_DISCOVERY_LIMIT_USER_HOUR', 60),
+        'admission_user_minute' => (int) env('FAMILY_REGISTRY_ADMISSION_LIMIT_USER_MINUTE', 5),
+        'admission_user_hour' => (int) env('FAMILY_REGISTRY_ADMISSION_LIMIT_USER_HOUR', 20),
     ],
 
 ];

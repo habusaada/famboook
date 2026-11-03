@@ -293,8 +293,14 @@ class RegistryAdmissionRefsTest extends TestCase
     public function test_nothing_routes_to_references_or_admits(): void
     {
         foreach (Route::getRoutes() as $route) {
+            // ADD-WP-06B-3 added the read-only discovery GET (ref = null); ADD-WP-07C the one admission POST.
+            if ($route->uri() === 'api/v1/family/household/registry-children/admissions') {
+                $this->assertSame(['POST'], $route->methods());
+                $this->assertSame('App\\Http\\Controllers\\Api\\V1\\Family\\FamilyRegistryAdmissionController@store', $route->getActionName());
+
+                continue;
+            }
             $this->assertStringNotContainsString('RegistryAdmission', (string) $route->getActionName());
-            // ADD-WP-06B-3 added the read-only discovery GET (ref = null); no admission route exists.
             $this->assertStringNotContainsString('admissions', $route->uri());
         }
         // Only the RegistryAdmission support namespace and, since ADD-WP-07B-2c, the internal
@@ -307,14 +313,18 @@ class RegistryAdmissionRefsTest extends TestCase
                 && str_contains((string) file_get_contents($path), 'RegistryAdmissionRefs')) {
                 $users[] = $path;
             }
-            if (str_ends_with($path, '.php') && ! str_contains($path, '/Actions/FamilyPortal/')) {
+            if (str_ends_with($path, '.php') && ! str_contains($path, '/Actions/FamilyPortal/')
+                && ! str_ends_with($path, '/Controllers/Api/V1/Family/FamilyRegistryAdmissionController.php')) {
                 // A use, not a mention: no import, ::class or construction of the action anywhere else.
                 $this->assertDoesNotMatchRegularExpression('/use App\\\\Actions\\\\FamilyPortal\\\\AdmitRegistryChildAction|AdmitRegistryChildAction::class|new AdmitRegistryChildAction/', (string) file_get_contents($path), $path);
             }
             $this->assertDoesNotMatchRegularExpression('/Admi\w*From\w*Registry|RegistryAdmission\w*Action/', basename($path));
         }
-        $this->assertCount(1, $users);
+        // The action, and (ADD-WP-07C) the admission request, for the reference's length limit only.
+        sort($users);
+        $this->assertCount(2, $users);
         $this->assertStringEndsWith('/Actions/FamilyPortal/AdmitRegistryChildAction.php', $users[0]);
+        $this->assertStringEndsWith('/Http/Requests/Api/V1/Family/FamilyRegistryAdmissionRequest.php', $users[1]);
         $this->assertSame('OFF', config('family_registry_admission.mode'));
     }
 }

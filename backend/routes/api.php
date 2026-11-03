@@ -33,6 +33,7 @@ use App\Http\Controllers\Api\V1\Family\FamilyHouseholdController;
 use App\Http\Controllers\Api\V1\Family\FamilyMemberRevealController;
 use App\Http\Controllers\Api\V1\Family\FamilyNotificationController;
 use App\Http\Controllers\Api\V1\Family\FamilyPasswordResetController;
+use App\Http\Controllers\Api\V1\Family\FamilyRegistryAdmissionController;
 use App\Http\Controllers\Api\V1\Family\FamilyRegistryChildrenController;
 use App\Http\Controllers\Api\V1\Family\FamilySelfController;
 use App\Http\Controllers\Api\V1\Family\FamilySessionController;
@@ -102,6 +103,16 @@ Route::post('/credentials/verify', [PublicCredentialController::class, 'verify']
 // `family.side` only says the account is family-side; it authorizes no family
 // data — family-data routes will resolve the Family context explicitly.
 Route::prefix('family')->group(function () use ($civilLookupEndpoints) {
+    // Direct admission of one suggested child (FB-FAMILY-ADD-01 ADD-WP-07C): POST only, the
+    // child named by the opaque reference, the household from family.context. Closed like
+    // discovery (flag OFF by default, a permission no role holds, its own per-user limits in
+    // family.registry-admission), and no registry source or pin verifier is bound, so even an
+    // open gate answers 503 without reading anything. Its own stack, the same boundary as the
+    // household routes below, wrapped by family.registry-admission.no-store so that EVERY
+    // answer, the boundary's 401 / 403 included, is no-store (ADD-WP-07C-C); nothing else changes.
+    Route::post('/household/registry-children/admissions', [FamilyRegistryAdmissionController::class, 'store'])
+        ->middleware(['family.registry-admission.no-store', 'auth:sanctum', 'family.side', 'can:family-portal.access', 'family.context', 'family.registry-admission']);
+
     // Family Auth capabilities (FU-14, FP-ADR-065): public, read-only and
     // OUTSIDE every Family Auth gate — the three global gates as booleans,
     // nothing user-specific, so the portal hides what is closed.
