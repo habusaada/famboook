@@ -93,7 +93,7 @@ final class RegistryChildEligibility
     }
 
     /** @return list<Reason> E-7 … E-9 from the application registry, read without locks. */
-    private static function registryReasons(FamilyAccessResult $context, string $nationalId, ?RegistryChildFacts $facts): array
+    private static function registryReasons(FamilyAccessResult $context, #[\SensitiveParameter] string $nationalId, ?RegistryChildFacts $facts): array
     {
         $reasons = [];
         $matches = $facts?->holders($nationalId) ?? NationalIdGuard::equivalentMatches($nationalId);

@@ -63,7 +63,7 @@ final class RegistryChildFacts
     ) {}
 
     /** @param  list<string>  $nationalIds  canonical nine-digit values */
-    public static function load(Family $family, array $nationalIds): self
+    public static function load(Family $family, #[\SensitiveParameter] array $nationalIds): self
     {
         $ids = array_values(array_unique($nationalIds));
         if (count($ids) > self::MAX_IDS) {
@@ -90,19 +90,19 @@ final class RegistryChildFacts
     }
 
     /** @return Collection<int, Person> */
-    public function holders(string $nationalId): Collection
+    public function holders(#[\SensitiveParameter] string $nationalId): Collection
     {
         return $this->holders[$nationalId] ?? throw new LogicException('No facts were read for this National ID.');
     }
 
-    public function heldByDeleted(string $nationalId): bool
+    public function heldByDeleted(#[\SensitiveParameter] string $nationalId): bool
     {
         $this->holders($nationalId);
 
         return isset($this->deleted[$nationalId]);
     }
 
-    public function requestOpen(string $nationalId): bool
+    public function requestOpen(#[\SensitiveParameter] string $nationalId): bool
     {
         $this->holders($nationalId);
 

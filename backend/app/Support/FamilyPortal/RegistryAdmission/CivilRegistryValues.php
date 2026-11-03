@@ -57,7 +57,7 @@ final class CivilRegistryValues
     }
 
     /** Exactly nine ASCII digits and not nine identical ones, as stored. */
-    public static function validNationalId(?string $raw): bool
+    public static function validNationalId(#[\SensitiveParameter] ?string $raw): bool
     {
         return is_string($raw) && preg_match('/\A[0-9]{9}\z/', $raw) === 1 && preg_match('/\A([0-9])\1{8}\z/', $raw) !== 1;
     }
@@ -66,7 +66,7 @@ final class CivilRegistryValues
      * Which parent field names the head: 'FATHER', 'MOTHER', NULL for neither, and
      * 'BOTH' when both do (an inconsistent record). Exact comparison only.
      */
-    public static function parentLink(CivilRecord $record, string $headNationalId): ?string
+    public static function parentLink(CivilRecord $record, #[\SensitiveParameter] string $headNationalId): ?string
     {
         $father = ($record->payload['fatherid'] ?? null) === $headNationalId;
         $mother = ($record->payload['motherid'] ?? null) === $headNationalId;

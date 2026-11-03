@@ -27,8 +27,10 @@ uncommitted; nothing deployed).**
   TRUNCATE guard, the reference fingerprint context and the admission audit helpers. Nothing calls them.
 - **Implemented in ADD-WP-07B-2a (committed `e3012aa`):** replay claims and the replay, conflict and unavailable-registry audit
   helpers (§7a, "Replay claims"). Nothing calls them; no action or route exists.
-- **Implemented in ADD-WP-07B-2b (local, uncommitted):** the application side of the registry release pin (§10a). Nothing calls
+- **Implemented in ADD-WP-07B-2b (committed `7ca1d6e`):** the application side of the registry release pin (§10a). Nothing calls
   it and nothing binds it; without the DBA package every pin fails closed.
+- **Implemented in ADD-WP-07B-2c-0 (local, uncommitted):** `RegistryAdmissionReference` hardened against ordinary exposure of the
+  child's National ID (§7a, "Reference exposure").
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
@@ -389,17 +391,48 @@ Gates G-01 … G-07 stay OPEN.
     the action's choice, outside the failed transaction. No global exception handler, route or action was added.
   - **Why.** A `QueryException` message carries the SQL and its bound values. For the audit helpers those are keyed
     fingerprints and IP hashes, never a National ID. Still, none of it may reach a response or a log.
-- **Known exposure, not changed here: `var_export()` of `RegistryAdmissionReference`. A security prerequisite before any
-  admission activation: the mitigation below must be implemented and tested before G-06 can close and before G-07.**
-  - **Risk.** `var_export()` ignores `__debugInfo()` and prints private properties, so it would print the child's raw
-    National ID. So do `(array)` casts, `get_object_vars()` inside the class and Reflection.
-  - **Today.** Nothing in `app/` calls `var_export` or exports the object. PHP's default traces print only `Object(...)` for
-    an object argument, and drop arguments entirely when `zend.exception_ignore_args` is on (not verified for Production).
-  - `RegistryAdmissionReplayClaim` keeps no National ID, so the same calls show only fingerprints.
-  - **Proposed separate mitigation (needs its own work package).**
-    - Hold the National ID in a private closure, which `var_export` and casts print without its bound value.
-    - Add tests for `var_export`, `(array)`, `get_object_vars`, `serialize`, `json_encode` and `print_r`.
-    - Make `zend.exception_ignore_args=On` a Production PHP prerequisite (`docs/08`).
+- **Reference exposure (hardened in ADD-WP-07B-2c-0; was the open `var_export` prerequisite).**
+  - **Threat model.**
+    - **In scope:** ordinary, accidental exposure through code and tools that inspect, dump, log or serialize objects:
+      `var_export()`, `(array)`, `get_object_vars()`, `print_r()`, `var_dump()`, `debug_zval_dump()`, `json_encode()`,
+      `serialize()`, cloning, exception traces and diagnostic logging.
+    - **Out of scope:** code running in the process on purpose, such as Reflection, memory inspection, core dumps, a debugger
+      or a privileged operator. PHP cannot keep a value secret from these, and this design does not claim to.
+  - **Measured first, then implemented** (synthetic probe, PHP 8.3).
+    - **The old private property** leaked through `var_export()`, `(array)` and `json_encode((array) …)`.
+    - **A private closure** leaked through `(array)` followed by calling it, so it was rejected.
+    - **A private static `WeakMap` keyed by the object** leaked through none of these, and was chosen. The National ID is no
+      longer a property: `childNationalId()` reads the map, and the entry disappears with the object.
+    - `jsonSerialize()`, `__serialize()`, `__unserialize()` and `__clone()` refuse. A clone would carry no child.
+    - `__debugInfo()` stays redacted.
+  - **Traces.**
+    - PHP prints string arguments in full in exception traces unless the parameter is `#[\SensitiveParameter]`, and the
+      local PHP configuration does not set `zend.exception_ignore_args`.
+    - Every parameter of the `RegistryAdmission` namespace that receives a National ID, or a decrypted payload carrying one,
+      is now marked; a test enforces this for the whole namespace.
+    - A first edit wrote the attribute without its leading backslash, which PHP silently resolves to a non-existent class;
+      the same test caught it.
+  - **Unchanged:** the encrypted reference format, the 15-minute `read()`, replay claims, fingerprints, the actor, Family and
+    head binding, and the discovery API.
+  - **Residual limitations.**
+    - Reflection on the private static map still returns the value; a test documents this as a residual, not a guarantee.
+    - **No secure erasure.** The value is a plain PHP string in memory while the reference lives. When the object is freed,
+      the `WeakMap` entry is removed and the string's memory is released to PHP's allocator. It is not overwritten, and it may
+      remain readable in process memory, a core dump or swap until reused. PHP offers no secure memory wipe for strings.
+      The same holds for the decrypted payload inside `RegistryAdmissionRefs::read()` and for every copy a caller makes.
+    - **Paths to review in ADD-WP-07B-2c.** Code that calls `childNationalId()` and passes the value on carries it into its
+      own frames.
+      - **Unmarked parameters.** `NationalIdGuard::matches()` and `assertAvailable()`, `CreatePersonAction::handle()` (its
+        `$data` array holds `national_id`) and the `RegistryChildSource` implementations.
+      - **Bound values.** `CreatePersonAction` rethrows the `QueryException` of the `persons` insert, and Laravel puts the
+        bound values, the National ID included, in that message. Only `RegistryAdmissionFailure::run()` around the whole
+        admission keeps it out of logs and responses; nothing may catch and log it on the way.
+      - **Query capture.** The query log, Telescope, Debugbar and any SQL logging record bindings. They must stay off on the
+        admission path, and off in Production.
+      - **Validation and dumps.** Validation messages, flashed input (`dontFlash` already lists `national_id`), `dd()`, `dump()`
+        and `Log::*` context arrays must never receive the value. Symfony VarDumper reads properties, so the reference itself
+        shows nothing there.
+    - `zend.exception_ignore_args=On` remains recommended as a Production PHP setting (`docs/08`, part of G-07 evidence).
 - **Key rotation.** A reference sealed under a key listed in `APP_PREVIOUS_KEYS` still opens after `APP_KEY` changes; one sealed
   under any other key is `REFERENCE_INVALID`. With the 15-minute lifetime, removing a previous key soon after rotation is safe.
 - **Unchanged:** `CivilLookupRefs` and every Civil Lookup behavior. A lookup reference is refused here.

@@ -117,7 +117,7 @@ final class RegistryAdmissionRefs
      * lifetime, and bound to the current family.context. Expiry and release are the
      * callers' checks.
      */
-    private static function authentic(mixed $payload, FamilyAccessResult $context, int $now): bool
+    private static function authentic(#[\SensitiveParameter] mixed $payload, FamilyAccessResult $context, int $now): bool
     {
         return is_array($payload)
             && self::sortedKeys($payload) === self::KEYS
@@ -155,7 +155,7 @@ final class RegistryAdmissionRefs
     }
 
     /** @param  array<mixed>  $payload  @return list<int|string> */
-    private static function sortedKeys(array $payload): array
+    private static function sortedKeys(#[\SensitiveParameter] array $payload): array
     {
         $keys = array_keys($payload);
         sort($keys, SORT_STRING);
