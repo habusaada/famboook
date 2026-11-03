@@ -9,6 +9,7 @@ use App\Models\FamilyMembership;
 use App\Models\User;
 use App\Support\FamilyAuth\KeyedFingerprint;
 use App\Support\FamilyPortal\RegistryAdmission\FamilyRegistryAdmissionAudit as Audit;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionEvidence as Evidence;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +107,7 @@ class FamilyRegistryAdmissionAuditTest extends TestCase
 
     public function test_replayed_and_refused_events(): void
     {
-        Audit::admissionReplayed($this->actor, $this->family, 4, self::CHILD, null);
+        Audit::replayedFromEvidence($this->actor, $this->family, $this->evidence(['release_id' => 4]), null);
         Audit::admissionRefused($this->actor, $this->family, RegistryChildReason::ACTIVE_MEMBERSHIP_ELSEWHERE->value, 4, self::CHILD, '10.0.0.1');
         Audit::admissionRefused($this->actor, $this->family, Audit::REFERENCE_INVALID, null, null, '10.0.0.1');
 
@@ -125,11 +126,12 @@ class FamilyRegistryAdmissionAuditTest extends TestCase
             'refusal LISTED' => fn () => Audit::admissionRefused($this->actor, $this->family, Audit::LISTED, 3, self::CHILD, null),
             'refusal PERSON_CREATED' => fn () => Audit::admissionRefused($this->actor, $this->family, Audit::PERSON_CREATED, 3, self::CHILD, null),
             'refusal unknown' => fn () => Audit::admissionRefused($this->actor, $this->family, 'SOMETHING_ELSE', 3, self::CHILD, null),
-            'release 0' => fn () => Audit::admissionReplayed($this->actor, $this->family, 0, self::CHILD, null),
+            'release 0' => fn () => Audit::admissionRefused($this->actor, $this->family, Audit::LOST_RACE, 0, self::CHILD, null),
             'release -1' => fn () => Audit::admissionRefused($this->actor, $this->family, Audit::LOST_RACE, -1, self::CHILD, null),
         ];
         foreach (['', '40123456', '4012345678', '000000000', '٤٠١٢٣٤٥٦٧', ' 401234567', '401-234-567'] as $id) {
-            $calls["id {$id}"] = fn () => Audit::admissionReplayed($this->actor, $this->family, 3, $id, null);
+            $calls["id {$id}"] = fn () => Audit::admissionRefused($this->actor, $this->family, Audit::LOST_RACE, 3, $id, null);
+            $calls["success id {$id}"] = fn () => DB::transaction(fn () => Audit::admissionSucceeded($this->actor, $this->family, 3, Audit::PERSON_CREATED, $id, null));
         }
         foreach ($calls as $label => $call) {
             try {
@@ -183,6 +185,98 @@ class FamilyRegistryAdmissionAuditTest extends TestCase
 
         $this->expectException(QueryException::class);
         Audit::admissionRefused($this->actor, $this->family, Audit::LOST_RACE, 3, self::CHILD, null);
+    }
+
+    // ---------------------------------------------------------------- ADD-WP-07B-2a
+
+    /** A committed evidence row of this actor and Family, under a stored key version that need not be the current one. */
+    private function evidence(array $override = []): Evidence
+    {
+        return Evidence::fromRow((object) [
+            'family_id' => $this->family->id, 'admitted_by' => $this->actor->id, 'admitted_by_person_id' => $this->head->person_id,
+            'reference_fingerprint' => str_repeat('d', 64), 'reference_key_version' => 7, 'release_id' => 5,
+            'declaration_version' => '2026-11-v1', ...$override,
+        ]);
+    }
+
+    public function test_a_replay_records_the_stored_evidence_values(): void
+    {
+        Audit::replayedFromEvidence($this->actor, $this->family, $this->evidence(), '10.0.0.1');
+
+        $row = $this->rows()[0];
+        $this->assertSame(['ADMISSION_REPLAYED', 'REPLAYED', 5, str_repeat('d', 64), 7, null],
+            [$row['event_type'], $row['outcome_code'], (int) $row['release_id'], $row['reference_fingerprint'], (int) $row['reference_key_version'], $row['result_count']]);
+        $this->assertNotNull($row['ip_hash']);
+
+        // Only for the actor and Family of the evidence; nothing is written otherwise.
+        $other = FamilyMembership::factory()->householdHead()->create()->family;
+        foreach ([
+            'another actor' => fn () => Audit::replayedFromEvidence(User::factory()->familySide()->create(), $this->family, $this->evidence(), null),
+            'another family' => fn () => Audit::replayedFromEvidence($this->actor, $other, $this->evidence(), null),
+        ] as $label => $call) {
+            try {
+                $call();
+                $this->fail("Accepted: {$label}");
+            } catch (InvalidArgumentException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        $this->assertCount(1, $this->rows());
+    }
+
+    public function test_an_idempotency_conflict_and_an_unavailable_registry_carry_no_child(): void
+    {
+        Audit::idempotencyConflict($this->actor, $this->family, '10.0.0.1');
+        Audit::registryUnavailable($this->actor, $this->family, 6, null);
+        Audit::registryUnavailable($this->actor, $this->family, null, null);
+
+        $this->assertSame([
+            ['ADMISSION_REFUSED', 'IDEMPOTENCY_CONFLICT', null, null, null],
+            ['ADMISSION_REFUSED', 'REGISTRY_UNAVAILABLE', 6, null, null],
+            ['ADMISSION_REFUSED', 'REGISTRY_UNAVAILABLE', null, null, null],
+        ], array_map(fn (array $r) => [$r['event_type'], $r['outcome_code'], $r['release_id'] === null ? null : (int) $r['release_id'],
+            $r['reference_fingerprint'], $r['reference_key_version']], $this->rows()));
+        $this->assertContains(Audit::REGISTRY_UNAVAILABLE, Audit::refusalCodes());
+        $this->assertContains(Audit::IDEMPOTENCY_CONFLICT, Audit::refusalCodes());
+
+        $this->expectException(InvalidArgumentException::class);
+        Audit::registryUnavailable($this->actor, $this->family, 0, null);
+    }
+
+    public function test_the_new_helpers_fail_closed_when_the_insert_fails(): void
+    {
+        DB::statement('DROP TABLE family_registry_admission_events');
+
+        foreach ([
+            'replay' => fn () => Audit::replayedFromEvidence($this->actor, $this->family, $this->evidence(), null),
+            'conflict' => fn () => Audit::idempotencyConflict($this->actor, $this->family, null),
+            'unavailable' => fn () => Audit::registryUnavailable($this->actor, $this->family, 3, null),
+        ] as $label => $call) {
+            try {
+                DB::transaction($call);
+                $this->fail("No exception: {$label}");
+            } catch (QueryException $e) {
+                // The driver message carries the bound values (keyed fingerprints), never a National ID.
+                $this->assertStringNotContainsString(self::CHILD, $e->getMessage(), $label);
+            }
+        }
+    }
+
+    public function test_the_new_rows_pass_the_postgresql_checks_and_carry_no_identifier(): void
+    {
+        $this->pgsql();
+        Audit::replayedFromEvidence($this->actor, $this->family, $this->evidence(), '192.168.10.20');
+        Audit::idempotencyConflict($this->actor, $this->family, '192.168.10.20');
+        Audit::registryUnavailable($this->actor, $this->family, 6, '192.168.10.20');
+        $this->assertCount(3, $this->rows());
+
+        $dump = (string) json_encode($this->rows(), JSON_UNESCAPED_UNICODE);
+        foreach ([self::CHILD, '192.168.10.20', $this->actor->name, '2026-11-v1', 'token', 'national'] as $secret) {
+            $this->assertStringNotContainsString((string) $secret, $dump, (string) $secret);
+        }
+        // Still append-only.
+        $this->assertRefused(fn () => DB::table('family_registry_admission_events')->update(['outcome_code' => 'LOST_RACE']), 'update', 'append-only');
+        $this->assertRefused(fn () => DB::table('family_registry_admission_events')->delete(), 'delete', 'append-only');
     }
 
     // ---------------------------------------------------------------- PostgreSQL integrity

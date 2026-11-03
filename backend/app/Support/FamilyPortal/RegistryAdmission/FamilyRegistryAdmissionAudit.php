@@ -22,12 +22,21 @@ use LogicException;
  * - ADD-WP-07B-1, foundation only (nothing calls these yet):
  *   - admissionSucceeded() runs ONLY inside the caller's transaction, so the event
  *     commits or rolls back with the membership and the evidence it describes;
- *   - admissionReplayed() and admissionRefused() are written on their own, after
+ *   - replayedFromEvidence() and admissionRefused() are written on their own, after
  *     the admission transaction (a refusal rolls it back).
  *   Every argument is checked before the insert; a bad one or a failed insert
  *   throws, and the caller must answer without changing anything (fail closed).
  * - The child's fingerprint is referenceFingerprint(): the same value the evidence
  *   row stores, under FingerprintContext::FAMILY_REGISTRY_ADMISSION_REFERENCE.
+ * - ADD-WP-07B-2a (ADD-WP-07B-2R D-B5, D-E3), foundation only:
+ *   - replayedFromEvidence() records a replay with the STORED child fingerprint, key
+ *     version and release of the committed evidence, never recomputed. It is the only
+ *     replay path: the earlier admissionReplayed(), which recomputed the fingerprint
+ *     under the current key, is removed (ADD-WP-07B-2a-F);
+ *   - idempotencyConflict() records the actor's key used for another request, with no
+ *     child and no release;
+ *   - registryUnavailable() records a refusal because the registry or the release pin
+ *     could not be used (REGISTRY_UNAVAILABLE), with no child.
  */
 final class FamilyRegistryAdmissionAudit
 {
@@ -62,9 +71,12 @@ final class FamilyRegistryAdmissionAudit
     /** A uniqueness guard refused a write the locks should have prevented. */
     public const LOST_RACE = 'LOST_RACE';
 
+    /** The registry, the release pin or a bounded wait could not be used: retryable, nothing changed. */
+    public const REGISTRY_UNAVAILABLE = 'REGISTRY_UNAVAILABLE';
+
     private const PROCEDURAL_REFUSALS = [
         self::REFERENCE_INVALID, self::RELEASE_CHANGED, self::IDEMPOTENCY_CONFLICT, self::CONTEXT_CHANGED,
-        self::LOST_RACE, self::RESULT_SET_TOO_BROAD,
+        self::LOST_RACE, self::RESULT_SET_TOO_BROAD, self::REGISTRY_UNAVAILABLE,
     ];
 
     public static function discoveryListed(User $actor, Family $family, ?int $releaseId, int $resultCount, bool $tooBroad, ?string $ip): void
@@ -112,11 +124,6 @@ final class FamilyRegistryAdmissionAudit
         self::admission(self::ADMISSION_SUCCEEDED, $actor, $family, $outcome, self::release($releaseId), self::referenceFingerprint($childNationalId), $ip);
     }
 
-    public static function admissionReplayed(User $actor, Family $family, int $releaseId, #[\SensitiveParameter] string $childNationalId, ?string $ip): void
-    {
-        self::admission(self::ADMISSION_REPLAYED, $actor, $family, self::REPLAYED, self::release($releaseId), self::referenceFingerprint($childNationalId), $ip);
-    }
-
     /** $childNationalId and $releaseId are NULL when the refusal came before they were known (an invalid reference). */
     public static function admissionRefused(User $actor, Family $family, string $code, ?int $releaseId, #[\SensitiveParameter] ?string $childNationalId, ?string $ip): void
     {
@@ -125,6 +132,28 @@ final class FamilyRegistryAdmissionAudit
         }
         self::admission(self::ADMISSION_REFUSED, $actor, $family, $code, $releaseId === null ? null : self::release($releaseId),
             $childNationalId === null ? null : self::referenceFingerprint($childNationalId), $ip);
+    }
+
+    /** A replay of a committed admission, recorded with what its evidence stored. */
+    public static function replayedFromEvidence(User $actor, Family $family, RegistryAdmissionEvidence $evidence, ?string $ip): void
+    {
+        if ($evidence->admittedBy !== (int) $actor->getKey() || $evidence->familyId !== (int) $family->getKey()) {
+            throw new InvalidArgumentException('A replay is recorded only for the actor and Family of its evidence.');
+        }
+        self::admission(self::ADMISSION_REPLAYED, $actor, $family, self::REPLAYED, self::release($evidence->releaseId),
+            ['fingerprint' => $evidence->referenceFingerprint, 'key_version' => $evidence->referenceKeyVersion], $ip);
+    }
+
+    /** The actor's idempotency key was already used for another request: nothing of either request is repeated. */
+    public static function idempotencyConflict(User $actor, Family $family, ?string $ip): void
+    {
+        self::admissionRefused($actor, $family, self::IDEMPOTENCY_CONFLICT, null, null, $ip);
+    }
+
+    /** $releaseId is the release the attempt was about, when one was known. */
+    public static function registryUnavailable(User $actor, Family $family, ?int $releaseId, ?string $ip): void
+    {
+        self::admissionRefused($actor, $family, self::REGISTRY_UNAVAILABLE, $releaseId, null, $ip);
     }
 
     /** @param  array{fingerprint: string, key_version: int}|null  $reference */

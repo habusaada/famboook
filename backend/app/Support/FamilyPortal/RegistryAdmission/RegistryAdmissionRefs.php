@@ -26,6 +26,9 @@ use JsonException;
  *   and evaluates again under its locks, and idempotency is its own (ADR §10).
  * - Every refusal is REFERENCE_INVALID; only a valid reference of another release is
  *   RELEASE_CHANGED. Nothing says which check failed.
+ * - openForReplay() (ADD-WP-07B-2a) opens an authentic, possibly expired reference, up to
+ *   REPLAY_WINDOW_SECONDS after issue, as a RegistryAdmissionReplayClaim: it can only be
+ *   compared with committed admission evidence, never admit.
  */
 final class RegistryAdmissionRefs
 {
@@ -34,6 +37,9 @@ final class RegistryAdmissionRefs
     public const PURPOSE = 'ADMIT_REGISTRY_CHILD';
 
     public const TTL_SECONDS = 900;
+
+    /** How long after issued-at an authentic reference may still identify a committed admission for a replay. */
+    public const REPLAY_WINDOW_SECONDS = 86400;
 
     /** Tolerated clock difference between application servers, for issued-at only. */
     public const CLOCK_SKEW_SECONDS = 30;
@@ -75,7 +81,45 @@ final class RegistryAdmissionRefs
         $payload = self::open($token);
         $now = now()->getTimestamp();
 
-        $valid = is_array($payload)
+        if (! self::authentic($payload, $context, $now) || $payload['x'] <= $now) {
+            throw new RefException(RefException::REFERENCE_INVALID);
+        }
+        if ($payload['r'] !== $activeReleaseId) {
+            throw new RefException(RefException::RELEASE_CHANGED);
+        }
+
+        return new RegistryAdmissionReference($payload['r'], $payload['n'], $payload['l'], $payload['i'], $payload['x']);
+    }
+
+    /**
+     * REPLAY ONLY (ADD-WP-07B-2a; ADD-WP-07B-2R D-B3): every check of read() except the
+     * expiry, which is replaced by REPLAY_WINDOW_SECONDS from issued-at, and except the
+     * release, which a replay does not compare (D-B2). The result can only be compared
+     * with committed evidence; it never authorizes an admission, and read() keeps its
+     * TTL_SECONDS lifetime unchanged.
+     *
+     * @throws RefException REFERENCE_INVALID
+     */
+    public static function openForReplay(mixed $token, FamilyAccessResult $context): RegistryAdmissionReplayClaim
+    {
+        $payload = self::open($token);
+        $now = now()->getTimestamp();
+
+        if (! self::authentic($payload, $context, $now) || $now - $payload['i'] >= self::REPLAY_WINDOW_SECONDS) {
+            throw new RefException(RefException::REFERENCE_INVALID);
+        }
+
+        return RegistryAdmissionReplayClaim::of($payload['u'], $payload['f'], $payload['h'], $payload['n']);
+    }
+
+    /**
+     * Ours, well formed, issued no later than the clock skew allows, with the fixed
+     * lifetime, and bound to the current family.context. Expiry and release are the
+     * callers' checks.
+     */
+    private static function authentic(mixed $payload, FamilyAccessResult $context, int $now): bool
+    {
+        return is_array($payload)
             && self::sortedKeys($payload) === self::KEYS
             && $payload['v'] === self::VERSION
             && $payload['p'] === self::PURPOSE
@@ -84,21 +128,12 @@ final class RegistryAdmissionRefs
             && in_array($payload['l'], self::PARENT_LINKS, true)
             && is_int($payload['i']) && is_int($payload['x'])
             && $payload['i'] <= $now + self::CLOCK_SKEW_SECONDS
-            && $payload['x'] > $now
             && $payload['x'] - $payload['i'] === self::TTL_SECONDS
             && is_string($payload['j']) && preg_match('/\A[0-9a-f]{32}\z/', $payload['j']) === 1
             && $context->hasFamilyContext()
             && $payload['u'] === (int) $context->user->getKey()
             && $payload['f'] === (int) $context->family->getKey()
             && $payload['h'] === (int) $context->person->getKey();
-        if (! $valid) {
-            throw new RefException(RefException::REFERENCE_INVALID);
-        }
-        if ($payload['r'] !== $activeReleaseId) {
-            throw new RefException(RefException::RELEASE_CHANGED);
-        }
-
-        return new RegistryAdmissionReference($payload['r'], $payload['n'], $payload['l'], $payload['i'], $payload['x']);
     }
 
     /** The decrypted payload, or NULL for anything that is not one of our tokens. */

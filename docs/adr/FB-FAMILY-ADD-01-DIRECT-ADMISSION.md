@@ -23,8 +23,10 @@ uncommitted; nothing deployed).**
   reading anything.
 - **Implemented in ADD-WP-06B-4:** the precise source contract and a synthetic-only adapter under
   `tests/` (§7c). The head's record is now read in the page's release.
-- **Implemented in ADD-WP-07B-1 (local, uncommitted):** the admission audit and integrity foundation (§9a): event CHECKs, a
+- **Implemented in ADD-WP-07B-1 (committed `5fe7174`):** the admission audit and integrity foundation (§9a): event CHECKs, a
   TRUNCATE guard, the reference fingerprint context and the admission audit helpers. Nothing calls them.
+- **Implemented in ADD-WP-07B-2a (local, uncommitted):** replay claims and the replay, conflict and unavailable-registry audit
+  helpers (§7a, "Replay claims"). Nothing calls them; no action or route exists.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
@@ -357,6 +359,45 @@ Gates G-01 … G-07 stay OPEN.
 - **Stateless replay.** Nothing is stored. A reference can be presented again until it expires, so it identifies a child; it does
   not authorize anything. The admission action (ADD-WP-07) must re-read the registry, evaluate again under its locks (§10), and
   rely on its own idempotency and uniqueness guards. Single use would need persistence and is not approved.
+- **Replay claims (ADD-WP-07B-2a; ADD-WP-07B-2R D-B2, D-B3, D-B5, D-B6). Local, uncommitted; nothing calls them.**
+  - `RegistryAdmissionRefs::openForReplay()` applies every check of `read()` except two: the expiry is replaced by
+    `REPLAY_WINDOW_SECONDS` (24 hours from issued-at), and the release is not compared. Every refusal is `REFERENCE_INVALID`.
+    `read()` and its 15-minute lifetime are unchanged.
+  - The result is a `RegistryAdmissionReplayClaim`, a separate type that authorizes nothing. It is not a
+    `RegistryAdmissionReference` and cannot become one. Its only operation is `matchesEvidence()` against a committed evidence
+    row (`RegistryAdmissionEvidence`, validated from the row, fail closed).
+  - It keeps no National ID: the child's keyed fingerprint is computed under each usable key version when it is built. A row is
+    compared under its stored `reference_key_version`, in constant time; a retired version does not match (D-B6, answered as a
+    conflict). Matched: actor, Family, household head, child and declaration version; not the release, parent link or outcome.
+  - Audit: `replayedFromEvidence()` records the stored fingerprint, key version and release; `idempotencyConflict()` and
+    `registryUnavailable()` (new procedural code `REGISTRY_UNAVAILABLE`) record no child. No schema change.
+  - ADD-WP-07B-2a-F: `replayedFromEvidence()` is the only replay audit path; the earlier `admissionReplayed()`, which
+    recomputed the fingerprint under the current key and was called only by tests, is removed.
+- **Failure contract for the admission action (ADD-WP-07B-2a-F; D-E2). Local, uncommitted; nothing calls it.**
+  - `RegistryAdmissionFailure::run()` wraps the whole admission, its transaction included. Reference refusals, the
+    caller's listed refusal classes and an already sanitized failure pass through unchanged. Anything else fails closed.
+  - Failing closed means one `Log::error` line with exactly four fields: a correlation id (UUID), a controlled failure code
+    (`LOCK_TIMEOUT`, `DEADLOCK`, `SERIALIZATION`, `DATABASE_ERROR`, `INTERNAL_ERROR`), the exception class and a validated
+    five-character SQLSTATE. Never the message, the SQL, the bound values or the trace. Then
+    `RegistryAdmissionUnavailableException`.
+  - That exception answers `503 {message, code: REGISTRY_UNAVAILABLE, correlation_id}` with `no-store, private`, plus
+    `Retry-After: 5` for 55P03, 40P01 and 40001. It chains no previous exception, and its `report()` stops the default
+    handler from logging it.
+  - It always rethrows, so an enclosing transaction rolls back. It writes no audit row: recording `REGISTRY_UNAVAILABLE` is
+    the action's choice, outside the failed transaction. No global exception handler, route or action was added.
+  - **Why.** A `QueryException` message carries the SQL and its bound values. For the audit helpers those are keyed
+    fingerprints and IP hashes, never a National ID. Still, none of it may reach a response or a log.
+- **Known exposure, not changed here: `var_export()` of `RegistryAdmissionReference`. A security prerequisite before any
+  admission activation: the mitigation below must be implemented and tested before G-06 can close and before G-07.**
+  - **Risk.** `var_export()` ignores `__debugInfo()` and prints private properties, so it would print the child's raw
+    National ID. So do `(array)` casts, `get_object_vars()` inside the class and Reflection.
+  - **Today.** Nothing in `app/` calls `var_export` or exports the object. PHP's default traces print only `Object(...)` for
+    an object argument, and drop arguments entirely when `zend.exception_ignore_args` is on (not verified for Production).
+  - `RegistryAdmissionReplayClaim` keeps no National ID, so the same calls show only fingerprints.
+  - **Proposed separate mitigation (needs its own work package).**
+    - Hold the National ID in a private closure, which `var_export` and casts print without its bound value.
+    - Add tests for `var_export`, `(array)`, `get_object_vars`, `serialize`, `json_encode` and `print_r`.
+    - Make `zend.exception_ignore_args=On` a Production PHP prerequisite (`docs/08`).
 - **Key rotation.** A reference sealed under a key listed in `APP_PREVIOUS_KEYS` still opens after `APP_KEY` changes; one sealed
   under any other key is `REFERENCE_INVALID`. With the 15-minute lifetime, removing a previous key soon after rotation is safe.
 - **Unchanged:** `CivilLookupRefs` and every Civil Lookup behavior. A lookup reference is refused here.
@@ -570,7 +611,8 @@ OPEN; D-06 is unchanged.
 - **Audit helpers (`FamilyRegistryAdmissionAudit`).**
   - `admissionSucceeded()` refuses to run outside a transaction, so the event commits or rolls back with the membership and
     evidence it describes;
-  - `admissionReplayed()` and `admissionRefused()` are written on their own, after the admission transaction;
+  - `admissionReplayed()` and `admissionRefused()` are written on their own, after the admission transaction
+    (`admissionReplayed()` was replaced by `replayedFromEvidence()` in ADD-WP-07B-2a-F);
   - a refusal code must be a `RegistryChildReason` or one of `REFERENCE_INVALID`, `RELEASE_CHANGED`, `IDEMPOTENCY_CONFLICT`,
     `CONTEXT_CHANGED`, `LOST_RACE`, `RESULT_SET_TOO_BROAD`; the child and the release are NULL only when the refusal came before
     they were known;
