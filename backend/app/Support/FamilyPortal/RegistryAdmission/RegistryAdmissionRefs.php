@@ -92,6 +92,26 @@ final class RegistryAdmissionRefs
     }
 
     /**
+     * read() for the admission action (ADD-WP-07B-2c): every check of read(), the
+     * 15-minute lifetime included, except the release, which the action learns only from
+     * the registry it reads next. The action MUST compare the reference's release with
+     * that page, and the release pin proves it is still active at commit.
+     *
+     * @throws RefException REFERENCE_INVALID
+     */
+    public static function readForAdmission(mixed $token, FamilyAccessResult $context): RegistryAdmissionReference
+    {
+        $payload = self::open($token);
+        $now = now()->getTimestamp();
+
+        if (! self::authentic($payload, $context, $now) || $payload['x'] <= $now) {
+            throw new RefException(RefException::REFERENCE_INVALID);
+        }
+
+        return new RegistryAdmissionReference($payload['r'], $payload['n'], $payload['l'], $payload['i'], $payload['x']);
+    }
+
+    /**
      * REPLAY ONLY (ADD-WP-07B-2a; ADD-WP-07B-2R D-B3): every check of read() except the
      * expiry, which is replaced by REPLAY_WINDOW_SECONDS from issued-at, and except the
      * release, which a replay does not compare (D-B2). The result can only be compared

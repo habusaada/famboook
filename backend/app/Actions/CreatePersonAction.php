@@ -58,7 +58,7 @@ class CreatePersonAction
      * }  $data
      * @param  string  $nationalIdField  Validation key used for a duplicate National ID.
      */
-    public function handle(array $data, ?int $actingUserId, string $nationalIdField = 'national_id'): Person
+    public function handle(#[\SensitiveParameter] array $data, ?int $actingUserId, string $nationalIdField = 'national_id'): Person
     {
         $life = LifeStatus::tryFrom((string) ($data['life_status'] ?? ''));
         if ($life === null) {

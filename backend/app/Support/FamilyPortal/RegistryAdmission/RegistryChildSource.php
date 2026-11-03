@@ -31,12 +31,12 @@ use App\Support\CivilLookup\CivilRecordPage;
  */
 interface RegistryChildSource
 {
-    public function childrenOf(string $parentNationalId, int $offset, int $limit): CivilRecordPage;
+    public function childrenOf(#[\SensitiveParameter] string $parentNationalId, int $offset, int $limit): CivilRecordPage;
 
     /**
      * The record of one National ID in $releaseId, or NULL.
      *
      * @throws CivilLookupException RELEASE_CHANGED when $releaseId is no longer published
      */
-    public function recordOf(string $nationalId, int $releaseId): ?CivilRecord;
+    public function recordOf(#[\SensitiveParameter] string $nationalId, int $releaseId): ?CivilRecord;
 }

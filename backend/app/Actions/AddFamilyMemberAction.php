@@ -39,7 +39,7 @@ class AddFamilyMemberAction
      *     relationship_type_id: int,
      * }  $data  Already-validated payload (see AddFamilyMemberRequest).
      */
-    public function handle(Family $family, array $data, ?int $actingUserId): FamilyMembership
+    public function handle(Family $family, #[\SensitiveParameter] array $data, ?int $actingUserId): FamilyMembership
     {
         return DB::transaction(function () use ($family, $data, $actingUserId) {
             Family::withTrashed()->whereKey($family->id)->lock('for key share')->first();

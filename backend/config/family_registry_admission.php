@@ -20,6 +20,11 @@ return [
         explode(',', (string) env('FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS', '')),
     ))),
 
+    // The version of the household head's declaration an admission must carry
+    // (ADD-WP-07B-2c; ADR §6, open decision O-K). NO default: while it is unset,
+    // every admission is refused DECLARATION_REQUIRED (fail closed).
+    'declaration_version' => env('FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION'),
+
     // Per-user discovery limits (ADR §10), independent of the civil lookup.
     'limits' => [
         'discovery_user_minute' => (int) env('FAMILY_REGISTRY_DISCOVERY_LIMIT_USER_MINUTE', 10),

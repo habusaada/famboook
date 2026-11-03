@@ -297,7 +297,9 @@ class RegistryAdmissionRefsTest extends TestCase
             // ADD-WP-06B-3 added the read-only discovery GET (ref = null); no admission route exists.
             $this->assertStringNotContainsString('admissions', $route->uri());
         }
-        // Only the RegistryAdmission support namespace may name the class.
+        // Only the RegistryAdmission support namespace and, since ADD-WP-07B-2c, the internal
+        // admission action may name the class; nothing routes to that action (asserted above
+        // for the controllers, and here for every other file).
         $users = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path(), \FilesystemIterator::SKIP_DOTS)) as $file) {
             $path = str_replace(DIRECTORY_SEPARATOR, '/', $file->getPathname());
@@ -305,9 +307,14 @@ class RegistryAdmissionRefsTest extends TestCase
                 && str_contains((string) file_get_contents($path), 'RegistryAdmissionRefs')) {
                 $users[] = $path;
             }
+            if (str_ends_with($path, '.php') && ! str_contains($path, '/Actions/FamilyPortal/')) {
+                // A use, not a mention: no import, ::class or construction of the action anywhere else.
+                $this->assertDoesNotMatchRegularExpression('/use App\\\\Actions\\\\FamilyPortal\\\\AdmitRegistryChildAction|AdmitRegistryChildAction::class|new AdmitRegistryChildAction/', (string) file_get_contents($path), $path);
+            }
             $this->assertDoesNotMatchRegularExpression('/Admi\w*From\w*Registry|RegistryAdmission\w*Action/', basename($path));
         }
-        $this->assertSame([], $users);
+        $this->assertCount(1, $users);
+        $this->assertStringEndsWith('/Actions/FamilyPortal/AdmitRegistryChildAction.php', $users[0]);
         $this->assertSame('OFF', config('family_registry_admission.mode'));
     }
 }

@@ -157,8 +157,10 @@ class RegistryReleasePinContractTest extends TestCase
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path(), \FilesystemIterator::SKIP_DOTS)) as $file) {
             $source = (string) file_get_contents($file->getPathname());
             $this->assertStringNotContainsString('SyntheticReleasePin', $source, $file->getPathname());
+            // ADD-WP-07B-2c: the internal admission action builds the pin on its own connection; nothing routes to it.
             if (! str_contains($file->getPathname(), 'RegistryAdmission') && ! str_ends_with($file->getPathname(), 'CivilRegistryReader.php')
-                && ! str_ends_with($file->getPathname(), 'RegistryReleasePinUnavailableException.php')) {
+                && ! str_ends_with($file->getPathname(), 'RegistryReleasePinUnavailableException.php')
+                && ! str_ends_with($file->getPathname(), 'AdmitRegistryChildAction.php')) {
                 $this->assertStringNotContainsString('RegistryReleasePin', $source, $file->getPathname());
             }
         }

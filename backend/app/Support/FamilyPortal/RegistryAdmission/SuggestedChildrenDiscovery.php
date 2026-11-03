@@ -56,31 +56,11 @@ final class SuggestedChildrenDiscovery
         if (! $context->hasFamilyContext()) {
             throw new LogicException('Suggested children are discovered only for an eligible household head.');
         }
-        $headId = FamilyNationalId::normalize($context->person->national_id)
-            ?? throw new LogicException('An eligible household head has a nine-digit National ID.');
-
-        $found = $this->source->childrenOf($headId, 0, CivilRegistrySource::LINKS_CAP);
-        $this->assertConsistent($found);
+        [$headId, $found, $groups, $headParents, $siblings] = $this->read($context);
         if ($found->tooBroad()) {
             return new SuggestedChildrenPage([], $page, $perPage, 0, tooBroad: true, releaseId: $found->releaseId);
         }
 
-        // One entry per National ID; the lowest record id stands for its duplicates.
-        $groups = [];
-        foreach (array_slice($found->rows, 0, CivilRegistrySource::LINKS_CAP) as $record) {
-            if (CivilRegistryValues::parentLink($record, $headId) !== null) {
-                $groups[$record->mainid][] = $record;
-            }
-        }
-        ksort($groups, SORT_STRING);
-
-        // The head is read in the page's release (ADD-WP-06B-4): a release published in between is RELEASE_CHANGED.
-        $headRecord = $this->source->recordOf($headId, $found->releaseId);
-        if ($headRecord !== null && $headRecord->releaseId !== $found->releaseId) {
-            throw new RegistryChildSourceIntegrityException;
-        }
-        $headParents = $this->parentsOf($headRecord);
-        $siblings = array_map('strval', array_keys($groups));
         $pageGroups = [];
         foreach (array_slice($groups, ($page - 1) * $perPage, $perPage, true) as $records) {
             usort($records, fn (CivilRecord $a, CivilRecord $b) => $a->recordId <=> $b->recordId);
@@ -97,6 +77,66 @@ final class SuggestedChildrenDiscovery
         }
 
         return new SuggestedChildrenPage($children, $page, $perPage, count($groups), releaseId: $found->releaseId);
+    }
+
+    /**
+     * The head's suggested children for an admission (ADD-WP-07B-2c): the same source
+     * read, release checks and cross-record reasons as discover(), for every child of the
+     * release at once, keyed by National ID. Nothing else is evaluated here; the admission
+     * evaluates its child again under its own locks.
+     */
+    public function candidates(FamilyAccessResult $context): AdmissionCandidates
+    {
+        if (! $context->hasFamilyContext()) {
+            throw new LogicException('Suggested children are discovered only for an eligible household head.');
+        }
+        [$headId, $found, $groups, $headParents, $siblings] = $this->read($context);
+        if ($found->tooBroad()) {
+            return new AdmissionCandidates($found->releaseId, true, []);
+        }
+        $candidates = [];
+        foreach ($groups as $nationalId => $records) {
+            usort($records, fn (CivilRecord $a, CivilRecord $b) => $a->recordId <=> $b->recordId);
+            $candidates[(string) $nationalId] = new AdmissionCandidate($records[0],
+                $this->sourceReasons($records[0], count($records) > 1, $headParents, $siblings, $headId));
+        }
+
+        return new AdmissionCandidates($found->releaseId, false, $candidates);
+    }
+
+    /**
+     * One source read for the head: the checked page, the records naming the head as a
+     * parent grouped by National ID (sorted), and the head's own record in the same release.
+     *
+     * @return array{0: string, 1: CivilRecordPage, 2: array<string, list<CivilRecord>>, 3: list<string>, 4: list<string>}
+     */
+    private function read(FamilyAccessResult $context): array
+    {
+        $headId = FamilyNationalId::normalize($context->person->national_id)
+            ?? throw new LogicException('An eligible household head has a nine-digit National ID.');
+
+        $found = $this->source->childrenOf($headId, 0, CivilRegistrySource::LINKS_CAP);
+        $this->assertConsistent($found);
+        if ($found->tooBroad()) {
+            return [$headId, $found, [], [], []];
+        }
+
+        // One entry per National ID; the lowest record id stands for its duplicates.
+        $groups = [];
+        foreach (array_slice($found->rows, 0, CivilRegistrySource::LINKS_CAP) as $record) {
+            if (CivilRegistryValues::parentLink($record, $headId) !== null) {
+                $groups[$record->mainid][] = $record;
+            }
+        }
+        ksort($groups, SORT_STRING);
+
+        // The head is read in the page's release (ADD-WP-06B-4): a release published in between is RELEASE_CHANGED.
+        $headRecord = $this->source->recordOf($headId, $found->releaseId);
+        if ($headRecord !== null && $headRecord->releaseId !== $found->releaseId) {
+            throw new RegistryChildSourceIntegrityException;
+        }
+
+        return [$headId, $found, $groups, $this->parentsOf($headRecord), array_map('strval', array_keys($groups))];
     }
 
     /** The page names one valid release, and its rows and total agree with it. */
@@ -122,18 +162,7 @@ final class SuggestedChildrenDiscovery
     private function present(FamilyAccessResult $context, CivilRecord $record, bool $duplicated, array $headParents, array $siblings, string $headId, RegistryChildFacts $facts): SuggestedChild
     {
         $assessment = RegistryChildEligibility::evaluate($context, $record, $facts);
-        $extra = [];
-        if ($duplicated) {
-            $extra[] = Reason::DUPLICATE_SOURCE_ROWS;
-        }
-        // The head's own record names this child as a parent, or the child's other parent
-        // is the child itself or one of the head's other suggested children.
-        $otherParents = array_diff($this->parentsOf($record), [$headId]);
-        if (in_array($record->mainid, $headParents, true)
-            || in_array($record->mainid, $otherParents, true)
-            || array_intersect($otherParents, $siblings) !== []) {
-            $extra[] = Reason::PARENTAGE_ANOMALY;
-        }
+        $extra = $this->sourceReasons($record, $duplicated, $headParents, $siblings, $headId);
         if ($extra !== []) {
             $assessment = new RegistryChildAssessment([...$assessment->reasons, ...$extra], $assessment->parentLink, $assessment->gender);
         }
@@ -147,6 +176,31 @@ final class SuggestedChildrenDiscovery
             $this->relationship($assessment, $status),
             $status,
         );
+    }
+
+    /**
+     * The cross-record reasons only discovery can see.
+     *
+     * @param  list<string>  $headParents
+     * @param  list<string>  $siblings
+     * @return list<Reason>
+     */
+    private function sourceReasons(CivilRecord $record, bool $duplicated, array $headParents, array $siblings, #[\SensitiveParameter] string $headId): array
+    {
+        $extra = [];
+        if ($duplicated) {
+            $extra[] = Reason::DUPLICATE_SOURCE_ROWS;
+        }
+        // The head's own record names this child as a parent, or the child's other parent
+        // is the child itself or one of the head's other suggested children.
+        $otherParents = array_diff($this->parentsOf($record), [$headId]);
+        if (in_array($record->mainid, $headParents, true)
+            || in_array($record->mainid, $otherParents, true)
+            || array_intersect($otherParents, $siblings) !== []) {
+            $extra[] = Reason::PARENTAGE_ANOMALY;
+        }
+
+        return $extra;
     }
 
     /** Only an APPROVED gender mapping names the relationship, and never for a refusal. */

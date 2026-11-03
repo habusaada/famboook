@@ -30,7 +30,7 @@ final class NationalIdGuard
      *
      * @return Collection<int, Person>
      */
-    public static function matches(string $nationalId, ?int $exceptPersonId = null): Collection
+    public static function matches(#[\SensitiveParameter] string $nationalId, ?int $exceptPersonId = null): Collection
     {
         return Person::query()
             ->where('national_id', $nationalId)
@@ -50,7 +50,7 @@ final class NationalIdGuard
      * A SOFT-DELETED Person keeps their National ID (CO-01D.4): it is refused
      * too, but without any reference — a deleted record is never described.
      */
-    public static function assertAvailable(?string $nationalId, string $field, ?int $exceptPersonId = null): void
+    public static function assertAvailable(#[\SensitiveParameter] ?string $nationalId, string $field, ?int $exceptPersonId = null): void
     {
         if ($nationalId === null || trim($nationalId) === '') {
             return;

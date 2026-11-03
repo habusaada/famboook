@@ -2,17 +2,22 @@
 
 namespace App\Support\FamilyPortal\RegistryAdmission;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
  * The fields of one committed family_registry_admissions row that a replay compares
- * and records (FB-FAMILY-ADD-01 ADD-WP-07B-2a; ADD-WP-07B-2R D-B2, D-B5). INTERNAL:
- * nothing reads evidence rows yet. Holds no National ID: the child is the stored keyed
- * fingerprint and the key version that produced it. A malformed row is refused
- * (fail closed), never repaired.
+ * and records (FB-FAMILY-ADD-01 ADD-WP-07B-2a; ADD-WP-07B-2R D-B2, D-B5). Holds no
+ * National ID: the child is the stored keyed fingerprint and the key version that
+ * produced it. A malformed row is refused (fail closed), never repaired.
+ *
+ * ADD-WP-07B-2c: forKey() reads the row of one idempotency key, and the membership and
+ * Person ids are carried for the replay's member reference (NULL in rows built by hand).
  */
 final class RegistryAdmissionEvidence
 {
+    private const TABLE = 'family_registry_admissions';
+
     private function __construct(
         public readonly int $familyId,
         public readonly int $admittedBy,
@@ -21,7 +26,21 @@ final class RegistryAdmissionEvidence
         public readonly int $referenceKeyVersion,
         public readonly int $releaseId,
         public readonly string $declarationVersion,
+        public readonly ?int $familyMembershipId = null,
+        public readonly ?int $personId = null,
     ) {}
+
+    /**
+     * The committed admission of this actor's idempotency key, or NULL. A committed row
+     * never changes (append-only), so reading it without a lock is safe; under the
+     * Family lock the same call sees a concurrent admission once it has committed.
+     */
+    public static function forKey(int $actorUserId, string $clientReference): ?self
+    {
+        $row = DB::table(self::TABLE)->where('admitted_by', $actorUserId)->where('client_reference', $clientReference)->first();
+
+        return $row === null ? null : self::fromRow($row);
+    }
 
     /** @param  object  $row  a family_registry_admissions row */
     public static function fromRow(object $row): self
@@ -29,6 +48,13 @@ final class RegistryAdmissionEvidence
         $ids = [];
         foreach (['family_id', 'admitted_by', 'admitted_by_person_id', 'reference_key_version', 'release_id'] as $column) {
             $ids[$column] = self::positiveInt($row->{$column} ?? null);
+        }
+        $optional = [];
+        foreach (['family_membership_id', 'person_id'] as $column) {
+            $optional[$column] = property_exists($row, $column) ? self::positiveInt($row->{$column}) : null;
+            if (property_exists($row, $column) && $optional[$column] === null) {
+                throw new InvalidArgumentException('An admission evidence row is malformed.');
+            }
         }
         $fingerprint = $row->reference_fingerprint ?? null;
         $declaration = $row->declaration_version ?? null;
@@ -39,7 +65,7 @@ final class RegistryAdmissionEvidence
         }
 
         return new self($ids['family_id'], $ids['admitted_by'], $ids['admitted_by_person_id'], $fingerprint,
-            $ids['reference_key_version'], $ids['release_id'], $declaration);
+            $ids['reference_key_version'], $ids['release_id'], $declaration, $optional['family_membership_id'], $optional['person_id']);
     }
 
     /** A positive integer, as either driver returns it; NULL for anything else. */

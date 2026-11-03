@@ -29,8 +29,12 @@ uncommitted; nothing deployed).**
   helpers (§7a, "Replay claims"). Nothing calls them; no action or route exists.
 - **Implemented in ADD-WP-07B-2b (committed `7ca1d6e`):** the application side of the registry release pin (§10a). Nothing calls
   it and nothing binds it; without the DBA package every pin fails closed.
-- **Implemented in ADD-WP-07B-2c-0 (local, uncommitted):** `RegistryAdmissionReference` hardened against ordinary exposure of the
-  child's National ID (§7a, "Reference exposure").
+- **Implemented in ADD-WP-07B-2c-0 (committed `6e3935c`):** `RegistryAdmissionReference` hardened against ordinary exposure of
+  the child's National ID (§7a, "Reference exposure").
+- **Implemented in ADD-WP-07B-2c (local, uncommitted):** the internal atomic admission action `AdmitRegistryChildAction` (§10b).
+  No route, controller, job or command calls it; nothing binds its source or verifier. In operation it admits no one: the flag
+  is `OFF`, no role holds the permission, no source is bound, the release pin fails closed until DBA-1 … DBA-4, and the
+  operational eligibility refuses every child until G-04 and G-05 close (D-06).
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
@@ -420,8 +424,9 @@ Gates G-01 … G-07 stay OPEN.
       the `WeakMap` entry is removed and the string's memory is released to PHP's allocator. It is not overwritten, and it may
       remain readable in process memory, a core dump or swap until reused. PHP offers no secure memory wipe for strings.
       The same holds for the decrypted payload inside `RegistryAdmissionRefs::read()` and for every copy a caller makes.
-    - **Paths to review in ADD-WP-07B-2c.** Code that calls `childNationalId()` and passes the value on carries it into its
-      own frames.
+    - **Paths to review in ADD-WP-07B-2c** (addressed there, §10b: the parameters are marked, the action runs inside
+      `RegistryAdmissionFailure::run()` and refuses to run while queries can be captured). Code that calls `childNationalId()`
+      and passes the value on carries it into its own frames.
       - **Unmarked parameters.** `NationalIdGuard::matches()` and `assertAvailable()`, `CreatePersonAction::handle()` (its
         `$data` array holds `national_id`) and the `RegistryChildSource` implementations.
       - **Bound values.** `CreatePersonAction` rethrows the `QueryException` of the `persons` insert, and Laravel puts the
@@ -804,6 +809,99 @@ applied, so in operation every pin fails closed and no admission could pass it. 
       split-brain, with two writable primaries, breaks the guarantee and must be excluded by the cluster manager.
     - **Evidence.** It is recorded in the Production audit before G-07: the configured endpoints, the routing and failover
       design, and a check run from both connections that they report the same server and database.
+
+## 10b. Atomic admission (ADD-WP-07B-2c)
+
+**Implemented locally, internal only; uncommitted.** It follows plan ADD-WP-07B-2c-P and the ADD-WP-07B-2R decisions. Gates
+G-01 … G-07 stay OPEN, D-06 is unchanged and the flag is `OFF`. No migration.
+
+- **Entry.** `AdmitRegistryChildAction::handle(FamilyAccessResult, RegistryAdmissionRequest): RegistryAdmissionOutcome`, entirely
+  inside `RegistryAdmissionFailure::run()`.
+  - The request carries the reference, a lowercase UUID `client_reference`, the declaration version and its acceptance.
+  - The outcome carries only `member_ref` and `replayed`.
+  - Refusals are `RegistryAdmissionRefusedException`: one public code, `{message, code}`, `no-store`, with the internal reason
+    kept for the audit only. The codes are 403 `FAMILY_CONTEXT_UNAVAILABLE`, 404 `ADMISSION_UNAVAILABLE`, 422
+    `DECLARATION_REQUIRED`, 422 `NOT_ELIGIBLE`, 409 `ADMISSION_IDEMPOTENCY_CONFLICT` and 422 `REFERENCE_INVALID` (the context
+    changed under the lock).
+  - A reference failure is `REFERENCE_INVALID` (422) or `RELEASE_CHANGED` (409); everything else is the sanitized 503.
+- **Order.**
+  - **A. Pre-checks.** Household context, flag and permission, then the declaration. The declaration must equal
+    `family_registry_admission.declaration_version`, which has no default, so while it is unset every admission is
+    `DECLARATION_REQUIRED` (O-K). None of these is recorded.
+  - **B. Replay.** A committed evidence row for the actor's key is replayed before any registry read (D-B1 … D-B6).
+  - **C. Reference.** `RegistryAdmissionRefs::readForAdmission()` applies `read()`'s 15 minutes and every check except the
+    release; the action compares the release itself. An authentic but expired reference (24 hours, `openForReplay()`) can
+    only find a committed admission of the key, after waiting for the Family lock; otherwise it is `REFERENCE_INVALID`.
+  - **D. Registry.** `SuggestedChildrenDiscovery::candidates()` reads the source outside the transaction, with the same read,
+    release checks and cross-record reasons as `discover()`, whose API is unchanged.
+  - **E. Transaction.** One READ COMMITTED transaction with `lock_timeout` 3 s and `statement_timeout` 15 s. The locks are taken
+    in order: the release pin on the same connection, Family `FOR UPDATE`, the head's membership `FOR SHARE` with the context
+    resolved again, the key looked up again, the child's National ID advisory lock, eligibility again under the locks (fresh
+    reads), then `FamilyMemberIdentity::resolve()`, which refuses an active member before Person `FOR UPDATE`. Then
+    `AddFamilyMemberAction` (new Person) or `AttachFamilyMemberAction` (existing Person, unchanged), the evidence row and
+    `ADMISSION_SUCCEEDED`, all committed together.
+  - **F. Refusals.** A refusal rolls everything back and is recorded in its own short transaction, with the internal reason, the
+    release and the child's fingerprint when known. It does not consume the key. A unique violation, or a duplicate or
+    validation refusal from the existing actions, is answered as a replay if the key committed meanwhile, otherwise
+    `LOST_RACE`. Registry and pin failures are recorded as `REGISTRY_UNAVAILABLE`.
+- **Eligibility.** `GatedRegistryChildAdmissibility` is `RegistryChildEligibility::evaluate()` plus discovery's reasons, and
+  never proves a life (G-05, D-06), so it admits no one. The action refuses any other `RegistryChildAdmissibility` outside the
+  test runner. The only other implementation, `tests/Support/FamilyPortal/PendingGatesLiftedAdmissibility`, lifts only the
+  pending gates (`GENDER_MAPPING_PROVISIONAL` when the gender maps, `LIFE_UNVERIFIED` only for an empty death date) and never
+  `DECEASED` or `INDETERMINATE`.
+- **Privacy.**
+  - **Query capture.** The action refuses to run (503) while the query log is enabled or any `QueryExecuted` listener exists.
+    This includes Laravel's own debug-mode exception renderer, which keeps up to 101 queries WITH their bindings when
+    `APP_DEBUG=true`. `APP_DEBUG=false` in Production is therefore a hard prerequisite.
+  - **Parameters.** National ID parameters along the path are `#[\SensitiveParameter]`: `AddFamilyMemberAction`,
+    `CreatePersonAction`, `NationalIdGuard::matches()` and `assertAvailable()`, and `RegistryChildSource`.
+  - **Bound values.** `CreatePersonAction`'s rethrown `QueryException`, which carries the bound National ID, reaches only
+    `RegistryAdmissionFailure::run()`.
+- **Tests.**
+  - `AdmitRegistryChildActionTest`, one session (15 on PostgreSQL; the context, flag, declaration, reference, replay and failure
+    paths also on SQLite), covers:
+    - success for NEW_PERSON and ATTACHABLE;
+    - every eligibility refusal;
+    - D-06;
+    - the replay scenarios;
+    - pin and verifier failures;
+    - evidence and audit failures;
+    - a unique violation;
+    - query capture;
+    - the test-only guard.
+  - `AdmitRegistryChildConcurrencyTest` (PostgreSQL) runs real processes:
+    - one key twice;
+    - two families and one child;
+    - a publication waiting for an admission while another admission gets `PIN_BUSY` and a stale one `RELEASE_CHANGED`;
+    - a lock timeout;
+    - a Staff add of the same child elsewhere and in the same Family.
+  - Committed admission rows make the tables refuse TRUNCATE, so that class rebuilds the schema with `migrate:fresh`.
+- **Review ADD-WP-07B-2c-C.**
+  - **Bounded wait on the replay path.** The expired-reference replay path waits for the Family lock under the same 3 s
+    `lock_timeout` as the admission: a long-held Family lock is a retryable 503, never an endless wait.
+  - **Query-capture guard compatibility.**
+    - Checked with the application booted under `APP_DEBUG=false`: no `QueryExecuted` listener and no query log, so the
+      guard does not interfere.
+    - Under `APP_DEBUG=true`, Laravel's renderer listener is present and every admission is refused, as intended.
+    - Any future APM or diagnostics package that listens to queries (Telescope, Pulse, Nightwatch, Sentry or similar) will
+      stop admissions until it excludes this path. That is deliberate, and must be weighed when one is added.
+  - **Deadlock (40P01).**
+    - The admission's transaction makes one attempt, so a 40P01 is rethrown as a `QueryException`, not retried.
+    - `RegistryAdmissionFailure::run()` maps 40P01 to `DEADLOCK`, a retryable 503 with `Retry-After`. This is tested with a
+      synthetic `QueryException` (`RegistryAdmissionFailureTest`).
+    - Nothing is committed, because PostgreSQL rolls the victim back.
+    - No test produces a real deadlock: the lock order (§10a) has no cycle with the existing writers, so none could be
+      constructed. That handling therefore rests on the contract test and the lock-order review.
+  - **Audit coverage of the pre-checks (for ADD-WP-07C).**
+    - No household context, a closed flag or a missing permission, and a missing or wrong declaration are NOT recorded:
+      - the first has no Family to record against;
+      - the flag and permission refusals are deliberately silent, as for discovery (§7b);
+      - the declaration has no procedural code.
+    - Everything after these checks is recorded: reference, release, eligibility, idempotency, lost race and registry or pin
+      unavailability.
+    - ADD-WP-07C must therefore put its rate limit before the action, and decide whether repeated declaration refusals need
+      their own code. One row per refused attempt also means the audit grows with abuse until that limit exists.
+- **Not covered by a test:** an actual deadlock (40P01), as explained above.
 
 ## 10. Idempotency, concurrency and rate limits
 
