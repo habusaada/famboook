@@ -102,9 +102,10 @@ class FamilyRegistryAdmissionSchemaTest extends TestCase
         $fingerprint = ['reference_fingerprint' => str_repeat('c', 64), 'reference_key_version' => 1];
         foreach ([
             ['event_type' => 'DISCOVERY_LISTED', 'outcome_code' => 'LISTED', 'result_count' => 3, 'release_id' => 7],
-            ['event_type' => 'ADMISSION_SUCCEEDED', 'outcome_code' => 'ADMITTED', 'release_id' => 7, ...$fingerprint],
+            // ADD-WP-07B-1: a success or a replay names the child and the release, with its own outcome codes.
+            ['event_type' => 'ADMISSION_SUCCEEDED', 'outcome_code' => 'PERSON_CREATED', 'release_id' => 7, ...$fingerprint],
             ['event_type' => 'ADMISSION_REFUSED', 'outcome_code' => 'REFERENCE_INVALID'],
-            ['event_type' => 'ADMISSION_REPLAYED', 'outcome_code' => 'REPLAYED', ...$fingerprint],
+            ['event_type' => 'ADMISSION_REPLAYED', 'outcome_code' => 'REPLAYED', 'release_id' => 7, ...$fingerprint],
         ] as $values) {
             $this->assertTrue(DB::table(self::EVENTS)->insert($this->event($values)), $values['event_type']);
         }

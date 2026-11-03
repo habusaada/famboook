@@ -772,6 +772,8 @@ Application logic additionally ensures active/inactive state consistency.
 **Schema foundation implemented locally, uncommitted and not deployed (ADD-WP-04, 2026-11-01; `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` §9). Direct admission is
 NOT operational: nothing reads or writes these tables.** Migration `2026_11_01_100000_create_family_registry_admission_tables` adds `family_registry_admissions` and
 `family_registry_admission_events`, both append-only on PostgreSQL. `down()` refuses once history exists.
+ADD-WP-07B-1 (local, uncommitted) adds migration `2026_11_02_100000_harden_family_registry_admission_audit`: admission event
+CHECKs and a TRUNCATE guard on both tables (ADR §9a).
 
 - No change to `identity_ref`, `persons`, `family_memberships` or `change_requests`: §20 and
   §21 and `uq_persons_national_id` stay the final guards.

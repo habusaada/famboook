@@ -5,8 +5,8 @@ architecture. **NOT implemented, NOT activated, NOT approved for real registry d
 Production.** Every activation gate in §12 is OPEN.
 
 **Implementation status (ADD-WP-04 and ADD-WP-05 committed locally in `a2bfbdb`, ADD-WP-06A in `219e0e2`, ADD-WP-06B-1 in
-`3bb64f4`, ADD-WP-06B-2 in `ec8f647`, ADD-WP-06B-3 in `2b2ce02`, not pushed; ADD-WP-06B-4 local, uncommitted; nothing
-deployed).**
+`3bb64f4`, ADD-WP-06B-2 in `ec8f647`, ADD-WP-06B-3 in `2b2ce02`, ADD-WP-06B-4 in `9a05e30`, not pushed; ADD-WP-07B-1 local,
+uncommitted; nothing deployed).**
 
 - **Implemented:** the flag `family_registry_admission.mode` (`FAMILY_REGISTRY_ADMISSION_MODE`, default and fail-closed
   `OFF`, read through `FamilyRegistryAdmissionPolicy`, read by nothing yet); the permission definition
@@ -21,10 +21,12 @@ deployed).**
 - **Implemented in ADD-WP-06B-3:** the guarded discovery route (§7b). It is unavailable in operation: the
   flag is `OFF`, no role holds the permission, and **no registry source is bound**, so even an open gate answers 503 without
   reading anything.
-- **Implemented in ADD-WP-06B-4 (local, uncommitted):** the precise source contract and a synthetic-only adapter under
+- **Implemented in ADD-WP-06B-4:** the precise source contract and a synthetic-only adapter under
   `tests/` (§7c). The head's record is now read in the page's release.
+- **Implemented in ADD-WP-07B-1 (local, uncommitted):** the admission audit and integrity foundation (§9a): event CHECKs, a
+  TRUNCATE guard, the reference fingerprint context and the admission audit helpers. Nothing calls them.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
-  not operational), issuing `ref` in a response, the Family Portal UI, the admission action, the reference fingerprint context,
+  not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
   pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
@@ -480,9 +482,9 @@ writes it. A CHECK cannot prove that the membership, Person and Family of a row 
 **Never stored:** the source `record_id` or `record_versions` id (D-02), a National ID, the
 registry payload, a name, or the request body.
 
-**Reference fingerprint:** computed with `KeyedFingerprint` under a new
-`FingerprintContext`, proposed as
-`famboook.family-registry-admission.reference.v1:`, over the canonical National ID. The
+**Reference fingerprint:** computed with `KeyedFingerprint` under
+`FingerprintContext::FAMILY_REGISTRY_ADMISSION_REFERENCE`
+(`famboook.family-registry-admission.reference.v1:`, ADD-WP-07B-1), over the canonical National ID. The
 key is the application's, so `identity_ref` readers cannot derive it, and there is no
 stored path from this table to a registry row by id.
 
@@ -502,6 +504,90 @@ stored path from this table to a registry row by id.
 Writes to `civil_lookup_audit_events` and the civil lookup quota are not used (D-05).
 `FAMILY_MEMBER_ADDED` is recorded in the Family Activity Log as for any new member, with no
 metadata. Retention is part of G-02.
+
+## 9a. Audit and integrity foundation (ADD-WP-07B-1)
+
+**Implemented locally, uncommitted; nothing writes admission rows yet** (no action, route or source). Gates G-01 … G-07 stay
+OPEN; D-06 is unchanged.
+
+- **Migration `2026_11_02_100000_harden_family_registry_admission_audit`** (additive, PostgreSQL only; validated when added, so
+  an existing row that breaks a rule stops the migration). On `family_registry_admission_events`:
+  - `chk_registry_admission_event_release`: a release id is NULL or positive;
+  - `chk_registry_admission_event_admission_reference`: `ADMISSION_SUCCEEDED` and `ADMISSION_REPLAYED` carry a reference
+    fingerprint and a release;
+  - outcome codes by type: success `PERSON_CREATED` or `PERSON_ATTACHED`; replay `REPLAYED`; a refusal never uses a success,
+    replay or listing code. Discovery rows are not constrained further.
+- **TRUNCATE guard (corrected in ADD-WP-07B-1R).** A `BEFORE TRUNCATE` statement trigger on both tables
+  (`famboook_family_registry_admission_no_truncate()`, SECURITY INVOKER with a pinned `search_path`) refuses TRUNCATE, direct or through CASCADE,
+  **whenever the table holds a row**, for every role and in every database. No database name, session setting or role opens it:
+  the first version's `*_test` exception and its `famboook.enforce_truncate_guard` setting are removed. The row triggers only
+  cover UPDATE and DELETE.
+  - **Why an empty table may be truncated.** It holds no history to destroy. This is what keeps the PostgreSQL test harness
+    working: `DatabaseTruncation` (55 test classes) issues `TRUNCATE … RESTART IDENTITY CASCADE` for every table, which reaches
+    both tables through `users`, the reason `workflow_events` has no TRUNCATE guard. No test commits an admission row.
+  - **Why READ COMMITTED only.** TRUNCATE takes ACCESS EXCLUSIVE before the trigger runs, so under READ COMMITTED the trigger's
+    fresh snapshot sees every committed row. Under REPEATABLE READ or SERIALIZABLE an older snapshot could miss rows committed
+    since, so TRUNCATE is refused there even on an empty table.
+  - **Test cleanup for later work packages.** A test that commits an admission row (for example a cross-process admission test
+    in ADD-WP-07B-2) cannot clean up with `DatabaseTruncation`: it must rebuild the schema instead (`DatabaseMigrations`, which
+    drops the tables, an owner operation). The guard is not relaxed for tests.
+  - `down()` removes these guards only while no admission event or evidence row exists.
+- **Security boundary and role assumptions.** The triggers bind every role that is neither a **superuser** nor the **owner** of
+  the tables. Those two can always switch triggers off (`session_replication_role = replica`, which needs superuser;
+  `ALTER TABLE … DISABLE TRIGGER` or `DROP TRIGGER`, which need ownership). Tested with a role created inside the test
+  transaction that is not a superuser, does not own the tables and holds SELECT, INSERT, UPDATE, DELETE and TRUNCATE on them:
+  it can read and insert, and cannot truncate, update, delete, change `session_replication_role`, disable or drop the triggers,
+  drop the function or drop a constraint. A role with TRUNCATE but without SELECT is refused too, because the check cannot read
+  the table. The local PostgreSQL test connection is the superuser `postgres`. The triggers fire for it too, and the other tests
+  show the refusals as `postgres`, but as a superuser it could switch them off; that is why the boundary is tested through the
+  non-owner role.
+- **Search-path hijacking (found in the ADD-WP-07B-1C review, fixed in ADD-WP-07B-1R2).**
+  - **Root cause.** The first trigger function ran as SECURITY INVOKER with the caller's `search_path` and called
+    `current_setting()`, `format()` and `<>` unqualified. A role that is neither superuser nor owner, holding only SELECT and
+    TRUNCATE on the table and owning a schema of its own, created `current_setting(text)`, `format(text, regclass)` and a `<>`
+    operator there, put that schema first in its `search_path`, and truncated a table that held a row. Confirmed on the local
+    test cluster inside a rolled-back transaction.
+  - **Correction.** The function is created with `SET search_path = pg_catalog, pg_temp` and calls
+    `pg_catalog.current_setting()`, `pg_catalog.format()`, `OPERATOR(pg_catalog.<>)` and `::pg_catalog.regclass`. The table is
+    read through `TG_RELID::regclass`, which prints schema-qualified under that path. It stays SECURITY INVOKER: no SECURITY
+    DEFINER, and no role, name or setting exception. The triggers call the function by OID.
+  - **Regression coverage.** A non-owner role with only SELECT and TRUNCATE, its own schema and TEMP replaces
+    `current_setting()`, `format()` and `<>`, and also creates empty temporary look-alike tables and a temporary `format()`.
+    Under a hostile ordinary search path and a hostile temporary-schema search path, direct TRUNCATE, TRUNCATE CASCADE and a
+    two-table TRUNCATE are all refused by the guard, and the rows stay. `pg_proc.proconfig` must equal
+    `search_path=pg_catalog, pg_temp`, and the source must use the qualified built-ins. Run against the unfixed function body,
+    both tests fail.
+  - **Other functions.** The ADD-WP-04 append-only function only raises: it resolves no function, operator or table. The CHECK
+    constraints bind their operators when they are created and do not depend on a caller's `search_path`.
+- **Deployment prerequisites (not done here; part of the Production audit before G-07).**
+  - The application's runtime database role is not a superuser and does not own these tables; migrations run as a separate
+    owner role.
+  - The runtime role holds only SELECT and INSERT on both tables, and USAGE on their sequences: UPDATE, DELETE and TRUNCATE
+    are not granted, so the triggers are a second line of defence, not the only one.
+  - The runtime role has no CREATE privilege on any schema (`public` included) and owns no schema, so it cannot place objects
+    on any `search_path`. The pinned `search_path` keeps the guard safe even if this is missed; the grant is still required.
+  - Who may hold the owner role, and how its use is logged, is recorded with that audit.
+- **Audit helpers (`FamilyRegistryAdmissionAudit`).**
+  - `admissionSucceeded()` refuses to run outside a transaction, so the event commits or rolls back with the membership and
+    evidence it describes;
+  - `admissionReplayed()` and `admissionRefused()` are written on their own, after the admission transaction;
+  - a refusal code must be a `RegistryChildReason` or one of `REFERENCE_INVALID`, `RELEASE_CHANGED`, `IDEMPOTENCY_CONFLICT`,
+    `CONTEXT_CHANGED`, `LOST_RACE`, `RESULT_SET_TOO_BROAD`; the child and the release are NULL only when the refusal came before
+    they were known;
+  - every argument is checked before the insert; a bad argument or a failed insert throws (fail closed). A row holds the actor,
+    the Family, the release, the code, the child's keyed fingerprint (`referenceFingerprint()`, also for the evidence row) and a
+    keyed IP hash: never a National ID, a name, a token or a payload.
+  - **These rows are not anonymous.** `actor_user_id` and `family_id` identify an account and a household directly. The
+    reference fingerprint and the IP hash are **pseudonymous**: anyone holding the application's fingerprint key can recompute
+    them for a known National ID or address, and the nine-digit ID space is small enough to search exhaustively. The audit is
+    therefore personal data under the same protection as the registry; access, retention and key handling stay with G-02.
+- **Recorded for later work packages, not decided here:**
+  - **O-F needs a stronger publication-consistency design.** Accepting a release published between the registry read and the
+    admission transaction (§10) is not settled: ADD-WP-07B-2 must not rely on it until a design that detects or excludes the
+    swap is approved.
+  - **O-B needs a replay-specific security review before implementation.** Accepting an expired but authentic reference for a
+    replay would change `RegistryAdmissionRefs`; nothing here does.
+  - **O-K and G-02 stay unresolved:** the declaration wording and version, and retention.
 
 ## 10. Idempotency, concurrency and rate limits
 

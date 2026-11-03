@@ -35,4 +35,8 @@ enum FingerprintContext: string
     // The client IP of a direct-admission event (FB-FAMILY-ADD-01 ADD-WP-06B-3,
     // family_registry_admission_events.ip_hash). Never returned.
     case FAMILY_REGISTRY_ADMISSION_IP = 'famboook.family-registry-admission.ip.v1:';
+    // The child of a direct-admission evidence row or event, over the canonical
+    // National ID (FB-FAMILY-ADD-01 ADD-WP-07B-1, ADR §9). Not a join key to
+    // identity_ref (D-02). Never returned.
+    case FAMILY_REGISTRY_ADMISSION_REFERENCE = 'famboook.family-registry-admission.reference.v1:';
 }

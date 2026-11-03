@@ -54,9 +54,9 @@ class KeyedFingerprintTest extends TestCase
 
         // LOGIN_ID, MOBILE, OTP_CODE, MEMBER_REF (FU-13), CHANGE_REQUEST_BASE
         // (PWA-5a), COORDINATOR_MEMBER_REF (CO-01C), CIVIL_LOOKUP_QUERY and CIVIL_LOOKUP_IP (FB-CIVIL-02A),
-        // FAMILY_REGISTRY_ADMISSION_IP (FB-FAMILY-ADD-01).
-        $this->assertCount(9, FingerprintContext::cases());
-        $this->assertCount(9, array_unique($values));
+        // FAMILY_REGISTRY_ADMISSION_IP and FAMILY_REGISTRY_ADMISSION_REFERENCE (FB-FAMILY-ADD-01).
+        $this->assertCount(10, FingerprintContext::cases());
+        $this->assertCount(10, array_unique($values));
     }
 
     public function test_it_is_independent_of_app_key_and_of_the_import_fingerprint(): void
