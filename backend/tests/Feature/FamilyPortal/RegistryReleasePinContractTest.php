@@ -162,7 +162,9 @@ class RegistryReleasePinContractTest extends TestCase
                 && ! str_ends_with($file->getPathname(), 'RegistryReleasePinUnavailableException.php')
                 && ! str_ends_with($file->getPathname(), 'AdmitRegistryChildAction.php')
                 // ADD-WP-07C: the admission controller takes the verifier from the container; nothing binds one.
-                && ! str_ends_with($file->getPathname(), 'FamilyRegistryAdmissionController.php')) {
+                && ! str_ends_with($file->getPathname(), 'FamilyRegistryAdmissionController.php')
+                // RR-02: discovery issues references only when a verifier is bound (it checks, never binds).
+                && ! str_ends_with($file->getPathname(), 'FamilyRegistryChildrenController.php')) {
                 $this->assertStringNotContainsString('RegistryReleasePin', $source, $file->getPathname());
             }
         }

@@ -32,13 +32,9 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// The shipped module exports NO approved declaration; tests that need one set a synthetic one.
-const declaration = vi.hoisted(() => ({ value: null as { version: string; text: string } | null }));
-vi.mock("@/lib/utils/registry-admission-declaration", () => ({
-  get APPROVED_REGISTRY_ADMISSION_DECLARATION() {
-    return declaration.value;
-  },
-}));
+// The declaration the server delivers with the list (RR-02): none by default, as the
+// server ships (no approved version); tests that need one deliver a synthetic one.
+const declaration = { value: null as { version: string; text: string } | null };
 
 const SYNTHETIC_DECLARATION = { version: "synthetic-declaration-v0", text: "إقرار تجريبي: هذا الاسم من أفراد أسرتي." };
 const REF_A = "synthetic-ref-a.0000000000000000";
@@ -50,7 +46,7 @@ function child(overrides: Partial<RegistryChild> = {}): RegistryChild {
 }
 
 function page(children: RegistryChild[], meta: Partial<RegistryChildrenPage["meta"]> = {}): RegistryChildrenPage {
-  return { children, meta: { page: 1, per_page: 25, total: children.length, ...meta } };
+  return { children, meta: { page: 1, per_page: 25, total: children.length, ...meta }, declaration: declaration.value };
 }
 
 type Discovery = RegistryChildrenPage | Error | ((path: string) => Promise<unknown>);
@@ -305,11 +301,19 @@ describe("feature-disabled and failure states of discovery", () => {
 });
 
 describe("the declaration requirement", () => {
-  it("ships with NO approved declaration: an eligible child with a reference still cannot be submitted", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/utils/registry-admission-declaration")>("@/lib/utils/registry-admission-declaration");
-    expect(actual.APPROVED_REGISTRY_ADMISSION_DECLARATION).toBeNull();
-
-    const { post } = renderPage(page([child()]));
+  it.each([
+    ["delivers none (null, as the server ships)", null],
+    ["omits the field (an older server)", undefined],
+    ["delivers an empty version", { version: "", text: "نص" }],
+    ["delivers a padded version", { version: " v1", text: "نص" }],
+    ["delivers a version over 40 characters", { version: "v".repeat(41), text: "نص" }],
+    ["delivers no text", { version: "v1", text: "  " }],
+    ["delivers a non-object", "v1"],
+  ])("when the server %s, an eligible child with a reference still cannot be submitted", async (_label, delivered) => {
+    const body = page([child()]);
+    if (delivered === undefined) delete body.declaration;
+    else body.declaration = delivered as never;
+    const { post } = renderPage(body);
     const button = await admitButton();
 
     expect(button).toBeDisabled();
@@ -319,8 +323,21 @@ describe("the declaration requirement", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it("shows exactly the delivered text and sends exactly the delivered version", async () => {
+    declaration.value = { version: "v-delivered-7", text: "نص إقرار تجريبي مُسلَّم من الخادم." };
+    const user = userEvent.setup();
+    const { post } = renderPage();
+    post.mockResolvedValue(outcome(false));
+    await user.click(await admitButton());
+    await user.click(within(await dialog()).getByRole("checkbox", { name: "نص إقرار تجريبي مُسلَّم من الخادم." }));
+    await user.click(confirmButton());
+
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0][1]).toMatchObject({ declaration_version: "v-delivered-7", declaration_accepted: true });
+  });
+
   it("does not hard-code a declaration version anywhere in the client", () => {
-    for (const file of ["components/family/members/registry-children.tsx", "lib/api/family-registry-admission.ts", "lib/utils/registry-admission-declaration.ts"]) {
+    for (const file of ["components/family/members/registry-children.tsx", "lib/api/family-registry-admission.ts"]) {
       expect(readFileSync(file, "utf8")).not.toMatch(/declaration_version\s*:\s*["'`]|version\s*:\s*["'`]\d/);
     }
   });

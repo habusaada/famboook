@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
+use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticReleasePinFixture as Fixture;
 use Tests\TestCase;
 
@@ -62,7 +63,7 @@ class AdmitRegistryChildConcurrencyTest extends TestCase
         $this->useFamilyAuthKey();
         $this->seed(RolePermissionSeeder::class);
         $this->seed(RelationshipTypeSeeder::class);
-        config(['family_registry_admission.mode' => 'ON', 'family_registry_admission.declaration_version' => self::DECLARATION]);
+        config(['family_registry_admission.mode' => 'ON', ...SyntheticDeclaration::approved(self::DECLARATION)]);
         $this->fixture = new Fixture;
         $this->admin = Fixture::connection('admin');
         $this->fixture->install($this->admin, self::RELEASE);
@@ -106,7 +107,7 @@ class AdmitRegistryChildConcurrencyTest extends TestCase
         file_put_contents($file, json_encode([
             'config' => [
                 'family_registry_admission.mode' => 'ON',
-                'family_registry_admission.declaration_version' => self::DECLARATION,
+                ...SyntheticDeclaration::approved(self::DECLARATION),
                 'family_auth.fingerprint' => config('family_auth.fingerprint'),
                 'app.key' => config('app.key'),
                 // The test's own connection, exactly: an empty password is dropped from a Windows

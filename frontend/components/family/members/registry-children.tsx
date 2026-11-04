@@ -13,14 +13,15 @@ import { FamilyRequestsHeader } from "@/components/family/requests/family-reques
 import { ApiError } from "@/lib/api/client";
 import { isAccessFailure, useFamilyAccessFailure } from "@/lib/api/family-household";
 import {
+  type RegistryAdmissionDeclaration,
   type RegistryChild,
   type RegistryChildStatus,
   registryAdmissionErrorCode,
   toPaginationMeta,
+  usableDeclaration,
   useAdmitRegistryChild,
   useFamilyRegistryChildrenQuery,
 } from "@/lib/api/family-registry-admission";
-import { APPROVED_REGISTRY_ADMISSION_DECLARATION, type RegistryAdmissionDeclaration } from "@/lib/utils/registry-admission-declaration";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 const ADD_MEMBER_REQUEST = "/family/requests/new/add-family-member";
@@ -270,8 +271,8 @@ function AdmissionDialog({
  * declaration (ADR §6, §7).
  *
  * - Admission is offered only for an ELIGIBLE child with a reference from
- *   the server and an approved declaration; otherwise the button is
- *   disabled. Today the server issues no reference and no declaration is
+ *   the server and an approved declaration delivered with the list; otherwise
+ *   the button is disabled. Today the server issues no reference and no declaration is
  *   approved, so nothing can be submitted.
  * - One client_reference per attempt (the child's reference and the
  *   declaration version), in memory only: kept for every retry of an
@@ -284,10 +285,11 @@ function AdmissionDialog({
  *   logged, put in a URL, or kept in browser storage.
  */
 export function RegistryChildren() {
-  const declaration = APPROVED_REGISTRY_ADMISSION_DECLARATION;
   const [page, setPage] = useState(1);
   const query = useFamilyRegistryChildrenQuery(page);
   const data = query.data;
+  // The approved declaration as the server delivered it with this page (RR-02); none = disabled.
+  const declaration = usableDeclaration(data?.declaration);
 
   const admit = useAdmitRegistryChild();
   useFamilyAccessFailure(admit.error);

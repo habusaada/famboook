@@ -168,7 +168,9 @@ class FamilyRegistryChildrenApiTest extends TestCase
         $response = $this->fetch()->assertOk();
         $this->assertNoStore($response);
         $this->assertSame(['data'], array_keys($response->json()));
-        $this->assertSame(['children', 'meta'], array_keys($response->json('data')));
+        $this->assertSame(['children', 'meta', 'declaration'], array_keys($response->json('data')));
+        // RR-02: the shipped catalogue holds a draft only, so no declaration is delivered.
+        $this->assertNull($response->json('data.declaration'));
         $this->assertSame(['page' => 1, 'per_page' => 25, 'total' => 2], $response->json('data.meta'));
         $this->assertSame([
             ['display_name' => 'اسم-أول', 'birth_year' => 2010, 'status' => 'NOT_ELIGIBLE', 'ref' => null],

@@ -296,11 +296,18 @@ class SyntheticRegistryChildAdapterTest extends TestCase
         $this->assertSame([], $queries->filter(fn (string $q) => str_contains($q, 'identity_ref'))->values()->all());
     }
 
-    public function test_the_application_binds_no_source_and_ships_no_adapter(): void
+    public function test_the_application_binds_no_source_by_default_and_ships_only_the_civil_registry_adapter(): void
     {
         $this->assertFalse($this->app->bound(RegistryChildSource::class));
         $this->assertStringStartsWith(realpath(base_path('tests')), (string) (new ReflectionClass(Adapter::class))->getFileName());
 
+        // RR-02: the approved adapter over the published registry, and the ONE place that may
+        // bind it (behind family_registry_admission.civil_registry_binding, false by default).
+        $allowed = array_map('realpath', [
+            app_path('Support/FamilyPortal/RegistryAdmission/CivilRegistryChildSource.php'),
+            app_path('Support/FamilyPortal/RegistryAdmission/RegistryAdmissionBindings.php'),
+            app_path('Providers/AppServiceProvider.php'),
+        ]);
         $shipped = [];
         foreach (['app', 'bootstrap', 'config', 'routes', 'database'] as $dir) {
             $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path($dir), RecursiveDirectoryIterator::SKIP_DOTS));
@@ -309,7 +316,9 @@ class SyntheticRegistryChildAdapterTest extends TestCase
                     continue;
                 }
                 $code = (string) file_get_contents($file->getPathname());
-                if (preg_match('/implements\s+[^{]*RegistryChildSource\b|Synthetic\w*Registry|CivilRegistryChildSource|(bind|singleton|instance|scoped)\(\s*RegistryChildSource::class/', $code) === 1) {
+                if (preg_match('/Synthetic\w*Registry/', $code) === 1
+                    || (preg_match('/implements\s+[^{]*RegistryChildSource\b|CivilRegistryChildSource|(bind|singleton|instance|scoped)\(\s*RegistryChildSource::class/', $code) === 1
+                        && ! in_array(realpath($file->getPathname()), $allowed, true))) {
                     $shipped[] = $file->getPathname();
                 }
             }

@@ -39,6 +39,7 @@ use LogicException;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
 use Tests\Support\FamilyPortal\PendingGatesLiftedAdmissibility;
+use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticReleasePinFixture as Fixture;
 use Tests\Support\FamilyPortal\SyntheticReleasePinVerifier as Verifier;
 use Tests\TestCase;
@@ -82,7 +83,7 @@ class AdmitRegistryChildActionTest extends TestCase
         $this->useFamilyAuthKey();
         $this->seed(RolePermissionSeeder::class);
         $this->seed(RelationshipTypeSeeder::class);
-        config(['family_registry_admission.mode' => 'ON', 'family_registry_admission.declaration_version' => self::DECLARATION]);
+        config(['family_registry_admission.mode' => 'ON', ...SyntheticDeclaration::approved(self::DECLARATION)]);
 
         $this->head = $this->activatedHead(self::HEAD);
         $this->head['user']->givePermissionTo(Action::PERMISSION);
@@ -403,10 +404,10 @@ class AdmitRegistryChildActionTest extends TestCase
 
         // 4. Same key, another child: a conflict, nothing written.
         $this->refused(fn () => $this->admit($this->request($this->ref('402234567'), $request->clientReference)), Refused::ADMISSION_IDEMPOTENCY_CONFLICT, 'IDEMPOTENCY_CONFLICT');
-        // 4b. Same key, another declaration version.
-        config(['family_registry_admission.declaration_version' => '2026-12-v2']);
+        // 4b. Same key, another (approved, RR-02) declaration version.
+        config(SyntheticDeclaration::approved('2026-12-v2'));
         $this->refused(fn () => $this->admit($this->request(key: $request->clientReference, declaration: '2026-12-v2')), Refused::ADMISSION_IDEMPOTENCY_CONFLICT);
-        config(['family_registry_admission.declaration_version' => self::DECLARATION]);
+        config(SyntheticDeclaration::approved(self::DECLARATION));
 
         // 5. Another key, the same child: already a member.
         $this->refused(fn () => $this->admit($this->request()), Refused::NOT_ELIGIBLE, 'ALREADY_MEMBER');

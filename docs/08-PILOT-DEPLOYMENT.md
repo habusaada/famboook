@@ -470,6 +470,16 @@ Design: `docs/adr/FB-CIVIL-02A-CIVIL-REGISTRY-LOOKUP.md`. **Nothing here is appr
 | Credentials | `/etc/famboook/identity-lookup.php` (`CIVIL_LOOKUP_CREDENTIALS_FILE`), `root:www-data 0640`, returning `['username' => …, 'password' => …]`. Never `.env`. Without it: 503 `LOOKUP_NOT_CONFIGURED`. |
 | Indexes | `09-lookup-indexes.dba.sql` (`CREATE INDEX CONCURRENTLY`, psql autocommit; **not approved**): name-search trigram and reverse-link btree indexes. |
 
+**FB-FAMILY-ADD-01 registry child admission (PREPARED by RR-02, not approved, not applied).** Deploying the code changes
+nothing visible. The checklist and runbook are `docs/deployment/FB-FAMILY-ADD-01-PILOT-READINESS-CHECKLIST.md`.
+
+| Item | Value |
+|---|---|
+| Switches | `FAMILY_REGISTRY_ADMISSION_MODE` (`OFF`); `FAMILY_REGISTRY_ADMISSION_CIVIL_REGISTRY_BINDING` (`false`); `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION` (unset; must name an APPROVED catalogue entry). |
+| DBA | `10-registry-admission-pin.dba.sql` (DBA-1 … DBA-3, **not applied**), after 08. Re-apply after a restore. DBA-4 (one cluster and one database under failover) is an operations guarantee. |
+| Readiness | `php artisan famboook:registry-admission-readiness [--probe-pin]`: read-only, counts only. Exit 0 approves nothing. |
+| Shutdown | `FAMILY_REGISTRY_ADMISSION_MODE=OFF`, then clear the config cache. |
+
 **FB-CIVIL-02B (Family Portal / Coordinator Space; PROPOSED, not enabled).**
 Design: `docs/adr/FB-CIVIL-02B-FAMILY-COORDINATOR-LOOKUP.md`. Deploying it
 changes nothing visible. Every item below is needed **in addition to** the
@@ -1603,6 +1613,7 @@ Never do this once real data has been entered.
 | 1.1.29 | 2026-10-18 | Approved | §16 (ADR FB-NOTIFY-01, 01B.1 alignment): scheduler and worker dependencies per function (manual publication, SYSTEM discovery and publication, follow-up / expiry); no synchronous fallback; Production readiness unverified; documentation only, no server change |
 | 1.1.30 | 2026-10-19 | Approved | §16 as built (FB-NOTIFY-01B.2b.7): notification mode, queue, dedicated worker, scheduler tasks and locks, heartbeat, `famboook:notifications-check`, reconciliation and expiry sweep; rollback constraint; PILOT readiness checklist `docs/deployment/FB-NOTIFY-01-PILOT-READINESS-CHECKLIST.md`. Documentation only, no server change |
 | 1.1.31 | 2026-10-30 | Ready for deployment review | FB-WEB-04: §1 adds `app.famboook.com` as an official Production host and corrects the Next.js port to 3001 (verified 2026-10-30); §4 `CORS_ALLOWED_ORIGINS` and the stateful domains; §19 service line. Checklist: `docs/deployment/FB-WEB-04-PRODUCTION-READINESS.md` |
+| 1.1.33 | 2026-11-04 | Ready for review (not applied to Production) | FB-FAMILY-ADD-01 RR-02: registry child admission switches, `10-registry-admission-pin.dba.sql`, the readiness command and shutdown. Checklist: `docs/deployment/FB-FAMILY-ADD-01-PILOT-READINESS-CHECKLIST.md`. Nothing applied or activated |
 | 1.1.32 | 2026-10-31 | Ready for review (not applied to Production) | FB-DEVOPS-01: isolated releases in `frontend/.builds/<id>` with a generated per-release tsconfig; `build-frontend.sh`, `smoke-frontend-release.sh`, `switch-frontend-release.sh`; `deploy-frontend.sh` now only builds a release (no `npm ci`, plain build or restart); §19 D, the §16b-style deployment and rollback steps and the runtime-writable path updated. Runbook: `docs/deployment/FB-DEVOPS-01-ISOLATED-FRONTEND-BUILDS.md` |
 | 1.1.3 | 2026-10-02 | Approved | §16a: actual environment names (`FAMILY_AUTH_FINGERPRINT_KEY` and version, previous key and version, `FAMILY_ACTIVATION_ENABLED`) and the PWA-1C deployment note (seven additive migrations, role seeding, no backfill). Nothing activated |
 | 1.1.2 | 2026-10-02 | Approved | §16a Family Portal activation prerequisites recorded (SMS provider, queue worker, delivery-failure handling, dedicated fingerprint secret, activation switch, retention, Head Succession rollout gate). Nothing deployed |

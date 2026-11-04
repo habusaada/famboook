@@ -39,10 +39,36 @@ export type RegistryChild = {
   ref: string | null;
 };
 
+/**
+ * The APPROVED declaration the server delivers with the list (RR-02; ADR §6): the
+ * exact text to show and the version an admission must carry. The client never
+ * holds its own wording or version.
+ */
+export type RegistryAdmissionDeclaration = { version: string; text: string };
+
 export type RegistryChildrenPage = {
   children: RegistryChild[];
   meta: { page: number; per_page: number; total: number };
+  /** null (or absent, from an older server) = no approved declaration: submission stays disabled. */
+  declaration?: RegistryAdmissionDeclaration | null;
 };
+
+/** The server limit of declaration_version (RegistryAdmissionRequest::DECLARATION_VERSION_MAX). */
+const DECLARATION_VERSION_MAX = 40;
+
+/**
+ * The delivered declaration when it is usable, otherwise null: a version that is a
+ * non-empty string with no surrounding spaces, of at most 40 characters, and a non-empty text.
+ * Anything else is treated as no declaration, never repaired.
+ */
+export function usableDeclaration(value: unknown): RegistryAdmissionDeclaration | null {
+  if (!value || typeof value !== "object") return null;
+  const { version, text } = value as { version?: unknown; text?: unknown };
+  if (typeof version !== "string" || version === "" || version !== version.trim() || version.length > DECLARATION_VERSION_MAX) return null;
+  if (typeof text !== "string" || text.trim() === "") return null;
+
+  return { version, text };
+}
 
 /** POST …/admissions: exactly the four fields of FamilyRegistryAdmissionRequest. */
 export type RegistryAdmissionSubmission = {

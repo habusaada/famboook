@@ -21,6 +21,7 @@ use App\Support\CivilLookup\CivilRegistryReader;
 use App\Support\CivilLookup\CivilRegistrySource;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\FamilyAuth\SignInHistory;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionBindings;
 use App\Support\Import\Apply\ApplyRunnerLock;
 use App\Support\Import\Apply\PostgresApplyRunnerLock;
 use App\Support\Import\Apply\ProcessApplyRunnerLock;
@@ -76,6 +77,10 @@ class AppServiceProvider extends ServiceProvider
 
         // FB-CIVIL-02A: the read-only civil registry of the lookup (one session per request).
         $this->app->scoped(CivilRegistrySource::class, CivilRegistryReader::class);
+
+        // FB-FAMILY-ADD-01 RR-02: the civil registry as the admission source and pin
+        // verifier, ONLY when family_registry_admission.civil_registry_binding is true.
+        RegistryAdmissionBindings::register($this->app);
     }
 
     /**

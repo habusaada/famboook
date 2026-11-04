@@ -26,6 +26,7 @@ use RuntimeException;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
 use Tests\Support\FamilyPortal\PendingGatesLiftedAdmissibility;
+use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticReleasePinFixture as Fixture;
 use Tests\Support\FamilyPortal\SyntheticReleasePinVerifier as Verifier;
 use Tests\TestCase;
@@ -110,7 +111,7 @@ class FamilyRegistryAdmissionApiTest extends TestCase
         if ($liftPendingGates) {
             $this->app->instance(RegistryChildAdmissibility::class, new PendingGatesLiftedAdmissibility);
         }
-        config(['family_registry_admission.mode' => $mode, 'family_registry_admission.declaration_version' => self::DECLARATION]);
+        config(['family_registry_admission.mode' => $mode, ...SyntheticDeclaration::approved(self::DECLARATION)]);
         ($user ?? $this->head['user'])->givePermissionTo(AdmitRegistryChildAction::PERMISSION);
     }
 

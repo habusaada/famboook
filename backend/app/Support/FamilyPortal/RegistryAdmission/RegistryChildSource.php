@@ -10,8 +10,9 @@ use App\Support\CivilLookup\CivilRecordPage;
  * The read-only civil records that suggested-children discovery may read
  * (FB-FAMILY-ADD-01 ADD-WP-06A). Deliberately NOT bound in the container: only a
  * caller that passes an implementation explicitly can run discovery, so the real
- * registry can never be reached by accident. Only synthetic sources exist (tests/,
- * ADD-WP-06B-4); an adapter over the real registry needs its own approved work package.
+ * registry can never be reached by accident. Synthetic sources live under tests/
+ * (ADD-WP-06B-4). The adapter over the published registry (RR-02) is bound only by RegistryAdmissionBindings when
+ * `family_registry_admission.civil_registry_binding` is true (false by default).
  *
  * Contract (ADD-WP-06B-4; mirrors identity_ref_lookup.children()), checked by
  * SuggestedChildrenDiscovery, which fails closed on any breach:

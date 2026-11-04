@@ -40,12 +40,21 @@ uncommitted; nothing deployed).**
 - **Implemented in ADD-WP-08 (committed `6d870b0`):** the Family Portal screen `/family/members/registry-children` (§7, "Family
   Portal screen (ADD-WP-08)"), over the two routes above. It admits no one: the routes are closed, the server issues no `ref`,
   and no declaration text and version are approved (§6), so its submission stays disabled.
-- **Implemented in RR-01 (local, uncommitted):** the visibility-only `registry_admission` on `GET /api/v1/family/me` and the
+- **Implemented in RR-01 (committed `693a789`):** the visibility-only `registry_admission` on `GET /api/v1/family/me` and the
   entry link driven by it (§7, "Family Portal screen", Entry). False as shipped: the flag is `OFF` and no role holds the
   permission.
-- **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
-  not operational), issuing `ref` in a response, an approved declaration (text and version) available to the client,
-  pilot activation.
+- **Implemented in RR-02 (local, uncommitted):** the production readiness package (§16). It covers:
+  - the declaration catalogue and its delivery;
+  - the life verifier contract;
+  - references issued by discovery;
+  - `CivilRegistryChildSource` and the binding switch;
+  - `10-registry-admission-pin.dba.sql` (DBA-1 … DBA-3);
+  - the readiness command.
+
+  Everything is closed as shipped: the draft declaration is not approved, no life verifier is bound, the gender mapping is
+  provisional and the binding is `false`. So no reference is issued and nobody is admissible.
+- **Not implemented (needs external decisions):** an approved declaration (G-02), an authoritative life source (G-05), an
+  approved gender table (G-04), DBA-1 … DBA-4 applied and verified, pilot activation (G-07).
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
 **Scope of this document:** the household head of an authenticated Family may discover
@@ -270,6 +279,18 @@ preselected, never bulk-accepted. Proposed wording, to be confirmed with G-02:
 
 It is recorded as an **assertion by the head**, never as verification. It grants no
 VERIFIED state and no eligibility for any programme (BD-052).
+
+**Prepared for approval (RR-02; NOT approved).** The wording above is catalogued as version `2026-11-draft-1` with
+`approved: false`.
+
+- **Catalogue.** It lives in `family_registry_admission.declarations`, in the committed config file, through
+  `RegistryAdmissionDeclarations`. A version's text never changes; a new wording is a new version.
+- **Approval.** `approved` becomes true only in a reviewed commit that records the G-02 decision, never through `.env`.
+- **Active version.** `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION` names the active version and has no default. It counts
+  only when it names an approved entry with a text.
+- **Delivery.** Discovery delivers the active version as `data.declaration` (`{version, text}`), or `null`.
+- **Acceptance.** The admission accepts exactly that version. A draft or unknown version is `422 DECLARATION_REQUIRED`.
+- **Evidence.** It keeps `declaration_version` and `declared_at`: the accepted version and the time of acceptance.
 
 ## 7. Proposed API contracts
 
@@ -1086,3 +1107,57 @@ schema is additive and forward-only.
 
 Implementation order is recorded in `docs/07` RM-ADR-071. WP-02 changes documentation only.
 Later work packages may build behind `OFF` locally, but none of them closes a gate by itself.
+
+## 16. Production readiness (RR-02; local, uncommitted)
+
+**Technical controls built and tested locally. No gate is closed by them, and nothing is activated.** The checklist and
+runbook are `docs/deployment/FB-FAMILY-ADD-01-PILOT-READINESS-CHECKLIST.md`.
+
+- **Declaration (O-K, G-02).** See §6, "Prepared for approval". The client shows only the delivered text and sends only the
+  delivered version. A missing or malformed declaration keeps submission disabled.
+- **Proof of life (D-06, G-05).** `RegistryLifeStatus` combines two sources and fails closed at every step:
+  1. The registry's own death evidence comes first. A valid `deathdate` is DECEASED; an unreadable one is UNVERIFIED. Neither
+     is overridden, and neither is sent to a verifier.
+  2. An empty `deathdate` proves nothing. Only a bound `RegistryLifeVerifier`, an authoritative source, can then prove a life,
+     and only with dated ALIVE evidence: not in the future (30 s of skew) and no older than
+     `life_verification.max_age_hours` (default 24).
+  3. Undated, stale, future or UNKNOWN evidence, an invalid limit or any failure is UNVERIFIED. A failure is logged by class
+     only.
+  4. DECEASED from the verifier is DECEASED.
+
+  Nothing implements or binds the verifier: which official source proves life is G-05. `presonstate` is still never read.
+- **References (§7a).** Discovery issues a reference only when all of these hold:
+  - an approved declaration is active;
+  - a pin verifier is bound;
+  - the admission's own `RegistryChildAdmissibility` admits the child now.
+
+  Discovery and the admission use the same admissibility, with the same guard: only the gated one outside the test runner.
+  TTL, purpose, release, head binding, replay, audit and limits are unchanged. As shipped the gated admissibility admits no
+  one (G-04, G-05), so `ref` stays `null`.
+- **Source.** `CivilRegistryChildSource` reads the published release through the existing `identity_ref_lookup` functions.
+  - `children()` pages 25 rows at most, so the bounded read up to `LINKS_CAP` is read in pages of 25.
+  - Every page must name the same release and the same total, or the read is `RELEASE_CHANGED`.
+  - `recordOf()` refuses another release.
+- **Binding.** `RegistryAdmissionBindings` is the one place that may bind the registry. It binds `RegistryChildSource` and
+  `RegistryReleasePinVerifier` (`CivilRegistryReader`) only when `family_registry_admission.civil_registry_binding` is a real
+  `true` (`FAMILY_REGISTRY_ADMISSION_CIVIL_REGISTRY_BINDING`, default `false`). It never binds a life verifier or an
+  admissibility.
+- **DBA-1 … DBA-3.** `deploy/sql/identity-ref/10-registry-admission-pin.dba.sql` (not applied anywhere but the disposable
+  test cluster):
+  - DBA-1: `publish_release()` is unchanged except that, after `'FBCIV01A'`, it waits for `'FBCIV01P'` (bounded by
+    `famboook.publication_pin_wait`, default 30 s) and holds it exclusively. A test checks it against `01-schema.sql`
+    character for character.
+  - DBA-2: a trigger keeps the pointer forward-only and writable only under the exclusive pin.
+  - DBA-3: `release_pin_held()`, equal to the contract above once qualified with `pg_catalog`, with EXECUTE for the reader
+    only.
+- **DBA-4.** It stays an operations guarantee. `famboook:registry-admission-readiness --probe-pin` proves it at the moment of
+  the probe only.
+- **Readiness command.** `famboook:registry-admission-readiness` is read-only and prints counts and PASS / BLOCKED only. Exit
+  0 means no technical control is open; it approves nothing.
+- **Evidence (G-06), on PostgreSQL in the disposable cluster.** `RegistryAdmissionCivilRegistryPostgresTest` covers:
+  - DBA-1, DBA-2 and DBA-3 against the real schema;
+  - the adapter over the real lookup functions;
+  - end to end over HTTP: discovery, the delivered declaration, a reference, an admission, its replay, a release change and
+    a draft declaration refused.
+
+  G-04 and G-05 are lifted there only by the test-only admissibility. `RegistryAdmissionReadinessTest` covers both drivers.

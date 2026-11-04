@@ -817,8 +817,9 @@ death-report workflow and `RecordPersonDeathAction`.
 **FP-ADR-081, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (2026-11-01). Not activated: gates G-01 … G-07 are open and
 `family_registry_admission.mode` defaults to `OFF`. Built locally behind `OFF`: the guarded discovery and admission routes
 (ADD-WP-06B-3, ADD-WP-07C) and the screen «الأبناء والبنات في السجل المدني» at `/family/members/registry-children`
-(ADD-WP-08). Its entry link shows only when `/me` reports `registry_admission: true` (RR-01; false as shipped), and its submission
-stays disabled until a `ref` is issued and a declaration is approved (ADR §6, §7). None is operational.**
+(ADD-WP-08). Its entry link shows only when `/me` reports `registry_admission: true` (RR-01; false as shipped). The screen
+shows only the declaration the server delivers, and stays disabled until a `ref` is issued and a declaration is approved
+(ADR §6, §7, §16; RR-02 readiness package). None is operational.**
 
 The one exception to "Family Users do not edit canonical records". An eligible household head
 discovers their sons and daughters in the published release, declares for each one that they
@@ -5409,3 +5410,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.60 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (ADD-WP-04): §14 status note. Not operational |
 | 1.61 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (ADD-WP-08): §14 status note, the screen at `/family/members/registry-children`. Submission disabled; not operational |
 | 1.62 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (RR-01): §14 status note, the entry shown through `/me` `registry_admission`. False as shipped |
+| 1.63 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (RR-02): §14 status note, the declaration delivered by the server. Not operational |

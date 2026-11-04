@@ -5,7 +5,6 @@ namespace App\Support\FamilyPortal\RegistryAdmission;
 use App\Enums\ChangeRequestStatus;
 use App\Enums\ChangeRequestType;
 use App\Enums\CivilValueStatus;
-use App\Enums\LifeEvidence;
 use App\Enums\RegistryChildReason as Reason;
 use App\Models\ChangeRequest;
 use App\Support\CivilLookup\CivilRecord;
@@ -70,15 +69,18 @@ final class RegistryChildEligibility
             $reasons[] = Reason::GENDER_MAPPING_PROVISIONAL;
         }
 
-        $reasons[] = match (ProofOfLife::evaluate($record)) {
-            LifeEvidence::DECEASED => Reason::DECEASED,
-            LifeEvidence::INDETERMINATE, LifeEvidence::UNVERIFIED => Reason::LIFE_UNVERIFIED,
-        };
+        // RR-02: the registry's death evidence first, then only an authoritative verifier
+        // (none is bound, G-05) can prove a life. An empty death date never does.
+        $life = RegistryLifeStatus::of($record);
+        if ($life !== LifeStatus::PROVEN_ALIVE) {
+            $reasons[] = $life === LifeStatus::DECEASED ? Reason::DECEASED : Reason::LIFE_UNVERIFIED;
+        }
 
         return new RegistryChildAssessment(
             $reasons,
             in_array($link, ['FATHER', 'MOTHER'], true) ? $link : null,
             $gender->status === CivilValueStatus::MAPPED ? $gender->value : null,
+            livingProven: $life === LifeStatus::PROVEN_ALIVE,
         );
     }
 

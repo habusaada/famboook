@@ -18,6 +18,8 @@ final class RegistryChildAssessment
         public readonly array $reasons,
         public readonly ?string $parentLink = null,
         public readonly ?Gender $gender = null,
+        // RR-02: an authoritative source proved the child alive (RegistryLifeStatus).
+        public readonly bool $livingProven = false,
     ) {}
 
     public function publicStatus(): RegistryChildStatus

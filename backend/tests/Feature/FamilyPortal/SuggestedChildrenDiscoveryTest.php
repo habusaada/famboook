@@ -245,7 +245,9 @@ class SuggestedChildrenDiscoveryTest extends TestCase
             'deathdate', 'presonstate', 'recordId', 'payload'] as $secret) {
             $this->assertStringNotContainsString($secret, $dump, $secret);
         }
-        $this->assertSame(['fullName', 'nationalIdMasked', 'birthDate', 'relationship', 'status'], array_keys(get_object_vars($page->children[0])));
+        $this->assertSame(['fullName', 'nationalIdMasked', 'birthDate', 'relationship', 'status', 'ref'], array_keys(get_object_vars($page->children[0])));
+        // RR-02: no reference unless the caller asks for them and the admission admits the child.
+        $this->assertNull($page->children[0]->ref);
     }
 
     // 15

@@ -10,8 +10,9 @@ use App\Support\FamilyAuth\FamilyAccessResult;
  * RegistryChildEligibility::evaluate(), unchanged, read per record (no batch facts, so
  * under the caller's locks), plus discovery's cross-record reasons.
  *
- * A life is NEVER proven here (gate G-05, D-06): ProofOfLife has no ALIVE outcome. So,
- * with the gender mapping still provisional (G-04), no child is admissible: every
+ * A life is proven only by an authoritative RegistryLifeVerifier through
+ * RegistryLifeStatus (RR-02; G-05, D-06), and none is bound, so no life is proven. With
+ * the gender mapping still provisional (G-04), no child is admissible either way: every
  * admission is refused NOT_ELIGIBLE until those gates are closed by their own decision.
  */
 final class GatedRegistryChildAdmissibility implements RegistryChildAdmissibility
@@ -20,6 +21,6 @@ final class GatedRegistryChildAdmissibility implements RegistryChildAdmissibilit
     {
         $assessment = RegistryChildEligibility::evaluate($context, $record);
 
-        return RegistryChildAdmission::of($record, $assessment, [...$assessment->reasons, ...$sourceReasons], livingProven: false);
+        return RegistryChildAdmission::of($record, $assessment, [...$assessment->reasons, ...$sourceReasons], livingProven: $assessment->livingProven);
     }
 }

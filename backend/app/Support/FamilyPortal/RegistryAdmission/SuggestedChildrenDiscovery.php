@@ -46,9 +46,25 @@ final class SuggestedChildrenDiscovery
 
     public const MAX_PER_PAGE = CivilRegistrySource::LINKS_CAP;
 
-    public function __construct(private readonly RegistryChildSource $source) {}
+    /**
+     * $admissibility (RR-02) decides whether a reference is issued: the SAME decision the
+     * admission takes. Outside the test runner only the gated one is accepted.
+     */
+    public function __construct(
+        private readonly RegistryChildSource $source,
+        private readonly RegistryChildAdmissibility $admissibility = new GatedRegistryChildAdmissibility,
+    ) {
+        if (! $admissibility instanceof GatedRegistryChildAdmissibility && ! app()->runningUnitTests()) {
+            throw new LogicException('Only the gated admissibility may issue references outside the test runner.');
+        }
+    }
 
-    public function discover(FamilyAccessResult $context, int $page = 1, int $perPage = self::PER_PAGE): SuggestedChildrenPage
+    /**
+     * $issueRefs (RR-02): issue an admission reference for each ELIGIBLE child. The
+     * caller asks only when an admission could succeed at all (a release pin verifier
+     * is bound and a declaration is approved); otherwise every `ref` stays NULL.
+     */
+    public function discover(FamilyAccessResult $context, int $page = 1, int $perPage = self::PER_PAGE, bool $issueRefs = false): SuggestedChildrenPage
     {
         if ($page < 1 || $perPage < 1 || $perPage > self::MAX_PER_PAGE) {
             throw new InvalidArgumentException('The page must be at least 1 and the page size between 1 and '.self::MAX_PER_PAGE.'.');
@@ -73,7 +89,8 @@ final class SuggestedChildrenDiscovery
 
         $children = [];
         foreach ($pageGroups as $records) {
-            $children[] = $this->present($context, $records[0], count($records) > 1, $headParents, $siblings, $headId, $facts);
+            $children[] = $this->present($context, $records[0], count($records) > 1, $headParents, $siblings, $headId, $facts,
+                $issueRefs ? $found->releaseId : null);
         }
 
         return new SuggestedChildrenPage($children, $page, $perPage, count($groups), releaseId: $found->releaseId);
@@ -159,15 +176,27 @@ final class SuggestedChildrenDiscovery
      * @param  list<string>  $headParents
      * @param  list<string>  $siblings
      */
-    private function present(FamilyAccessResult $context, CivilRecord $record, bool $duplicated, array $headParents, array $siblings, string $headId, RegistryChildFacts $facts): SuggestedChild
+    private function present(FamilyAccessResult $context, CivilRecord $record, bool $duplicated, array $headParents, array $siblings, string $headId, RegistryChildFacts $facts, ?int $refRelease): SuggestedChild
     {
         $assessment = RegistryChildEligibility::evaluate($context, $record, $facts);
         $extra = $this->sourceReasons($record, $duplicated, $headParents, $siblings, $headId);
         if ($extra !== []) {
-            $assessment = new RegistryChildAssessment([...$assessment->reasons, ...$extra], $assessment->parentLink, $assessment->gender);
+            $assessment = new RegistryChildAssessment([...$assessment->reasons, ...$extra], $assessment->parentLink, $assessment->gender, $assessment->livingProven);
         }
 
         $status = $assessment->publicStatus();
+        // RR-02: a reference only when the admission's own admissibility admits this child
+        // now (no reason, a proven life, a FATHER / MOTHER link, a mapped gender), bound to
+        // this head, this release and a short expiry (RegistryAdmissionRefs, ADR §7a). The
+        // admission evaluates it again under its locks.
+        $ref = null;
+        if ($refRelease !== null) {
+            $admission = $this->admissibility->assess($context, $record, $extra);
+            if ($admission->admissible()) {
+                $status = RegistryChildStatus::ELIGIBLE;
+                $ref = RegistryAdmissionRefs::issue($context, $refRelease, $record->mainid, $admission->parentLink);
+            }
+        }
 
         return new SuggestedChild(
             CivilRegistryValues::fullName($record),
@@ -175,6 +204,7 @@ final class SuggestedChildrenDiscovery
             CivilRegistryValues::date($record->payload['datebirth'] ?? null),
             $this->relationship($assessment, $status),
             $status,
+            $ref,
         );
     }
 

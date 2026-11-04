@@ -9,8 +9,12 @@ use App\Http\Middleware\EnsureRegistryDiscoveryAvailable;
 use App\Http\Requests\Api\V1\Family\FamilyRegistryChildrenRequest;
 use App\Http\Resources\FamilyRegistryChildResource;
 use App\Support\FamilyPortal\RegistryAdmission\FamilyRegistryAdmissionAudit;
+use App\Support\FamilyPortal\RegistryAdmission\GatedRegistryChildAdmissibility;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionDeclarations;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryChildAdmissibility;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSource;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSourceIntegrityException;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
 use App\Support\FamilyPortal\RegistryAdmission\SuggestedChildrenDiscovery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +28,8 @@ use Throwable;
  * - The source is whatever RegistryChildSource the container holds. NONE is bound
  *   by the application: until an approved adapter exists, every allowed request is
  *   503 REGISTRY_UNAVAILABLE without reading anything. Tests bind synthetic sources.
+ * - RR-02: `data.declaration` is the approved declaration or NULL, and an ELIGIBLE child
+ *   carries a `ref` only when a declaration is approved and a pin verifier is bound.
  * - The page is recorded (DISCOVERY_LISTED) BEFORE it is returned; if the record
  *   cannot be written, nothing is returned.
  * - More matches than the cap are 409 RESULT_SET_TOO_BROAD (ADD-WP-06B-3R): no
@@ -48,7 +54,12 @@ class FamilyRegistryChildrenController extends Controller
         }
 
         try {
-            $page = (new SuggestedChildrenDiscovery(app(RegistryChildSource::class)))->discover($context, $request->page());
+            // RR-02: references only when an admission could succeed at all.
+            $declaration = RegistryAdmissionDeclarations::active();
+            $issueRefs = $declaration !== null && app()->bound(RegistryReleasePinVerifier::class);
+            $admissibility = app()->bound(RegistryChildAdmissibility::class) ? app(RegistryChildAdmissibility::class) : new GatedRegistryChildAdmissibility;
+            $page = (new SuggestedChildrenDiscovery(app(RegistryChildSource::class), $admissibility))
+                ->discover($context, $request->page(), issueRefs: $issueRefs);
         } catch (CivilLookupException) {
             return $this->unavailable();
         } catch (RegistryChildSourceIntegrityException $e) {
@@ -72,6 +83,9 @@ class FamilyRegistryChildrenController extends Controller
             'data' => [
                 'children' => FamilyRegistryChildResource::collection($page->children)->resolve($request),
                 'meta' => ['page' => $page->page, 'per_page' => $page->perPage, 'total' => $page->total],
+                // RR-02: the APPROVED declaration to show, {version, text}, or NULL (none
+                // approved: the client keeps its submission disabled).
+                'declaration' => $declaration?->toArray(),
             ],
         ])->header('Cache-Control', 'no-store, private');
     }

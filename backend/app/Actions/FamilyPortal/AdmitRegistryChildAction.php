@@ -25,6 +25,7 @@ use App\Support\FamilyPortal\RegistryAdmission\AdmissionCandidate;
 use App\Support\FamilyPortal\RegistryAdmission\FamilyRegistryAdmissionAudit as Audit;
 use App\Support\FamilyPortal\RegistryAdmission\GatedRegistryChildAdmissibility;
 use App\Support\FamilyPortal\RegistryAdmission\PostgresRegistryReleasePin;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionDeclarations;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionEvidence as Evidence;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionFailure;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionOutcome as Outcome;
@@ -85,7 +86,7 @@ final class AdmitRegistryChildAction
         if (! $admissibility instanceof GatedRegistryChildAdmissibility && ! app()->runningUnitTests()) {
             throw new LogicException('Only the gated admissibility may admit outside the test runner.');
         }
-        $this->discovery = new SuggestedChildrenDiscovery($source);
+        $this->discovery = new SuggestedChildrenDiscovery($source, $admissibility);
     }
 
     /**
@@ -106,9 +107,9 @@ final class AdmitRegistryChildAction
         if (! FamilyRegistryAdmissionPolicy::allowsFamily($context->family) || ! $context->user->can(self::PERMISSION)) {
             throw new Refused(Refused::ADMISSION_UNAVAILABLE);
         }
-        $declaration = config('family_registry_admission.declaration_version');
-        if (! is_string($declaration) || trim($declaration) === '' || ! $request->declarationAccepted
-            || ! hash_equals($declaration, $request->declarationVersion)) {
+        // The active version must name an APPROVED catalogue entry (RR-02): a draft or an
+        // unknown version is refused like a missing declaration.
+        if (! $request->declarationAccepted || ! RegistryAdmissionDeclarations::accepts($request->declarationVersion)) {
             throw new Refused(Refused::DECLARATION_REQUIRED);
         }
         self::assertNoQueryCapture();

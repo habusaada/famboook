@@ -12,7 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * allowlist of the least that tells children apart — the first name, the birth year
  * and the public status. Never a National ID (even masked), a full birth date, a
  * relationship, an internal reason, another household or a registry field. `ref` is
- * NULL: no reference is issued while nothing can be ELIGIBLE.
+ * the opaque admission reference of an ELIGIBLE child when one was issued (RR-02), NULL
+ * otherwise; while gates G-04 and G-05 are open nothing is ELIGIBLE, so it is NULL.
  *
  * @property SuggestedChild $resource
  */
@@ -27,7 +28,7 @@ class FamilyRegistryChildResource extends JsonResource
             'display_name' => $name === '' ? null : preg_split('/\s+/u', $name)[0],
             'birth_year' => $this->resource->birthDate === null ? null : (int) substr($this->resource->birthDate, 0, 4),
             'status' => $this->resource->status->value,
-            'ref' => null,
+            'ref' => $this->resource->ref,
         ];
     }
 }
