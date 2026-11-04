@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight, RotateCw, UsersRound } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronLeft, RotateCw, UserPlus, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MemberCard } from "@/components/family/members/member-card";
 import { MemberDetailSheet } from "@/components/family/members/member-detail-sheet";
 import { isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyMembersQuery } from "@/lib/api/family-household";
+import { registryChildrenEntryVisible } from "@/lib/api/family-registry-admission";
 
 const card = "rounded-2xl border border-border bg-surface-1 p-4";
 
@@ -39,6 +40,35 @@ function MembersError({ onRetry, retrying }: { onRetry: () => void; retrying: bo
         <RotateCw className={`size-4 ${retrying ? "animate-spin" : ""}`} aria-hidden />
         إعادة المحاولة
       </Button>
+    </section>
+  );
+}
+
+/**
+ * The way to «الأبناء والبنات في السجل المدني» (FB-FAMILY-ADD-01 ADD-WP-08).
+ * A plain link, shown only when the server says the service is open for
+ * this account (registryChildrenEntryVisible; hidden until that contract
+ * exists). The suggested children are read on their own page only, because
+ * every read is audited and counted by the server.
+ */
+function RegistryChildrenEntry() {
+  return (
+    <section className={card} aria-labelledby="members-registry-children-title" data-registry-children-entry>
+      <h2 id="members-registry-children-title" className="text-base font-semibold text-foreground">
+        الأبناء والبنات في السجل المدني
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">اعرض أبناءك وبناتك المسجلين في السجل المدني، وأضف المتاح منهم إلى أفراد الأسرة بعد الإقرار.</p>
+      <Link
+        href="/family/members/registry-children"
+        className="mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border px-3.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-ring"
+        data-registry-children-link
+      >
+        <span className="flex items-center gap-2">
+          <UserPlus className="size-4" aria-hidden />
+          عرض الأبناء والبنات المقترحين
+        </span>
+        <ChevronLeft className="size-4" aria-hidden />
+      </Link>
     </section>
   );
 }
@@ -120,6 +150,7 @@ export function FamilyMembers() {
                 ))}
               </ul>
             )}
+            {registryChildrenEntryVisible() && <RegistryChildrenEntry />}
           </div>
         ) : query.isError ? (
           !isAccessFailure(query.error) && <MembersError onRetry={() => query.refetch()} retrying={query.isFetching} />

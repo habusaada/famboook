@@ -34,11 +34,14 @@ uncommitted; nothing deployed).**
 - **Implemented in ADD-WP-07B-2c (committed `87b2928`):** the atomic admission action `AdmitRegistryChildAction` (§10b). In
   operation it admits no one: the flag is `OFF`, no role holds the permission, no source is bound, the release pin fails closed
   until DBA-1 … DBA-4, and the operational eligibility refuses every child until G-04 and G-05 close (D-06).
-- **Implemented in ADD-WP-07C (local, uncommitted):** the admission route `POST
+- **Implemented in ADD-WP-07C (committed `2894178`):** the admission route `POST
   /api/v1/family/household/registry-children/admissions` (§7, "Admission (implemented, ADD-WP-07C)"). It is closed in
   operation: no source and no verifier are bound, so even an open gate answers 503 without reading anything.
+- **Implemented in ADD-WP-08 (local, uncommitted):** the Family Portal screen `/family/members/registry-children` (§7, "Family
+  Portal screen (ADD-WP-08)"), over the two routes above. It admits no one: the routes are closed, the server issues no `ref`,
+  and no declaration text and version are approved (§6), so its submission stays disabled.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
-  not operational), issuing `ref` in a response, the Family Portal UI, the admission action and route,
+  not operational), issuing `ref` in a response, an approved declaration (text and version) available to the client,
   pilot activation.
 - **Unchanged:** D-01 … D-06. Gates G-01 … G-07 remain OPEN, and every mode other than `OFF` stays unapproved.
 
@@ -385,6 +388,48 @@ source nor a release pin verifier is bound.
   - No National ID, reference, name or internal reason is ever answered or logged; the controller logs nothing.
 - **Operational binding (not done; its own approved package):** a real `RegistryChildSource` adapter, `CivilRegistryReader` as
   the `RegistryReleasePinVerifier`, DBA-1 … DBA-4, then G-01 … G-07.
+
+### Family Portal screen (ADD-WP-08; local, uncommitted)
+
+The household-facing screen over discovery and admission. It changes no backend rule and enables nothing.
+
+- **Entry (ADD-WP-08-C decision).** A link on «أفراد الأسرة» to `/family/members/registry-children` («الأبناء والبنات في
+  السجل المدني»).
+  - **Hidden** when the flag is `OFF`, `PILOT` for another Family, the permission is missing, or the answer is unknown. In
+    `PILOT` and `ON` it is shown only to an authorized account.
+  - No authenticated contract states this yet, so the link is **hidden for everyone** (`registryChildrenEntryVisible()` is
+    `false`). The client does not guess: no `NEXT_PUBLIC` flag, and no discovery read, which would be audited and counted.
+  - **Missing contract (proposal, not implemented):** a visibility-only `registry_admission: boolean` on
+    `GET /api/v1/family/me`, beside `notifications` and `civil_lookup`. It would be true only when the Family has context,
+    `FamilyRegistryAdmissionPolicy::allowsFamily()` passes and the account holds `family-member.admit-from-registry`. It
+    reads no registry and records, counts or exposes nothing else (no mode, no allowlist). The routes keep authorizing on
+    their own.
+  - Direct navigation stays safe: a closed gate answers `404 ADMISSION_UNAVAILABLE` before anything is read, counted or
+    recorded, and the screen shows that the service is unavailable.
+- **Discovery.** `GET …/registry-children?page=N` with the server's `{page, per_page, total}` and the shared pagination bar. It
+  shows `display_name`, `birth_year` and `status` only; `ref` never reaches the DOM.
+  - The documented statuses each get a fixed explanation. `NOT_ELIGIBLE` never says why, and an undocumented status is
+    shown as `NOT_ELIGIBLE`.
+  - It is never re-read behind the user: no retry, no refetch on focus or reconnect, and nothing is kept once the page is
+    left (`gcTime` 0).
+  - Errors: `404` and `409 RESULT_SET_TOO_BROAD` are final; `429`, `503` and a network failure are retryable on request;
+    `401` and `403` go to the existing session and access flow.
+- **Admission.** Offered only for `ELIGIBLE` with a non-empty `ref` **and** an approved declaration.
+  - The declaration has no hard-coded version: `APPROVED_REGISTRY_ADMISSION_DECLARATION` is `null` until G-02 approves the
+    text and an approved package supplies the version. Until then submission stays disabled.
+  - One child per dialog. The declaration is never preselected and is asked again each time.
+  - `client_reference` is `crypto.randomUUID()` per attempt, keyed by the child's `ref` and the declaration version, and kept
+    in memory only.
+    - It is kept for retries after `503`, `429` and network failures, even when another child was tried in between.
+    - It is never used for another child, and is replaced after a success, a final refusal or
+      `409 ADMISSION_IDEMPOTENCY_CONFLICT`.
+    - A page reload starts with a new key. If the uncertain attempt had succeeded, the server shows the child as
+      `ALREADY_MEMBER` or answers `NOT_ELIGIBLE`; it never creates a second membership.
+  - At most one send in flight, never retried automatically, and an admitted `ref` cannot be sent again.
+  - Success (`201`) and replay (`200`, `replayed: true`) re-read the members, the household summary, the profile and the
+    suggested children.
+  - Refusals show fixed messages, never the server's text or a reason.
+- **Privacy.** Nothing is logged, put in a URL or kept in browser storage. The Family service worker caches no API answer.
 
 ## 7a. Admission references (ADD-WP-06B-2)
 

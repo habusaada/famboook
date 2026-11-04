@@ -815,7 +815,10 @@ death-report workflow and `RecordPersonDeathAction`.
 ## Direct admission of civil-verified children (approved architecture, NOT implemented)
 
 **FP-ADR-081, `docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md` (2026-11-01). Not activated: gates G-01 … G-07 are open and
-`family_registry_admission.mode` defaults to `OFF`. Only the schema, flag and permission definition exist locally (ADD-WP-04); no route or screen does.**
+`family_registry_admission.mode` defaults to `OFF`. Built locally behind `OFF`: the guarded discovery and admission routes
+(ADD-WP-06B-3, ADD-WP-07C) and the screen «الأبناء والبنات في السجل المدني» at `/family/members/registry-children`
+(ADD-WP-08). Its entry link stays hidden until `/me` states that the service is open for the account, and its submission
+stays disabled until a `ref` is issued and a declaration is approved (ADR §6, §7). None is operational.**
 
 The one exception to "Family Users do not edit canonical records". An eligible household head
 discovers their sons and daughters in the published release, declares for each one that they
@@ -5404,3 +5407,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.58 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (WP-02, documentation only): §14 direct admission, §9 annotated, A-21, FP-ADR-081. Not implemented or activated; gates G-01 … G-07 open |
 | 1.59 | 2026-11-01 | Approved | FB-FAMILY-RECON-01 (WP-02, documentation only): pointer in the Staff API record. Not implemented |
 | 1.60 | 2026-11-01 | Approved | FB-FAMILY-ADD-01 (ADD-WP-04): §14 status note. Not operational |
+| 1.61 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (ADD-WP-08): §14 status note, the screen at `/family/members/registry-children`. Submission disabled; not operational |
