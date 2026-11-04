@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
+import type { FamilyUser } from "@/lib/api/family-auth";
 import { changeRequestErrorCode } from "@/lib/api/change-requests";
 import {
   FAMILY_HOUSEHOLD_QUERY_KEY,
@@ -96,18 +97,16 @@ export function useAdmitRegistryChild() {
 }
 
 /**
- * Whether to SHOW the entry point on «أفراد الأسرة» (ADD-WP-08-C decision):
- * hidden when the flag is OFF, PILOT for another Family, the permission is
- * missing, or the answer is unknown. No authenticated contract states this
- * yet, and the client must not guess it: not from a NEXT_PUBLIC flag, and
- * not from a discovery read (audited and counted). So it is hidden until
- * /api/v1/family/me carries a visibility-only field for it (proposed:
- * `registry_admission: boolean`, the gate's own flag and permission check,
- * reading and recording nothing), like `notifications` and `civil_lookup`.
- * The route itself stays safe on direct navigation: a closed gate is 404.
+ * Whether to SHOW the entry point on «أفراد الأسرة» (ADD-WP-08-C decision,
+ * RR-01): only when /api/v1/family/me says `registry_admission: true` — the
+ * server's own gate check, so OFF, PILOT for another Family, a missing
+ * permission or no household context are all hidden. Missing, false or not
+ * a boolean is hidden too, and a failed /me never renders the portal. Never
+ * guessed: no NEXT_PUBLIC flag, no discovery read (audited and counted). The
+ * route stays safe on direct navigation: a closed gate is 404.
  */
-export function registryChildrenEntryVisible(): boolean {
-  return false;
+export function registryChildrenEntryVisible(user: FamilyUser | null | undefined): boolean {
+  return user?.registry_admission === true;
 }
 
 /** The machine code of a refusal ({message, code}); the shape is the Change Requests' one. */

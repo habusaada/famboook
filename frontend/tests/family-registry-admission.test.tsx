@@ -6,6 +6,7 @@ import { FamilyGate } from "@/components/family/family-gate";
 import { FamilyMembers } from "@/components/family/members/family-members";
 import { RegistryChildren } from "@/components/family/members/registry-children";
 import { ApiError, apiClient } from "@/lib/api/client";
+import type { FamilyUser } from "@/lib/api/family-auth";
 import {
   FAMILY_REGISTRY_CHILDREN_QUERY_KEY,
   REGISTRY_ADMISSIONS_PATH,
@@ -14,7 +15,7 @@ import {
   type RegistryChildrenPage,
   registryChildrenEntryVisible,
 } from "@/lib/api/family-registry-admission";
-import { browserStorageDump, familyGet, renderWithClient } from "./helpers";
+import { browserStorageDump, familyGet, familyUser, renderWithClient } from "./helpers";
 
 // FB-FAMILY-ADD-01 ADD-WP-08: «الأبناء والبنات في السجل المدني» on
 // GET …/registry-children and POST …/registry-children/admissions.
@@ -109,21 +110,58 @@ afterEach(() => {
 });
 
 describe("the entry point", () => {
-  it("is hidden while no server contract says the service is open (OFF, unknown or unavailable)", async () => {
-    expect(registryChildrenEntryVisible()).toBe(false);
-    const get = vi.spyOn(apiClient, "get").mockImplementation(familyGet());
+  function renderMembersAs(user: FamilyUser | Error) {
+    const get = vi.spyOn(apiClient, "get").mockImplementation(familyGet({ user }));
     renderWithClient(
       <FamilyGate>
         <FamilyMembers />
       </FamilyGate>
     );
 
+    return get;
+  }
+
+  const entryLink = () => screen.queryByRole("link", { name: "عرض الأبناء والبنات المقترحين" });
+
+  it("is visible only when /me says registry_admission: true (ON, or PILOT for this Family, with the permission)", async () => {
+    const get = renderMembersAs(familyUser({ registry_admission: true }));
+
     // The first render of the file loads the portal shell: allow it time.
-    await screen.findByRole("list", { name: "أفراد الأسرة" }, { timeout: 5000 });
-    expect(screen.queryByRole("link", { name: "عرض الأبناء والبنات المقترحين" })).not.toBeInTheDocument();
-    expect(screen.queryByText("الأبناء والبنات في السجل المدني")).not.toBeInTheDocument();
+    const link = await screen.findByRole("link", { name: "عرض الأبناء والبنات المقترحين" }, { timeout: 5000 });
+    expect(link).toHaveAttribute("href", "/family/members/registry-children");
+    expect(screen.getByRole("heading", { name: "الأبناء والبنات في السجل المدني" })).toBeInTheDocument();
     // Visibility is never decided by an (audited, counted) discovery read.
     expect(discoveryCalls(get)).toEqual([]);
+  });
+
+  it.each([
+    ["the field is missing (an older server)", familyUser()],
+    ["OFF, PILOT for another Family, or no permission (false)", familyUser({ registry_admission: false })],
+    ["a non-boolean value", familyUser({ registry_admission: "true" as unknown as boolean })],
+  ])("is hidden when %s", async (_label, user) => {
+    const get = renderMembersAs(user);
+
+    await screen.findByRole("list", { name: "أفراد الأسرة" }, { timeout: 5000 });
+    expect(entryLink()).not.toBeInTheDocument();
+    expect(screen.queryByText("الأبناء والبنات في السجل المدني")).not.toBeInTheDocument();
+    expect(discoveryCalls(get)).toEqual([]);
+  });
+
+  it("is hidden when the capability request (/me) fails: the portal itself does not render", async () => {
+    const get = renderMembersAs(new ApiError(503, null));
+
+    expect(await screen.findByText(/تعذّر التحقق من الجلسة/)).toBeInTheDocument();
+    expect(entryLink()).not.toBeInTheDocument();
+    expect(discoveryCalls(get)).toEqual([]);
+  });
+
+  it("decides on a strict true only", () => {
+    expect(registryChildrenEntryVisible(null)).toBe(false);
+    expect(registryChildrenEntryVisible(undefined)).toBe(false);
+    expect(registryChildrenEntryVisible(familyUser())).toBe(false);
+    expect(registryChildrenEntryVisible(familyUser({ registry_admission: false }))).toBe(false);
+    expect(registryChildrenEntryVisible(familyUser({ registry_admission: 1 as unknown as boolean }))).toBe(false);
+    expect(registryChildrenEntryVisible(familyUser({ registry_admission: true }))).toBe(true);
   });
 
   it("direct navigation with the service closed reads once, says so, and offers nothing to submit", async () => {

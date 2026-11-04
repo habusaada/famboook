@@ -37,9 +37,12 @@ uncommitted; nothing deployed).**
 - **Implemented in ADD-WP-07C (committed `2894178`):** the admission route `POST
   /api/v1/family/household/registry-children/admissions` (§7, "Admission (implemented, ADD-WP-07C)"). It is closed in
   operation: no source and no verifier are bound, so even an open gate answers 503 without reading anything.
-- **Implemented in ADD-WP-08 (local, uncommitted):** the Family Portal screen `/family/members/registry-children` (§7, "Family
+- **Implemented in ADD-WP-08 (committed `6d870b0`):** the Family Portal screen `/family/members/registry-children` (§7, "Family
   Portal screen (ADD-WP-08)"), over the two routes above. It admits no one: the routes are closed, the server issues no `ref`,
   and no declaration text and version are approved (§6), so its submission stays disabled.
+- **Implemented in RR-01 (local, uncommitted):** the visibility-only `registry_admission` on `GET /api/v1/family/me` and the
+  entry link driven by it (§7, "Family Portal screen", Entry). False as shipped: the flag is `OFF` and no role holds the
+  permission.
 - **Not implemented:** discovery against the real civil registry (no adapter over it exists and none is bound, so the route is
   not operational), issuing `ref` in a response, an approved declaration (text and version) available to the client,
   pilot activation.
@@ -389,7 +392,7 @@ source nor a release pin verifier is bound.
 - **Operational binding (not done; its own approved package):** a real `RegistryChildSource` adapter, `CivilRegistryReader` as
   the `RegistryReleasePinVerifier`, DBA-1 … DBA-4, then G-01 … G-07.
 
-### Family Portal screen (ADD-WP-08; local, uncommitted)
+### Family Portal screen (ADD-WP-08, committed `6d870b0`; entry visibility RR-01, local and uncommitted)
 
 The household-facing screen over discovery and admission. It changes no backend rule and enables nothing.
 
@@ -397,13 +400,18 @@ The household-facing screen over discovery and admission. It changes no backend 
   السجل المدني»).
   - **Hidden** when the flag is `OFF`, `PILOT` for another Family, the permission is missing, or the answer is unknown. In
     `PILOT` and `ON` it is shown only to an authorized account.
-  - No authenticated contract states this yet, so the link is **hidden for everyone** (`registryChildrenEntryVisible()` is
-    `false`). The client does not guess: no `NEXT_PUBLIC` flag, and no discovery read, which would be audited and counted.
-  - **Missing contract (proposal, not implemented):** a visibility-only `registry_admission: boolean` on
-    `GET /api/v1/family/me`, beside `notifications` and `civil_lookup`. It would be true only when the Family has context,
-    `FamilyRegistryAdmissionPolicy::allowsFamily()` passes and the account holds `family-member.admit-from-registry`. It
-    reads no registry and records, counts or exposes nothing else (no mode, no allowlist). The routes keep authorizing on
-    their own.
+  - **Contract (RR-01):** `registry_admission: boolean` on `GET /api/v1/family/me`, beside `notifications` and
+    `civil_lookup`. It is `FamilyRegistryAdmissionPolicy::allowsAccount()`, the one account check that the discovery and
+    admission gates also refuse with. That check is true only when all of these hold:
+    - the account has a household context;
+    - it holds `family-portal.access`;
+    - `allowsFamily()` passes for its Family;
+    - it holds `family-member.admit-from-registry`.
+  - Reading it reads no registry and records or counts nothing. It exposes no mode, allowlist or reason. It is visibility
+    only: the routes keep authorizing on their own.
+  - The client shows the link only for a strict `true` (`registryChildrenEntryVisible(user)`). A missing field, `false`,
+    another value or a failed `/me` hides it. The client does not guess: no `NEXT_PUBLIC` flag, and no discovery read, which
+    would be audited and counted.
   - Direct navigation stays safe: a closed gate answers `404 ADMISSION_UNAVAILABLE` before anything is read, counted or
     recorded, and the screen shows that the service is unavailable.
 - **Discovery.** `GET …/registry-children?page=N` with the server's `{page, per_page, total}` and the shared pagination bar. It

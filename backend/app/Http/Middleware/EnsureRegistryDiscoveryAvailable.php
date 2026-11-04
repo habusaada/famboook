@@ -34,9 +34,7 @@ class EnsureRegistryDiscoveryAvailable
     {
         $context = EnsureFamilyContext::context($request);
         $user = $request->user();
-        if ($context === null || ! $context->hasFamilyContext() || $user === null
-            || ! FamilyRegistryAdmissionPolicy::allowsFamily($context->family)
-            || ! $user->can('family-member.admit-from-registry')) {
+        if ($user === null || ! FamilyRegistryAdmissionPolicy::allowsAccount($user, $context)) {
             return self::refuse(self::CODE, self::MESSAGE, 404);
         }
 

@@ -35,6 +35,13 @@ export type FamilyUser = {
    */
   civil_lookup?: { family: boolean; coordinator: boolean };
   /**
+   * FB-FAMILY-ADD-01 RR-01: show the «الأبناء والبنات في السجل المدني» entry —
+   * the discovery and admission gates' own check (household context, Family
+   * Portal permission, flag for this Family, the admission permission).
+   * Visibility only; both routes authorize again. Absent or false = hidden.
+   */
+  registry_admission?: boolean;
+  /**
    * FB-FAMILY-DASHBOARD-01: the previous successful sign-in before THIS
    * session (UTC ISO 8601), resolved once by the server when the session
    * started; null when unknown or on a first sign-in.

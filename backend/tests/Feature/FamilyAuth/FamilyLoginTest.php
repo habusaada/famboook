@@ -106,6 +106,8 @@ class FamilyLoginTest extends TestCase
             'coordinator_notifications' => false,
             // FB-CIVIL-02B: the Civil Registry Lookup entries stay hidden (both sides closed by default).
             'civil_lookup' => ['family' => false, 'coordinator' => false],
+            // FB-FAMILY-ADD-01 RR-01: the registry children entry stays hidden (flag OFF, no role holds the permission).
+            'registry_admission' => false,
             // FB-FAMILY-DASHBOARD-01: no earlier sign-in is recorded for this fixture account: unknown.
             'previous_sign_in_at' => null,
             'first_sign_in' => false,

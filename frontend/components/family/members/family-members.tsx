@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MemberCard } from "@/components/family/members/member-card";
 import { MemberDetailSheet } from "@/components/family/members/member-detail-sheet";
+import { useFamilyUser } from "@/components/family/family-context";
 import { isAccessFailure, useFamilyHouseholdHealthQuery, useFamilyMembersQuery } from "@/lib/api/family-household";
 import { registryChildrenEntryVisible } from "@/lib/api/family-registry-admission";
 
@@ -46,9 +47,8 @@ function MembersError({ onRetry, retrying }: { onRetry: () => void; retrying: bo
 
 /**
  * The way to «الأبناء والبنات في السجل المدني» (FB-FAMILY-ADD-01 ADD-WP-08).
- * A plain link, shown only when the server says the service is open for
- * this account (registryChildrenEntryVisible; hidden until that contract
- * exists). The suggested children are read on their own page only, because
+ * A plain link, shown only when /me says the service is open for this
+ * account (`registry_admission`, registryChildrenEntryVisible). The suggested children are read on their own page only, because
  * every read is audited and counted by the server.
  */
 function RegistryChildrenEntry() {
@@ -81,6 +81,7 @@ function RegistryChildrenEntry() {
  * gate and the shell), any other failure inline.
  */
 export function FamilyMembers() {
+  const user = useFamilyUser();
   const query = useFamilyMembersQuery();
   const data = query.data;
   // The member whose registry details are open (PWA-3B.3), by its opaque
@@ -150,7 +151,7 @@ export function FamilyMembers() {
                 ))}
               </ul>
             )}
-            {registryChildrenEntryVisible() && <RegistryChildrenEntry />}
+            {registryChildrenEntryVisible(user) && <RegistryChildrenEntry />}
           </div>
         ) : query.isError ? (
           !isAccessFailure(query.error) && <MembersError onRetry={() => query.refetch()} retrying={query.isFetching} />

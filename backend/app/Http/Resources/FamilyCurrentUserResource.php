@@ -9,6 +9,7 @@ use App\Support\CivilLookup\CivilLookupContext;
 use App\Support\FamilyAuth\CoordinatorScopes;
 use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\FamilyAuth\SignInHistory;
+use App\Support\FamilyPortal\FamilyRegistryAdmissionPolicy;
 use App\Support\Notifications\NotificationVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -73,6 +74,11 @@ class FamilyCurrentUserResource extends JsonResource
                 'family' => $family !== null && CivilLookupAccess::evaluate($this->resource, CivilLookupContext::FAMILY)['allowed'],
                 'coordinator' => $coordinatorSpace && CivilLookupAccess::evaluate($this->resource, CivilLookupContext::COORDINATOR)['allowed'],
             ],
+            // FB-FAMILY-ADD-01 RR-01: whether to SHOW the registry children entry. Visibility
+            // only, the gate's own check (FamilyRegistryAdmissionPolicy::allowsAccount): no
+            // mode, allowlist or reason, no registry read, nothing recorded or counted. The
+            // discovery and admission routes keep authorizing on their own.
+            'registry_admission' => FamilyRegistryAdmissionPolicy::allowsAccount($this->resource, $context),
             ...SignInHistory::forSession($request),
             'context' => [
                 'available' => $family !== null,
