@@ -20,6 +20,8 @@ final class RegistryChildAssessment
         public readonly ?Gender $gender = null,
         // RR-02: an authoritative source proved the child alive (RegistryLifeStatus).
         public readonly bool $livingProven = false,
+        // RR-02A (D-06R): in a living-scope release; admissible only on the head's declaration.
+        public readonly bool $livingByDeclaration = false,
     ) {}
 
     public function publicStatus(): RegistryChildStatus

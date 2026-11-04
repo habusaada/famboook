@@ -72,7 +72,9 @@ final class RegistryChildEligibility
         // RR-02: the registry's death evidence first, then only an authoritative verifier
         // (none is bound, G-05) can prove a life. An empty death date never does.
         $life = RegistryLifeStatus::of($record);
-        if ($life !== LifeStatus::PROVEN_ALIVE) {
+        // RR-02A: DECLARATION_IN_SCOPE adds no reason, but it is NOT a proven life: the
+        // admission requires the head's declaration of current life for it.
+        if ($life !== LifeStatus::PROVEN_ALIVE && $life !== LifeStatus::DECLARATION_IN_SCOPE) {
             $reasons[] = $life === LifeStatus::DECEASED ? Reason::DECEASED : Reason::LIFE_UNVERIFIED;
         }
 
@@ -81,6 +83,7 @@ final class RegistryChildEligibility
             in_array($link, ['FATHER', 'MOTHER'], true) ? $link : null,
             $gender->status === CivilValueStatus::MAPPED ? $gender->value : null,
             livingProven: $life === LifeStatus::PROVEN_ALIVE,
+            livingByDeclaration: $life === LifeStatus::DECLARATION_IN_SCOPE,
         );
     }
 

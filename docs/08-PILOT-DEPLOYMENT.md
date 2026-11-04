@@ -476,6 +476,7 @@ nothing visible. The checklist and runbook are `docs/deployment/FB-FAMILY-ADD-01
 | Item | Value |
 |---|---|
 | Switches | `FAMILY_REGISTRY_ADMISSION_MODE` (`OFF`); `FAMILY_REGISTRY_ADMISSION_CIVIL_REGISTRY_BINDING` (`false`); `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION` (unset; must name an APPROVED catalogue entry). |
+| Life policy (RR-02A, D-06R proposed) | `FAMILY_REGISTRY_LIFE_POLICY` (`VERIFIER_ONLY`); `FAMILY_REGISTRY_LIFE_POLICY_APPROVAL` (unset); `FAMILY_REGISTRY_LIVING_SCOPE_RELEASES` (empty). Migration `2026_11_04_100000_add_life_basis_to_family_registry_admissions` (additive). |
 | DBA | `10-registry-admission-pin.dba.sql` (DBA-1 … DBA-3, **not applied**), after 08. Re-apply after a restore. DBA-4 (one cluster and one database under failover) is an operations guarantee. |
 | Readiness | `php artisan famboook:registry-admission-readiness [--probe-pin]`: read-only, counts only. Exit 0 approves nothing. |
 | Shutdown | `FAMILY_REGISTRY_ADMISSION_MODE=OFF`, then clear the config cache. |

@@ -21,13 +21,16 @@ use Illuminate\Validation\Validator;
  * - `client_reference`: a lowercase canonical UUID, the idempotency key.
  * - `declaration_version`: the version of the declaration shown (checked by the action).
  * - `declaration_accepted`: the JSON boolean true, nothing else ("true", 1, "on" … refuse).
+ * - `life_declaration_accepted` (RR-02A, optional): when sent, the JSON boolean true only:
+ *   the head's separate declaration that the child is alive now. The action requires it
+ *   while the revised life policy (D-06R) is active.
  *
  * Validation messages name fields, never their values, and the 422 is no-store like every
  * other answer of this route.
  */
 class FamilyRegistryAdmissionRequest extends FormRequest
 {
-    private const FIELDS = ['ref', 'client_reference', 'declaration_version', 'declaration_accepted'];
+    private const FIELDS = ['ref', 'client_reference', 'declaration_version', 'declaration_accepted', 'life_declaration_accepted'];
 
     public function authorize(): bool
     {
@@ -44,6 +47,11 @@ class FamilyRegistryAdmissionRequest extends FormRequest
             'declaration_accepted' => ['required', function (string $attribute, mixed $value, Closure $fail): void {
                 if ($value !== true) {
                     $fail('يلزم الإقرار بأن الابن أو الابنة من أفراد الأسرة.');
+                }
+            }],
+            'life_declaration_accepted' => ['sometimes', 'required', function (string $attribute, mixed $value, Closure $fail): void {
+                if ($value !== true) {
+                    $fail('يلزم الإقرار بأن الابن أو الابنة على قيد الحياة.');
                 }
             }],
         ];
@@ -70,6 +78,7 @@ class FamilyRegistryAdmissionRequest extends FormRequest
     {
         $valid = $this->validated();
 
-        return new RegistryAdmissionRequest($valid['ref'], $valid['client_reference'], $valid['declaration_version'], true, $this->ip());
+        return new RegistryAdmissionRequest($valid['ref'], $valid['client_reference'], $valid['declaration_version'], true, $this->ip(),
+            lifeDeclared: ($valid['life_declaration_accepted'] ?? null) === true);
     }
 }

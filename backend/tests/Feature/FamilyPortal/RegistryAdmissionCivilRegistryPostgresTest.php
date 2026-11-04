@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
 use PDO;
 use PDOException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\FamilyPortal\GenderGateLiftedAdmissibility;
 use Tests\Support\FamilyPortal\PendingGatesLiftedAdmissibility;
 use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticLifeVerifier;
@@ -269,7 +270,7 @@ class RegistryAdmissionCivilRegistryPostgresTest extends TestCase
         $listed = $as()->getJson(self::DISCOVERY)->assertOk();
         $this->assertSame(['NOT_ELIGIBLE', 'NOT_ELIGIBLE'], array_column($listed->json('data.children'), 'status'));
         $this->assertSame([null, null], array_column($listed->json('data.children'), 'ref'));
-        $this->assertSame(['version' => self::DECLARATION, 'text' => SyntheticDeclaration::TEXT], $listed->json('data.declaration'));
+        $this->assertSame(['version' => self::DECLARATION, 'text' => SyntheticDeclaration::TEXT, 'life_text' => null], $listed->json('data.declaration'));
         // A proven life alone opens nothing while G-04 is open.
         $life = new SyntheticLifeVerifier;
         foreach ([self::CHILD, self::SECOND] as $id) {
@@ -310,6 +311,87 @@ class RegistryAdmissionCivilRegistryPostgresTest extends TestCase
         foreach ([self::CHILD, self::SECOND, self::HEAD] as $secret) {
             $this->assertStringNotContainsString($secret, implode("\n", $logged));
             $this->assertStringNotContainsString($secret, json_encode($children, JSON_UNESCAPED_UNICODE));
+        }
+    }
+
+    // ---------------------------------------------------------------- revised life policy (RR-02A, D-06R)
+
+    public function test_the_revised_life_policy_admits_only_on_the_heads_declaration_and_records_unknown(): void
+    {
+        $logged = [];
+        Event::listen(MessageLogged::class, function (MessageLogged $e) use (&$logged) {
+            $logged[] = $e->message.json_encode($e->context);
+        });
+        $child = ['fatherid' => self::HEAD, 'gender' => 'ذكر', 'datebirth' => '2010-01-15T00:00:00', 'maritalst' => 'اعزب'];
+        $dead = '403234567';
+        $r1 = $this->publishedRelease([self::HEAD => ['fullname' => 'رب-تجريبي'],
+            self::CHILD => [...$child, 'fullname' => 'ابن-تجريبي أول'], self::SECOND => [...$child, 'fullname' => 'ابن-تجريبي ثان'],
+            $dead => [...$child, 'fullname' => 'ابن-تجريبي متوفى', 'deathdate' => '2024-03-01T00:00:00']]);
+        $head = $this->activatedHead(self::HEAD);
+        $head['user']->givePermissionTo(AdmitRegistryChildAction::PERMISSION);
+        config(['family_registry_admission.mode' => 'ON', 'family_registry_admission.civil_registry_binding' => true,
+            ...SyntheticDeclaration::approved(self::DECLARATION, withLife: true)]);
+        RegistryAdmissionBindings::register($this->app);
+        // TEST ONLY: G-04 lifted; life is decided by the application's own rules.
+        $this->app->instance(RegistryChildAdmissibility::class, new GenderGateLiftedAdmissibility);
+        $as = fn () => $this->actingAs($head['user']->fresh());
+        $statuses = fn () => array_column($as()->getJson(self::DISCOVERY)->assertOk()->json('data.children'), 'status');
+
+        // As shipped (VERIFIER_ONLY): an unproven life is never admissible, and no life statement is delivered.
+        $off = $as()->getJson(self::DISCOVERY)->assertOk();
+        $this->assertSame(['NOT_ELIGIBLE', 'NOT_ELIGIBLE', 'NOT_ELIGIBLE'], array_column($off->json('data.children'), 'status'));
+        $this->assertNull($off->json('data.declaration.life_text'));
+
+        // Revised policy, with r1 listed as a living-scope release extracted on 2026-10-25.
+        config(SyntheticDeclaration::revisedLifePolicy(self::DECLARATION, $r1.':2026-10-25'));
+        $on = $as()->getJson(self::DISCOVERY)->assertOk();
+        $children = $on->json('data.children');
+        $this->assertSame(['ELIGIBLE', 'ELIGIBLE', 'NOT_ELIGIBLE'], array_column($children, 'status'), 'a known death is still refused');
+        $this->assertNull($children[2]['ref']);
+        $this->assertSame(SyntheticDeclaration::LIFE_TEXT, $on->json('data.declaration.life_text'));
+
+        $body = ['ref' => $children[0]['ref'], 'client_reference' => (string) Str::uuid(),
+            'declaration_version' => self::DECLARATION, 'declaration_accepted' => true];
+        // Without the separate declaration of current life: refused before anything is read or written.
+        $as()->postJson(self::ADMISSIONS, $body)->assertStatus(422)->assertJsonPath('code', 'DECLARATION_REQUIRED');
+        $this->assertSame(0, DB::table('family_registry_admissions')->count());
+
+        $body['life_declaration_accepted'] = true;
+        $as()->postJson(self::ADMISSIONS, $body)->assertCreated()->assertJsonPath('data.replayed', false);
+        $as()->postJson(self::ADMISSIONS, $body)->assertOk()->assertJsonPath('data.replayed', true);
+
+        // The evidence: the actor, the release, both declarations with their time, the basis and its approval.
+        $evidence = DB::table('family_registry_admissions')->sole();
+        $this->assertSame([(int) $head['user']->id, (int) $head['person']->id, $r1, self::DECLARATION, 'REGISTRY_SCOPE_DECLARATION', 'TEST-D-06R-0001', '2026-10-25'],
+            [(int) $evidence->admitted_by, (int) $evidence->admitted_by_person_id, (int) $evidence->release_id, $evidence->declaration_version,
+                $evidence->life_basis, $evidence->life_policy_reference, substr((string) $evidence->registry_extracted_on, 0, 10)]);
+        $this->assertNotNull($evidence->declared_at);
+        $this->assertNotNull($evidence->life_declared_at);
+        // Never ALIVE: the declared, unverified life is recorded UNKNOWN.
+        $this->assertSame('UNKNOWN', DB::table('persons')->where('national_id', self::CHILD)->value('life_status'));
+
+        // Credible contradictory evidence refuses, even with the head's declaration.
+        $verifier = (new SyntheticLifeVerifier)->answer(self::SECOND, LifeVerificationStatus::DECEASED, new DateTimeImmutable('@'.now()->getTimestamp()));
+        $this->app->instance(RegistryLifeVerifier::class, $verifier);
+        $this->assertSame('NOT_ELIGIBLE', $statuses()[1]);
+        $as()->postJson(self::ADMISSIONS, [...$body, 'ref' => $children[1]['ref'], 'client_reference' => (string) Str::uuid()])
+            ->assertStatus(422)->assertJsonPath('code', 'NOT_ELIGIBLE');
+        unset($this->app[RegistryLifeVerifier::class]);
+        $this->assertSame('ELIGIBLE', $statuses()[1], 'the verifier is unbound again');
+
+        // A release that is not listed, or a missing approval reference: nothing in scope.
+        $this->publishedRelease([], $r1);
+        $this->assertSame('NOT_ELIGIBLE', $statuses()[1], 'an unlisted release');
+        config(['family_registry_admission.life_policy.living_scope_releases' => ($r1 + 1).':2026-10-25',
+            'family_registry_admission.life_policy.approval_reference' => null]);
+        $this->assertSame('NOT_ELIGIBLE', $statuses()[1], 'no approval reference');
+        $this->assertSame(1, DB::table('family_registry_admissions')->count());
+
+        // The CHECKs that keep a declared life complete.
+        $this->assertSame(3, (int) DB::scalar("SELECT count(*) FROM pg_constraint WHERE conrelid = 'family_registry_admissions'::regclass
+            AND conname IN ('chk_registry_admission_life_basis', 'chk_registry_admission_life_scope', 'chk_registry_admission_life_verified')"));
+        foreach ([self::CHILD, self::SECOND, $dead, self::HEAD] as $secret) {
+            $this->assertStringNotContainsString($secret, implode("\n", $logged));
         }
     }
 }

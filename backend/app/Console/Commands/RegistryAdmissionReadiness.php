@@ -10,6 +10,7 @@ use App\Support\FamilyPortal\RegistryAdmission\CivilRegistryValues;
 use App\Support\FamilyPortal\RegistryAdmission\PostgresRegistryReleasePin;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionDeclarations;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSource;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryLifePolicy;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryLifeVerifier;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
 use Illuminate\Console\Command;
@@ -59,7 +60,13 @@ class RegistryAdmissionReadiness extends Command
         $this->check('O-K / G-02', 'an APPROVED declaration is active', $declaration !== null,
             $declaration === null ? 'no approved catalogue entry is active (submission stays disabled)' : 'version '.$declaration->version);
         $this->check('G-04', 'the gender code mapping is approved', CivilRegistryValues::MAPPINGS_APPROVED, 'CivilRegistryValues::MAPPINGS_APPROVED is false');
-        $this->check('G-05', 'an authoritative life verifier is bound', app()->bound(RegistryLifeVerifier::class), 'no RegistryLifeVerifier is bound (no life can be proven)');
+        // RR-02A: the life basis is a bound authoritative verifier (G-05) or the revised policy (D-06R).
+        $revised = RegistryLifePolicy::scopeAndDeclarationActive();
+        $this->line(sprintf('  life policy: %s; approval reference recorded: %s; living-scope releases listed: %d',
+            $revised ? RegistryLifePolicy::SCOPE_AND_DECLARATION : RegistryLifePolicy::VERIFIER_ONLY,
+            RegistryLifePolicy::approvalReference() !== null ? 'YES' : 'NO', count(RegistryLifePolicy::releases())));
+        $this->check('G-05 / D-06R', 'a life basis is available', app()->bound(RegistryLifeVerifier::class) || ($revised && RegistryLifePolicy::releases() !== []),
+            'no RegistryLifeVerifier is bound and the revised life policy is not active with a listed release');
         $bound = config('family_registry_admission.civil_registry_binding') === true;
         $this->check('SOURCE', 'the civil registry is bound as the source', $bound && app()->bound(RegistryChildSource::class), 'family_registry_admission.civil_registry_binding is false');
         $this->check('PIN', 'a release pin verifier is bound', app()->bound(RegistryReleasePinVerifier::class), 'no RegistryReleasePinVerifier is bound');
@@ -83,6 +90,7 @@ class RegistryAdmissionReadiness extends Command
             'G-03  verified fatherid / motherid / mainid semantics',
             'G-04  verified gender code table (then a reviewed change of MAPPINGS_APPROVED)',
             'G-05  the official life / death source and its freshness (then a verifier package)',
+            'D-06R the revised life policy: documented scope statement of the release, approval reference, legal review',
             'G-06  an independent security review of the passing test evidence',
             'G-07  the activation approval: commit, mode, allowlist, DBA-1 … DBA-4 applied and verified',
             'DBA-4 one cluster and one database under all routing and failover (operations guarantee)',

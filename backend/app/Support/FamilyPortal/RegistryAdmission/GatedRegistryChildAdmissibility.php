@@ -21,6 +21,7 @@ final class GatedRegistryChildAdmissibility implements RegistryChildAdmissibilit
     {
         $assessment = RegistryChildEligibility::evaluate($context, $record);
 
-        return RegistryChildAdmission::of($record, $assessment, [...$assessment->reasons, ...$sourceReasons], livingProven: $assessment->livingProven);
+        return RegistryChildAdmission::of($record, $assessment, [...$assessment->reasons, ...$sourceReasons], livingProven: $assessment->livingProven,
+            livingByDeclaration: $assessment->livingByDeclaration);
     }
 }

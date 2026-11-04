@@ -229,6 +229,10 @@ class FamilyRegistryAdmissionApiTest extends TestCase
             'declaration "true"' => ['declaration_accepted' => 'true'],
             'declaration 1' => ['declaration_accepted' => 1],
             'declaration "on"' => ['declaration_accepted' => 'on'],
+            // RR-02A: the optional life declaration is the JSON true or nothing.
+            'life declaration false' => ['life_declaration_accepted' => false],
+            'life declaration "true"' => ['life_declaration_accepted' => 'true'],
+            'life declaration 1' => ['life_declaration_accepted' => 1],
             'a National ID' => ['national_id' => self::CHILD],
             'a family' => ['family_id' => $this->head['family']->id],
             'a release' => ['release_id' => self::RELEASE],
@@ -243,7 +247,7 @@ class FamilyRegistryAdmissionApiTest extends TestCase
             // {message, errors}: field names only.
             $this->assertSame(['message', 'errors'], array_keys($response->json()), $label);
             $this->assertSame([], array_diff(array_keys($response->json('errors')),
-                ['ref', 'client_reference', 'declaration_version', 'declaration_accepted', 'parameters']), $label);
+                ['ref', 'client_reference', 'declaration_version', 'declaration_accepted', 'life_declaration_accepted', 'parameters']), $label);
             foreach ([self::CHILD, $ref] as $secret) {
                 $this->assertStringNotContainsString($secret, (string) $response->getContent(), $label);
             }

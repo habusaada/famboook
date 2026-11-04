@@ -181,7 +181,7 @@ final class SuggestedChildrenDiscovery
         $assessment = RegistryChildEligibility::evaluate($context, $record, $facts);
         $extra = $this->sourceReasons($record, $duplicated, $headParents, $siblings, $headId);
         if ($extra !== []) {
-            $assessment = new RegistryChildAssessment([...$assessment->reasons, ...$extra], $assessment->parentLink, $assessment->gender, $assessment->livingProven);
+            $assessment = new RegistryChildAssessment([...$assessment->reasons, ...$extra], $assessment->parentLink, $assessment->gender, $assessment->livingProven, $assessment->livingByDeclaration);
         }
 
         $status = $assessment->publicStatus();

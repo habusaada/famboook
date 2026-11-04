@@ -21,6 +21,7 @@ use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionRefs;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildAdmissibility;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildEligibility;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSource;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryLifePolicy;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryLifeStatus;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryLifeVerifier;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
@@ -94,8 +95,12 @@ class RegistryAdmissionReadinessTest extends TestCase
 
     public function test_the_shipped_catalogue_holds_only_the_unapproved_adr_draft_and_delivers_nothing(): void
     {
-        $this->assertSame([self::DRAFT], array_keys(RegistryAdmissionDeclarations::catalogue()));
+        // RR-02A adds draft-2: the same wording plus a separate statement of current life. Neither is approved.
+        $this->assertSame([self::DRAFT, '2026-11-draft-2'], array_keys(RegistryAdmissionDeclarations::catalogue()));
         $this->assertFalse(RegistryAdmissionDeclarations::catalogue()[self::DRAFT]['approved']);
+        $this->assertFalse(RegistryAdmissionDeclarations::catalogue()['2026-11-draft-2']['approved']);
+        $this->assertSame(self::ADR_TEXT, RegistryAdmissionDeclarations::catalogue()['2026-11-draft-2']['text']);
+        $this->assertStringContainsString('على قيد الحياة', RegistryAdmissionDeclarations::catalogue()['2026-11-draft-2']['life_text']);
         // The draft is the ADR §6 proposal, word for word, and its text is pinned: a new wording is a new version.
         $this->assertSame(self::ADR_TEXT, RegistryAdmissionDeclarations::catalogue()[self::DRAFT]['text']);
         $adr = (string) file_get_contents(base_path('../docs/adr/FB-FAMILY-ADD-01-DIRECT-ADMISSION.md'));
@@ -112,7 +117,13 @@ class RegistryAdmissionReadinessTest extends TestCase
     public function test_only_an_approved_entry_with_a_text_is_active(): void
     {
         config(SyntheticDeclaration::approved('v-test-1'));
-        $this->assertSame(['version' => 'v-test-1', 'text' => SyntheticDeclaration::TEXT], RegistryAdmissionDeclarations::active()?->toArray());
+        $this->assertSame(['version' => 'v-test-1', 'text' => SyntheticDeclaration::TEXT, 'life_text' => null], RegistryAdmissionDeclarations::active()?->toArray());
+        config(SyntheticDeclaration::approved('v-test-1', withLife: true));
+        $this->assertSame(SyntheticDeclaration::LIFE_TEXT, RegistryAdmissionDeclarations::active()?->toArray(true)['life_text']);
+        $this->assertNull(RegistryAdmissionDeclarations::active()?->toArray()['life_text'], 'delivered only on request');
+        config(['family_registry_admission.declarations.v-test-1.life_text' => '  ']);
+        $this->assertNull(RegistryAdmissionDeclarations::active(), 'an unusable life statement makes the entry unusable');
+        config(SyntheticDeclaration::approved('v-test-1'));
         $this->assertTrue(RegistryAdmissionDeclarations::accepts('v-test-1'));
         $this->assertFalse(RegistryAdmissionDeclarations::accepts('v-test-2'));
         $this->assertFalse(RegistryAdmissionDeclarations::accepts('v-test-1 '));
@@ -208,6 +219,86 @@ class RegistryAdmissionReadinessTest extends TestCase
         $admission = (new GatedRegistryChildAdmissibility)->assess($context, $this->record(), []);
         $this->assertTrue($admission->livingProven);
         $this->assertFalse($admission->admissible());
+    }
+
+    // ---------------------------------------------------------------- revised life policy (RR-02A, D-06R)
+
+    public function test_the_revised_life_policy_is_off_by_default_and_needs_every_piece(): void
+    {
+        $this->assertSame('VERIFIER_ONLY', config('family_registry_admission.life_policy.mode'));
+        $this->assertNull(config('family_registry_admission.life_policy.approval_reference'));
+        $this->assertSame([], RegistryLifePolicy::releases());
+        $this->assertFalse(RegistryLifePolicy::scopeAndDeclarationActive());
+
+        config(SyntheticDeclaration::revisedLifePolicy('v-life-1', '7:2026-10-25'));
+        $this->assertTrue(RegistryLifePolicy::scopeAndDeclarationActive());
+        $this->assertSame('2026-10-25', RegistryLifePolicy::extractedOn(7));
+        $this->assertNull(RegistryLifePolicy::extractedOn(8), 'an unlisted release');
+
+        foreach ([
+            'another mode' => ['family_registry_admission.life_policy.mode' => 'registry_scope_and_declaration'],
+            'no approval' => ['family_registry_admission.life_policy.approval_reference' => null],
+            'a malformed approval' => ['family_registry_admission.life_policy.approval_reference' => 'x y'],
+            'a too short approval' => ['family_registry_admission.life_policy.approval_reference' => 'ab'],
+            'a declaration without a life statement' => SyntheticDeclaration::approved('v-life-1'),
+        ] as $label => $override) {
+            config(SyntheticDeclaration::revisedLifePolicy('v-life-1', '7:2026-10-25'));
+            config($override);
+            $this->assertFalse(RegistryLifePolicy::scopeAndDeclarationActive(), $label);
+            $this->assertNull(RegistryLifePolicy::extractedOn(7), $label);
+        }
+
+        config(SyntheticDeclaration::revisedLifePolicy('v-life-1', ''));
+        $this->assertSame([7 => '2026-10-25', 9 => '2026-11-01'], (function () {
+            config(['family_registry_admission.life_policy.living_scope_releases' => ' 7:2026-10-25 , 9:2026-11-01']);
+
+            return RegistryLifePolicy::releases();
+        })());
+        foreach (['7:2026-10-25,x', '7:2026-10-25,7:2026-10-26', '7:2026-02-30', '7:'.now()->addDay()->toDateString(), '0:2026-10-25', '7-2026-10-25', '7:26-10-25'] as $raw) {
+            config(['family_registry_admission.life_policy.living_scope_releases' => $raw]);
+            $this->assertSame([], RegistryLifePolicy::releases(), $raw);
+        }
+    }
+
+    public function test_under_the_revised_policy_an_unproven_life_is_declaration_in_scope_and_never_alive(): void
+    {
+        config(SyntheticDeclaration::revisedLifePolicy('v-life-1', '7:2026-10-25'));
+        $this->assertSame(LifeStatus::DECLARATION_IN_SCOPE, RegistryLifeStatus::of($this->record()));
+        $this->assertSame(LifeStatus::UNVERIFIED, RegistryLifeStatus::of(new CivilRecord(8, 1, self::CHILD, $this->record()->payload)), 'another release');
+        $this->assertSame(LifeStatus::DECEASED, RegistryLifeStatus::of($this->record(fields: ['deathdate' => '2020-02-02T00:00:00'])), 'a known death');
+        $this->assertSame(LifeStatus::UNVERIFIED, RegistryLifeStatus::of($this->record(fields: ['deathdate' => 'xx'])), 'contradictory evidence');
+
+        // The verifier gate is never bypassed: a deceased answer or a failure refuses; only no proof falls back.
+        $verifier = $this->verifier();
+        $now = new DateTimeImmutable('@'.now()->getTimestamp());
+        $verifier->answer(self::CHILD, Says::DECEASED, $now);
+        $this->assertSame(LifeStatus::DECEASED, RegistryLifeStatus::of($this->record()));
+        $verifier->fail(self::CHILD);
+        $this->assertSame(LifeStatus::UNVERIFIED, RegistryLifeStatus::of($this->record()));
+        $verifier->answer(self::CHILD, Says::UNKNOWN, $now);
+        $this->assertSame(LifeStatus::DECLARATION_IN_SCOPE, RegistryLifeStatus::of($this->record()));
+        $verifier->answer(self::CHILD, Says::ALIVE, $now->modify('-1 hour'));
+        $this->assertSame(LifeStatus::PROVEN_ALIVE, RegistryLifeStatus::of($this->record()));
+
+        // Switched off: nothing in scope.
+        config(['family_registry_admission.life_policy.mode' => 'VERIFIER_ONLY']);
+        $verifier->answer(self::CHILD, Says::UNKNOWN, $now);
+        $this->assertSame(LifeStatus::UNVERIFIED, RegistryLifeStatus::of($this->record()));
+    }
+
+    public function test_a_declared_life_adds_no_reason_but_is_not_proven_and_g04_still_refuses(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $context = $this->headContext();
+        config(SyntheticDeclaration::revisedLifePolicy('v-life-1', '7:2026-10-25'));
+
+        $assessment = RegistryChildEligibility::evaluate($context, $this->record());
+        $this->assertFalse($assessment->livingProven);
+        $this->assertTrue($assessment->livingByDeclaration);
+        $this->assertSame([Reason::GENDER_MAPPING_PROVISIONAL], $assessment->reasons);
+        $admission = (new GatedRegistryChildAdmissibility)->assess($context, $this->record(), []);
+        $this->assertTrue($admission->livingByDeclaration);
+        $this->assertFalse($admission->admissible(), 'G-04 still refuses');
     }
 
     // ---------------------------------------------------------------- references (ADR §7a)
@@ -322,7 +413,7 @@ class RegistryAdmissionReadinessTest extends TestCase
             ->expectsOutputToContain('roles holding the admission permission: 0; accounts holding it directly: 0')
             ->expectsOutputToContain('[BLOCKED] O-K / G-02')
             ->expectsOutputToContain('[BLOCKED] G-04')
-            ->expectsOutputToContain('[BLOCKED] G-05')
+            ->expectsOutputToContain('[BLOCKED] G-05 / D-06R')
             ->expectsOutputToContain('[BLOCKED] SOURCE')
             ->expectsOutputToContain('[BLOCKED] PIN')
             ->expectsOutputToContain('[EXTERNAL] G-07')
@@ -335,7 +426,7 @@ class RegistryAdmissionReadinessTest extends TestCase
         $this->artisan('famboook:registry-admission-readiness', ['--probe-pin' => true])
             ->expectsOutputToContain('pilot families allowed: 1')
             ->expectsOutputToContain('[PASS] O-K / G-02')
-            ->expectsOutputToContain('[PASS] G-05')
+            ->expectsOutputToContain('[PASS] G-05 / D-06R')
             ->expectsOutputToContain('[BLOCKED] G-04')
             ->doesntExpectOutputToContain('987654')
             ->assertExitCode(1);

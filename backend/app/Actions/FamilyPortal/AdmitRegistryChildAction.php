@@ -36,6 +36,7 @@ use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionRequest;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildAdmissibility;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSource;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSourceIntegrityException;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryLifePolicy;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
 use App\Support\FamilyPortal\RegistryAdmission\SuggestedChildrenDiscovery;
 use App\Support\NationalIdGuard;
@@ -110,6 +111,11 @@ final class AdmitRegistryChildAction
         // The active version must name an APPROVED catalogue entry (RR-02): a draft or an
         // unknown version is refused like a missing declaration.
         if (! $request->declarationAccepted || ! RegistryAdmissionDeclarations::accepts($request->declarationVersion)) {
+            throw new Refused(Refused::DECLARATION_REQUIRED);
+        }
+        // RR-02A (D-06R): while the revised life policy is active, every admission carries
+        // the head's separate declaration of current life, before anything is read.
+        if (RegistryLifePolicy::scopeAndDeclarationActive() && ! $request->lifeDeclared) {
             throw new Refused(Refused::DECLARATION_REQUIRED);
         }
         self::assertNoQueryCapture();
@@ -204,6 +210,12 @@ final class AdmitRegistryChildAction
         if (! $admission->admissible() || $admission->parentLink !== $ref->parentLink || $admission->relationship() === null) {
             throw Refused::notEligible($admission->admissible() ? Reason::PARENT_LINK_INDETERMINATE->value : $admission->refusalReason()->value);
         }
+        // RR-02A: a life admitted on the head's declaration needs that declaration, the policy
+        // still active and the release still listed, here under the locks. Never ALIVE.
+        $extractedOn = $admission->livingByDeclaration ? RegistryLifePolicy::extractedOn($ref->releaseId) : null;
+        if ($admission->livingByDeclaration && (! $request->lifeDeclared || $extractedOn === null)) {
+            throw Refused::notEligible(Reason::LIFE_UNVERIFIED->value);
+        }
 
         // An active member anywhere is refused before ⑤ the Person lock (the same lock, re-entrant).
         $identity = FamilyMemberIdentity::resolve($ref->childNationalId());
@@ -217,17 +229,21 @@ final class AdmitRegistryChildAction
 
         $actorId = (int) $context->user->getKey();
         $created = $identity->outcome === FamilyMemberIdentityOutcome::NEW_PERSON;
-        $membership = $created
-            ? $this->add->handle($family, [
-                'full_name' => $admission->fullName,
-                'national_id' => $ref->childNationalId(),
-                'gender' => $admission->gender->value,
-                'marital_status' => $admission->maritalStatus->value,
-                'birth_date' => $admission->birthDate,
-                'relationship_type_id' => RelationshipTypes::required($admission->relationship()),
-            ], $actorId)
+        $data = [
+            'full_name' => $admission->fullName,
+            'national_id' => $ref->childNationalId(),
+            'gender' => $admission->gender->value,
+            'marital_status' => $admission->maritalStatus->value,
+            'birth_date' => $admission->birthDate,
+            'relationship_type_id' => RelationshipTypes::required($admission->relationship()),
+        ];
+        $membership = match (true) {
+            // RR-02A (D-06R): a declared, unverified life is recorded UNKNOWN, never ALIVE.
+            $created && $admission->livingByDeclaration => $this->add->handleWithUnknownLife($family, $data, $actorId),
+            $created => $this->add->handle($family, $data, $actorId),
             // The registry Person is attached as recorded: nothing about them is changed.
-            : $this->attach->handle($family, $identity->person, $admission->relationship(), $actorId);
+            default => $this->attach->handle($family, $identity->person, $admission->relationship(), $actorId),
+        };
 
         $outcome = $created ? Audit::PERSON_CREATED : Audit::PERSON_ATTACHED;
         $reference = Audit::referenceFingerprint($ref->childNationalId());
@@ -246,6 +262,12 @@ final class AdmitRegistryChildAction
             'release_id' => $ref->releaseId,
             'declaration_version' => $request->declarationVersion,
             'declared_at' => now(),
+            // RR-02A: on what the life rests, and for a declared life its approval, the
+            // release's extraction date and when the head declared it.
+            'life_basis' => $admission->livingByDeclaration ? Evidence::LIFE_REGISTRY_SCOPE_DECLARATION : Evidence::LIFE_VERIFIED_SOURCE,
+            'life_policy_reference' => $admission->livingByDeclaration ? RegistryLifePolicy::approvalReference() : null,
+            'registry_extracted_on' => $extractedOn,
+            'life_declared_at' => $request->lifeDeclared ? now() : null,
             'created_at' => now(),
         ]);
         Audit::admissionSucceeded($context->user, $family, $ref->releaseId, $outcome, $ref->childNationalId(), $request->ip);

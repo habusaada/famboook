@@ -14,6 +14,9 @@ use App\Support\CivilLookup\CivilRecord;
  *
  * admissible() needs no reason at all AND a proven living child (D-06: an unproven life
  * is a refusal, never a default), a FATHER / MOTHER link, a mapped gender and a name.
+ * RR-02A (D-06R, proposed): or a child in a living-scope release (`livingByDeclaration`),
+ * which the admission accepts ONLY with the head's declaration of current life and records
+ * with life status UNKNOWN, never ALIVE.
  */
 final class RegistryChildAdmission
 {
@@ -26,6 +29,7 @@ final class RegistryChildAdmission
         public readonly MaritalStatus $maritalStatus,
         public readonly ?string $fullName,
         public readonly ?string $birthDate,
+        public readonly bool $livingByDeclaration = false,
     ) {}
 
     /**
@@ -34,7 +38,7 @@ final class RegistryChildAdmission
      *
      * @param  list<RegistryChildReason>  $reasons
      */
-    public static function of(CivilRecord $record, RegistryChildAssessment $assessment, array $reasons, bool $livingProven): self
+    public static function of(CivilRecord $record, RegistryChildAssessment $assessment, array $reasons, bool $livingProven, bool $livingByDeclaration = false): self
     {
         $marital = CivilRegistryValues::maritalStatus($record->payload['maritalst'] ?? null);
 
@@ -46,12 +50,13 @@ final class RegistryChildAdmission
             $marital->value instanceof MaritalStatus ? $marital->value : MaritalStatus::UNKNOWN,
             CivilRegistryValues::fullName($record),
             CivilRegistryValues::date($record->payload['datebirth'] ?? null),
+            ! $livingProven && $livingByDeclaration,
         );
     }
 
     public function admissible(): bool
     {
-        return $this->reasons === [] && $this->livingProven && in_array($this->parentLink, ['FATHER', 'MOTHER'], true)
+        return $this->reasons === [] && ($this->livingProven || $this->livingByDeclaration) && in_array($this->parentLink, ['FATHER', 'MOTHER'], true)
             && in_array($this->gender, [Gender::MALE, Gender::FEMALE], true) && $this->fullName !== null;
     }
 

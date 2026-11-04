@@ -29,8 +29,14 @@ final class RegistryAdmissionDeclarations
             return null;
         }
         $text = $entry['text'] ?? null;
+        // RR-02A: an optional, separate statement of current life. Present but unusable
+        // makes the whole entry unusable (fail closed), never a declaration without it.
+        $lifeText = $entry['life_text'] ?? null;
+        if ($lifeText !== null && (! is_string($lifeText) || trim($lifeText) === '')) {
+            return null;
+        }
 
-        return is_string($text) && trim($text) !== '' ? new RegistryAdmissionDeclaration($version, $text) : null;
+        return is_string($text) && trim($text) !== '' ? new RegistryAdmissionDeclaration($version, $text, $lifeText) : null;
     }
 
     /** Whether $version is the active, approved one; a constant-time comparison. */

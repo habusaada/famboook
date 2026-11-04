@@ -35,6 +35,13 @@ return [
             'approved' => false,
             'text' => 'أُقرّ بأن هذا الابن / هذه الابنة من أفراد أسرتي ويقيم/تقيم فعليًا ضمن هذه الأسرة، وأن هذا الإقرار صحيح على مسؤوليتي.',
         ],
+        // RR-02A (D-06R, proposed): the same wording plus a SEPARATE statement of current
+        // life (`life_text`), confirmed on its own. Needed only by the revised life policy.
+        '2026-11-draft-2' => [
+            'approved' => false,
+            'text' => 'أُقرّ بأن هذا الابن / هذه الابنة من أفراد أسرتي ويقيم/تقيم فعليًا ضمن هذه الأسرة، وأن هذا الإقرار صحيح على مسؤوليتي.',
+            'life_text' => 'وأُقرّ بأن هذا الابن / هذه الابنة على قيد الحياة في تاريخ هذا الإقرار، وأتحمّل مسؤولية صحة ذلك.',
+        ],
     ],
 
     // Proof of life (RR-02; D-06, G-05). Only an authoritative source bound as
@@ -43,6 +50,23 @@ return [
     // closed.
     'life_verification' => [
         'max_age_hours' => (int) env('FAMILY_REGISTRY_LIFE_EVIDENCE_MAX_AGE_HOURS', 24),
+    ],
+
+    // RR-02A: the life policy (D-06; revision D-06R PROPOSED, not approved).
+    // - VERIFIER_ONLY (default): only an authoritative RegistryLifeVerifier proves a life.
+    // - REGISTRY_SCOPE_AND_DECLARATION: a child of a release whose issuing authority
+    //   described it as living persons only, at extraction, may be admitted on the
+    //   head's explicit declaration of current life. It is NOT proof of life: the Person
+    //   is created with life status UNKNOWN. It counts ONLY with all of: this exact mode,
+    //   an approval reference (the recorded decision), an approved declaration that has
+    //   a `life_text`, and the release listed in `living_scope_releases`
+    //   ("<release id>:<extraction date YYYY-MM-DD>", comma-separated; one malformed
+    //   entry lists nothing). A death date, a deceased answer or a failing verifier
+    //   still refuses.
+    'life_policy' => [
+        'mode' => env('FAMILY_REGISTRY_LIFE_POLICY', 'VERIFIER_ONLY'),
+        'approval_reference' => env('FAMILY_REGISTRY_LIFE_POLICY_APPROVAL'),
+        'living_scope_releases' => env('FAMILY_REGISTRY_LIVING_SCOPE_RELEASES', ''),
     ],
 
     // RR-02: bind the published civil registry (the RR-02 adapter over

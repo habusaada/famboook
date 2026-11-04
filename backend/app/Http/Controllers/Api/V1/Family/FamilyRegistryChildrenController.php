@@ -14,6 +14,7 @@ use App\Support\FamilyPortal\RegistryAdmission\RegistryAdmissionDeclarations;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildAdmissibility;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSource;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryChildSourceIntegrityException;
+use App\Support\FamilyPortal\RegistryAdmission\RegistryLifePolicy;
 use App\Support\FamilyPortal\RegistryAdmission\RegistryReleasePinVerifier;
 use App\Support\FamilyPortal\RegistryAdmission\SuggestedChildrenDiscovery;
 use Illuminate\Http\JsonResponse;
@@ -85,7 +86,8 @@ class FamilyRegistryChildrenController extends Controller
                 'meta' => ['page' => $page->page, 'per_page' => $page->perPage, 'total' => $page->total],
                 // RR-02: the APPROVED declaration to show, {version, text}, or NULL (none
                 // approved: the client keeps its submission disabled).
-                'declaration' => $declaration?->toArray(),
+                // RR-02A: with `life_text` only while the revised life policy is active.
+                'declaration' => $declaration?->toArray(RegistryLifePolicy::scopeAndDeclarationActive()),
             ],
         ])->header('Cache-Control', 'no-store, private');
     }

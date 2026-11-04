@@ -26,6 +26,8 @@ final class RegistryAdmissionRequest implements JsonSerializable
         public readonly string $declarationVersion,
         public readonly bool $declarationAccepted,
         public readonly ?string $ip = null,
+        // RR-02A (D-06R): the head's separate declaration that the child is alive now.
+        public readonly bool $lifeDeclared = false,
     ) {
         if ($ref === '' || strlen($ref) > RegistryAdmissionRefs::MAX_LENGTH) {
             throw new InvalidArgumentException('An admission names its child by a reference.');
@@ -42,7 +44,7 @@ final class RegistryAdmissionRequest implements JsonSerializable
     public function __debugInfo(): array
     {
         return ['ref' => '[redacted]', 'clientReference' => $this->clientReference, 'declarationVersion' => $this->declarationVersion,
-            'declarationAccepted' => $this->declarationAccepted];
+            'declarationAccepted' => $this->declarationAccepted, 'lifeDeclared' => $this->lifeDeclared];
     }
 
     public function jsonSerialize(): never

@@ -34,7 +34,7 @@ vi.mock("next/link", () => ({
 
 // The declaration the server delivers with the list (RR-02): none by default, as the
 // server ships (no approved version); tests that need one deliver a synthetic one.
-const declaration = { value: null as { version: string; text: string } | null };
+const declaration = { value: null as { version: string; text: string; life_text?: string | null } | null };
 
 const SYNTHETIC_DECLARATION = { version: "synthetic-declaration-v0", text: "إقرار تجريبي: هذا الاسم من أفراد أسرتي." };
 const REF_A = "synthetic-ref-a.0000000000000000";
@@ -46,7 +46,11 @@ function child(overrides: Partial<RegistryChild> = {}): RegistryChild {
 }
 
 function page(children: RegistryChild[], meta: Partial<RegistryChildrenPage["meta"]> = {}): RegistryChildrenPage {
-  return { children, meta: { page: 1, per_page: 25, total: children.length, ...meta }, declaration: declaration.value };
+  return {
+    children,
+    meta: { page: 1, per_page: 25, total: children.length, ...meta },
+    declaration: declaration.value ? { life_text: null, ...declaration.value } : null,
+  };
 }
 
 type Discovery = RegistryChildrenPage | Error | ((path: string) => Promise<unknown>);
@@ -334,6 +338,54 @@ describe("the declaration requirement", () => {
 
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0][1]).toMatchObject({ declaration_version: "v-delivered-7", declaration_accepted: true });
+  });
+
+  it("with a delivered life statement (D-06R): a SEPARATE, unchecked confirmation, both required, and life_declaration_accepted sent", async () => {
+    declaration.value = { ...SYNTHETIC_DECLARATION, life_text: "إقرار حياة تجريبي: هذا الاسم على قيد الحياة اليوم." };
+    const user = userEvent.setup();
+    const { post } = renderPage();
+    post.mockResolvedValue(outcome(false));
+    await user.click(await admitButton());
+    const modal = await dialog();
+    const membership = within(modal).getByRole("checkbox", { name: SYNTHETIC_DECLARATION.text });
+    const life = within(modal).getByRole("checkbox", { name: "إقرار حياة تجريبي: هذا الاسم على قيد الحياة اليوم." });
+
+    expect([membership, life].map((box) => (box as HTMLInputElement).checked)).toEqual([false, false]);
+    expect(life).toBeRequired();
+    await user.click(membership);
+    expect(confirmButton()).toBeDisabled();
+    await user.click(life);
+    expect(confirmButton()).toBeEnabled();
+    await user.click(confirmButton());
+
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    const body = post.mock.calls[0][1] as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(["client_reference", "declaration_accepted", "declaration_version", "life_declaration_accepted", "ref"]);
+    expect(body.life_declaration_accepted).toBe(true);
+  });
+
+  it("asks for the life statement again each time, and sends no life field when none is delivered", async () => {
+    declaration.value = { ...SYNTHETIC_DECLARATION, life_text: "إقرار حياة تجريبي." };
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await admitButton());
+    await user.click(within(await dialog()).getByRole("checkbox", { name: "إقرار حياة تجريبي." }));
+    await user.click(screen.getByRole("button", { name: "رجوع" }));
+    await user.click(await admitButton());
+
+    expect(within(await dialog()).getByRole("checkbox", { name: "إقرار حياة تجريبي." })).not.toBeChecked();
+  });
+
+  it.each([
+    ["an empty life statement", ""],
+    ["a non-string life statement", 5],
+  ])("treats %s as no usable declaration", async (_label, lifeText) => {
+    const body = page([child()]);
+    body.declaration = { ...SYNTHETIC_DECLARATION, life_text: lifeText as never };
+    const { post } = renderPage(body);
+
+    expect(await admitButton()).toBeDisabled();
+    expect(post).not.toHaveBeenCalled();
   });
 
   it("does not hard-code a declaration version anywhere in the client", () => {

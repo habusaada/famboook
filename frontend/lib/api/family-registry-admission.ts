@@ -44,7 +44,16 @@ export type RegistryChild = {
  * exact text to show and the version an admission must carry. The client never
  * holds its own wording or version.
  */
-export type RegistryAdmissionDeclaration = { version: string; text: string };
+export type RegistryAdmissionDeclaration = {
+  version: string;
+  text: string;
+  /**
+   * RR-02A (D-06R, proposed): the head's SEPARATE statement that the child is alive
+   * now, delivered only while the revised life policy is active; confirmed with its own
+   * checkbox and sent as life_declaration_accepted. null = not required.
+   */
+  life_text: string | null;
+};
 
 export type RegistryChildrenPage = {
   children: RegistryChild[];
@@ -63,11 +72,13 @@ const DECLARATION_VERSION_MAX = 40;
  */
 export function usableDeclaration(value: unknown): RegistryAdmissionDeclaration | null {
   if (!value || typeof value !== "object") return null;
-  const { version, text } = value as { version?: unknown; text?: unknown };
+  const { version, text, life_text } = value as { version?: unknown; text?: unknown; life_text?: unknown };
   if (typeof version !== "string" || version === "" || version !== version.trim() || version.length > DECLARATION_VERSION_MAX) return null;
   if (typeof text !== "string" || text.trim() === "") return null;
+  // A life statement is either absent / null or a real text: anything else makes the declaration unusable.
+  if (life_text !== undefined && life_text !== null && (typeof life_text !== "string" || life_text.trim() === "")) return null;
 
-  return { version, text };
+  return { version, text, life_text: typeof life_text === "string" ? life_text : null };
 }
 
 /** POST …/admissions: exactly the four fields of FamilyRegistryAdmissionRequest. */
@@ -77,6 +88,8 @@ export type RegistryAdmissionSubmission = {
   client_reference: string;
   declaration_version: string;
   declaration_accepted: true;
+  /** RR-02A: sent only when the delivered declaration has a life_text, and then only as true. */
+  life_declaration_accepted?: true;
 };
 
 /** 201 {replayed: false} for an admission, 200 {replayed: true} for a replay. */

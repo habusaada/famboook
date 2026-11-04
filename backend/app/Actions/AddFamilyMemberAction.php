@@ -41,7 +41,25 @@ class AddFamilyMemberAction
      */
     public function handle(Family $family, #[\SensitiveParameter] array $data, ?int $actingUserId): FamilyMembership
     {
-        return DB::transaction(function () use ($family, $data, $actingUserId) {
+        return $this->add($family, $data, $actingUserId, LifeStatus::ALIVE);
+    }
+
+    /**
+     * The same addition with life status UNKNOWN (FB-FAMILY-ADD-01 RR-02A, D-06R): for the
+     * registry admission's declared, unverified life ONLY, never for client input. Every
+     * other caller uses handle(), which records ALIVE.
+     *
+     * @param  array<string, mixed>  $data  as for handle()
+     */
+    public function handleWithUnknownLife(Family $family, #[\SensitiveParameter] array $data, ?int $actingUserId): FamilyMembership
+    {
+        return $this->add($family, $data, $actingUserId, LifeStatus::UNKNOWN);
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private function add(Family $family, #[\SensitiveParameter] array $data, ?int $actingUserId, LifeStatus $lifeStatus): FamilyMembership
+    {
+        return DB::transaction(function () use ($family, $data, $actingUserId, $lifeStatus) {
             Family::withTrashed()->whereKey($family->id)->lock('for key share')->first();
 
             // Never a second Person with the same National ID (docs/03 §21):
@@ -54,7 +72,7 @@ class AddFamilyMemberAction
                 'gender' => $data['gender'],
                 'marital_status' => $data['marital_status'] ?? MaritalStatus::UNKNOWN->value,
                 'birth_date' => $data['birth_date'] ?? null,
-                'life_status' => LifeStatus::ALIVE->value,
+                'life_status' => $lifeStatus->value,
                 'mobile' => $data['mobile'] ?? null,
                 'alternate_mobile' => $data['alternate_mobile'] ?? null,
             ], $actingUserId);

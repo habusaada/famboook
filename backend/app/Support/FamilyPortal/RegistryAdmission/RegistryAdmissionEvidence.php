@@ -16,6 +16,12 @@ use InvalidArgumentException;
  */
 final class RegistryAdmissionEvidence
 {
+    /** RR-02A: the life of the admitted child was proven by an authoritative verifier. */
+    public const LIFE_VERIFIED_SOURCE = 'VERIFIED_SOURCE';
+
+    /** RR-02A (D-06R): a living-scope release plus the head's declaration; recorded UNKNOWN, never ALIVE. */
+    public const LIFE_REGISTRY_SCOPE_DECLARATION = 'REGISTRY_SCOPE_DECLARATION';
+
     private const TABLE = 'family_registry_admissions';
 
     private function __construct(

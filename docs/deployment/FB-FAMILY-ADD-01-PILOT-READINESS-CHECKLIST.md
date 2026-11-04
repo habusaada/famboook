@@ -21,6 +21,7 @@ authorizes a step. Each step names the decision it needs. Design: `docs/adr/FB-F
 | G-03 parent-link semantics | the adapter reads exact `fatherid` / `motherid` matches only | written confirmation from the registry owner, plus aggregate profiling | Civil registry data owner |
 | G-04 gender codes | mapping provisional (`CivilRegistryValues::MAPPINGS_APPROVED = false`); every child is `NOT_ELIGIBLE` | an authoritative code table, then a reviewed change of the constant | Civil registry data owner |
 | G-05 proof of life | `RegistryLifeVerifier` contract; fails closed (missing, stale, future, undated, unknown, error); none bound | the official source and its freshness rule, then a verifier implementation package | Registry data owner + project owner |
+| D-06R revised life policy (alternative to G-05 for admission only; PROPOSED) | `REGISTRY_SCOPE_AND_DECLARATION` path, OFF by default (§16); a living-scope release plus the head's separate life declaration; recorded UNKNOWN, never ALIVE; evidence of basis, approval, extraction date and declaration time | the issuing authority's written scope statement for each release (for 2026-10-25: reported by the project owner, document to be filed); legal and privacy review; an approved declaration with `life_text`; a recorded approval reference | Project owner + legal and privacy counsel |
 | G-06 tests and security review | PostgreSQL, concurrency and integrity suites pass locally, including DBA-1 … DBA-3 against the real schema | an independent security review of that evidence | Engineering lead + security reviewer |
 | G-07 activation | readiness command; flag, permission and binding are separate switches | a recorded approval naming the commit, mode, allowlist and DBA evidence | Project owner |
 | DBA-1 publication waits for the pin | `deploy/sql/identity-ref/10-registry-admission-pin.dba.sql` | apply and verify (step 3) | DBA |
@@ -40,7 +41,8 @@ authorizes a step. Each step names the decision it needs. Design: `docs/adr/FB-F
 1. **Decisions G-01 … G-05 recorded.** Code changes follow them, each in its own reviewed commit:
    - G-02: the approved declaration version in the catalogue;
    - G-04: the gender table;
-   - G-05: a `RegistryLifeVerifier` and its binding.
+   - G-05: a `RegistryLifeVerifier` and its binding, **or** the D-06R approval (the release scope statement on file, legal
+     review) and an approved declaration version that has a `life_text`.
 2. **G-06 review** of the passing evidence (PostgreSQL suites listed in ADR §16).
 3. **DBA, after a backup**, as the administrator, in the database that holds both the application and `identity_ref`:
    ```bash
@@ -56,7 +58,14 @@ authorizes a step. Each step names the decision it needs. Design: `docs/adr/FB-F
    - `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION=<approved version>`;
    - `FAMILY_REGISTRY_ADMISSION_CIVIL_REGISTRY_BINDING=true`;
    - `FAMILY_REGISTRY_ADMISSION_MODE=PILOT`;
-   - `FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS=<ids>`.
+   - `FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS=<ids>`;
+   - only with the D-06R approval:
+     - `FAMILY_REGISTRY_LIFE_POLICY=REGISTRY_SCOPE_AND_DECLARATION`;
+     - `FAMILY_REGISTRY_LIFE_POLICY_APPROVAL=<decision reference>`;
+     - `FAMILY_REGISTRY_LIVING_SCOPE_RELEASES=<release id>:<extraction date>` (for example the release built from the
+       2026-10-25 export).
+
+     Run the migration `2026_11_04_100000_add_life_basis_to_family_registry_admissions` first.
 6. **Permission.** Grant `family-member.admit-from-registry` only to the pilot accounts, as G-07 records it.
 7. **Readiness.** `php artisan famboook:registry-admission-readiness --probe-pin` must exit 0.
    - Exit 0 approves nothing. It means only that no technical control is open.
@@ -81,6 +90,8 @@ Watch the following, without reading payloads:
   - The entry disappears, because `/me` reports `registry_admission: false`.
   - Discovery and admission answer 404.
   - Existing members and evidence stay. An admitted member is removed only through existing Staff actions.
+- **Stop the revised life policy only:** `FAMILY_REGISTRY_LIFE_POLICY=VERIFIER_ONLY`. Unproven lives are refused again;
+  admitted members stay, recorded UNKNOWN.
 - **Unbind the registry:** `FAMILY_REGISTRY_ADMISSION_CIVIL_REGISTRY_BINDING=false`. Discovery and admission answer 503.
 - **DBA objects:** leaving them in place is safe. DBA-1 only makes publication wait at most `famboook.publication_pin_wait`
   (default 30 s) for running admissions. Removing them is a separate DBA decision.

@@ -5411,3 +5411,4 @@ is handled in the phase named; none changes code or an unrelated rule now.
 | 1.61 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (ADD-WP-08): §14 status note, the screen at `/family/members/registry-children`. Submission disabled; not operational |
 | 1.62 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (RR-01): §14 status note, the entry shown through `/me` `registry_admission`. False as shipped |
 | 1.63 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (RR-02): §14 status note, the declaration delivered by the server. Not operational |
+| 1.64 | 2026-11-04 | Approved | FB-FAMILY-ADD-01 (RR-02A): the screen shows a separate statement of current life when the server delivers one (proposed D-06R, OFF by default). Not operational |

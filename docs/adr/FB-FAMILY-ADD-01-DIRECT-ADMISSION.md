@@ -83,6 +83,27 @@ schemas have no runtime effect and can change in review.
 | D-05 | Discovery does not consume the general civil lookup quota. It has independent rate limiting and auditing |
 | D-06 | An active living membership is never created automatically for a deceased child. Uncertain death status fails closed |
 
+**Proposed revision D-06R (RR-02A, 2026-11-04; PROPOSED, NOT approved; implemented behind a separate switch, OFF by default).**
+
+- **Basis.** The project owner reports that the civil registry export dated 2026-10-25 was described by its issuing authority
+  as containing living persons only. That establishes the release's **scope at extraction**. It is **not** proof that any
+  person is alive now.
+- **Rule.** Under D-06R a child may be admitted without a verified life only when every condition below holds:
+  - a known death refuses (a valid `deathdate`);
+  - contradictory or unreadable evidence refuses (an unreadable `deathdate`, a verifier that says DECEASED, a verifier that
+    fails);
+  - the child is in a release recorded with its extraction date as a living-scope release;
+  - the household head makes a **separate, explicit declaration** that the child is alive now.
+- **Recording.** The child is recorded with life status **UNKNOWN**, never ALIVE. NULL or unknown is never equated with alive.
+- **Unchanged.** D-06 itself is unchanged, and the authoritative verifier path (G-05) is not bypassed: when it proves a life it
+  is used, and when it refuses, the refusal stands.
+- **Activation.** D-06R needs its own recorded approval:
+  - the documented scope statement of each release;
+  - the legal and privacy review of a declared, unverified life;
+  - its approval reference in `FAMILY_REGISTRY_LIFE_POLICY_APPROVAL`.
+
+  No such approval exists. Implementation: §16, "Revised life policy (D-06R)".
+
 **Business rules approved with them:**
 
 - all sons and daughters are in scope, regardless of age or marital status;
@@ -187,7 +208,9 @@ admission, inside the locks of §10. Any failure refuses the admission.
 - an empty `deathdate` is therefore **not yet proof of life**;
 - until G-05 defines what proves it, E-6 cannot pass for anyone, and activation stays
   blocked;
-- this flow never creates a DECEASED Person.
+- this flow never creates a DECEASED Person;
+- the proposed revision D-06R (§1) would let E-6 pass on a living-scope release plus the head's declaration of current life,
+  recording UNKNOWN. It is off by default and not approved.
 
 **Registry values are not interpreted beyond the verified tables:**
 
@@ -1152,8 +1175,40 @@ runbook are `docs/deployment/FB-FAMILY-ADD-01-PILOT-READINESS-CHECKLIST.md`.
     only.
 - **DBA-4.** It stays an operations guarantee. `famboook:registry-admission-readiness --probe-pin` proves it at the moment of
   the probe only.
+- **Revised life policy (D-06R; RR-02A; PROPOSED, OFF by default).** `RegistryLifePolicy` is active only when all of these
+  hold:
+  - `life_policy.mode` is exactly `REGISTRY_SCOPE_AND_DECLARATION`;
+  - an approval reference is set;
+  - the active, approved declaration has a `life_text`.
+
+  How it applies:
+  - **Releases.** A release counts only when `living_scope_releases` lists it with its extraction date
+    (`<release id>:<YYYY-MM-DD>`). One malformed, duplicate, impossible or future entry lists nothing.
+  - **Life status.** `RegistryLifeStatus` gives `DECLARATION_IN_SCOPE` only when the registry has no death evidence, and the
+    verifier is unbound or answered without proof (UNKNOWN, stale or undated). A death date, a DECEASED answer or a failing
+    verifier still refuses. `DECLARATION_IN_SCOPE` adds no reason but is not a proven life.
+  - **Contracts.**
+    - Discovery delivers the separate statement as `data.declaration.life_text`, only while the policy is active.
+    - The admission request takes an optional `life_declaration_accepted`: the JSON `true` only.
+    - While the policy is active, every admission must carry `life_declaration_accepted`, or it is
+      `422 DECLARATION_REQUIRED` before anything is read.
+  - **Under the locks.** A declared life needs the declaration, the policy and the listed release once more.
+  - **Recording.** The Person is created with life status `UNKNOWN`, through the separate
+    `AddFamilyMemberAction::handleWithUnknownLife()`. `handle()` is unchanged and still records ALIVE for every other caller.
+  - **Evidence** (migration `2026_11_04_100000_add_life_basis_to_family_registry_admissions`, additive, append-only unchanged):
+    - `life_basis` (`VERIFIED_SOURCE` or `REGISTRY_SCOPE_DECLARATION`);
+    - `life_policy_reference`;
+    - `registry_extracted_on`;
+    - `life_declared_at`;
+    - next to the actor, the release, `declaration_version` and `declared_at`.
+
+    PostgreSQL CHECKs keep a declared life complete and a verified life free of scope fields.
+  - **Unchanged.** Uniqueness, the National ID and Family locks, eligibility E-3 … E-9, audit, replay and limits.
+  - **Catalogue.** Draft `2026-11-draft-2` holds the separate life statement for approval; it is not approved.
 - **Readiness command.** `famboook:registry-admission-readiness` is read-only and prints counts and PASS / BLOCKED only. Exit
-  0 means no technical control is open; it approves nothing.
+  0 means no technical control is open; it approves nothing. RR-02A adds the effective life policy, whether an approval
+  reference is recorded and the number of living-scope releases. The life basis passes with a bound verifier, or with the
+  revised policy active and a listed release.
 - **Evidence (G-06), on PostgreSQL in the disposable cluster.** `RegistryAdmissionCivilRegistryPostgresTest` covers:
   - DBA-1, DBA-2 and DBA-3 against the real schema;
   - the adapter over the real lookup functions;

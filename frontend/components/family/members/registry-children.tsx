@@ -192,6 +192,8 @@ function AdmissionDialog({
   declaration,
   accepted,
   onAccept,
+  lifeAccepted,
+  onLifeAccept,
   error,
   pending,
   onSubmit,
@@ -201,6 +203,8 @@ function AdmissionDialog({
   declaration: RegistryAdmissionDeclaration | null;
   accepted: boolean;
   onAccept: (accepted: boolean) => void;
+  lifeAccepted: boolean;
+  onLifeAccept: (accepted: boolean) => void;
   error: string | null;
   pending: boolean;
   onSubmit: () => void;
@@ -241,6 +245,20 @@ function AdmissionDialog({
             نص الإقرار غير متاح حاليًا، فلا يمكن إتمام الإضافة.
           </p>
         )}
+        {/* RR-02A: the separate statement of current life, confirmed on its own. */}
+        {declaration?.life_text && (
+          <label className="flex items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-sm text-foreground" data-registry-life-declaration>
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 shrink-0 accent-brand-600"
+              checked={lifeAccepted}
+              onChange={(event) => onLifeAccept(event.target.checked)}
+              disabled={pending}
+              aria-required
+            />
+            <span>{declaration.life_text}</span>
+          </label>
+        )}
 
         {error && (
           <Alert variant="destructive" data-registry-admission-error>
@@ -254,7 +272,12 @@ function AdmissionDialog({
           <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
             رجوع
           </Button>
-          <Button type="button" onClick={onSubmit} disabled={!declaration || !accepted || pending} data-registry-admission-confirm>
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={!declaration || !accepted || (declaration.life_text !== null && !lifeAccepted) || pending}
+            data-registry-admission-confirm
+          >
             {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {pending ? "جارٍ الإضافة…" : error ? "إعادة المحاولة" : "تأكيد الإضافة"}
           </Button>
@@ -295,6 +318,7 @@ export function RegistryChildren() {
   useFamilyAccessFailure(admit.error);
   const [candidate, setCandidate] = useState<RegistryChild | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [lifeAccepted, setLifeAccepted] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
@@ -316,6 +340,7 @@ export function RegistryChildren() {
     setNotice(null);
     setDialogError(null);
     setAccepted(false); // never preselected
+    setLifeAccepted(false);
     setCandidate(child);
   }
 
@@ -326,17 +351,24 @@ export function RegistryChildren() {
   }
 
   function submit() {
-    if (sending.current || !candidate || !admissible(candidate) || !declaration || !accepted) return;
+    const lifeRequired = declaration?.life_text != null;
+    if (sending.current || !candidate || !admissible(candidate) || !declaration || !accepted || (lifeRequired && !lifeAccepted)) return;
     const ref = candidate.ref as string;
     const name = candidate.display_name ?? UNNAMED;
-    const key = JSON.stringify([ref, declaration.version]);
+    const key = JSON.stringify([ref, declaration.version, lifeRequired]);
     const reference = attempts.current.get(key) ?? crypto.randomUUID();
     attempts.current.set(key, reference);
 
     sending.current = true;
     setDialogError(null);
     admit.mutate(
-      { ref, client_reference: reference, declaration_version: declaration.version, declaration_accepted: true },
+      {
+        ref,
+        client_reference: reference,
+        declaration_version: declaration.version,
+        declaration_accepted: true,
+        ...(lifeRequired ? { life_declaration_accepted: true as const } : {}),
+      },
       {
         onSettled: () => {
           sending.current = false;
@@ -444,6 +476,8 @@ export function RegistryChildren() {
         declaration={declaration}
         accepted={accepted}
         onAccept={setAccepted}
+        lifeAccepted={lifeAccepted}
+        onLifeAccept={setLifeAccepted}
         error={dialogError}
         pending={admit.isPending}
         onSubmit={submit}
