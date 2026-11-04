@@ -7,6 +7,7 @@ use App\Actions\RegisterFamilyAction;
 use App\Models\Family;
 use App\Models\Person;
 use App\Models\RelationshipType;
+use App\Models\User;
 use App\Support\BusinessIdentifier;
 use Database\Seeders\RelationshipTypeSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -64,9 +65,15 @@ class PublicIdentifierTest extends TestCase
         return $family->householdHeadMembership()->first()->person;
     }
 
-    /** Pushes the table's autoincrement sequence past max(id) (SQLite). */
+    /** Pushes the table's id sequence past max(id) (SQLite autoincrement or PostgreSQL sequence). */
     private function advanceSequence(string $table, int $by): void
     {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::selectOne("select setval(pg_get_serial_sequence(?, 'id'), ?)", [$table, (int) DB::table($table)->max('id') + $by]);
+
+            return;
+        }
+
         DB::table('sqlite_sequence')->updateOrInsert(
             ['name' => $table],
             ['seq' => (int) DB::table($table)->max('id') + $by]
@@ -163,7 +170,7 @@ class PublicIdentifierTest extends TestCase
     public function test_family_and_person_apis_still_use_public_codes(): void
     {
         $family = $this->register();
-        $admin = \App\Models\User::factory()->create();
+        $admin = User::factory()->create();
         $admin->assignRole('SUPER_ADMIN');
 
         $this->actingAs($admin)->getJson("/api/v1/families/{$family->family_code}")

@@ -152,8 +152,9 @@ class NotificationOperationsTemplatesTest extends TestCase
         $units = array_map('basename', glob(base_path('../deploy/systemd/*')));
         sort($units);
         // The civil identity import worker (FB-CIVIL-01A-UI U2, ADR §4) is a separate, non-queue unit.
-        $this->assertSame(['famboook-identity-import-worker.service', 'famboook-notifications-worker.service', 'famboook-scheduler.service',
-            'famboook-scheduler.timer'], $units);
+        // The Next.js unit and its release drop-in (FB-DEVOPS-01) are neither a scheduler nor a worker.
+        $this->assertSame(['famboook-frontend.service', 'famboook-frontend.service.d', 'famboook-identity-import-worker.service',
+            'famboook-notifications-worker.service', 'famboook-scheduler.service', 'famboook-scheduler.timer'], $units);
         // The health script watches the one worker unit (O1).
         $this->assertStringContainsString('UNIT="famboook-notifications-worker"', $this->deploy('scripts/notifications-health.sh'));
     }

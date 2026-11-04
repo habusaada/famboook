@@ -2,6 +2,7 @@
 
 namespace Tests\Support\Notifications;
 
+use App\Models\Clan;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use PDOException;
@@ -86,10 +87,15 @@ trait NotificationActorProcesses
         return trim((string) fgets($this->children[$child]['pipes'][1]));
     }
 
-    /** Resets the session lock_timeout and truncates (DatabaseTruncation). */
+    /**
+     * Resets the session lock_timeout and truncates (DatabaseTruncation). `clans` is kept
+     * for its migration-created row, so the Clans a test created (TEST_CLAN, OTHER_CLAN) are
+     * removed here; left committed, they broke every later test that creates them.
+     */
     private function resetConcurrencyDatabase(): void
     {
         DB::statement('RESET lock_timeout');
         $this->truncateTablesForAllConnections();
+        DB::table('clans')->where('code', '<>', Clan::AL_BREEM)->delete();
     }
 }
