@@ -220,6 +220,27 @@ class RegistryAdmissionCivilRegistryPostgresTest extends TestCase
             fn () => DB::select('SELECT * FROM identity_ref_lookup.release_pin_held(1, 1)'))), 'the application role cannot call it');
     }
 
+    // ---------------------------------------------------------------- readiness probe
+
+    public function test_the_readiness_probe_proves_dba_1_to_4_and_needs_the_active_release_listed_under_d06r(): void
+    {
+        $r1 = $this->publishedRelease(['111111118' => []]);
+        config(['family_registry_admission.civil_registry_binding' => true, 'app.debug' => false,
+            ...SyntheticDeclaration::revisedLifePolicy(self::DECLARATION, ($r1 + 1000).':2026-10-25')]);
+        RegistryAdmissionBindings::register($this->app);
+        $this->artisan('famboook:registry-admission-readiness', ['--probe-pin' => true])
+            ->expectsOutputToContain('[PASS] DBA-1')
+            ->expectsOutputToContain('[PASS] DBA-2')
+            ->expectsOutputToContain('[PASS] DBA-3 / 4')
+            ->expectsOutputToContain('[BLOCKED] D-06R       the active release is a listed living-scope release')
+            ->assertExitCode(1);
+
+        config(['family_registry_admission.life_policy.living_scope_releases' => $r1.':2026-10-25']);
+        $this->artisan('famboook:registry-admission-readiness', ['--probe-pin' => true])
+            ->expectsOutputToContain('[PASS] D-06R       the active release is a listed living-scope release')
+            ->assertExitCode(1);
+    }
+
     // ---------------------------------------------------------------- the adapter
 
     public function test_the_adapter_reads_the_published_release_through_the_lookup_functions(): void

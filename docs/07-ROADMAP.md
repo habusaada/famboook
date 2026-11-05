@@ -4988,6 +4988,17 @@ PWA-0, PWA-1A and PWA-1B are done. PWA-1 is implemented as slices PWA-1C … PWA
 ### RM-ADR-043
 TweetsMS SMS delivery is delivered between PWA-1H and PWA-1I without a slice letter. It sends after the response without a queue, so the Production activation gate no longer needs a queue worker for SMS; configuring and validating TweetsMS on the server and the scheduler cron remain Production prerequisites.
 
+### RM-ADR-090
+FB-FAMILY-ADD-01 RR-04 (2026-11-05): release completion, local (ADR §16 "Release completion").
+- DBA precheck, verification and rollback scripts for DBA-1 … DBA-4, with PostgreSQL tests.
+- A per-account PILOT grant command.
+- PILOT scope checks in the readiness command, and the listed-active-release check under D-06R.
+- Decision register and approval artifacts (`docs/decisions/FB-FAMILY-ADD-01-ACTIVATION-DECISIONS.md`) and the completed
+  runbook.
+
+No approval, activation, permission grant, DBA execution or Production change. The shipped catalogue and
+`MAPPINGS_APPROVED` are unchanged. G-01 … G-07, D-06R and DBA-1 … DBA-4 remain OPEN.
+
 ### RM-ADR-089
 FB-FAMILY-ADD-01 RR-02A (2026-11-04): the proposed revision D-06R of the life policy, local and uncommitted (ADR §1 D-06R, §16). Basis: the issuing authority described the 2026-10-25 export as living persons only, which establishes scope at extraction, not current life. It adds:
 - `RegistryLifePolicy` (`REGISTRY_SCOPE_AND_DECLARATION`; mode, approval reference, approved declaration with `life_text` and listed release all required; OFF by default);

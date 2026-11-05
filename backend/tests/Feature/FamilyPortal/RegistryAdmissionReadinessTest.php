@@ -463,6 +463,25 @@ class RegistryAdmissionReadinessTest extends TestCase
         preg_match('/(CREATE OR REPLACE FUNCTION identity_ref_lookup\.release_pin_held.*?\$\$;)/s', RegistryReleasePinContractTest::documentedDba3(), $adr);
         $this->assertSame(trim($normalize($adr[1] ?? 'missing')), trim($normalize($ours[1] ?? 'missing')));
     }
+
+    public function test_the_rollback_restores_publish_release_verbatim_and_the_checks_change_nothing(): void
+    {
+        $sql = static fn (string $f) => str_replace("\r\n", "\n", (string) file_get_contents(base_path('../deploy/sql/identity-ref/'.$f)));
+        $function = static function (string $text): string {
+            preg_match('/FUNCTION identity_ref\.publish_release\(p_release bigint\).*?\n\$\$;\n/s', $text, $m);
+
+            return $m[0] ?? '';
+        };
+        $original = $function($sql('01-schema.sql'));
+        $this->assertNotSame('', $original);
+        $this->assertSame($original, $function($sql('13-registry-admission-pin-rollback.dba.sql')));
+
+        // The precheck and the verification are read-only: no DDL, DML, grant or role change outside comments.
+        foreach (['11-registry-admission-pin-precheck.sql', '12-registry-admission-pin-verify.sql'] as $file) {
+            $code = preg_replace('/--[^\n]*/', '', $sql($file));
+            $this->assertDoesNotMatchRegularExpression('/\b(CREATE|ALTER|DROP|GRANT|REVOKE|INSERT|UPDATE|DELETE|TRUNCATE|SET ROLE|set_config)\b/i', (string) $code, $file);
+        }
+    }
 }
 
 /** A fake CivilRegistrySource for the adapter: synthetic children of one parent, read in pages. */

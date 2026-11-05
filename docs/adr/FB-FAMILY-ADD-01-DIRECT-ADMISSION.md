@@ -1216,3 +1216,21 @@ runbook are `docs/deployment/FB-FAMILY-ADD-01-PILOT-READINESS-CHECKLIST.md`.
     a draft declaration refused.
 
   G-04 and G-05 are lifted there only by the test-only admissibility. `RegistryAdmissionReadinessTest` covers both drivers.
+- **Release completion (RR-04, 2026-11-05; local).** No admission rule, contract, migration or default changes, and every
+  gate stays OPEN. RR-04 adds:
+  - **DBA procedure:**
+    - `11-registry-admission-pin-precheck.sql` (read-only): a primary, both sides in one database (DBA-4), lookup
+      installed, no publication running, a published active release;
+    - `12-registry-admission-pin-verify.sql` (read-only): DBA-1 … DBA-3 definitions and privileges, plus DBA-4 at that
+      moment;
+    - `13-registry-admission-pin-rollback.dba.sql`: restores `publish_release()` verbatim from `01-schema.sql`, drops
+      DBA-2 and DBA-3, and refuses while a pin or publication lock is held.
+
+    PostgreSQL evidence: `RegistryAdmissionPinScriptsPostgresTest`.
+  - **Pilot grant:** `famboook:registry-admission-pilot-access`, per account only (docs/06 §61d-2).
+  - **Readiness, in PILOT:** BLOCKED when the allowlist is empty, when a role holds the permission, or when a holder is
+    outside the pilot.
+  - **Readiness, `--probe-pin` with D-06R active and no verifier:** BLOCKED when the active release is not listed.
+  - **Approval artifacts:** `docs/decisions/FB-FAMILY-ADD-01-ACTIVATION-DECISIONS.md`. This holds the exact declaration
+    to approve (`2026-11-draft-2`, to be approved as the new version `2026-11-v1`), the gender table to confirm, and the
+    evidence each gate needs.

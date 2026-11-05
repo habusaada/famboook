@@ -3083,6 +3083,28 @@ family-member.admit-from-registry   FAMILY_USER only
   G-01 … G-07.
 - `famboook:verify-permissions` compares with the seeder, not with a fixed number. The catalog is now 179 (§98).
 
+**PILOT grant (RR-04, prepared; needs G-07).** During a pilot the permission reaches accounts one by one, never through a
+role. The role grant above stays a proposal for `ON`.
+
+```text
+php artisan famboook:registry-admission-pilot-access grant --family=<FAM-code> --approval=<G-07 reference>
+php artisan famboook:registry-admission-pilot-access revoke --family=<FAM-code>
+php artisan famboook:registry-admission-pilot-access revoke-all
+```
+
+- The account is chosen by the command from the Family: the one account of its eligible household head, whose resolved
+  Family context is that Family. The operator never names a user.
+- A grant is refused, with nothing changed, in these cases:
+  - the Family is not in `FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS`;
+  - any role holds the permission;
+  - there is not exactly one eligible account;
+  - there is no approval reference.
+- Each grant and revocation is logged with internal ids and the approval reference, and never a National ID.
+- In `PILOT`, `famboook:registry-admission-readiness` BLOCKS in three cases:
+  - the allowlist is empty;
+  - a role holds the permission;
+  - no account holds it, or a holder is not the eligible head of an allowlisted Family.
+
 ---
 
 # 62. System Administration Permissions

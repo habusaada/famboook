@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Enums\FamilyRegistryAdmissionMode;
+use App\Models\User;
 use App\Support\CivilLookup\CivilRegistryReader;
 use App\Support\CivilLookup\CivilRegistrySource;
+use App\Support\FamilyAuth\FamilyAccessResolver;
 use App\Support\FamilyPortal\FamilyRegistryAdmissionPolicy;
 use App\Support\FamilyPortal\RegistryAdmission\CivilRegistryValues;
 use App\Support\FamilyPortal\RegistryAdmission\PostgresRegistryReleasePin;
@@ -29,7 +31,12 @@ use Throwable;
  * rolled-back transaction and asks the lookup login whether it sees it: a positive answer
  * proves DBA-3 is applied and that both connections reach the same database NOW (DBA-4
  * at this moment, not under failover). It also checks the catalogue for DBA-1 and DBA-2.
- * It reads no registry record.
+ * It reads no registry record. With the revised life policy active and no verifier bound,
+ * the active release must be a listed living-scope release (RR-04).
+ *
+ * In PILOT (RR-04, G-07) it also blocks an empty allowlist, a role holding the admission
+ * permission, and a pilot without holders or with a holder who is not the eligible head of
+ * an allowlisted Family (famboook:registry-admission-pilot-access grants per account).
  */
 class RegistryAdmissionReadiness extends Command
 {
@@ -78,6 +85,9 @@ class RegistryAdmissionReadiness extends Command
         $this->check('LOOKUP', 'the lookup login is configured', $lookupReady, 'no lookup database or credentials file (CIVIL_LOOKUP_CREDENTIALS_FILE)');
         $this->check('KEY', 'the reference fingerprint key is configured', is_string(config('family_auth.fingerprint.key')) && config('family_auth.fingerprint.key') !== '', 'FAMILY_AUTH_FINGERPRINT_KEY is not set');
         $this->check('DEBUG', 'APP_DEBUG is off (no query capture)', config('app.debug') !== true, 'APP_DEBUG is on: every admission refuses to run');
+        if ($mode === FamilyRegistryAdmissionMode::PILOT) {
+            $this->pilotScope($permission);
+        }
 
         if ($this->option('probe-pin')) {
             $this->probe();
@@ -140,6 +150,38 @@ class RegistryAdmissionReadiness extends Command
             $this->check('DBA-3 / 4', 'the lookup login sees this session\'s pin now', true, '');
         } catch (Throwable $e) {
             $this->check('DBA-3 / 4', 'the lookup login sees this session\'s pin now', false, 'probe failed ('.class_basename($e).')');
+
+            return;
         }
+        // D-06R without a verifier: the ACTIVE release must be the listed one, or every child is refused.
+        if (RegistryLifePolicy::scopeAndDeclarationActive() && ! app()->bound(RegistryLifeVerifier::class)) {
+            $this->check('D-06R', 'the active release is a listed living-scope release', RegistryLifePolicy::extractedOn((int) $release) !== null,
+                'FAMILY_REGISTRY_LIVING_SCOPE_RELEASES does not list the active release');
+        }
+    }
+
+    /**
+     * PILOT only (G-07): an allowlist, the admission permission held by no role, and every
+     * direct holder the eligible household head of an allowlisted Family. Counts only.
+     */
+    private function pilotScope(?Permission $permission): void
+    {
+        $allowed = (array) config('family_registry_admission.pilot_family_ids');
+        $this->check('ALLOWLIST', 'the pilot Family allowlist is not empty', $allowed !== [], 'FAMILY_REGISTRY_ADMISSION_PILOT_FAMILY_IDS lists no Family');
+        $this->check('SCOPE', 'no role holds the admission permission', ($permission?->roles()->count() ?? 0) === 0,
+            'a role holds family-member.admit-from-registry (a PILOT grant is per account only)');
+        $holders = $permission === null ? collect() : User::query()
+            ->whereIn('id', DB::table('model_has_permissions')->where('permission_id', $permission->getKey())
+                ->where('model_type', (new User)->getMorphClass())->select('model_id'))
+            ->get();
+        $resolver = app(FamilyAccessResolver::class);
+        $outside = $holders->reject(function (User $user) use ($resolver) {
+            $context = $resolver->familyContext($user);
+
+            return FamilyRegistryAdmissionPolicy::allowsAccount($user, $context);
+        })->count();
+        $this->line(sprintf('  pilot accounts holding the permission: %d; of them outside the pilot: %d', $holders->count(), $outside));
+        $this->check('GRANTS', 'every holder is an allowlisted household head', $holders->isNotEmpty() && $outside === 0,
+            $holders->isEmpty() ? 'no pilot account holds the permission' : 'a holder is not the eligible head of an allowlisted Family');
     }
 }
