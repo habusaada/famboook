@@ -19,7 +19,7 @@ activated.** Nothing here authorizes a step. Each step names the decision it nee
 | Gate | Technical state (RR-02) | Still needed | Owner |
 |---|---|---|---|
 | G-01 legal basis | none possible | recorded legal decision for this purpose | Project owner + legal counsel |
-| G-02 privacy, adult children, declaration wording | the catalogue holds draft `2026-11-draft-1` (ADR §6 wording), `approved: false`; delivered and accepted only once approved | approved wording; then a reviewed commit adding or approving the version and setting `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION` | Project owner + legal and privacy counsel |
+| G-02 privacy, adult children, declaration wording | wording approved 2026-11-05: catalogue version `2026-11-v1`, `approved: true` (drafts kept unapproved); delivered only once `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION` names it | the privacy / legal review for adult children (still open); then set `FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION=2026-11-v1` under G-07 | Project owner + legal and privacy counsel |
 | G-03 parent-link semantics | the adapter reads exact `fatherid` / `motherid` matches only | written confirmation from the registry owner, plus aggregate profiling | Civil registry data owner |
 | G-04 gender codes | mapping provisional (`CivilRegistryValues::MAPPINGS_APPROVED = false`); every child is `NOT_ELIGIBLE` | an authoritative code table, then a reviewed change of the constant | Civil registry data owner |
 | G-05 proof of life | `RegistryLifeVerifier` contract; fails closed (missing, stale, future, undated, unknown, error); none bound | the official source and its freshness rule, then a verifier implementation package | Registry data owner + project owner |
@@ -45,7 +45,7 @@ both the application and `identity_ref` (`famboook`). `psql` runs as the databas
 from a recorded decision.
 
 1. **Decisions recorded** (decision register, items 1 – 5). Code changes follow them, each in its own reviewed commit:
-   - G-02: the approved declaration `2026-11-v1` (register §3);
+   - G-02: the declaration `2026-11-v1` (register §3): wording approved and committed; the privacy / legal review is still required;
    - G-04: `MAPPINGS_APPROVED = true` (register §4);
    - G-05: a `RegistryLifeVerifier` and its binding, **or** the D-06R approval (register item 5).
 

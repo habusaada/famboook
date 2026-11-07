@@ -93,10 +93,33 @@ class RegistryAdmissionReadinessTest extends TestCase
 
     // ---------------------------------------------------------------- declaration (O-K, G-02)
 
-    public function test_the_shipped_catalogue_holds_only_the_unapproved_adr_draft_and_delivers_nothing(): void
+    public function test_the_shipped_catalogue_approves_only_2026_11_v1_with_the_draft_2_wording_verbatim(): void
+    {
+        // G-02 wording approved 2026-11-05: 2026-11-v1 carries draft-2's two texts, byte for byte.
+        $catalogue = RegistryAdmissionDeclarations::catalogue();
+        $this->assertSame([self::DRAFT, '2026-11-draft-2', '2026-11-v1'], array_keys($catalogue));
+        $this->assertSame(['2026-11-v1'], array_keys(array_filter($catalogue, fn ($entry) => ($entry['approved'] ?? null) === true)));
+        $this->assertSame(['approved', 'text', 'life_text'], array_keys($catalogue['2026-11-v1']));
+        $this->assertSame($catalogue['2026-11-draft-2']['text'], $catalogue['2026-11-v1']['text']);
+        $this->assertSame($catalogue['2026-11-draft-2']['life_text'], $catalogue['2026-11-v1']['life_text']);
+        $this->assertSame('أُقرّ بأن هذا الابن / هذه الابنة من أفراد أسرتي ويقيم/تقيم فعليًا ضمن هذه الأسرة، وأن هذا الإقرار صحيح على مسؤوليتي.', $catalogue['2026-11-v1']['text']);
+        $this->assertSame('وأُقرّ بأن هذا الابن / هذه الابنة على قيد الحياة في تاريخ هذا الإقرار، وأتحمّل مسؤولية صحة ذلك.', $catalogue['2026-11-v1']['life_text']);
+
+        // Nothing is delivered until the environment names it (no default) …
+        $this->assertNull(config('family_registry_admission.declaration_version'));
+        $this->assertNull(RegistryAdmissionDeclarations::active());
+        // … and once named it is delivered with its separate statement of current life.
+        config(['family_registry_admission.declaration_version' => '2026-11-v1']);
+        $this->assertSame(['version' => '2026-11-v1', 'text' => $catalogue['2026-11-v1']['text'], 'life_text' => $catalogue['2026-11-v1']['life_text']],
+            RegistryAdmissionDeclarations::active()?->toArray(true));
+        $this->assertTrue(RegistryAdmissionDeclarations::accepts('2026-11-v1'));
+        $this->assertFalse(RegistryAdmissionDeclarations::accepts('2026-11-draft-2'));
+        config(['family_registry_admission.declaration_version' => null]);
+    }
+
+    public function test_the_drafts_stay_unapproved_and_deliver_nothing(): void
     {
         // RR-02A adds draft-2: the same wording plus a separate statement of current life. Neither is approved.
-        $this->assertSame([self::DRAFT, '2026-11-draft-2'], array_keys(RegistryAdmissionDeclarations::catalogue()));
         $this->assertFalse(RegistryAdmissionDeclarations::catalogue()[self::DRAFT]['approved']);
         $this->assertFalse(RegistryAdmissionDeclarations::catalogue()['2026-11-draft-2']['approved']);
         $this->assertSame(self::ADR_TEXT, RegistryAdmissionDeclarations::catalogue()['2026-11-draft-2']['text']);

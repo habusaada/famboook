@@ -306,6 +306,11 @@ VERIFIED state and no eligibility for any programme (BD-052).
 **Prepared for approval (RR-02; NOT approved).** The wording above is catalogued as version `2026-11-draft-1` with
 `approved: false`.
 
+**Wording approved (2026-11-05; G-02 wording only).** The Famboook administration approved the membership statement above
+and the separate life statement of `2026-11-draft-2` verbatim. They are catalogued as version `2026-11-v1`, `approved: true`;
+the drafts stay unapproved. The G-02 privacy / legal review for adult children is still open (decision register item 2),
+and the version is delivered only when the environment names it under G-07.
+
 - **Catalogue.** It lives in `family_registry_admission.declarations`, in the committed config file, through
   `RegistryAdmissionDeclarations`. A version's text never changes; a new wording is a new version.
 - **Approval.** `approved` becomes true only in a reviewed commit that records the G-02 decision, never through `.env`.

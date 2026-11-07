@@ -42,6 +42,16 @@ return [
             'text' => 'أُقرّ بأن هذا الابن / هذه الابنة من أفراد أسرتي ويقيم/تقيم فعليًا ضمن هذه الأسرة، وأن هذا الإقرار صحيح على مسؤوليتي.',
             'life_text' => 'وأُقرّ بأن هذا الابن / هذه الابنة على قيد الحياة في تاريخ هذا الإقرار، وأتحمّل مسؤولية صحة ذلك.',
         ],
+        // G-02 WORDING approved by the Famboook administration on 2026-11-05 (decision register
+        // §3): the two texts of 2026-11-draft-2, character for character. This approves the
+        // wording only; the privacy / legal review for adult children (G-02, register item 2)
+        // is still OPEN. It is delivered only when FAMILY_REGISTRY_ADMISSION_DECLARATION_VERSION
+        // names it, and it activates nothing (mode, binding and the other gates still decide).
+        '2026-11-v1' => [
+            'approved' => true,
+            'text' => 'أُقرّ بأن هذا الابن / هذه الابنة من أفراد أسرتي ويقيم/تقيم فعليًا ضمن هذه الأسرة، وأن هذا الإقرار صحيح على مسؤوليتي.',
+            'life_text' => 'وأُقرّ بأن هذا الابن / هذه الابنة على قيد الحياة في تاريخ هذا الإقرار، وأتحمّل مسؤولية صحة ذلك.',
+        ],
     ],
 
     // Proof of life (RR-02; D-06, G-05). Only an authoritative source bound as

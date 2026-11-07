@@ -34,6 +34,25 @@ class CivilRegistryValuesTest extends TestCase
         $this->assertSame(S::MISSING, V::gender('')->status);
     }
 
+    public function test_the_gender_table_is_exactly_the_three_observed_codes_pinned_by_their_bytes(): void
+    {
+        // G-04 (still open): the table under review is exactly these three stored values, as UTF-8
+        // bytes, so a normalized, re-encoded or added code fails here rather than mapping silently.
+        $this->assertSame([
+            "\u{0630}\u{0643}\u{0631}" => Gender::MALE,                                         // ذكر
+            "\u{0623}\u{0646}\u{062B}\u{0649}" => Gender::FEMALE,                               // أنثى
+            "\u{063A}\u{064A}\u{0631} \u{0645}\u{0639}\u{0631}\u{0648}\u{0641}" => null,         // غير معروف
+        ], V::GENDER);
+        // MALE and FEMALE only; unknown, null and empty never carry a value.
+        foreach (["\u{063A}\u{064A}\u{0631} \u{0645}\u{0639}\u{0631}\u{0648}\u{0641}", null, ''] as $raw) {
+            $this->assertNull(V::gender($raw)->value, var_export($raw, true));
+        }
+        // Decomposed or presentation forms of the same letters are other values, never these.
+        foreach (["\u{0627}\u{0654}\u{0646}\u{062B}\u{0649}", "\u{FEAB}\u{FEDB}\u{FEAE}"] as $raw) {
+            $this->assertSame(S::UNSUPPORTED, V::gender($raw)->status);
+        }
+    }
+
     public function test_similar_or_coded_gender_values_are_never_guessed(): void
     {
         foreach (['1', '2', 'M', 'F', 'male', 'ذكر ', ' ذكر', 'انثى', 'أنثي', 'ذكور', 'Male'] as $raw) {
