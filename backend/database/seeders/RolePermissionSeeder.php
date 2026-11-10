@@ -803,6 +803,10 @@ class RolePermissionSeeder extends Seeder
             'change-request.cancel',
             // §22b Family Portal, family context (PWA-1).
             'family-portal.access',
+            // FB-FAMILY-ADD-01 (docs/06 §61d-2; owner decision 2026-11-10: general release, no PILOT).
+            // Authorizes nothing alone: family.context (eligible household head), the mode switch
+            // (OFF by default) and every eligibility gate still decide.
+            'family-member.admit-from-registry',
         ],
         'COORDINATOR' => [
             // §22b. Effective only with an active scope assignment (PWA-1H).

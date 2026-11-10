@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Testing\TestResponse;
 use RuntimeException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\Support\FamilyPortal\SyntheticRegistryChildSource;
 use Tests\TestCase;
 
@@ -30,7 +31,7 @@ use Tests\TestCase;
  */
 class FamilyRegistryChildrenApiTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const URI = '/api/v1/family/household/registry-children';
 
@@ -130,6 +131,7 @@ class FamilyRegistryChildrenApiTest extends TestCase
 
     public function test_without_the_permission_the_answer_is_the_same_unavailable(): void
     {
+        $this->revokeFamilyUserAdmissionGrant();
         $this->app->instance(RegistryChildSource::class, $this->source);
         config(['family_registry_admission.mode' => 'ON']);
         $off = $this->fetch();
@@ -138,9 +140,9 @@ class FamilyRegistryChildrenApiTest extends TestCase
         $this->assertSame($off->json(), $this->fetch()->json());
         $this->assertSame([], $this->source->calls);
 
-        // No role holds it, FAMILY_USER included.
+        // As shipped, FAMILY_USER is the only role that holds it (owner decision 2026-11-10).
         foreach (RolePermissionSeeder::ROLES as $role) {
-            $this->assertNotContains(self::PERMISSION, RolePermissionSeeder::rolePermissions($role), $role);
+            $this->assertSame($role === 'FAMILY_USER', in_array(self::PERMISSION, RolePermissionSeeder::rolePermissions($role), true), $role);
         }
     }
 

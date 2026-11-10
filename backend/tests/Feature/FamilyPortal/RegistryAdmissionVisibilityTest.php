@@ -15,6 +15,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\TestCase;
 
 /**
@@ -26,7 +27,7 @@ use Tests\TestCase;
  */
 class RegistryAdmissionVisibilityTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const ME = '/api/v1/family/me';
 
@@ -83,7 +84,8 @@ class RegistryAdmissionVisibilityTest extends TestCase
     public function test_on_shows_it_only_with_the_permission(): void
     {
         $this->mode('ON');
-        $this->assertFalse($this->visible(), 'no role holds the permission');
+        $this->revokeFamilyUserAdmissionGrant();
+        $this->assertFalse($this->visible(), 'without the permission');
         $this->grant();
         $this->assertTrue($this->visible());
     }
@@ -195,6 +197,7 @@ class RegistryAdmissionVisibilityTest extends TestCase
 
         // Visibility grants nothing: the permission revoked, the route refuses at once.
         $this->mode('ON');
+        $this->revokeFamilyUserAdmissionGrant();
         $this->head['user']->revokePermissionTo(AdmitRegistryChildAction::PERMISSION);
         $this->actingAs($this->head['user']->fresh())->getJson(self::DISCOVERY)->assertNotFound()->assertJsonPath('code', 'ADMISSION_UNAVAILABLE');
         $this->assertSame(0, $this->source->reads);

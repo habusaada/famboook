@@ -39,6 +39,7 @@ use LogicException;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
 use Tests\Support\FamilyPortal\PendingGatesLiftedAdmissibility;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticReleasePinFixture as Fixture;
 use Tests\Support\FamilyPortal\SyntheticReleasePinVerifier as Verifier;
@@ -54,7 +55,7 @@ use Throwable;
  */
 class AdmitRegistryChildActionTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const HEAD = '123456789';
 
@@ -350,6 +351,7 @@ class AdmitRegistryChildActionTest extends TestCase
         config(['family_registry_admission.mode' => 'PILOT', 'family_registry_admission.pilot_family_ids' => [999999]]);
         $this->refused(fn () => $this->admit($this->request()), Refused::ADMISSION_UNAVAILABLE);
         config(['family_registry_admission.mode' => 'ON']);
+        $this->revokeFamilyUserAdmissionGrant();
         $this->head['user']->revokePermissionTo(Action::PERMISSION);
         $this->refused(fn () => $this->admit($this->request(), context: $this->contextOf($this->head['user']->fresh())), Refused::ADMISSION_UNAVAILABLE);
         $this->head['user']->givePermissionTo(Action::PERMISSION);

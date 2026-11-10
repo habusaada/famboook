@@ -17,6 +17,7 @@ use RecursiveIteratorIterator;
 use ReflectionClass;
 use RuntimeException;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\Support\FamilyPortal\SyntheticRegistryChildAdapter as Adapter;
 use Tests\TestCase;
 
@@ -28,7 +29,7 @@ use Tests\TestCase;
  */
 class SyntheticRegistryChildAdapterTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const URI = '/api/v1/family/household/registry-children';
 
@@ -244,6 +245,7 @@ class SyntheticRegistryChildAdapterTest extends TestCase
 
     public function test_off_and_a_missing_permission_never_read_the_adapter(): void
     {
+        $this->revokeFamilyUserAdmissionGrant();
         $adapter = Adapter::household(self::HEAD, 3);
         $this->app->instance(RegistryChildSource::class, $adapter);
 

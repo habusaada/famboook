@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\PendingCommand;
 use Spatie\Permission\Models\Role;
 use Tests\Support\FamilyIdentityFixtures;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\TestCase;
 
 /**
@@ -25,7 +26,7 @@ use Tests\TestCase;
  */
 class RegistryAdmissionPilotAccessTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const HEAD = '123456789';
 
@@ -36,6 +37,8 @@ class RegistryAdmissionPilotAccessTest extends TestCase
         parent::setUp();
         $this->useFamilyAuthKey();
         $this->seed(RolePermissionSeeder::class);
+        // The per-account PILOT model presumes no role grant (now FAMILY_USER holds it as shipped).
+        $this->revokeFamilyUserAdmissionGrant();
     }
 
     /** @return array{user: User, family: Family} */
@@ -118,6 +121,11 @@ class RegistryAdmissionPilotAccessTest extends TestCase
         foreach ($logged as $line) {
             $this->assertStringNotContainsString(self::HEAD, $line);
         }
+        // The role grant revoked in setUp differs from the shipped baseline, which verify-permissions
+        // refuses; with the baseline restored, the direct per-account grant still passes.
+        $this->artisan('famboook:verify-permissions')->assertExitCode(1);
+        $this->seed(RolePermissionSeeder::class);
+        $this->assertTrue($head['user']->fresh()->hasDirectPermission(AdmitRegistryChildAction::PERMISSION));
         $this->artisan('famboook:verify-permissions')->assertExitCode(0);
     }
 

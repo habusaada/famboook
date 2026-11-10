@@ -434,7 +434,7 @@ class RegistryAdmissionReadinessTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
         $this->artisan('famboook:registry-admission-readiness')
             ->expectsOutputToContain('mode: OFF')
-            ->expectsOutputToContain('roles holding the admission permission: 0; accounts holding it directly: 0')
+            ->expectsOutputToContain('roles holding the admission permission: 1; accounts holding it directly: 0')
             ->expectsOutputToContain('[BLOCKED] O-K / G-02')
             ->expectsOutputToContain('[PASS] G-04')
             ->expectsOutputToContain('[BLOCKED] G-05 / D-06R')

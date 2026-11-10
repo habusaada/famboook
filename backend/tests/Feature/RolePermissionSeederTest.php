@@ -421,7 +421,8 @@ class RolePermissionSeederTest extends TestCase
         $familyUser->assignRole('FAMILY_USER');
 
         // Exactly its approved Family Portal permissions: the change-request
-        // set (§53) and family-portal.access (§22b).
+        // set (§53), family-portal.access (§22b) and, since the general release
+        // decision of 2026-11-10, family-member.admit-from-registry (§61d-2).
         $this->assertEqualsCanonicalizing(
             [
                 'change-request.create',
@@ -430,6 +431,7 @@ class RolePermissionSeederTest extends TestCase
                 'change-request.resubmit',
                 'change-request.cancel',
                 'family-portal.access',
+                'family-member.admit-from-registry',
             ],
             $familyUser->getAllPermissions()->pluck('name')->all()
         );

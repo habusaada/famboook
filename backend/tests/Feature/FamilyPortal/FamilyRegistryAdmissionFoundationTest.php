@@ -105,25 +105,27 @@ class FamilyRegistryAdmissionFoundationTest extends TestCase
 
     // ---------------------------------------------------------------- permission
 
-    public function test_the_permission_is_defined_and_assigned_to_no_role(): void
+    public function test_the_permission_is_defined_and_assigned_to_family_user_only(): void
     {
+        // Owner decision 2026-11-10 (general release, docs/06 §61d-2): FAMILY_USER only.
         $this->seed(RolePermissionSeeder::class);
 
         $this->assertContains(self::PERMISSION, RolePermissionSeeder::PERMISSIONS);
-        $this->assertSame(0, Permission::findByName(self::PERMISSION, 'web')->roles()->count());
+        $this->assertSame(['FAMILY_USER'], Permission::findByName(self::PERMISSION, 'web')->roles()->pluck('name')->all());
         foreach (RolePermissionSeeder::ROLES as $role) {
-            $this->assertNotContains(self::PERMISSION, RolePermissionSeeder::rolePermissions($role), $role);
+            $holds = $role === 'FAMILY_USER';
+            $this->assertSame($holds, in_array(self::PERMISSION, RolePermissionSeeder::rolePermissions($role), true), $role);
             $user = tap(User::factory()->create(), fn (User $u) => $u->assignRole(Role::findByName($role, 'web')));
-            $this->assertFalse($user->can(self::PERMISSION), $role);
+            $this->assertSame($holds, $user->can(self::PERMISSION), $role);
         }
     }
 
-    public function test_seeding_twice_keeps_it_unassigned_and_verify_permissions_passes(): void
+    public function test_seeding_twice_keeps_it_on_family_user_only_and_verify_permissions_passes(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $this->seed(RolePermissionSeeder::class);
 
-        $this->assertSame(0, Permission::findByName(self::PERMISSION, 'web')->roles()->count());
+        $this->assertSame(['FAMILY_USER'], Permission::findByName(self::PERMISSION, 'web')->roles()->pluck('name')->all());
         $this->assertSame(0, Artisan::call('famboook:verify-permissions'));
         $this->assertEqualsCanonicalizing(['SUPER_ADMIN', 'ADMINISTRATOR'],
             Permission::findByName('family-membership.transfer', 'web')->roles()->pluck('name')->all());

@@ -26,6 +26,7 @@ use RuntimeException;
 use Tests\Support\FamilyIdentityFixtures;
 use Tests\Support\FamilyPortal\AdmissionRegistrySource;
 use Tests\Support\FamilyPortal\PendingGatesLiftedAdmissibility;
+use Tests\Support\FamilyPortal\RevokesFamilyUserAdmissionGrant;
 use Tests\Support\FamilyPortal\SyntheticDeclaration;
 use Tests\Support\FamilyPortal\SyntheticReleasePinFixture as Fixture;
 use Tests\Support\FamilyPortal\SyntheticReleasePinVerifier as Verifier;
@@ -40,7 +41,7 @@ use Tests\TestCase;
  */
 class FamilyRegistryAdmissionApiTest extends TestCase
 {
-    use FamilyIdentityFixtures, RefreshDatabase;
+    use FamilyIdentityFixtures, RefreshDatabase, RevokesFamilyUserAdmissionGrant;
 
     private const URI = '/api/v1/family/household/registry-children/admissions';
 
@@ -184,6 +185,7 @@ class FamilyRegistryAdmissionApiTest extends TestCase
             $this->assertRefused($this->submit($this->body()), 404, 'ADMISSION_UNAVAILABLE');
         }
         config(['family_registry_admission.mode' => 'ON']);
+        $this->revokeFamilyUserAdmissionGrant();
         $this->head['user']->revokePermissionTo(AdmitRegistryChildAction::PERMISSION);
         $this->assertRefused($this->submit($this->body()), 404, 'ADMISSION_UNAVAILABLE');
 
