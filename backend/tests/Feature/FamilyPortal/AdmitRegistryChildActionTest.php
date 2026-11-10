@@ -259,9 +259,9 @@ class AdmitRegistryChildActionTest extends TestCase
         $this->child();
         $before = $this->counts();
 
-        $this->refused(fn () => $this->admit($this->request(), new GatedRegistryChildAdmissibility), Refused::NOT_ELIGIBLE, 'GENDER_MAPPING_PROVISIONAL');
+        $this->refused(fn () => $this->admit($this->request(), new GatedRegistryChildAdmissibility), Refused::NOT_ELIGIBLE, 'LIFE_UNVERIFIED');
         $this->nothingWritten($before);
-        $this->assertSame(['ADMISSION_REFUSED', 'GENDER_MAPPING_PROVISIONAL'], [$this->lastEvent()->event_type, $this->lastEvent()->outcome_code]);
+        $this->assertSame(['ADMISSION_REFUSED', 'LIFE_UNVERIFIED'], [$this->lastEvent()->event_type, $this->lastEvent()->outcome_code]);
         $this->assertNotNull($this->lastEvent()->reference_fingerprint, 'the refused child is recorded by fingerprint');
     }
 

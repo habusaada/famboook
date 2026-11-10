@@ -292,13 +292,15 @@ class RegistryAdmissionCivilRegistryPostgresTest extends TestCase
         $this->assertSame(['NOT_ELIGIBLE', 'NOT_ELIGIBLE'], array_column($listed->json('data.children'), 'status'));
         $this->assertSame([null, null], array_column($listed->json('data.children'), 'ref'));
         $this->assertSame(['version' => self::DECLARATION, 'text' => SyntheticDeclaration::TEXT, 'life_text' => null], $listed->json('data.declaration'));
-        // A proven life alone opens nothing while G-04 is open.
+        // G-04 approved: a proven life makes both children eligible, each with a reference.
         $life = new SyntheticLifeVerifier;
         foreach ([self::CHILD, self::SECOND] as $id) {
             $life->answer($id, LifeVerificationStatus::ALIVE, new DateTimeImmutable('@'.now()->getTimestamp()));
         }
         $this->app->instance(RegistryLifeVerifier::class, $life);
-        $this->assertSame([null, null], array_column($as()->getJson(self::DISCOVERY)->assertOk()->json('data.children'), 'ref'));
+        $proven = $as()->getJson(self::DISCOVERY)->assertOk()->json('data.children');
+        $this->assertSame(['ELIGIBLE', 'ELIGIBLE'], array_column($proven, 'status'));
+        $this->assertContainsOnly('string', array_column($proven, 'ref'));
 
         // TEST ONLY: both pending gates lifted. Discovery issues references, and one admission succeeds.
         $this->app->instance(RegistryChildAdmissibility::class, new PendingGatesLiftedAdmissibility);

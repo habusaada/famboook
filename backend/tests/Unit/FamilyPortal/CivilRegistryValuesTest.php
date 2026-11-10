@@ -23,9 +23,9 @@ class CivilRegistryValuesTest extends TestCase
         return new CivilRecord(1, 1, $mainid, $payload);
     }
 
-    public function test_only_the_listed_gender_values_are_mapped_and_mappings_are_not_approved(): void
+    public function test_only_the_listed_gender_values_are_mapped_and_the_g04_table_is_approved(): void
     {
-        $this->assertFalse(V::MAPPINGS_APPROVED);
+        $this->assertTrue(V::MAPPINGS_APPROVED);
         $this->assertSame([S::MAPPED, Gender::MALE], [V::gender('ذكر')->status, V::gender('ذكر')->value]);
         $this->assertSame([S::MAPPED, Gender::FEMALE], [V::gender('أنثى')->status, V::gender('أنثى')->value]);
         $this->assertSame(S::INDETERMINATE, V::gender('غير معروف')->status);

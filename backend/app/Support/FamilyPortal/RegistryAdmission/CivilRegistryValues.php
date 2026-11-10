@@ -14,16 +14,17 @@ use DateTimeImmutable;
  *
  * - A value is matched EXACTLY as stored: never trimmed, normalized or compared by
  *   similarity. Anything not listed is UNSUPPORTED, never guessed.
- * - The listed values are the ones OBSERVED in the 2026-10-25 export (aggregate audit
- *   WP-04B). No source owner has confirmed them, so every mapping is PROVISIONAL
- *   (gate G-04) and cannot authorize an admission.
+ * - The listed values are the ones OBSERVED in the 2026-10-25 import (aggregate audit
+ *   WP-04B). The GENDER table is confirmed by gate G-04 (A-3, reference
+ *   FB-FAMILY-ADD-01-G03-G04-20261110, 2026-11-10); the MARITAL table is not part of G-04 and stays
+ *   as observed.
  * - Parentage comes only from fatherid / motherid (gate G-03), never from names.
  * - The record is only read; nothing is written anywhere.
  */
 final class CivilRegistryValues
 {
-    /** Gate G-04: no mapping is approved by the source owner yet. */
-    public const MAPPINGS_APPROVED = false;
+    /** Gate G-04: the gender table below is approved (FB-FAMILY-ADD-01-G03-G04-20261110, 2026-11-10; decision register §7.4). */
+    public const MAPPINGS_APPROVED = true;
 
     /** Observed gender values, exactly as stored (WP-04B). NULL = listed without a mapping. */
     public const GENDER = [

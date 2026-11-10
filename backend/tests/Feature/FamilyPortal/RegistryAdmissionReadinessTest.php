@@ -228,7 +228,7 @@ class RegistryAdmissionReadinessTest extends TestCase
         $this->assertStringNotContainsString(self::CHILD, implode("\n", $logged));
     }
 
-    public function test_a_proven_life_alone_admits_no_one_while_the_gender_mapping_is_provisional(): void
+    public function test_a_proven_life_with_the_approved_gender_table_is_admissible(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $context = $this->headContext();
@@ -237,11 +237,12 @@ class RegistryAdmissionReadinessTest extends TestCase
         $assessment = RegistryChildEligibility::evaluate($context, $this->record());
         $this->assertTrue($assessment->livingProven);
         $this->assertNotContains(Reason::LIFE_UNVERIFIED, $assessment->reasons);
-        $this->assertSame([Reason::GENDER_MAPPING_PROVISIONAL], $assessment->reasons, 'G-04 still refuses');
-        $this->assertSame(RegistryChildStatus::NOT_ELIGIBLE, $assessment->publicStatus());
+        // G-04 approved: with a proven life nothing refuses.
+        $this->assertSame([], $assessment->reasons);
+        $this->assertSame(RegistryChildStatus::ELIGIBLE, $assessment->publicStatus());
         $admission = (new GatedRegistryChildAdmissibility)->assess($context, $this->record(), []);
         $this->assertTrue($admission->livingProven);
-        $this->assertFalse($admission->admissible());
+        $this->assertTrue($admission->admissible());
     }
 
     // ---------------------------------------------------------------- revised life policy (RR-02A, D-06R)
@@ -309,7 +310,7 @@ class RegistryAdmissionReadinessTest extends TestCase
         $this->assertSame(LifeStatus::UNVERIFIED, RegistryLifeStatus::of($this->record()));
     }
 
-    public function test_a_declared_life_adds_no_reason_but_is_not_proven_and_g04_still_refuses(): void
+    public function test_a_declared_life_adds_no_reason_and_is_never_proven(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $context = $this->headContext();
@@ -318,10 +319,10 @@ class RegistryAdmissionReadinessTest extends TestCase
         $assessment = RegistryChildEligibility::evaluate($context, $this->record());
         $this->assertFalse($assessment->livingProven);
         $this->assertTrue($assessment->livingByDeclaration);
-        $this->assertSame([Reason::GENDER_MAPPING_PROVISIONAL], $assessment->reasons);
+        $this->assertSame([], $assessment->reasons);
         $admission = (new GatedRegistryChildAdmissibility)->assess($context, $this->record(), []);
         $this->assertTrue($admission->livingByDeclaration);
-        $this->assertFalse($admission->admissible(), 'G-04 still refuses');
+        $this->assertFalse($admission->livingProven, 'a declared life is never a proven one');
     }
 
     // ---------------------------------------------------------------- references (ADR §7a)
@@ -435,14 +436,14 @@ class RegistryAdmissionReadinessTest extends TestCase
             ->expectsOutputToContain('mode: OFF')
             ->expectsOutputToContain('roles holding the admission permission: 0; accounts holding it directly: 0')
             ->expectsOutputToContain('[BLOCKED] O-K / G-02')
-            ->expectsOutputToContain('[BLOCKED] G-04')
+            ->expectsOutputToContain('[PASS] G-04')
             ->expectsOutputToContain('[BLOCKED] G-05 / D-06R')
             ->expectsOutputToContain('[BLOCKED] SOURCE')
             ->expectsOutputToContain('[BLOCKED] PIN')
             ->expectsOutputToContain('[EXTERNAL] G-07')
             ->assertExitCode(1);
 
-        // Everything technical that a test can supply: still BLOCKED by G-04, whose switch is a reviewed constant.
+        // Everything technical that a test can supply here: G-04 passes; the registry source is still not bound.
         config([...SyntheticDeclaration::approved('v-test-1'), 'family_registry_admission.mode' => 'PILOT',
             'family_registry_admission.pilot_family_ids' => [987654], 'app.debug' => false]);
         $this->verifier();
@@ -450,7 +451,8 @@ class RegistryAdmissionReadinessTest extends TestCase
             ->expectsOutputToContain('pilot families allowed: 1')
             ->expectsOutputToContain('[PASS] O-K / G-02')
             ->expectsOutputToContain('[PASS] G-05 / D-06R')
-            ->expectsOutputToContain('[BLOCKED] G-04')
+            ->expectsOutputToContain('[PASS] G-04')
+            ->expectsOutputToContain('[BLOCKED] SOURCE')
             ->doesntExpectOutputToContain('987654')
             ->assertExitCode(1);
     }

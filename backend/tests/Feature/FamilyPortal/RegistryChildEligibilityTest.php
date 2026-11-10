@@ -28,7 +28,7 @@ use Tests\TestCase;
 /**
  * FB-FAMILY-ADD-01 ADD-WP-05: the read-only evaluation of a suggested child, on both
  * drivers. Synthetic data and synthetic National IDs only. No record can be ELIGIBLE
- * while gates G-04 and G-05 are open.
+ * while gate G-05 is open (G-04: the gender table is approved; life still refuses).
  */
 class RegistryChildEligibilityTest extends TestCase
 {
@@ -75,11 +75,11 @@ class RegistryChildEligibilityTest extends TestCase
         return $person;
     }
 
-    public function test_a_complete_living_looking_record_is_still_not_eligible_while_gates_are_open(): void
+    public function test_a_complete_living_looking_record_is_still_not_eligible_while_the_life_gate_is_open(): void
     {
         $assessment = $this->evaluate($this->child());
 
-        $this->assertSame([R::GENDER_MAPPING_PROVISIONAL, R::LIFE_UNVERIFIED], $assessment->reasons);
+        $this->assertSame([R::LIFE_UNVERIFIED], $assessment->reasons);
         $this->assertSame(Status::NOT_ELIGIBLE, $assessment->publicStatus());
         $this->assertFalse($assessment->admissible());
         $this->assertSame('FATHER', $assessment->parentLink);
@@ -154,7 +154,7 @@ class RegistryChildEligibilityTest extends TestCase
             'is_active' => false, 'started_at' => '2001-01-01', 'ended_at' => '2002-01-01']);
 
         $assessment = $this->evaluate($this->child());
-        $this->assertSame([R::GENDER_MAPPING_PROVISIONAL, R::LIFE_UNVERIFIED], $assessment->reasons);
+        $this->assertSame([R::LIFE_UNVERIFIED], $assessment->reasons);
     }
 
     public function test_unattachable_ambiguous_and_soft_deleted_holders(): void

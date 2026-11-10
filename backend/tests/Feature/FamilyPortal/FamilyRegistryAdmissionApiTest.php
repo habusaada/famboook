@@ -337,7 +337,7 @@ class FamilyRegistryAdmissionApiTest extends TestCase
         $this->pgsql();
         $this->open(liftPendingGates: false);
         $this->assertRefused($this->submit($this->body()), 422, 'NOT_ELIGIBLE');
-        $this->assertSame('GENDER_MAPPING_PROVISIONAL', DB::table('family_registry_admission_events')->orderByDesc('id')->value('outcome_code'),
+        $this->assertSame('LIFE_UNVERIFIED', DB::table('family_registry_admission_events')->orderByDesc('id')->value('outcome_code'),
             'the reason is recorded, never answered');
         $this->assertSame(0, DB::table('family_registry_admissions')->count());
     }
