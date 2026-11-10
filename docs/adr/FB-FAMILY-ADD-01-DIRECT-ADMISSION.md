@@ -85,9 +85,13 @@ schemas have no runtime effect and can change in review.
 
 **Proposed revision D-06R (RR-02A, 2026-11-04; PROPOSED, NOT approved; implemented behind a separate switch, OFF by default).**
 
-- **Basis.** The project owner reports that the civil registry export dated 2026-10-25 was described by its issuing authority
-  as containing living persons only. That establishes the release's **scope at extraction**. It is **not** proof that any
+- **Basis.** The project owner reports that the civil registry dataset imported into Famboook on 2026-10-25 (the
+  owner-reported import date; the source extraction date is UNKNOWN) was described by its issuing authority as containing
+  living persons only. That establishes the release's **scope at extraction**. It is **not** proof that any
   person is alive now.
+- **Owner confirmation (2026-11-10).** The dataset comes from an official, trusted authority (recorded, not reopened); its
+  living-only description was given **orally**. 2026-10-25 is the owner-reported import date into Famboook, not an export or
+  extraction date; the source extraction date remains UNKNOWN. No written scope statement or extraction date is on file (decision register §6, §7.5). D-06R stays PROPOSED.
 - **Rule.** Under D-06R a child may be admitted without a verified life only when every condition below holds:
   - a known death refuses (a valid `deathdate`);
   - contradictory or unreadable evidence refuses (an unreadable `deathdate`, a verifier that says DECEASED, a verifier that

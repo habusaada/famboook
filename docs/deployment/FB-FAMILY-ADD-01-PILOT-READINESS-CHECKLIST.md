@@ -50,6 +50,8 @@ from a recorded decision.
    - G-05: a `RegistryLifeVerifier` and its binding, **or** the D-06R approval (register item 5).
 
    Deploy that commit as usual (`deploy/scripts/deploy-backend.sh`). It brings no migration, and every switch stays as it is.
+
+   Draft decision texts and the remaining-actions list: decision register §7 and §9.
 2. **G-06 review** of the passing evidence (register item 6).
 3. **DBA, after a verified backup** (`deploy/scripts/backup-db.sh`, then `pg_restore --list` of the dump):
    ```bash
